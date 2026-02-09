@@ -1,0 +1,74 @@
+schema: testpattern/v1
+name: Australian Medicare Number
+slug: au-medicare-number
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects Australian Medicare card numbers, which are issued to Australian citizens and permanent residents for access
+  to subsidised healthcare under the Medicare system. The number consists of 10 digits: the first digit is between 2 and
+  6, followed by 8 additional digits and a single check digit. Numbers are commonly formatted as groups of 4-5-1 digits
+  separated by spaces or hyphens.
+operation: >-
+  Validation: Mod 10 with weights [1,3,7,9,1,3,7,9]. Reference: https://clearwater.com.au/code/medicare/,
+  https://learn.microsoft.com/en-us/purview/sit-defn-australia-medical-account-number Corroborative evidence: 6 keywords
+  within 300 characters. Keyword lists: au-identity-medicare, au-healthcare-identifiers, pii-government-id.
+pattern: \b[2-6]\d{3}[\s-]?\d{5}[\s-]?\d{1}\b
+confidence: high
+confidence_justification: >-
+  High confidence when corroborative evidence keywords are present. The leading digit constraint (2-6) and fixed
+  10-digit length reduce false positives compared to generic digit sequences. Combined with proximity keywords like
+  "medicare" or "health insurance", this pattern reliably identifies Medicare numbers.
+jurisdictions:
+  - au
+regulations:
+  - privacy-act-1988
+  - my-health-records-act-2012
+data_categories:
+  - pii
+  - phi
+  - government-id
+corroborative_evidence:
+  keywords:
+    - medicare
+    - health insurance
+    - medicare card
+    - medicare number
+    - medicare no
+    - health insurance number
+  proximity: 300
+  keyword_lists:
+    - au-identity-medicare
+    - au-healthcare-identifiers
+    - pii-government-id
+test_cases:
+  should_match:
+    - value: 2123 45670 1
+      description: Standard spaced format (4-5-1 grouping)
+    - value: 2123-45670-1
+      description: Hyphen-separated format (4-5-1 grouping)
+    - value: '21234567001'
+      description: Continuous digits without separators
+  should_not_match:
+    - value: 1234 56789 0
+      description: First digit is 1, which is outside the valid range of 2-6
+    - value: 7890 12345 6
+      description: First digit is 7, which is outside the valid range of 2-6
+false_positives:
+  - description: Phone numbers starting with digits 2-6
+    mitigation: >-
+      Require corroborative evidence keywords within proximity window to confirm context as a Medicare number rather
+      than a phone number.
+  - description: Australian Business Number (ABN) digit subsequences that overlap with the Medicare pattern
+    mitigation: >-
+      Use corroborative evidence to distinguish Medicare context from business-related contexts. Layer with ABN-specific
+      detection to deprioritise overlapping matches.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+created: '2026-02-08'
+updated: '2026-02-08'
+author: testpattern-community
+license: MIT

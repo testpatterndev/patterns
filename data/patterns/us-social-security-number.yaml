@@ -1,0 +1,74 @@
+schema: testpattern/v1
+name: US Social Security Number
+slug: us-social-security-number
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects US Social Security Numbers (SSNs) in both formatted (XXX-XX-XXXX) and unformatted (XXXXXXXXX) representations.
+  The pattern excludes invalid SSN ranges including area numbers 000, 666, and 900-999, group numbers 00, and serial
+  numbers 0000, in accordance with SSA assignment rules. SSNs are critical PII used across healthcare, financial, and
+  government contexts.
+operation: >-
+  Validation: Format exclusions only. Reference:
+  https://learn.microsoft.com/en-us/purview/sit-defn-us-social-security-number Corroborative evidence: 5 keywords within
+  300 characters. Keyword lists: pii-government-id, pii-identity.
+pattern: \b(?!000|666|9\d{2})\d{3}[-\s]?(?!00)\d{2}[-\s]?(?!0000)\d{4}\b
+confidence: high
+confidence_justification: >-
+  The pattern enforces SSA-defined exclusion rules for invalid area, group, and serial numbers, significantly reducing
+  false positives. Combined with corroborative keyword proximity, this provides high-confidence detection of genuine
+  SSNs.
+jurisdictions:
+  - us
+regulations:
+  - hipaa
+  - sox
+  - pci-dss
+  - ccpa
+data_categories:
+  - pii
+  - phi
+  - government-id
+corroborative_evidence:
+  keywords:
+    - social security
+    - SSN
+    - social security number
+    - SS#
+    - soc sec
+  proximity: 300
+  keyword_lists:
+    - pii-government-id
+    - pii-identity
+test_cases:
+  should_match:
+    - value: 123-45-6789
+      description: Standard hyphen-delimited SSN format
+    - value: 123 45 6789
+      description: Space-delimited SSN format
+    - value: '123456789'
+      description: Unformatted nine-digit SSN
+  should_not_match:
+    - value: 000-12-3456
+      description: Area number 000 is never assigned by SSA
+    - value: 666-12-3456
+      description: Area number 666 is never assigned by SSA
+    - value: 900-12-3456
+      description: Area numbers 900-999 are reserved and not valid SSNs
+    - value: 123-00-6789
+      description: Group number 00 is never assigned by SSA
+false_positives:
+  - description: Random nine-digit numbers without context may match the pattern
+    mitigation: >-
+      Require corroborative keyword proximity (e.g., 'SSN', 'social security') within 300 characters to confirm the
+      match as a genuine SSN
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+created: '2026-02-08'
+updated: '2026-02-08'
+author: testpattern-community
+license: MIT
