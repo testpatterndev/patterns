@@ -1,0 +1,82 @@
+schema: testpattern/v1
+name: Azure Storage Account Access Key
+slug: azure-storage-account-access-key
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Azure Storage account access key patterns in connection strings. This pattern is based on a Microsoft Purview
+  built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or
+  use this version as a starting point for customisation.
+operation: >-
+  Matches Azure Storage account connection strings containing DefaultEndpointsProtocol, AccountName, and AccountKey
+  parameters. The AccountKey is an 88-character Base64-encoded string. Corroborative evidence: 8 keywords within 300
+  characters. Keyword lists: credentials-api-keys.
+pattern: DefaultEndpointsProtocol=https?;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/]{86,88}={0,2}
+confidence: high
+confidence_justification: >-
+  High confidence: DefaultEndpointsProtocol prefix combined with AccountKey of exactly 88 Base64 characters is
+  structurally unique to Azure Storage connection strings.
+jurisdictions:
+  - global
+regulations:
+  - general-data-protection
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - Azure Storage
+    - storage account
+    - AccountKey
+    - AccountName
+    - DefaultEndpointsProtocol
+    - blob
+    - container
+    - connection string
+  proximity: 300
+  keyword_lists:
+    - credentials-api-keys
+test_cases:
+  should_match:
+    - value: DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
+      description: Azure Storage connection string with 88-char key
+    - value: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=00000000000000000000000000000000000000000000000000000000000000000000000000000000000000==
+      description: Storage emulator connection string
+    - value: DefaultEndpointsProtocol=https;AccountName=prodstore;AccountKey=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/ABCDEFGHIJKLMNOPQRSTUV==
+      description: Storage connection with mixed case key
+  should_not_match:
+    - value: DefaultEndpointsProtocol=https;AccountName=myaccount
+      description: Storage connection without AccountKey
+    - value: AccountKey=shortkey
+      description: Account key too short to be valid
+false_positives:
+  - description: >-
+      Azure Storage documentation with placeholder connection strings and example keys.
+    mitigation: >-
+      Check for the well-known development storage emulator key and documentation patterns.
+  - description: >-
+      Azurite local storage emulator using the well-known development account key.
+    mitigation: >-
+      Exclude the known Azurite/development storage emulator key value.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 10
+risk_description: >-
+  Exposure of this credential could grant unauthorized access to cloud infrastructure, databases, or services. Compromised
+  credentials are a leading cause of data breaches and can result in full system takeover.
+sensitivity_labels:
+  pspf: "PROTECTED"
+  qgiscf: "PROTECTED"
+  qgiscf_dlm: "PROTECTED"
+references:
+  - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-storage-account-access-key
+    title: "Azure Storage account access key entity definition - Microsoft Learn"
+created: '2026-02-09'
+updated: '2026-02-09'
+author: testpattern-community
+source: microsoft
+license: MIT
