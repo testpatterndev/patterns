@@ -1,0 +1,83 @@
+schema: testpattern/v1
+name: Azure SQL Connection String
+slug: azure-sql-connection-string
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Azure SQL Database connection string patterns specifically targeting the .database.windows.net domain. This
+  pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to
+  enable the built-in SIT directly, or use this version as a starting point for customisation.
+operation: >-
+  Matches connection strings containing the .database.windows.net Azure SQL hostname with embedded credentials. This is
+  more specific than the general IaaS database connection string pattern. Corroborative evidence: 8 keywords within 300
+  characters. Keyword lists: credentials-api-keys, credentials-passwords.
+pattern: (?i)(Server|Data Source)\s*=\s*[^;]*\.database\.windows\.net[^;]*;\s*(Database|Initial Catalog)\s*=\s*[^;]+;\s*(User Id|Uid)\s*=\s*[^;]+;\s*(Password|Pwd)\s*=\s*[^;]+
+confidence: high
+confidence_justification: >-
+  High confidence: .database.windows.net domain combined with credential parameters provides strong structural constraint
+  unique to Azure SQL.
+jurisdictions:
+  - global
+regulations:
+  - general-data-protection
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - Azure SQL
+    - SQL Database
+    - database.windows.net
+    - connection string
+    - Server
+    - Password
+    - SQL Server
+    - connectionString
+  proximity: 300
+  keyword_lists:
+    - credentials-api-keys
+    - credentials-passwords
+test_cases:
+  should_match:
+    - value: Server=myserver.database.windows.net;Database=mydb;User Id=admin;Password=P@ssw0rd123
+      description: Standard Azure SQL connection string
+    - value: Data Source=tcp:prod-sql.database.windows.net,1433;Initial Catalog=appdb;Uid=appuser;Pwd=TestS3cret
+      description: Azure SQL with TCP and port
+    - value: Server=test.database.windows.net;Database=testdb;User Id=sa;Password=0000000000
+      description: Azure SQL with placeholder password
+  should_not_match:
+    - value: Server=myserver.database.windows.net;Database=mydb;Integrated Security=True
+      description: Azure SQL with integrated auth, no password
+    - value: Server=localserver;Database=mydb;User Id=sa;Password=secret
+      description: Local SQL Server, not Azure
+false_positives:
+  - description: >-
+      Azure SQL documentation and quickstart guides with example connection strings.
+    mitigation: >-
+      Check for common placeholder passwords and documentation context.
+  - description: >-
+      Connection strings with Key Vault references instead of actual passwords.
+    mitigation: >-
+      Check if the password value is a Key Vault URI rather than an actual credential.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 10
+risk_description: >-
+  Exposure of this credential could grant unauthorized access to cloud infrastructure, databases, or services. Compromised
+  credentials are a leading cause of data breaches and can result in full system takeover.
+sensitivity_labels:
+  pspf: "PROTECTED"
+  qgiscf: "PROTECTED"
+  qgiscf_dlm: "PROTECTED"
+references:
+  - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-sql-connection-string
+    title: "Azure SQL connection string entity definition - Microsoft Learn"
+created: '2026-02-09'
+updated: '2026-02-09'
+author: testpattern-community
+source: microsoft
+license: MIT
