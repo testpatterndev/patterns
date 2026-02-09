@@ -139,6 +139,32 @@ We welcome contributions. To add or improve a pattern:
 
 See the [contributing guide](https://testpattern.dev/contributing) for full details.
 
+## Generating patterns
+
+### From a description (AI-assisted)
+
+Use the prompt in `prompts/generate-pattern.md` as context for any AI assistant (Claude, ChatGPT, etc.), then describe the pattern you need:
+
+> "Generate a pattern for Australian Medicare numbers"
+
+The AI will output a complete `testpattern/v1` YAML file ready to save in `data/patterns/`.
+
+### From sample data (local script)
+
+Analyze a CSV or text file to auto-detect sensitive data patterns:
+
+```bash
+node scripts/generate-from-sample.js sample.csv
+node scripts/generate-from-sample.js sample.csv --output-dir ./drafts
+node scripts/generate-from-sample.js sample.csv --verbose
+```
+
+The script detects emails, credit cards, IBANs, IP addresses, UUIDs, AWS keys, SSNs, phone numbers, dates, URLs, and unknown structured formats. Output is draft YAML that you review and refine before committing.
+
+### From sample data (AI-assisted)
+
+Use the prompt in `prompts/generate-from-sample.md` as context for any AI assistant, then paste your sample data. The AI will analyze the data, identify all sensitive types, and generate complete pattern YAML files.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
