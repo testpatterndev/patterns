@@ -27,7 +27,7 @@ npm run compile
 
 ```
 data/
-  patterns/     1,059 detection pattern YAML files
+  patterns/     1,407 detection pattern YAML files
   collections/  14 curated pattern bundles
   keywords/     105 keyword dictionary YAMLs
   reference/    Large consolidated reference lists (JSON)
@@ -84,21 +84,49 @@ exports:
   - yaml
   - regex_copy
 scope: narrow                  # wide | narrow | specific
+purview:                       # Optional: full Microsoft SIT definition
+  patterns_proximity: 300
+  recommended_confidence: 85
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_1
+      matches:
+        - ref: Keyword_1
+    - confidence_level: 65
+      id_match: Regex_1
+  regexes:
+    - id: Regex_1
+      pattern: '\b\d{3}\s?\d{3}\s?\d{3}\b'
+      validators: [Validator_1]
+  keywords:
+    - id: Keyword_1
+      groups:
+        - match_style: word
+          terms: [tax file number, tfn]
+  validators:
+    - id: Validator_1
+      type: Checksum
+      weights: '1 4 3 7 5 8 6 9 10'
+      mod: 11
+      check_digit: last
 created: '2026-02-08'
 updated: '2026-02-08'
 author: testpattern-community
 license: MIT
 ```
 
+The `purview` block is optional. When present, the website uses it for full Purview XML export with multiple confidence tiers, checksum validators, filters, and nested AND/OR/NOT match trees. When absent, the simple export path generates basic XML from the top-level `pattern` and `corroborative_evidence` fields.
+
 ## Export formats
 
 Patterns export to:
 
-- **Microsoft Purview** — XML RulePack format importable via `New-DlpSensitiveInformationTypeRulePackage`
+- **Microsoft Purview XML** — RulePack format importable via `New-DlpSensitiveInformationTypeRulePackage`
+- **Purview Deployment Script** — PowerShell that creates keyword dictionaries + imports the SIT
+- **GCP DLP JSON** — InspectTemplate format for Google Cloud DLP
+- **AWS Macie JSON** — Custom data identifier format for Amazon Macie
 - **Raw YAML** — Full pattern definition
 - **Regex** — Copy-to-clipboard regex pattern
-
-GCP DLP and AWS Macie formats are planned.
 
 ## Data categories
 
@@ -171,4 +199,4 @@ MIT. See [LICENSE](LICENSE).
 
 ## Sponsored by
 
-[Compl8](https://compl8.com) — TestPattern is a community project, not a Compl8 product.
+[Compl8](https://aairii.com) — TestPattern is a community project, not a Compl8 product.
