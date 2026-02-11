@@ -1,9 +1,10 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'fs'
 import { join, relative } from 'path'
+import { fileURLToPath } from 'url'
 import yaml from 'js-yaml'
 
-const DATA_DIR = new URL('../data', import.meta.url).pathname
-const OUT_FILE = new URL('../patterns.json', import.meta.url).pathname
+const DATA_DIR = fileURLToPath(new URL('../data', import.meta.url))
+const OUT_FILE = fileURLToPath(new URL('../patterns.json', import.meta.url))
 
 const REQUIRED_PATTERN_FIELDS = ['schema', 'name', 'slug', 'type', 'confidence', 'jurisdictions', 'regulations', 'data_categories', 'test_cases']
 const REQUIRED_COLLECTION_FIELDS = ['schema', 'name', 'slug', 'description', 'patterns']
