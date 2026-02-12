@@ -1,30 +1,37 @@
 schema: testpattern/v1
 name: Australian Superannuation Fund Number
 slug: au-superannuation-fund-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects Australian Superannuation Fund Number patterns.
+description: >-
+  Detects Australian Superannuation Fund Number (RSE) patterns. An R prefix followed by 7 digits, registered with
+  APRA.
 operation: >-
-  Reference: https://www.apra.gov.au/register-of-superannuation-entities Corroborative evidence: 3 keywords within 300
-  characters. Keyword lists: financial-deposit-terms, industry-hr.
+  Regex pattern using universal engine. The top-level regex \bR\d{7}\b matches an uppercase R followed by exactly 7
+  digits. The Purview engine uses two regexes: Pattern_super_labeled (labeled format with RSE/fund/APRA/superannuation
+  prefix + R + digits) and Pattern_au_super_fund (bare R + 7 digits format). Three confidence tiers: High (85)
+  requires superannuation terms + payroll/retirement keywords with template exclusion logic; Medium (75) requires
+  superannuation terms; Low (65) requires superannuation terms only (minimum context). Evidence uses 2 keyword groups
+  (9 superannuation terms, 9 payroll/retirement terms) within 300-character proximity. Keyword lists:
+  financial-deposit-terms, industry-hr.
 pattern: \bR\d{7}\b
 confidence: low
 confidence_justification: >-
-  Low confidence: generic pattern format that may match unrelated data. Corroborative evidence keywords are essential
-  for reliable detection.
+  Low confidence: an R followed by 7 digits is a relatively short pattern that can match reference codes, part
+  numbers, and other alphanumeric sequences. Corroborative evidence keywords such as superannuation, APRA, or RSE are
+  essential for reliable detection.
 jurisdictions:
   - au
 regulations:
   - privacy-act-1988
-  - pci-dss
 data_categories:
   - financial
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+    - superannuation
+    - super fund
+    - APRA
   proximity: 300
   keyword_lists:
     - financial-deposit-terms
@@ -77,24 +84,37 @@ purview:
   recommended_confidence: 85
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_au_super_fund
+      id_match: Pattern_super_labeled
       matches:
-        - ref: Keyword_superannuation
+        - ref: Evidence_superannuation
+        - ref: Evidence_payroll_retirement
+      exclusion:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_au_super_fund
+      id_match: Pattern_au_super_fund
       matches:
-        - ref: Keyword_financial_services
+        - ref: Evidence_superannuation
+        - ref: Evidence_payroll_retirement
+    - confidence_level: 65
+      id_match: Pattern_au_super_fund
+      matches:
+        - ref: Evidence_superannuation
   regexes:
-    - id: Regex_au_super_fund
+    - id: Pattern_au_super_fund
       pattern: \bR\d{7}\b
+    - id: Pattern_super_labeled
+      pattern: (?i)\b(?:RSE|fund\s+no|APRA|super(?:annuation)?\s+fund\s+(?:number|no|ID))\s*[:#-]?\s*R\d{7}\b
   keywords:
-    - id: Keyword_superannuation
+    - id: Evidence_superannuation
       groups:
         - match_style: word
           terms:
             - superannuation
             - super fund
-            - superannuation fund
             - APRA
             - RSE
             - registrable superannuation entity
@@ -102,25 +122,34 @@ purview:
             - pension fund
             - super member
             - fund number
-    - id: Keyword_financial_services
+    - id: Evidence_payroll_retirement
       groups:
         - match_style: word
           terms:
-            - financial services
-            - financial advice
-            - financial adviser
-            - financial advisor
-            - investment
-            - securities
-            - superannuation
-            - managed fund
-            - insurance
-            - credit
-            - derivatives
-            - trading
-            - broker
-            - dealer
+            - payroll
+            - salary sacrifice
+            - employer contribution
+            - SG
+            - superannuation guarantee
+            - retirement
+            - pension
+            - defined benefit
+            - accumulation
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

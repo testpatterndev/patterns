@@ -1,14 +1,22 @@
 schema: testpattern/v1
 name: Security Clearance Reference
 slug: au-security-clearance-reference
-version: 1.0.0
+version: 1.1.0
 type: keyword_list
 description: Detects references to Australian Government security clearances and personnel vetting status.
 operation: >-
-  Keyword-based detection. Corroborative evidence: 16 keywords within 300 characters related to security clearance
-  levels and vetting.
+  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_clearance_phrase matches phrases such as
+  Baseline clearance, Negative Vetting 1/2 clearance, Positive Vetting clearance, NV1/NV2/PV clearance, AGSVA
+  clearance, AGSVA vetting, security clearance level/status/holder/granted/required, and personnel security vetting.
+  Three confidence tiers: High (85) requires clearance context + government security keywords with template exclusion
+  logic; Medium (75) requires clearance context keywords; Low (65) requires only the regex match. Evidence uses 2
+  keyword groups (5 clearance context terms, 10 government security terms) within 300-character proximity.
+  Template/sample exclusion prevents false positives from training materials.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative
+  evidence keywords are needed for reliable identification since clearance-related terms can appear in non-vetting
+  contexts.
 jurisdictions:
   - au
 regulations:
@@ -21,16 +29,16 @@ data_categories:
 test_cases:
   should_match:
     - value: 'Security clearance: Negative Vetting 1 granted'
-      description: Test match 1
+      description: Matches 'Negative Vetting 1 clearance' via Pattern_clearance_phrase
     - value: AGSVA clearance level Positive Vetting required
-      description: Test match 2
+      description: Matches 'AGSVA clearance' via Pattern_clearance_phrase
     - value: 'Personnel security vetting: Baseline clearance active'
-      description: Test match 3
+      description: Matches 'personnel security vetting' and 'Baseline clearance' via Pattern_clearance_phrase
   should_not_match:
     - value: Security guard clearance badge
-      description: Non-match 1
+      description: No clearance phrase matched by the Purview regex
     - value: Clear the security checkpoint
-      description: Non-match 2
+      description: No clearance phrase present
 false_positives:
   - description: Generic security terms in non-vetting contexts.
     mitigation: Require AGSVA-specific or clearance level terminology.
@@ -50,13 +58,28 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
+  regexes:
+    - id: Pattern_clearance_phrase
+      pattern: '(?i)\b(?:(?:Baseline|Negative\s+Vetting\s+[12]|Positive\s+Vetting|NV[12]|PV)\s+clearance|AGSVA\s+(?:clearance|vetting)|security\s+(?:clearance|vetting)\s+(?:level|status|holder|granted|required)|personnel\s+(?:security\s+)?vetting)\b'
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Keyword_security_clearance
+    - confidence_level: 85
+      id_match: Pattern_clearance_phrase
       matches:
-        - ref: Keyword_clearance_context
+        - ref: Evidence_clearance_context
+        - ref: Evidence_government_security
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_clearance_phrase
+      matches:
+        - ref: Evidence_clearance_context
+    - confidence_level: 65
+      id_match: Pattern_clearance_phrase
   keywords:
-    - id: Keyword_clearance_context
+    - id: Evidence_clearance_context
       groups:
         - match_style: word
           terms:
@@ -65,8 +88,36 @@ purview:
             - vetting
             - personnel security
             - security check
+    - id: Evidence_government_security
+      groups:
+        - match_style: word
+          terms:
+            - classified
+            - SECRET
+            - PROTECTED
+            - security
+            - vetting
+            - personnel
+            - government
+            - national security
+            - access
+            - compartment
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT
 keywords:

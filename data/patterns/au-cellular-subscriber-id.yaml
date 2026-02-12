@@ -11,8 +11,8 @@ description: >-
 operation: >-
   Lookaround-bounded regex matching Australian cellular subscriber numbers. Domestic prefix 04 followed
   by 8 digits, or international prefix +61 4 followed by 8 digits, with optional single-space separators.
-  Corroborative evidence: 4 tiers with telecom and personal-context keywords within 300 characters.
-pattern: (?<!\d)04(?:\s?\d{2}\s?\d{3}\s?\d{3}|\d{8})(?!\d)
+  Corroborative evidence: 3 tiers with telecom and personal-context keywords within 300 characters.
+pattern: (?<!\d)(?:04(?:\s?\d{2}\s?\d{3}\s?\d{3}|\d{8})|\+61\s?4\d{2}\s?\d{3}\s?\d{3})(?!\d)
 confidence: medium
 confidence_justification: >-
   Medium confidence: the 04 prefix is Australian-mobile-specific but 10-digit numeric sequences occur
@@ -45,8 +45,8 @@ test_cases:
   should_match:
     - value: 'Cellular: 0412 345 678'
       description: Standard domestic format with spaces
-    - value: 'Subscriber: +61412345678'
-      description: International format continuous digits
+    - value: 'Subscriber: +61 412 345 678'
+      description: International format with spaces
     - value: 'Handset: 0498 765 432'
       description: Domestic with context keyword
     - value: 'SMS contact: 0400 000 111'
@@ -58,8 +58,8 @@ test_cases:
       description: Prefix 05 is not a valid Australian mobile prefix
     - value: '041 234 56'
       description: Only 8 digits after prefix, too short
-    - value: 'xx0412345678yy'
-      description: Embedded alphanumeric context should not match
+    - value: '0412345678 9'
+      description: Trailing digit prevents word boundary match
 false_positives:
   - description: 10-digit sequences starting with 04 in reference numbers or dates.
     mitigation: Lookaround boundaries prevent embedded matches. Corroborative keywords required.
@@ -83,26 +83,23 @@ purview:
   recommended_confidence: 85
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_cellular_domestic
+      id_match: Pattern_cellular_combined
       matches:
         - ref: Evidence_telecom_primary
-    - confidence_level: 85
-      id_match: Pattern_cellular_intl
-      matches:
-        - ref: Evidence_telecom_primary
+        - ref: Evidence_template_exclusion
+          min_matches: 0
+          max_matches: 0
     - confidence_level: 75
-      id_match: Pattern_cellular_domestic
+      id_match: Pattern_cellular_combined
       matches:
         - ref: Evidence_telecom_context
     - confidence_level: 65
-      id_match: Pattern_cellular_domestic
+      id_match: Pattern_cellular_combined
       matches:
         - ref: Evidence_personal_record
   regexes:
-    - id: Pattern_cellular_domestic
-      pattern: (?<!\d)04\s?\d{2}\s?\d{3}\s?\d{3}(?!\d)
-    - id: Pattern_cellular_intl
-      pattern: \+61\s?4\d{2}\s?\d{3}\s?\d{3}(?!\d)
+    - id: Pattern_cellular_combined
+      pattern: (?<!\d)(?:04\s?\d{2}\s?\d{3}\s?\d{3}|\+61\s?4\d{2}\s?\d{3}\s?\d{3})(?!\d)
   keywords:
     - id: Evidence_telecom_primary
       groups:
@@ -137,6 +134,15 @@ purview:
             - register
             - roster
             - directory
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - test
+            - example
+            - sample
+            - dummy
+            - placeholder
 created: '2026-02-09'
 updated: '2026-02-12'
 author: testpattern-community

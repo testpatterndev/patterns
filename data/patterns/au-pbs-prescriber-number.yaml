@@ -1,19 +1,26 @@
 schema: testpattern/v1
 name: PBS Prescriber Number
 slug: au-pbs-prescriber-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects PBS Prescriber Number patterns.
+description: >-
+  Detects PBS Prescriber Number patterns. A 7-digit number with check digit validation using weights [0,5,8,4,2,1],
+  mod 11.
 operation: >-
-  Validation: Check digit: weights [0,5,8,4,2,1], mod 11. Reference:
-  https://www.servicesaustralia.gov.au/prescriber-numbers Corroborative evidence: 3 keywords within 300 characters.
-  Keyword lists: au-healthcare-identifiers, au-healthcare-medications.
+  Regex pattern using universal engine. The top-level regex \b\d{7}\b matches any 7-digit number. Check digit
+  validated with weights [0,5,8,4,2,1], mod 11. The Purview engine uses two regexes: Pattern_pbs_labeled (labeled
+  format with prescriber/PBS prefix + 7 digits) and Pattern_pbs_prescriber (bare 7-digit format). Three confidence
+  tiers: High (85) requires PBS label + healthcare/pharmacy keywords with template exclusion logic; Medium (75)
+  requires PBS label keywords; Low (65) requires PBS label keywords only (minimum context). Evidence uses 2 keyword
+  groups (6 PBS label terms, 11 healthcare/pharmacy terms) within 300-character proximity. Keyword lists:
+  au-healthcare-identifiers, au-healthcare-medications.
 pattern: \b\d{7}\b
-confidence: medium
+confidence: low
 confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false
-  positive rates.
+  Low confidence: a bare 7-digit number is extremely common and will match phone numbers, postcodes, reference codes,
+  and many other numeric sequences. Corroborative evidence keywords such as PBS, prescriber, or pharmaceutical are
+  essential for reliable detection.
 jurisdictions:
   - au
 regulations:
@@ -23,9 +30,9 @@ data_categories:
   - government-id
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+    - prescriber
+    - PBS
+    - Pharmaceutical Benefits
   proximity: 300
   keyword_lists:
     - au-healthcare-identifiers
@@ -39,9 +46,9 @@ test_cases:
     - value: '9876543'
       description: High-range prescriber number
   should_not_match:
-    - value: 123456
+    - value: '123456'
       description: Only 6 digits instead of 7
-    - value: 12345678
+    - value: '12345678'
       description: 8 digits instead of 7
     - value: 123456A
       description: Contains a letter instead of all digits
@@ -62,7 +69,7 @@ exports:
   - purview_xml
   - yaml
   - regex_copy
-scope: narrow
+scope: wide
 risk_rating: 8
 risk_description: PBS prescriber exposure enables pharmaceutical fraud and prescription manipulation
 sensitivity_labels:
@@ -78,28 +85,70 @@ purview:
   recommended_confidence: 75
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_au_pbs_prescriber
+      id_match: Pattern_pbs_labeled
       matches:
-        - ref: Keyword_pbs_prescriber
+        - ref: Evidence_healthcare_pharmacy
+      exclusion:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_pbs_prescriber
+      matches:
+        - ref: Evidence_pbs_label
+        - ref: Evidence_healthcare_pharmacy
     - confidence_level: 65
-      id_match: Regex_au_pbs_prescriber
+      id_match: Pattern_pbs_prescriber
+      matches:
+        - ref: Evidence_pbs_label
   regexes:
-    - id: Regex_au_pbs_prescriber
+    - id: Pattern_pbs_prescriber
       pattern: \b\d{7}\b
+    - id: Pattern_pbs_labeled
+      pattern: (?i)\b(?:prescriber|PBS|provider\s+no|prescriber\s+(?:number|no|ID))\s*[:#-]?\s*\d{7}\b
   keywords:
-    - id: Keyword_pbs_prescriber
+    - id: Evidence_pbs_label
       groups:
         - match_style: word
           terms:
             - prescriber
-            - prescriber number
             - PBS
-            - PBS prescriber
-            - pharmaceutical benefits
-            - pharmaceutical benefit scheme
-            - prescribing
-            - approved prescriber
+            - provider no
+            - prescriber number
+            - prescriber ID
+            - Pharmaceutical Benefits Scheme
+    - id: Evidence_healthcare_pharmacy
+      groups:
+        - match_style: word
+          terms:
+            - PBS
+            - Pharmaceutical Benefits
+            - prescriber
+            - prescription
+            - pharmacy
+            - dispensing
+            - medication
+            - drug
+            - pharmaceutical
+            - Schedule 8
+            - controlled substance
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

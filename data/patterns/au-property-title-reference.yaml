@@ -1,18 +1,27 @@
 schema: testpattern/v1
 name: NSW Property Title Reference (Lot/DP)
 slug: au-property-title-reference
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects NSW Property Title Reference (Lot/DP) patterns. Requires property/title/lot/DP keyword context
+description: >-
+  Detects Australian property title references including Lot/DP, Lot/SP, Title References, and Folio Identifiers.
+  Requires property/title/lot/DP keyword context.
 operation: >-
-  Corroborative evidence: 8 keywords within 300 characters. Keyword lists: pii-contact, au-major-cities, au-states-full,
-  au-states-abbreviations.
+  Regex pattern using universal engine. The top-level regex \b\d+/\d{5,7}\b matches a generic lot/plan format of
+  digits, a forward slash, and 5-7 digits. The Purview engine uses four regexes of decreasing specificity:
+  Pattern_property_lot_dp (Lot + number + DP/SP/PS/LP/CP plan number), Pattern_property_title_ref (Title Ref/CT/Folio
+  format), Pattern_property_lot_plan (numeric/DP format), and Pattern_property_generic (bare digits/digits format).
+  Three confidence tiers: High (85) requires land registry + state geography keywords with template exclusion logic;
+  Medium (75) requires land registry keywords; Low (65) requires property context keywords. Evidence uses 3 keyword
+  groups (9 land registry terms, 11 state geography terms, 10 property context terms) within 300-character proximity.
+  Keyword lists: pii-contact, au-major-cities, au-states-full, au-states-abbreviations.
 pattern: \b\d+/\d{5,7}\b
 confidence: low
 confidence_justification: >-
-  Low confidence: generic pattern format that may match unrelated data. Corroborative evidence keywords are essential
-  for reliable detection.
+  Low confidence: the generic digits/digits format matches many non-property references such as date fractions,
+  version numbers, and ratios. Corroborative evidence keywords such as property, title, lot, or DP are essential for
+  reliable detection.
 jurisdictions:
   - au
 regulations:
@@ -89,32 +98,92 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 75
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_au_property_title
+    - confidence_level: 85
+      id_match: Pattern_property_lot_dp
       matches:
-        - ref: Keyword_property
+        - ref: Evidence_land_registry
+        - ref: Evidence_state_geography
+      exclusion:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_property_title_ref
+      matches:
+        - ref: Evidence_land_registry
+    - confidence_level: 65
+      id_match: Pattern_property_generic
+      matches:
+        - ref: Evidence_property_context
   regexes:
-    - id: Regex_au_property_title
+    - id: Pattern_property_lot_dp
+      pattern: (?i)\b(?:Lot|LOT)\s+\d+(?:/|\s+on\s+)(?:DP|SP|PS|LP|CP)\s*\d{3,7}\b
+    - id: Pattern_property_title_ref
+      pattern: (?i)\b(?:Title\s+Ref(?:erence)?|CT|Folio\s+Identifier|Volume\s+\d+\s+Folio)\s*[:#-]?\s*\d+/?\d*\b
+    - id: Pattern_property_lot_plan
+      pattern: \b\d{1,5}/(?:DP|SP|PS|LP|CP)\d{3,7}\b
+    - id: Pattern_property_generic
       pattern: \b\d+/\d{5,7}\b
   keywords:
-    - id: Keyword_property
+    - id: Evidence_land_registry
+      groups:
+        - match_style: word
+          terms:
+            - title
+            - land registry
+            - torrens
+            - real property
+            - registrar
+            - land titles office
+            - LTO
+            - LPI
+            - titles office
+    - id: Evidence_state_geography
+      groups:
+        - match_style: word
+          terms:
+            - NSW
+            - VIC
+            - QLD
+            - SA
+            - WA
+            - TAS
+            - NT
+            - ACT
+            - New South Wales
+            - Victoria
+            - Queensland
+    - id: Evidence_property_context
       groups:
         - match_style: word
           terms:
             - property
-            - title
-            - lot
-            - deposited plan
-            - DP
-            - strata plan
-            - SP
-            - title reference
-            - Torrens
-            - folio
-            - real property
-            - conveyance
-            - conveyancing
+            - land
+            - parcel
+            - survey
+            - subdivision
+            - easement
+            - covenant
+            - strata
+            - community title
+            - building
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

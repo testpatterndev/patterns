@@ -1,18 +1,26 @@
 schema: testpattern/v1
 name: Unique Student Identifier
 slug: au-unique-student-identifier
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects Unique Student Identifier patterns. Mandatory since January 2023 for higher education.
+description: >-
+  Detects Unique Student Identifier (USI) patterns. A 10-character alphanumeric code (uppercase letters and digits)
+  mandatory since January 2023 for higher education in Australia.
 operation: >-
-  Reference: https://www.usi.gov.au/ Corroborative evidence: 3 keywords within 300 characters. Keyword lists:
+  Regex pattern using universal engine. The top-level regex \b[A-Z0-9]{10}\b matches exactly 10 uppercase
+  alphanumeric characters. The Purview engine uses two regexes: Pattern_usi_labeled (labeled format with USI/Unique
+  Student Identifier/student identifier prefix + 10 alphanumeric chars) and Pattern_au_usi (bare 10-char format).
+  Three confidence tiers: High (85) requires USI terms + education context keywords with template exclusion logic;
+  Medium (75) requires USI terms + education context keywords; Low (65) requires USI terms only. Evidence uses 2
+  keyword groups (7 USI terms, 13 education context terms) within 300-character proximity. Keyword lists:
   au-identity-usi, industry-education.
 pattern: \b[A-Z0-9]{10}\b
 confidence: low
 confidence_justification: >-
-  Low confidence: generic pattern format that may match unrelated data. Corroborative evidence keywords are essential
-  for reliable detection.
+  Low confidence: a 10-character uppercase alphanumeric pattern is extremely broad and will match tracking numbers,
+  serial codes, product IDs, and many other identifiers. Corroborative evidence keywords such as USI, student
+  identifier, or TAFE are essential for reliable detection.
 jurisdictions:
   - au
 regulations:
@@ -83,18 +91,28 @@ purview:
   recommended_confidence: 75
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_au_usi
+      id_match: Pattern_usi_labeled
       matches:
-        - ref: Keyword_au_usi
+        - ref: Evidence_usi_terms
+        - ref: Evidence_education_context
+      excludes:
+        - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_au_usi
+      id_match: Pattern_au_usi
       matches:
-        - ref: Keyword_au_education
+        - ref: Evidence_usi_terms
+        - ref: Evidence_education_context
+    - confidence_level: 65
+      id_match: Pattern_au_usi
+      matches:
+        - ref: Evidence_usi_terms
   regexes:
-    - id: Regex_au_usi
+    - id: Pattern_au_usi
       pattern: \b[A-Z0-9]{10}\b
+    - id: Pattern_usi_labeled
+      pattern: (?i)\b(?:USI|Unique\s+Student\s+Identifier|student\s+(?:identifier|ID))\s*[:#-]?\s*[A-Z0-9]{10}\b
   keywords:
-    - id: Keyword_au_usi
+    - id: Evidence_usi_terms
       groups:
         - match_style: word
           terms:
@@ -105,7 +123,7 @@ purview:
             - vocational education
             - TAFE
             - training
-    - id: Keyword_au_education
+    - id: Evidence_education_context
       groups:
         - match_style: word
           terms:
@@ -119,7 +137,27 @@ purview:
             - training
             - course
             - qualification
+            - RTO
+            - registered training organisation
+            - AVETMISS
+    - id: Evidence_template_exclusion
+      type: any
+      min_matches: 0
+      max_matches: 0
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

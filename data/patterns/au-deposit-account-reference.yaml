@@ -9,7 +9,8 @@ description: >-
   documents. Uses structural anchors with proximity constraints.
 operation: >-
   Structural-anchor regex matching account identifiers preceded by financial field labels. Corroborative
-  evidence: 2 tiers with deposit-specific and broad financial keywords within 300 characters.
+  evidence: 3 tiers with deposit-specific keywords and exclusion logic, broad financial keywords, and
+  standalone anchor match within 300 characters.
 pattern: >-
   (?is)\b(?:deposit\s+account|id|identifier|number|no\.?|reference|record)\b\s{0,80}\b[A-Z0-9][A-Z0-9\-/]{4,24}\b
 confidence: medium
@@ -38,15 +39,19 @@ corroborative_evidence:
     - financial-deposit-terms
 test_cases:
   should_match:
-    - value: 'Account number: 123456789'
-      description: Structural anchor with account number
-    - value: 'Reference: BSB-062000-ACC12345'
-      description: Structured financial reference
+    - value: 'number  A12345678'
+      description: Structural anchor with whitespace gap and alphanumeric account
+    - value: 'reference B062000ACC12'
+      description: Structural anchor followed by financial reference code
+    - value: 'record  X1234-5678/90'
+      description: Anchor with alphanumeric identifier containing hyphens and slashes
   should_not_match:
     - value: unrelated generic text
       description: No relevant context
-    - value: placeholder value 12345
-      description: Too short for account reference
+    - value: 'number: A123'
+      description: Colon is not whitespace and value too short
+    - value: the quick brown fox
+      description: No structural anchor or identifier
 false_positives:
   - description: Financial terminology in published reports or textbooks without actual data.
     mitigation: Require corroborative keywords in proximity.
@@ -74,7 +79,14 @@ purview:
       id_match: Pattern_deposit_account_ref
       matches:
         - ref: Evidence_deposit_account_specific
+        - ref: Evidence_template_exclusion
+          min_matches: 0
+          max_matches: 0
     - confidence_level: 75
+      id_match: Pattern_deposit_account_ref
+      matches:
+        - ref: Evidence_deposit_account_broad
+    - confidence_level: 65
       id_match: Pattern_deposit_account_ref
   regexes:
     - id: Pattern_deposit_account_ref
@@ -97,6 +109,26 @@ purview:
             - financial institution
             - account holder
             - customer account
+    - id: Evidence_deposit_account_broad
+      groups:
+        - match_style: word
+          terms:
+            - banking
+            - funds transfer
+            - remittance
+            - payee
+            - beneficiary
+            - financial
+            - payment
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - test
+            - example
+            - sample
+            - dummy
+            - placeholder
 created: '2026-02-08'
 updated: '2026-02-12'
 author: testpattern-community

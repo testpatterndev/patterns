@@ -1,16 +1,26 @@
 schema: testpattern/v1
 name: FOI Exemption Section References
 slug: au-foi-exemption-references
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects FOI Exemption Section References patterns. Requires FOI/freedom of information keyword context
-operation: 'Corroborative evidence: 3 keywords within 300 characters. Keyword lists: au-government-foi.'
-pattern: \bs3[3-8]\b|\bs4[2-7][A-Z]?\b
+description: >-
+  Detects Freedom of Information Act exemption section references (sections 33-38 and 42-47) in Australian government
+  documents. Requires FOI/freedom of information keyword context.
+operation: >-
+  Regex pattern using universal engine. The top-level regex
+  (?i)\b(?:s(?:ection|ect)?\.?\s*(?:3[3-8]|4[2-7][A-Za-z]?))\b matches FOI Act section references in formats like
+  s33, section 47F, sect.38, etc. for sections 33-38 and 42-47 (with optional letter suffix). The Purview engine uses
+  Pattern_au_foi_section (same regex). Three confidence tiers: High (85) requires FOI terms + government context
+  keywords with template exclusion logic; Medium (75) requires FOI terms with source code exclusion; Low (65)
+  requires legal context keywords. Evidence uses 3 keyword groups (10 FOI terms, 8 government context terms, 10 legal
+  context terms) within 300-character proximity. Keyword lists: au-government-foi.
+pattern: (?i)\b(?:s(?:ection|ect)?\.?\s*(?:3[3-8]|4[2-7][A-Za-z]?))\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false
-  positive rates.
+  Medium confidence: section number references are somewhat specific to FOI contexts when combined with the s/section
+  prefix and constrained number ranges. However, legislative section references appear in many legal contexts, so
+  corroborative keywords improve accuracy.
 jurisdictions:
   - au
 regulations:
@@ -20,9 +30,9 @@ data_categories:
   - security
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+    - FOI
+    - freedom of information
+    - exemption
   proximity: 300
   keyword_lists:
     - au-government-foi
@@ -43,22 +53,22 @@ test_cases:
       description: Section 41 not in valid range (42-47)
 false_positives:
   - description: >-
-      Authentication-related terminology in software documentation, security training materials, or system architecture
-      descriptions without actual credentials.
+      Legislative section references in non-FOI contexts such as other acts, regulations, or legal documents that use
+      sections 33-38 or 42-47.
     mitigation: >-
-      Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-      security terminology.
+      Require proximity to FOI-specific keywords such as FOI, freedom of information, exemption, or right to
+      information to confirm FOI context.
   - description: >-
-      Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
+      Code snippets and configuration examples containing section-related keywords or numeric references in developer
       documentation.
     mitigation: >-
-      Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce false
-      positives from technical writing.
+      Check for common source code patterns (function, import, class) and exclude technical contexts to reduce false
+      positives.
 exports:
   - purview_xml
   - yaml
   - regex_copy
-scope: wide
+scope: narrow
 risk_rating: 7
 risk_description: FOI exemption markers indicate information withheld from public disclosure
 sensitivity_labels:
@@ -73,30 +83,98 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 75
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_au_foi_section
+    - confidence_level: 85
+      id_match: Pattern_au_foi_section
       matches:
-        - ref: Keyword_foi
+        - ref: Evidence_foi_terms
+        - ref: Evidence_government_context
+      excludes:
+        - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_au_foi_section
+      matches:
+        - ref: Evidence_foi_terms
+      excludes:
+        - ref: Evidence_source_code_exclusion
+    - confidence_level: 65
+      id_match: Pattern_au_foi_section
+      matches:
+        - ref: Evidence_legal_context
   regexes:
-    - id: Regex_au_foi_section
-      pattern: \b(?:s3[3-8]|s4[2-7][A-Z]?)\b
+    - id: Pattern_au_foi_section
+      pattern: (?i)\b(?:s(?:ection|ect)?\.?\s*(?:3[3-8]|4[2-7][A-Za-z]?))\b
   keywords:
-    - id: Keyword_foi
+    - id: Evidence_foi_terms
       groups:
         - match_style: word
           terms:
             - FOI
             - freedom of information
             - FOI Act
-            - information access
-            - right to information
-            - RTI
-            - exemption
             - FOI request
             - FOI exemption
-            - s33
-            - s47
+            - right to information
+            - RTI
+            - information access
+            - exemption
+            - exempt
+    - id: Evidence_government_context
+      groups:
+        - match_style: word
+          terms:
+            - government
+            - department
+            - agency
+            - minister
+            - public servant
+            - official
+            - Commonwealth
+            - state government
+    - id: Evidence_legal_context
+      groups:
+        - match_style: word
+          terms:
+            - legal
+            - legislation
+            - act
+            - statute
+            - section
+            - provision
+            - clause
+            - exemption
+            - disclosure
+            - public interest
+    - id: Evidence_source_code_exclusion
+      type: any
+      min_matches: 0
+      max_matches: 0
+      groups:
+        - match_style: word
+          terms:
+            - source code
+            - function
+            - method
+            - variable
+            - import
+            - class
+    - id: Evidence_template_exclusion
+      type: any
+      min_matches: 0
+      max_matches: 0
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

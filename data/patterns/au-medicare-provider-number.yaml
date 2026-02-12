@@ -1,19 +1,25 @@
 schema: testpattern/v1
 name: Medicare Provider Number
 slug: au-medicare-provider-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects Medicare Provider Number patterns.
+description: >-
+  Detects Medicare Provider Number patterns. An 8-character code consisting of 6 digits, a location character, and a
+  check character. Validated by location and check character sets.
 operation: >-
-  Validation: Location char + check char validation. Reference:
-  https://www.servicesaustralia.gov.au/medicare-provider-numbers Corroborative evidence: 3 keywords within 300
-  characters. Keyword lists: au-healthcare-identifiers, healthcare-identifiers.
+  Regex pattern using universal engine. The top-level regex \b\d{6}[0-9A-HJKLMNPQRTUVWXY][ABFHJKLTWXY]\b matches 6
+  digits followed by a location character (0-9, A-H, J-L, M, N, P, Q, R, T-W, X, Y) and a check character (A, B, F,
+  H, J, K, L, T, W, X, Y). The Purview engine uses Pattern_au_medicare_provider (same regex) with a TextMatchFilter
+  excluding known test values. Three confidence tiers: High (85) requires Medicare provider terms + medical context
+  keywords with template exclusion logic; Medium (75) requires Medicare provider terms; Low (65) requires medical
+  context keywords only. Evidence uses 2 keyword groups (6 Medicare provider terms, 10 medical context terms) within
+  300-character proximity. Keyword lists: au-healthcare-identifiers, healthcare-identifiers.
 pattern: \b\d{6}[0-9A-HJKLMNPQRTUVWXY][ABFHJKLTWXY]\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false
-  positive rates.
+  Medium confidence: the constrained character sets for location and check positions provide moderate specificity.
+  Corroborative keywords are recommended to reduce false positives from 8-character alphanumeric strings.
 jurisdictions:
   - au
 regulations:
@@ -23,9 +29,9 @@ data_categories:
   - government-id
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+    - Medicare
+    - provider number
+    - Medicare provider
   proximity: 300
   keyword_lists:
     - au-healthcare-identifiers
@@ -33,7 +39,7 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 123456AW
-      description: Medicare provider number
+      description: Medicare provider number with valid location and check chars
     - value: 000000AA
       description: Low-range provider number
     - value: 999999YX
@@ -42,9 +48,9 @@ test_cases:
     - value: 12345AW
       description: Only 5 digits instead of 6
     - value: 123456AI
-      description: Invalid location character (I not in valid set)
+      description: Invalid check character (I not in valid set ABFHJKLTWXY)
     - value: 123456AS
-      description: Invalid location character (S not in valid set)
+      description: Invalid check character (S not in valid set ABFHJKLTWXY)
 false_positives:
   - description: >-
       Common words and phrases related to medicare provider number appearing in policy documents, training materials, HR
@@ -76,48 +82,75 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
+  filters:
+    - type: TextMatchFilter
+      exclude:
+        - 000000AA
+        - 111111AA
+        - 999999AA
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_au_medicare_provider
+      id_match: Pattern_au_medicare_provider
       matches:
-        - ref: Keyword_medicare_provider
+        - ref: Evidence_medicare_provider
+        - ref: Evidence_medical_context
+      exclusion:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_au_medicare_provider
+      id_match: Pattern_au_medicare_provider
       matches:
-        - ref: Keyword_medical
+        - ref: Evidence_medicare_provider
+    - confidence_level: 65
+      id_match: Pattern_au_medicare_provider
+      matches:
+        - ref: Evidence_medical_context
   regexes:
-    - id: Regex_au_medicare_provider
+    - id: Pattern_au_medicare_provider
       pattern: \b\d{6}[0-9A-HJKLMNPQRTUVWXY][ABFHJKLTWXY]\b
   keywords:
-    - id: Keyword_medicare_provider
+    - id: Evidence_medicare_provider
       groups:
         - match_style: word
           terms:
+            - Medicare
             - provider number
             - Medicare provider
-            - provider
-            - Medicare provider number
-            - services Australia
-            - health provider
-            - billing provider
-            - servicing provider
-    - id: Keyword_medical
+            - provider no
+            - Services Australia
+            - MPIR
+    - id: Evidence_medical_context
       groups:
         - match_style: word
           terms:
             - medical
-            - clinical
             - healthcare
-            - health care
+            - clinical
             - hospital
-            - clinic
-            - practice
-            - surgery
-            - medical centre
-            - health service
-            - provider
-            - practitioner
+            - GP
+            - specialist
+            - referral
+            - billing
+            - claim
+            - rebate
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

@@ -1,14 +1,23 @@
 schema: testpattern/v1
 name: Employment/HR Sensitive Data
 slug: au-employment-hr-sensitive-data
-version: 1.0.0
+version: 1.1.0
 type: keyword_list
 description: >-
   Detects references to sensitive employment and human resources data including performance reviews, disciplinary
   actions, and workplace investigations.
-operation: 'Keyword-based detection. Corroborative evidence: 16 keywords within 300 characters related to HR sensitive data.'
+operation: >-
+  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_hr_sensitive_phrase matches phrases such as
+  disciplinary action, performance review, workplace investigation, workplace bullying, workplace misconduct,
+  termination letter, unfair dismissal, workers compensation, grievance process, harassment complaint, return to work
+  plan, and redundancy notice. Three confidence tiers: High (85) requires HR context + employment operations keywords
+  with template exclusion logic; Medium (75) requires HR context keywords; Low (65) requires only the regex match.
+  Evidence uses 2 keyword groups (8 HR context terms, 10 employment operations terms) within 300-character proximity.
+  Template/sample exclusion prevents false positives from training materials.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative
+  evidence keywords are needed for reliable identification since HR-related terms can appear in non-sensitive contexts.
 jurisdictions:
   - au
 regulations:
@@ -21,16 +30,16 @@ data_categories:
 test_cases:
   should_match:
     - value: Disciplinary action taken regarding workplace misconduct
-      description: Test match 1
+      description: Matches 'disciplinary action' and 'workplace misconduct' via Pattern_hr_sensitive_phrase
     - value: Performance review summary and salary review documentation
-      description: Test match 2
+      description: Matches 'performance review' via Pattern_hr_sensitive_phrase
     - value: Workers compensation claim and return to work plan
-      description: Test match 3
+      description: Matches 'workers compensation' and 'return to work plan' via Pattern_hr_sensitive_phrase
   should_not_match:
     - value: HR department phone number
-      description: Non-match 1
+      description: No HR sensitive phrase matched by the Purview regex
     - value: Employment opportunities available
-      description: Non-match 2
+      description: No HR sensitive phrase present
 false_positives:
   - description: Generic HR terms such as employment or salary in non-sensitive contexts.
     mitigation: Require specific sensitive HR keywords like disciplinary, grievance, or misconduct.
@@ -50,13 +59,28 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
+  regexes:
+    - id: Pattern_hr_sensitive_phrase
+      pattern: '(?i)\b(?:disciplinary\s+action|performance\s+review|workplace\s+(?:investigation|bullying|misconduct)|termination\s+(?:letter|notice)|unfair\s+dismissal|workers?\s+compensation|grievance\s+(?:process|procedure|complaint)|harassment\s+complaint|return\s+to\s+work\s+plan|redundancy\s+notice)\b'
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Keyword_hr_sensitive
+    - confidence_level: 85
+      id_match: Pattern_hr_sensitive_phrase
       matches:
-        - ref: Keyword_hr_context
+        - ref: Evidence_hr_context
+        - ref: Evidence_employment_operations
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_hr_sensitive_phrase
+      matches:
+        - ref: Evidence_hr_context
+    - confidence_level: 65
+      id_match: Pattern_hr_sensitive_phrase
   keywords:
-    - id: Keyword_hr_context
+    - id: Evidence_hr_context
       groups:
         - match_style: word
           terms:
@@ -68,8 +92,36 @@ purview:
             - HR
             - payroll
             - workforce
+    - id: Evidence_employment_operations
+      groups:
+        - match_style: word
+          terms:
+            - employee
+            - staff
+            - personnel
+            - HR
+            - human resources
+            - payroll
+            - workforce
+            - workplace
+            - manager
+            - supervisor
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT
 keywords:

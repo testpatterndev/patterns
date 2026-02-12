@@ -1,16 +1,24 @@
 schema: testpattern/v1
 name: Indigenous Data Reference
 slug: au-indigenous-data-reference
-version: 1.0.0
+version: 1.1.0
 type: keyword_list
 description: >-
   Detects references to Aboriginal and Torres Strait Islander data requiring cultural sensitivity and community consent
   considerations.
 operation: >-
-  Keyword-based detection. Corroborative evidence: 16 keywords within 300 characters related to Indigenous data
-  sovereignty.
+  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_indigenous_data_phrase matches phrases such
+  as Aboriginal data, Torres Strait Islander data, Indigenous data, First Nations data, data sovereignty, AIATSIS,
+  Native Title, Closing the Gap, and cultural heritage data. Three confidence tiers: High (85) requires Indigenous
+  context + data governance keywords with template exclusion logic; Medium (75) requires Indigenous context keywords;
+  Low (65) requires only the regex match. Evidence uses 2 keyword groups (9 Indigenous context terms, 10 data
+  governance terms) within 300-character proximity. Template/sample exclusion prevents false positives from training
+  materials.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative
+  evidence keywords are needed for reliable identification since Indigenous-related terms can appear in non-data
+  contexts.
 jurisdictions:
   - au
 regulations:
@@ -22,16 +30,16 @@ data_categories:
 test_cases:
   should_match:
     - value: Aboriginal data sovereignty principles apply to this dataset
-      description: Test match 1
+      description: Matches 'Aboriginal data' and 'data sovereignty' via Pattern_indigenous_data_phrase
     - value: Torres Strait Islander health data collected with community consent
-      description: Test match 2
+      description: Matches 'Torres Strait Islander health data' via Pattern_indigenous_data_phrase
     - value: Indigenous data governance framework per AIATSIS guidelines
-      description: Test match 3
+      description: Matches 'Indigenous data' and 'AIATSIS' via Pattern_indigenous_data_phrase
   should_not_match:
     - value: Indigenous plants found in the region
-      description: Non-match 1
+      description: No Indigenous data phrase matched by the Purview regex
     - value: The community garden project was successful
-      description: Non-match 2
+      description: No Indigenous data phrase present
 false_positives:
   - description: References to Indigenous in geographical or botanical contexts.
     mitigation: Require data-specific keywords alongside Indigenous references.
@@ -51,27 +59,70 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
+  regexes:
+    - id: Pattern_indigenous_data_phrase
+      pattern: '(?i)\b(?:(?:Aboriginal|Torres\s+Strait\s+Islander|Indigenous|First\s+Nations)\s+(?:data|health\s+data|community|heritage|identifier)|data\s+sovereignty|AIATSIS|Native\s+Title|Closing\s+the\s+Gap|cultural\s+(?:heritage\s+)?data)\b'
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Keyword_indigenous
+    - confidence_level: 85
+      id_match: Pattern_indigenous_data_phrase
       matches:
-        - ref: Keyword_data_collection
+        - ref: Evidence_indigenous_context
+        - ref: Evidence_data_governance
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_indigenous_data_phrase
+      matches:
+        - ref: Evidence_indigenous_context
+    - confidence_level: 65
+      id_match: Pattern_indigenous_data_phrase
   keywords:
-    - id: Keyword_data_collection
+    - id: Evidence_indigenous_context
+      groups:
+        - match_style: word
+          terms:
+            - Aboriginal
+            - Indigenous
+            - Torres Strait
+            - First Nations
+            - traditional
+            - cultural
+            - community
+            - elders
+            - country
+    - id: Evidence_data_governance
       groups:
         - match_style: word
           terms:
             - data
+            - governance
+            - sovereignty
             - collection
-            - storage
-            - processing
-            - database
-            - record
+            - consent
+            - protocol
+            - ethics
+            - community
+            - custodian
+            - stewardship
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
             - template
-            - scan
-            - capture
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT
 keywords:
