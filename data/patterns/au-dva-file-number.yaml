@@ -1,20 +1,25 @@
 schema: testpattern/v1
 name: DVA File Number
 slug: au-dva-file-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
   Detects Department of Veterans' Affairs (DVA) file numbers used to identify Australian veterans and eligible
   dependants for health and support services.
 operation: >-
-  Matches a DVA file number consisting of a state letter (N, V, Q, S, W, A, T, D) optionally followed by a card-type
-  letter, then 5-7 digits. Corroborative evidence: 19 keywords within 300 characters.
-pattern: \b[NVQSWATD][XKVGTASBM]?\d{5,7}\b
+  Regex pattern using universal engine. The top-level regex \b[NVQSWATD][XKVGTASBM]?\s?\d{5,7}\b matches a state
+  letter (N, V, Q, S, W, A, T, D) optionally followed by a card-type letter (X, K, V, G, T, A, S, B, M), an optional
+  space, then 5-7 digits. The Purview engine uses Pattern_dva_file (same regex). Three confidence tiers: High (85)
+  requires DVA-specific terms + card type keywords with template exclusion logic; Medium (75) requires DVA-specific
+  terms; Low (65) requires veteran context keywords. Evidence uses 3 keyword groups (7 DVA-specific terms, 9 card type
+  terms, 10 veteran context terms) within 300-character proximity.
+pattern: \b[NVQSWATD][XKVGTASBM]?\s?\d{5,7}\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence: the format is relatively short and state-letter prefixes could match other identifiers.
-  Corroborative keywords improve accuracy.
+  Medium confidence: the constrained state-letter prefix and optional card-type letter provide moderate specificity.
+  Corroborative keywords such as DVA, veteran, or defence service are recommended to reduce false positives from
+  short alphanumeric codes.
 jurisdictions:
   - au
 regulations:
@@ -31,33 +36,23 @@ corroborative_evidence:
     - veteran
     - veterans
     - ex-service
-    - ex service
-    - defence service
-    - defense service
-    - war widow
-    - war widower
-    - TPI
-    - totally and permanently incapacitated
-    - gold card
-    - white card
     - DVA card
     - DVA file
     - DVA number
-    - repatriation
   proximity: 300
 test_cases:
   should_match:
-    - value: 'DVA file number: NX1234567'
-      description: NSW DVA file number with card type
-    - value: Veteran DVA card QA12345
-      description: QLD DVA file number
-    - value: 'Department of Veterans Affairs reference: V123456'
-      description: VIC DVA file number
+    - value: NX1234567
+      description: NSW DVA file number with card type letter X
+    - value: QA12345
+      description: QLD DVA file number with 5 digits
+    - value: V123456
+      description: VIC DVA file number without card type letter
   should_not_match:
     - value: B1234567
       description: Prefix letter B is not in valid DVA state set (NVQSWATD)
     - value: NX12
-      description: Too few digits after prefix letters
+      description: Too few digits after prefix letters (only 2)
 false_positives:
   - description: State-prefixed reference codes in non-DVA contexts may match the pattern.
     mitigation: Require corroborative keywords such as DVA, veteran, or defence service within proximity.
@@ -80,85 +75,81 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 95
-      id_match: Regex_dva_file
-      matches:
-        - ref: Keyword_dva
     - confidence_level: 85
-      id_match: Regex_dva_file
+      id_match: Pattern_dva_file
       matches:
-        - ref: Keyword_veteran
+        - ref: Evidence_dva_specific
+        - ref: Evidence_card_type
+      excludes:
+        - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_dva_file
+      id_match: Pattern_dva_file
       matches:
-        - ref: Keyword_defence
+        - ref: Evidence_dva_specific
+    - confidence_level: 65
+      id_match: Pattern_dva_file
+      matches:
+        - ref: Evidence_veteran_context
   regexes:
-    - id: Regex_dva_file
-      pattern: \b[NVQSWATD][XKVGTASBM]?\d{5,7}\b
+    - id: Pattern_dva_file
+      pattern: \b[NVQSWATD][XKVGTASBM]?\s?\d{5,7}\b
   keywords:
-    - id: Keyword_dva
+    - id: Evidence_dva_specific
       groups:
         - match_style: word
           terms:
             - DVA
             - Department of Veterans Affairs
             - Veterans Affairs
+            - DVA card
+            - DVA file
+            - DVA number
+            - repatriation
+    - id: Evidence_card_type
+      groups:
+        - match_style: word
+          terms:
+            - gold card
+            - white card
+            - orange card
+            - TPI
+            - totally and permanently incapacitated
+            - war widow
+            - war widower
+            - POW
+            - special rate
+    - id: Evidence_veteran_context
+      groups:
+        - match_style: word
+          terms:
             - veteran
             - veterans
             - ex-service
             - ex service
             - defence service
             - defense service
-            - war widow
-            - war widower
-            - TPI
-            - totally and permanently incapacitated
-            - gold card
-            - white card
-            - DVA card
-            - DVA file
-            - DVA number
-            - repatriation
-    - id: Keyword_veteran
-      groups:
-        - match_style: word
-          terms:
-            - veteran
-            - veterans
-            - ex-service
-            - ex service
             - returned service
             - RSL
-            - returned serviceman
-            - returned servicewoman
-            - war service
-            - military service
             - ADF
-            - Australian Defence Force
-            - defence member
-            - defense member
-    - id: Keyword_defence
+            - military service
+    - id: Evidence_template_exclusion
+      type: any
+      min_matches: 0
+      max_matches: 0
       groups:
         - match_style: word
           terms:
-            - defence
-            - defense
-            - military
-            - army
-            - navy
-            - air force
-            - RAAF
-            - RAN
-            - ADF
-            - soldier
-            - sailor
-            - airman
-            - officer
-            - enlisted
-            - regiment
-            - battalion
-            - squadron
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

@@ -1,14 +1,20 @@
 schema: testpattern/v1
 name: AI Training Data Reference
 slug: au-ai-training-data-reference
-version: 1.0.0
+version: 1.1.0
 type: keyword_list
 description: Detects references to AI training data, model datasets, and data provenance documentation in Australian contexts.
 operation: >-
-  Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters related to AI training data and
-  model datasets.
+  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_ai_training_phrase matches phrases such as
+  training dataset, training corpus, data provenance, ML dataset, labelled data, annotated data, synthetic data, and
+  model training. Three confidence tiers: High (85) requires AI context + data operations keywords with template
+  exclusion logic; Medium (75) requires AI context keywords; Low (65) requires only the regex match. Evidence uses 2
+  keyword groups (9 AI context terms, 9 data operations terms) within 300-character proximity. Template/sample
+  exclusion prevents false positives from training materials.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative
+  evidence keywords are needed for reliable identification since AI-related terms can appear in non-sensitive contexts.
 jurisdictions:
   - au
 regulations:
@@ -20,16 +26,16 @@ data_categories:
 test_cases:
   should_match:
     - value: This AI training dataset contains 50,000 labelled records
-      description: Test match 1
+      description: Matches 'training dataset' via Pattern_ai_training_phrase
     - value: Review the training corpus for bias before model training
-      description: Test match 2
+      description: Matches 'training corpus' and 'model training' via Pattern_ai_training_phrase
     - value: Data provenance report for ML dataset version 3.2
-      description: Test match 3
+      description: Matches 'data provenance' and 'ML dataset' via Pattern_ai_training_phrase
   should_not_match:
     - value: The training schedule for new employees
-      description: Non-match 1
+      description: No AI training phrase matched by the Purview regex
     - value: AI-powered search engine results
-      description: Non-match 2
+      description: No training data phrase present
 false_positives:
   - description: Generic use of training or dataset in non-AI contexts such as staff training.
     mitigation: Require multiple AI-specific keywords to co-occur within proximity.
@@ -49,13 +55,28 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
+  regexes:
+    - id: Pattern_ai_training_phrase
+      pattern: '(?i)\b(?:training\s+data(?:set)?s?|training\s+corpus|data\s+provenance|ML\s+dataset|labelled?\s+(?:data|records)|annotated\s+data|synthetic\s+data|model\s+training)\b'
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Keyword_ai_training
+    - confidence_level: 85
+      id_match: Pattern_ai_training_phrase
       matches:
-        - ref: Keyword_ai_context
+        - ref: Evidence_ai_context
+        - ref: Evidence_data_operations
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_ai_training_phrase
+      matches:
+        - ref: Evidence_ai_context
+    - confidence_level: 65
+      id_match: Pattern_ai_training_phrase
   keywords:
-    - id: Keyword_ai_context
+    - id: Evidence_ai_context
       groups:
         - match_style: word
           terms:
@@ -68,8 +89,35 @@ purview:
             - deep learning
             - large language model
             - LLM
+    - id: Evidence_data_operations
+      groups:
+        - match_style: word
+          terms:
+            - data
+            - dataset
+            - records
+            - collection
+            - processing
+            - pipeline
+            - batch
+            - ingestion
+            - annotation
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT
 keywords:

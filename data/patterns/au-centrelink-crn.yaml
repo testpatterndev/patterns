@@ -1,18 +1,23 @@
 schema: testpattern/v1
 name: Centrelink Customer Reference Number
 slug: au-centrelink-crn
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects Centrelink Customer Reference Number patterns.
+description: Detects Centrelink Customer Reference Number (CRN) patterns consisting of 9 digits followed by a letter.
 operation: >-
-  Reference: https://www.servicesaustralia.gov.au/centrelink-customer-reference-number-crn Corroborative evidence: 3
-  keywords within 300 characters. Keyword lists: au-identity-centrelink, au-government-services-australia.
+  Regex pattern using universal engine. The top-level regex \b\d{9}[A-Za-z]\b matches 9 digits followed by a single
+  letter. The Purview engine uses two regexes: Pattern_crn_labeled (labeled format with CRN/Centrelink prefix +
+  digits + letter) and Pattern_au_crn (bare 9-digit + letter format). Three confidence tiers: High (85) requires
+  Services Australia keywords + welfare context keywords with template exclusion logic; Medium (75) requires Services
+  Australia keywords; Low (65) requires only the regex match. Evidence uses 2 keyword groups (4 Services Australia
+  terms, 10 welfare context terms) within 300-character proximity. Keyword lists: au-identity-centrelink,
+  au-government-services-australia.
 pattern: \b\d{9}[A-Za-z]\b
 confidence: low
 confidence_justification: >-
-  Low confidence: generic pattern format that may match unrelated data. Corroborative evidence keywords are essential
-  for reliable detection.
+  Low confidence: the 9-digit-plus-letter pattern is generic and may match unrelated alphanumeric sequences.
+  Corroborative evidence keywords such as Centrelink, CRN, or Services Australia are essential for reliable detection.
 jurisdictions:
   - au
 regulations:
@@ -22,9 +27,9 @@ data_categories:
   - government-id
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+    - Centrelink
+    - CRN
+    - Customer Reference Number
   proximity: 300
   keyword_lists:
     - au-identity-centrelink
@@ -42,7 +47,7 @@ test_cases:
       description: Only 8 digits instead of 9 before letter
     - value: 1234567890A
       description: 10 digits instead of 9 before letter
-    - value: 123456789
+    - value: '123456789'
       description: Missing trailing letter
 false_positives:
   - description: >-
@@ -83,56 +88,66 @@ purview:
   recommended_confidence: 75
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_au_crn
+      id_match: Pattern_crn_labeled
       matches:
-        - ref: Keyword_au_centrelink
-    - confidence_level: 75
-      id_match: Regex_au_crn
-      matches:
+        - ref: Evidence_welfare_context
         - type: any
-          min_matches: 1
+          min_matches: 0
+          max_matches: 0
           children:
-            - ref: Keyword_au_government
-            - ref: Keyword_au_benefits
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_au_crn
+      matches:
+        - ref: Evidence_services_australia
+        - ref: Evidence_welfare_context
+    - confidence_level: 65
+      id_match: Pattern_au_crn
+      matches:
+        - ref: Evidence_services_australia
   regexes:
-    - id: Regex_au_crn
+    - id: Pattern_au_crn
       pattern: \b\d{9}[A-Za-z]\b
+    - id: Pattern_crn_labeled
+      pattern: (?i)\b(?:CRN|Customer\s+Reference\s+Number|Centrelink\s+(?:reference|number|ID))\s*[:#-]?\s*\d{9}[A-Za-z]\b
   keywords:
-    - id: Keyword_au_centrelink
+    - id: Evidence_services_australia
       groups:
         - match_style: word
           terms:
-            - centrelink
+            - Centrelink
             - CRN
-            - customer reference number
-            - services australia
-            - myGov
+            - Customer Reference Number
+            - Services Australia
+    - id: Evidence_welfare_context
+      groups:
+        - match_style: word
+          terms:
+            - Centrelink
+            - Services Australia
             - welfare
-            - social security
+            - benefits
+            - payment
             - pension
             - allowance
-    - id: Keyword_au_government
-      groups:
-        - match_style: word
-          terms:
-            - government
-            - services australia
-            - federal
-            - commonwealth
-            - department
-    - id: Keyword_au_benefits
-      groups:
-        - match_style: word
-          terms:
             - JobSeeker
             - Youth Allowance
-            - Age Pension
-            - Disability Support
-            - Family Tax Benefit
-            - Parenting Payment
-            - Carer Payment
-            - NDIS
+            - Disability Support Pension
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

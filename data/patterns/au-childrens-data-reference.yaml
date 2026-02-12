@@ -1,14 +1,21 @@
 schema: testpattern/v1
 name: Children's Data Reference
 slug: au-childrens-data-reference
-version: 1.0.0
+version: 1.1.0
 type: keyword_list
 description: Detects references to children's personal data requiring heightened protection under Australian privacy law.
 operation: >-
-  Keyword-based detection. Corroborative evidence: 14 keywords within 300 characters related to children's data and
-  minor protections.
+  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_children_data_phrase matches phrases such
+  as children's data, child record, child protection, minor's data, parental consent, guardian consent, and under 16/18
+  data references. Three confidence tiers: High (85) requires child protection context + data operations keywords with
+  template exclusion logic; Medium (75) requires child protection context keywords; Low (65) requires only the regex
+  match. Evidence uses 2 keyword groups (9 child protection terms, 9 data operations terms) within 300-character
+  proximity. Template/sample exclusion prevents false positives from training materials.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative
+  evidence keywords are needed for reliable identification since children-related terms can appear in non-sensitive
+  contexts.
 jurisdictions:
   - au
 regulations:
@@ -21,16 +28,16 @@ data_categories:
 test_cases:
   should_match:
     - value: Children's data must be collected with parental consent
-      description: Test match 1
+      description: Matches 'parental consent' via Pattern_children_data_phrase
     - value: Child protection records for minor under 16
-      description: Test match 2
+      description: Matches 'child protection' via Pattern_children_data_phrase
     - value: The children's privacy policy requires guardian consent
-      description: Test match 3
+      description: Matches 'guardian consent' via Pattern_children_data_phrase
   should_not_match:
     - value: The children played in the park
-      description: Non-match 1
+      description: No children data phrase matched by the Purview regex
     - value: Child-friendly restaurant menu
-      description: Non-match 2
+      description: No children data phrase present
 false_positives:
   - description: Generic references to children in non-data contexts.
     mitigation: Require data-specific keywords alongside children references.
@@ -50,13 +57,41 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
+  regexes:
+    - id: Pattern_children_data_phrase
+      pattern: '(?i)\b(?:child(?:ren)?(?:''s)?\s+(?:data|record|information|privacy|protection|consent)|minor(?:''s)?\s+(?:data|personal\s+information|consent)|parental\s+consent|guardian\s+consent|under\s+(?:16|18)\s+(?:data|consent|record))\b'
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Keyword_children
+    - confidence_level: 85
+      id_match: Pattern_children_data_phrase
       matches:
-        - ref: Keyword_data_collection
+        - ref: Evidence_child_protection_context
+        - ref: Evidence_data_operations
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_children_data_phrase
+      matches:
+        - ref: Evidence_child_protection_context
+    - confidence_level: 65
+      id_match: Pattern_children_data_phrase
   keywords:
-    - id: Keyword_data_collection
+    - id: Evidence_child_protection_context
+      groups:
+        - match_style: word
+          terms:
+            - child
+            - children
+            - minor
+            - youth
+            - student
+            - parental
+            - guardian
+            - juvenile
+            - adolescent
+    - id: Evidence_data_operations
       groups:
         - match_style: word
           terms:
@@ -69,8 +104,22 @@ purview:
             - template
             - scan
             - capture
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT
 keywords:

@@ -1,16 +1,22 @@
 schema: testpattern/v1
 name: DISP/Defence Industry Marker
 slug: au-disp-defence-industry
-version: 1.0.0
+version: 1.1.0
 type: keyword_list
 description: >-
   Detects references to Defence Industry Security Program (DISP) membership and defence industry security markers in
   Australian documents.
 operation: >-
-  Keyword-based detection. Corroborative evidence: 14 keywords within 300 characters related to DISP and defence
-  industry security.
+  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_disp_phrase matches phrases such as DISP
+  membership, DISP accreditation, Defence Industry Security Program, defence contractor, ITAR controlled, controlled
+  technology, and AGSVA clearance. Three confidence tiers: High (85) requires defence context + security program
+  keywords with template exclusion logic; Medium (75) requires defence context keywords; Low (65) requires only the
+  regex match. Evidence uses 2 keyword groups (7 defence context terms, 9 security program terms) within 300-character
+  proximity. Template/sample exclusion prevents false positives from training materials.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative
+  evidence keywords are needed for reliable identification since defence-related terms can appear in non-DISP contexts.
 jurisdictions:
   - au
 regulations:
@@ -23,16 +29,16 @@ data_categories:
 test_cases:
   should_match:
     - value: 'DISP membership level: Governance and Personnel Security'
-      description: Test match 1
+      description: Matches 'DISP membership' via Pattern_disp_phrase
     - value: Defence Industry Security Program clearance required
-      description: Test match 2
+      description: Matches 'Defence Industry Security Program' via Pattern_disp_phrase
     - value: The defence contractor holds DISP accreditation
-      description: Test match 3
+      description: Matches 'defence contractor' and 'DISP accreditation' via Pattern_disp_phrase
   should_not_match:
     - value: The industry conference was well attended
-      description: Non-match 1
+      description: No DISP phrase matched by the Purview regex
     - value: Security guard dispatched to site
-      description: Non-match 2
+      description: No DISP phrase present
 false_positives:
   - description: Generic use of defence or security in non-DISP contexts.
     mitigation: Require DISP-specific terms or defence industry program references.
@@ -52,13 +58,28 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
+  regexes:
+    - id: Pattern_disp_phrase
+      pattern: '(?i)\b(?:DISP\s+(?:member(?:ship)?|accredit(?:ation|ed)|level|clearance)|Defence\s+Industry\s+Security\s+Program|defence\s+(?:contractor|supplier|procurement)|ITAR\s+(?:controlled|compliance)|controlled\s+technology|AGSVA\s+(?:clearance|vetting))\b'
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Keyword_disp
+    - confidence_level: 85
+      id_match: Pattern_disp_phrase
       matches:
-        - ref: Keyword_defence_context
+        - ref: Evidence_defence_context
+        - ref: Evidence_security_program
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_disp_phrase
+      matches:
+        - ref: Evidence_defence_context
+    - confidence_level: 65
+      id_match: Pattern_disp_phrase
   keywords:
-    - id: Keyword_defence_context
+    - id: Evidence_defence_context
       groups:
         - match_style: word
           terms:
@@ -69,8 +90,35 @@ purview:
             - national security
             - export
             - controlled
+    - id: Evidence_security_program
+      groups:
+        - match_style: word
+          terms:
+            - defence
+            - defense
+            - military
+            - national security
+            - classified
+            - restricted
+            - controlled
+            - strategic
+            - export control
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT
 keywords:

@@ -1,18 +1,25 @@
 schema: testpattern/v1
 name: Healthcare Provider Identifier - Individual
 slug: au-hpi-individual
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects Healthcare Provider Identifier - Individual patterns. No checksum validation
+description: >-
+  Detects Healthcare Provider Identifier - Individual (HPI-I) patterns. The HPI-I is a 16-digit number starting with
+  the prefix 800361. No checksum validation.
 operation: >-
-  Corroborative evidence: 19 keywords within 300 characters. Keyword lists: au-healthcare-identifiers,
-  healthcare-identifiers.
+  Regex pattern using universal engine. The top-level regex \b800361\d{10}\b matches 16-digit numbers starting with
+  the fixed prefix 800361. The Purview engine uses Pattern_hpii (same regex). Three confidence tiers: High (85)
+  requires HPI-I-specific terms + provider credential keywords with template exclusion logic; Medium (75) requires
+  HPI-I terms + provider role keywords; Low (65) requires HPI-I terms only. Evidence uses 3 keyword groups (11 HPI-I
+  terms, 23 provider credential terms, 11 provider role terms) within 300-character proximity. Keyword lists:
+  au-healthcare-identifiers, healthcare-identifiers.
 pattern: \b800361\d{10}\b
-confidence: low
+confidence: medium
 confidence_justification: >-
-  Low confidence: generic pattern format that may match unrelated data. Corroborative evidence keywords are essential
-  for reliable detection.
+  Medium confidence: the 800361 prefix provides strong structural specificity for a 16-digit identifier. However,
+  corroborative keywords are recommended to distinguish from other long numeric sequences. The prefix significantly
+  reduces false positives compared to generic patterns.
 jurisdictions:
   - au
 regulations:
@@ -23,25 +30,9 @@ data_categories:
   - healthcare
 corroborative_evidence:
   keywords:
-    - MRN
-    - medical record number
-    - patient ID
-    - NPI
-    - DEA
-    - medicare
-    - medicaid
-    - insurance ID
-    - member ID
-    - beneficiary
-    - ICD-10
-    - ICD-9
-    - CPT
-    - NDC
-    - SNOMED
-    - HCPCS
-    - diagnosis code
-    - procedure code
-    - drug code
+    - HPI-I
+    - HPII
+    - healthcare provider identifier
   proximity: 300
   keyword_lists:
     - au-healthcare-identifiers
@@ -55,11 +46,11 @@ test_cases:
     - value: '8003619999999999'
       description: HPI-I upper range
   should_not_match:
-    - value: 8003620000000001
+    - value: '8003620000000001'
       description: Wrong prefix (800362 instead of 800361)
-    - value: 800361000000001
+    - value: '800361000000001'
       description: Too few trailing digits (9 instead of 10)
-    - value: 80036100000000020
+    - value: '80036100000000020'
       description: Too many trailing digits (11 instead of 10)
 false_positives:
   - description: >-
@@ -85,23 +76,31 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 95
-      id_match: Regex_hpii
-      matches:
-        - ref: Keyword_hpii
     - confidence_level: 85
-      id_match: Regex_hpii
+      id_match: Pattern_hpii
       matches:
-        - ref: Keyword_healthcare_provider
+        - ref: Evidence_hpii_terms
+        - ref: Evidence_provider_credential
+      exclusion:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_hpii
+      id_match: Pattern_hpii
       matches:
-        - ref: Keyword_health_identifier
+        - ref: Evidence_hpii_terms
+        - ref: Evidence_provider_role
+    - confidence_level: 65
+      id_match: Pattern_hpii
+      matches:
+        - ref: Evidence_hpii_terms
   regexes:
-    - id: Regex_hpii
+    - id: Pattern_hpii
       pattern: \b800361\d{10}\b
   keywords:
-    - id: Keyword_hpii
+    - id: Evidence_hpii_terms
       groups:
         - match_style: word
           terms:
@@ -116,7 +115,7 @@ purview:
             - HI number
             - provider number
             - provider HI
-    - id: Keyword_healthcare_provider
+    - id: Evidence_provider_credential
       groups:
         - match_style: word
           terms:
@@ -144,20 +143,36 @@ purview:
             - anaesthetist
             - radiologist
             - pathologist
-    - id: Keyword_health_identifier
+    - id: Evidence_provider_role
       groups:
         - match_style: word
           terms:
-            - health identifier
-            - healthcare identifier
-            - HI
-            - identifier
-            - national identifier
-            - My Health Record
-            - eHealth
-            - digital health
-            - Services Australia
+            - doctor
+            - nurse
+            - pharmacist
+            - dentist
+            - physiotherapist
+            - psychologist
+            - midwife
+            - specialist
+            - surgeon
+            - clinician
+            - practitioner
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

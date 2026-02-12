@@ -1,20 +1,23 @@
 schema: testpattern/v1
 name: AFSL Number (Australian Financial Services Licence)
 slug: au-afsl-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
   Detects Australian Financial Services Licence (AFSL) numbers issued by ASIC to authorised financial services
   providers.
 operation: >-
-  Matches a 6-digit AFSL number. Corroborative evidence: 14 keywords within 300 characters including AFSL, AFS licence,
-  Australian Financial Services, and related terms.
-pattern: \b\d{6}\b
-confidence: medium
+  Regex pattern using universal engine. The top-level regex \b\d{6}\b matches any 6-digit number. The Purview engine
+  uses two regexes: Pattern_afsl_labeled (labeled format with AFSL/AFS licence/Australian Financial Services prefix +
+  6 digits) and Pattern_afsl (bare 6-digit format). Three confidence tiers: High (85) requires AFSL terms + ASIC
+  context keywords with template exclusion logic; Medium (75) requires AFSL terms; Low (65) requires ASIC context
+  keywords only. Evidence uses 2 keyword groups (13 AFSL terms, 10 ASIC context terms) within 300-character proximity.
+confidence: low
 confidence_justification: >-
-  Medium confidence: 6-digit numbers are common in many contexts. Requires corroborative evidence keywords such as AFSL
-  or financial services licence to reduce false positives.
+  Low confidence: a bare 6-digit number is extremely common and will match postcodes, reference codes, invoice numbers,
+  and many other numeric sequences. Corroborative evidence keywords such as AFSL, financial services licence, or ASIC
+  are essential for reliable detection.
 jurisdictions:
   - au
 regulations:
@@ -42,12 +45,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: 'AFSL Number: 234567'
-      description: Standard AFSL number with label
-    - value: Australian Financial Services Licence 456789
-      description: AFSL with full name prefix
-    - value: The licensee holds AFSL 123456 issued by ASIC
-      description: AFSL in sentence context
+    - value: '234567'
+      description: Bare 6-digit number matching AFSL format
+    - value: '456789'
+      description: Another 6-digit number matching AFSL format
+    - value: '123456'
+      description: Standard 6-digit AFSL number
   should_not_match:
     - value: '12345'
       description: Only 5 digits, too short for AFSL number
@@ -60,7 +63,7 @@ exports:
   - purview_xml
   - yaml
   - regex_copy
-scope: narrow
+scope: wide
 risk_rating: 7
 risk_description: AFSL exposure enables financial services impersonation and fraudulent investment advice.
 sensitivity_labels:
@@ -75,23 +78,28 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 75
   pattern_tiers:
-    - confidence_level: 95
-      id_match: Regex_afsl
-      matches:
-        - ref: Keyword_afsl
     - confidence_level: 85
-      id_match: Regex_afsl
+      id_match: Pattern_afsl_labeled
       matches:
-        - ref: Keyword_financial_services
+        - ref: Evidence_afsl_terms
+        - ref: Evidence_asic_context
+      excludes:
+        - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_afsl
+      id_match: Pattern_afsl
       matches:
-        - ref: Keyword_asic
+        - ref: Evidence_afsl_terms
+    - confidence_level: 65
+      id_match: Pattern_afsl
+      matches:
+        - ref: Evidence_asic_context
   regexes:
-    - id: Regex_afsl
+    - id: Pattern_afsl
       pattern: \b\d{6}\b
+    - id: Pattern_afsl_labeled
+      pattern: (?i)\b(?:AFSL|AFS\s+licen[cs]e|Australian\s+Financial\s+Services)\s*(?:number|no|#)?\s*[:#-]?\s*\d{6}\b
   keywords:
-    - id: Keyword_afsl
+    - id: Evidence_afsl_terms
       groups:
         - match_style: word
           terms:
@@ -99,7 +107,6 @@ purview:
             - AFS licence
             - AFS license
             - Australian Financial Services
-            - Australian Financial Services Licence
             - financial services licence
             - financial services license
             - ASIC licence
@@ -109,25 +116,7 @@ purview:
             - authorized representative
             - financial adviser
             - financial advisor
-    - id: Keyword_financial_services
-      groups:
-        - match_style: word
-          terms:
-            - financial services
-            - financial advice
-            - financial adviser
-            - financial advisor
-            - investment
-            - securities
-            - superannuation
-            - managed fund
-            - insurance
-            - credit
-            - derivatives
-            - trading
-            - broker
-            - dealer
-    - id: Keyword_asic
+    - id: Evidence_asic_context
       groups:
         - match_style: word
           terms:
@@ -141,7 +130,24 @@ purview:
             - authorisation
             - authorization
             - compliance
+    - id: Evidence_template_exclusion
+      type: any
+      min_matches: 0
+      max_matches: 0
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

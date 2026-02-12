@@ -1,14 +1,22 @@
 schema: testpattern/v1
 name: Water Quality Data Reference
 slug: au-water-quality-data-reference
-version: 1.0.0
+version: 1.1.0
 type: keyword_list
 description: Detects references to water quality monitoring data, compliance reports, and environmental water testing results.
 operation: >-
-  Keyword-based detection. Corroborative evidence: 14 keywords within 300 characters related to water quality
-  monitoring.
+  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_water_quality_phrase matches phrases such
+  as water quality, water testing, water sample, water treatment, water monitoring, water compliance, ADWG, Australian
+  Drinking Water Guidelines, turbidity, E. coli/coliform test/level/result/count, effluent quality, and catchment data.
+  Three confidence tiers: High (85) requires infrastructure context + environmental monitoring keywords with template
+  exclusion logic; Medium (75) requires infrastructure context keywords; Low (65) requires only the regex match.
+  Evidence uses 2 keyword groups (8 infrastructure context terms, 10 environmental monitoring terms) within
+  300-character proximity. Template/sample exclusion prevents false positives from training materials.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative
+  evidence keywords are needed for reliable identification since water-related terms can appear in non-monitoring
+  contexts.
 jurisdictions:
   - au
 regulations:
@@ -20,16 +28,16 @@ data_categories:
 test_cases:
   should_match:
     - value: 'Water quality report: turbidity within ADWG limits'
-      description: Test match 1
+      description: Matches 'water quality' and 'turbidity' and 'ADWG' via Pattern_water_quality_phrase
     - value: Water testing results show E. coli below threshold
-      description: Test match 2
+      description: Matches 'water testing' via Pattern_water_quality_phrase
     - value: Catchment data and water monitoring compliance review
-      description: Test match 3
+      description: Matches 'catchment data' and 'water monitoring' via Pattern_water_quality_phrase
   should_not_match:
     - value: Water the garden regularly
-      description: Non-match 1
+      description: No water quality phrase matched by the Purview regex
     - value: Quality assurance testing complete
-      description: Non-match 2
+      description: No water quality phrase present
 false_positives:
   - description: Generic references to water or quality in non-monitoring contexts.
     mitigation: Require specific water quality terms like turbidity, ADWG, or coliform.
@@ -49,13 +57,28 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
+  regexes:
+    - id: Pattern_water_quality_phrase
+      pattern: '(?i)\b(?:water\s+(?:quality|testing|sample|treatment|monitoring|compliance)|ADWG|Australian\s+Drinking\s+Water\s+Guidelines|turbidity|(?:E\.\s*coli|coliform)\s+(?:test|level|result|count)|effluent\s+quality|catchment\s+data)\b'
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Keyword_water_quality
+    - confidence_level: 85
+      id_match: Pattern_water_quality_phrase
       matches:
-        - ref: Keyword_critical_infrastructure
+        - ref: Evidence_infrastructure_context
+        - ref: Evidence_environmental_monitoring
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_water_quality_phrase
+      matches:
+        - ref: Evidence_infrastructure_context
+    - confidence_level: 65
+      id_match: Pattern_water_quality_phrase
   keywords:
-    - id: Keyword_critical_infrastructure
+    - id: Evidence_infrastructure_context
       groups:
         - match_style: word
           terms:
@@ -64,8 +87,39 @@ purview:
             - SOCI
             - utility
             - water authority
+            - water supply
+            - reservoir
+            - treatment plant
+    - id: Evidence_environmental_monitoring
+      groups:
+        - match_style: word
+          terms:
+            - monitoring
+            - compliance
+            - report
+            - testing
+            - sample
+            - analysis
+            - threshold
+            - guideline
+            - standard
+            - exceedance
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT
 keywords:

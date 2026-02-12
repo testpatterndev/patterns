@@ -1,17 +1,22 @@
 schema: testpattern/v1
 name: NDIS Participant Number
 slug: au-ndis-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects NDIS Participant Number patterns.
+description: Detects NDIS Participant Number patterns. A 9-digit number starting with the prefix 43.
 operation: >-
-  Reference: https://www.ndis.gov.au/media/2018/download Corroborative evidence: 4 keywords within 300 characters.
-  Keyword lists: au-identity-ndis, au-government-services-australia.
+  Regex pattern using universal engine. The top-level regex \b43\d{7}\b matches 9-digit numbers starting with prefix
+  43. The Purview engine uses two regexes: Pattern_ndis_labeled (labeled format with NDIS/NDIA/participant prefix + 43
+  + digits) and Pattern_au_ndis (bare 43 + 7 digits format). Three confidence tiers: High (85) requires NDIS label +
+  NDIS context keywords with template exclusion logic; Medium (75) requires NDIS label keywords; Low (65) requires
+  NDIS label keywords only (minimum context). Evidence uses 2 keyword groups (6 NDIS label terms, 9 NDIS context
+  terms) within 300-character proximity. Keyword lists: au-identity-ndis, au-government-services-australia.
 pattern: \b43\d{7}\b
 confidence: low
 confidence_justification: >-
-  Low confidence: generic pattern format that may match unrelated data. Corroborative evidence keywords are essential
+  Low confidence: a 9-digit number starting with 43 is a relatively short pattern that can match phone numbers and
+  other numeric sequences. Corroborative evidence keywords such as NDIS, NDIA, or participant number are essential
   for reliable detection.
 jurisdictions:
   - au
@@ -39,11 +44,11 @@ test_cases:
     - value: '439999999'
       description: Upper range NDIS number
   should_not_match:
-    - value: 440000001
+    - value: '440000001'
       description: Wrong prefix (44 instead of 43)
-    - value: 42000001
+    - value: '42000001'
       description: Wrong prefix (42 instead of 43) and too few digits
-    - value: 4312345678
+    - value: '4312345678'
       description: Too many digits (10 instead of 9)
 false_positives:
   - description: >-
@@ -84,26 +89,68 @@ purview:
   recommended_confidence: 75
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_au_ndis
+      id_match: Pattern_ndis_labeled
       matches:
-        - ref: Keyword_au_ndis
+        - ref: Evidence_ndis_context
+      exclusion:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_au_ndis
+      matches:
+        - ref: Evidence_ndis_label
+        - ref: Evidence_ndis_context
+    - confidence_level: 65
+      id_match: Pattern_au_ndis
+      matches:
+        - ref: Evidence_ndis_label
   regexes:
-    - id: Regex_au_ndis
+    - id: Pattern_au_ndis
       pattern: \b43\d{7}\b
+    - id: Pattern_ndis_labeled
+      pattern: (?i)\b(?:NDIS|NDIA|participant)\s*(?:number|no|ID|ref|reference)?\s*[:#-]?\s*43\d{7}\b
   keywords:
-    - id: Keyword_au_ndis
+    - id: Evidence_ndis_label
       groups:
         - match_style: word
           terms:
             - NDIS
-            - national disability
-            - disability insurance scheme
-            - participant number
             - NDIA
-            - disability support
+            - National Disability Insurance Scheme
+            - participant number
+            - NDIS number
+            - NDIS participant
+    - id: Evidence_ndis_context
+      groups:
+        - match_style: word
+          terms:
+            - NDIS
+            - NDIA
+            - National Disability Insurance
+            - participant
+            - support plan
             - plan manager
             - support coordinator
+            - disability
+            - disability support
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

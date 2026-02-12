@@ -1,19 +1,25 @@
 schema: testpattern/v1
 name: Australian Citizenship Certificate
 slug: au-citizenship-certificate
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects Australian Citizenship Certificate patterns.
+description: >-
+  Detects Australian Citizenship Certificate number patterns including prefixed formats (ACC, CDM, ACS, CAS followed
+  by 4-8 digits) and numeric-only formats (0 + 10 digits).
 operation: >-
-  Validation: Prefix validates certificate type. Reference: https://immi.homeaffairs.gov.au/citizenship/certificate
-  Corroborative evidence: 3 keywords within 300 characters. Keyword lists: au-government-citizenship-immigration,
-  pii-civic-credentials.
+  Regex pattern using universal engine. The top-level regex \b(ACC|CDM|ACS|CAS)[\s]?\d{4,8}\b matches a certificate
+  type prefix followed by an optional space and 4-8 digits. The Purview engine uses two regexes:
+  Pattern_au_citizenship_cert (prefixed format) and Pattern_au_citizenship_cert_numeric (11-digit format starting with
+  0). Three confidence tiers: High (85) requires citizenship-specific terms + Home Affairs context keywords with
+  template exclusion logic; Medium (75) requires citizenship-specific terms; Low (65) requires immigration context
+  keywords. Evidence uses 3 keyword groups (8 citizenship-specific terms, 7 Home Affairs terms, 10 immigration context
+  terms) within 300-character proximity. Keyword lists: au-government-citizenship-immigration, pii-civic-credentials.
 pattern: \b(ACC|CDM|ACS|CAS)[\s]?\d{4,8}\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false
-  positive rates.
+  Medium confidence: the 3-letter prefix (ACC, CDM, ACS, CAS) provides good structural specificity. Corroborative
+  keywords are recommended to distinguish from other prefixed reference codes.
 jurisdictions:
   - au
 regulations:
@@ -23,9 +29,9 @@ data_categories:
   - government-id
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+    - citizenship
+    - citizenship certificate
+    - Australian citizen
   proximity: 300
   keyword_lists:
     - au-government-citizenship-immigration
@@ -33,11 +39,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: ACC12345678
-      description: Citizenship certificate ACC prefix
+      description: Citizenship certificate ACC prefix with 8 digits
     - value: CDM 1234
-      description: CDM prefix with space
+      description: CDM prefix with space and 4 digits
     - value: ACS56789
-      description: ACS prefix certificate number
+      description: ACS prefix certificate number with 5 digits
   should_not_match:
     - value: XYZ12345
       description: Invalid prefix (XYZ instead of ACC/CDM/ACS/CAS)
@@ -78,39 +84,51 @@ purview:
   recommended_confidence: 85
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_au_citizenship_cert
+      id_match: Pattern_au_citizenship_cert
       matches:
-        - ref: Keyword_citizenship
-    - confidence_level: 85
-      id_match: Regex_au_citizenship_cert_numeric
-      matches:
-        - ref: Keyword_citizenship
+        - ref: Evidence_citizenship_specific
+        - ref: Evidence_home_affairs
+      excludes:
+        - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_au_citizenship_cert
+      id_match: Pattern_au_citizenship_cert
       matches:
-        - ref: Keyword_immigration
+        - ref: Evidence_citizenship_specific
+    - confidence_level: 65
+      id_match: Pattern_au_citizenship_cert_numeric
+      matches:
+        - ref: Evidence_citizenship_specific
+        - ref: Evidence_immigration_context
   regexes:
-    - id: Regex_au_citizenship_cert
+    - id: Pattern_au_citizenship_cert
       pattern: \b(?:ACC|CDM|ACS|CAS)\s?\d{4,8}\b
-    - id: Regex_au_citizenship_cert_numeric
+    - id: Pattern_au_citizenship_cert_numeric
       pattern: \b0\d{10}\b
   keywords:
-    - id: Keyword_citizenship
+    - id: Evidence_citizenship_specific
       groups:
         - match_style: word
           terms:
             - citizenship
-            - certificate
             - citizenship certificate
-            - evidence number
-            - stock number
+            - certificate of citizenship
             - naturalisation
             - naturalization
             - Australian citizen
-            - immigration
+            - evidence number
+            - stock number
+    - id: Evidence_home_affairs
+      groups:
+        - match_style: word
+          terms:
             - Home Affairs
-            - certificate of citizenship
-    - id: Keyword_immigration
+            - Department of Home Affairs
+            - immigration
+            - DIAC
+            - DIBP
+            - IMMI
+            - immi.homeaffairs
+    - id: Evidence_immigration_context
       groups:
         - match_style: word
           terms:
@@ -119,16 +137,29 @@ purview:
             - migrant
             - immigrant
             - visa
-            - citizenship
             - permanent resident
             - temporary resident
             - asylum
             - refugee
             - border
-            - entry
-            - arrival
-            - departure
+    - id: Evidence_template_exclusion
+      type: any
+      min_matches: 0
+      max_matches: 0
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

@@ -1,19 +1,25 @@
 schema: testpattern/v1
 name: Individual Healthcare Identifier
 slug: au-individual-healthcare-identifier
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
-description: Detects Individual Healthcare Identifier patterns.
+description: >-
+  Detects Individual Healthcare Identifier (IHI) patterns. The IHI is a 16-digit number starting with the prefix
+  800360, validated with the Luhn algorithm.
 operation: >-
-  Validation: Luhn algorithm. Reference: https://www.servicesaustralia.gov.au/individual-healthcare-identifiers
-  Corroborative evidence: 3 keywords within 300 characters. Keyword lists: au-healthcare-identifiers,
-  healthcare-identifiers.
+  Regex pattern using universal engine. The top-level regex \b800360\d{10}\b matches 16-digit numbers starting with
+  the fixed prefix 800360. Luhn algorithm validation applies. The Purview engine uses Pattern_au_ihi (same regex).
+  Three confidence tiers: High (85) requires IHI-specific terms + clinical/health system context keywords with
+  template exclusion logic; Medium (75) requires IHI-specific terms; Low (65) requires clinical context keywords with
+  non-health exclusion logic. Evidence uses 3 keyword groups (3 IHI terms, 8 clinical context terms, 7 health system
+  terms) within 300-character proximity. Keyword lists: au-healthcare-identifiers, healthcare-identifiers.
 pattern: \b800360\d{10}\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false
-  positive rates.
+  Medium confidence: the 800360 prefix provides strong structural specificity for a 16-digit identifier. Corroborative
+  keywords are recommended to distinguish from other long numeric sequences but the prefix already significantly
+  reduces false positives.
 jurisdictions:
   - au
 regulations:
@@ -23,9 +29,9 @@ data_categories:
   - government-id
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+    - IHI
+    - Individual Healthcare Identifier
+    - healthcare identifier
   proximity: 300
   keyword_lists:
     - au-healthcare-identifiers
@@ -39,11 +45,11 @@ test_cases:
     - value: '8003609999999999'
       description: IHI upper range
   should_not_match:
-    - value: 8003610000000001
+    - value: '8003610000000001'
       description: Wrong prefix (800361 instead of 800360)
-    - value: 800360000000001
+    - value: '800360000000001'
       description: Too few trailing digits (9 instead of 10)
-    - value: 80036000000000020
+    - value: '80036000000000020'
       description: Too many trailing digits (11 instead of 10)
 false_positives:
   - description: >-
@@ -70,30 +76,92 @@ purview:
   recommended_confidence: 85
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_au_ihi
+      id_match: Pattern_au_ihi
       matches:
-        - ref: Keyword_au_healthcare
+        - ref: Evidence_ihi_terms
+        - type: any
+          min_matches: 2
+          children:
+            - ref: Evidence_clinical_context
+            - ref: Evidence_health_system
+      exclusion:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_au_ihi
+      id_match: Pattern_au_ihi
+      matches:
+        - ref: Evidence_ihi_terms
+    - confidence_level: 65
+      id_match: Pattern_au_ihi
+      matches:
+        - ref: Evidence_clinical_context
+      exclusion:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_non_health_exclusion
   regexes:
-    - id: Regex_au_ihi
+    - id: Pattern_au_ihi
       pattern: \b800360\d{10}\b
   keywords:
-    - id: Keyword_au_healthcare
+    - id: Evidence_ihi_terms
       groups:
         - match_style: word
           terms:
-            - healthcare
-            - health identifier
             - IHI
-            - individual healthcare identifier
+            - Individual Healthcare Identifier
+            - healthcare identifier
+    - id: Evidence_clinical_context
+      groups:
+        - match_style: word
+          terms:
             - patient
+            - clinical
+            - health record
+            - My Health Record
             - medical
+            - healthcare
+            - health service
+            - practitioner
+    - id: Evidence_health_system
+      groups:
+        - match_style: word
+          terms:
+            - Medicare
+            - PBS
+            - health insurance
             - hospital
             - GP
-            - doctor
-            - My Health Record
+            - general practitioner
+            - specialist
+    - id: Evidence_non_health_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - invoice
+            - order
+            - tracking
+            - shipment
+            - serial
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

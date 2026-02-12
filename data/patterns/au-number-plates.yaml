@@ -1,17 +1,27 @@
 schema: testpattern/v1
 name: Au Number Plates
 slug: au-number-plates
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
-  Detects Au Number Plates patterns. Standard plate formats only; personalised plates excluded. Requires
+  Detects Australian number plate patterns. Standard plate formats only; personalised plates excluded. Requires
   vehicle/registration keyword context.
-operation: 'Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-contact.'
-pattern: \b([A-Z]{2}\d{2}[A-Z]{2}|\d[A-Z]{2}\d{3}|\d{3}[A-Z]{2}\d)\b
+operation: >-
+  Regex pattern using universal engine. The top-level regex matches three NSW-centric plate formats:
+  AA99AA (2 letters, 2 digits, 2 letters), 9AA999 (digit, 2 letters, 3 digits), and 999AA9 (3 digits, 2 letters,
+  digit), with optional spaces/hyphens. The Purview engine uses five state-specific regexes:
+  Pattern_au_plate_nsw (AA99AA), Pattern_au_plate_vic (9AA999), Pattern_au_plate_qld (999AA9),
+  Pattern_au_plate_sa (S999AAA), and Pattern_au_plate_wa (1AAA999). Three confidence tiers: High (85) requires
+  registration context + transport agency keywords with template exclusion; Medium (75) requires registration context
+  keywords with serial code exclusion; Low (65) requires vehicle terms only. Evidence uses 3 keyword groups (9
+  registration terms, 10 transport agency terms, 9 vehicle terms) within 300-character proximity. Keyword lists:
+  pii-contact.
+pattern: \b([A-Z]{2}[\s\-]?\d{2}[\s\-]?[A-Z]{2}|\d[A-Z]{2}[\s\-]?\d{3}|\d{3}[\s\-]?[A-Z]{2}[\s\-]?\d)\b
 confidence: low
 confidence_justification: >-
-  Low confidence: generic pattern format that may match unrelated data. Corroborative evidence keywords are essential
+  Low confidence: short alphanumeric plate formats can easily match product codes, abbreviations, and other
+  non-vehicle identifiers. Corroborative evidence keywords such as registration, rego, or number plate are essential
   for reliable detection.
 jurisdictions:
   - au
@@ -22,16 +32,16 @@ data_categories:
   - pii
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+    - registration
+    - rego
+    - number plate
   proximity: 300
   keyword_lists:
     - pii-contact
 test_cases:
   should_match:
     - value: AB12CD
-      description: NSW standard plate format
+      description: NSW standard plate format (AA99AA)
     - value: XY99ZZ
       description: NSW plate upper range
     - value: DL45KM
@@ -67,7 +77,12 @@ exports:
   - yaml
   - regex_copy
 scope: wide
+risk_rating: 5
+risk_description: Number plate exposure enables vehicle tracking and owner identification
 sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
   us_gov: "CUI"
   uk_gov: "OFFICIAL"
   nz_gov: "IN-CONFIDENCE"
@@ -76,65 +91,126 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 75
   pattern_tiers:
+    - confidence_level: 85
+      id_match:
+        type: any
+        ids:
+          - Pattern_au_plate_nsw
+          - Pattern_au_plate_vic
+          - Pattern_au_plate_qld
+          - Pattern_au_plate_sa
+          - Pattern_au_plate_wa
+      matches:
+        - ref: Evidence_registration_context
+        - ref: Evidence_transport_agency
+      excludes:
+        - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_au_plate_nsw
+      id_match:
+        type: any
+        ids:
+          - Pattern_au_plate_nsw
+          - Pattern_au_plate_vic
+          - Pattern_au_plate_qld
+          - Pattern_au_plate_sa
+          - Pattern_au_plate_wa
       matches:
-        - ref: Keyword_number_plate
-    - confidence_level: 75
-      id_match: Regex_au_plate_vic
-      matches:
-        - ref: Keyword_number_plate
-    - confidence_level: 75
-      id_match: Regex_au_plate_qld
-      matches:
-        - ref: Keyword_number_plate
+        - ref: Evidence_registration_context
+      excludes:
+        - ref: Evidence_serial_code_exclusion
     - confidence_level: 65
-      id_match: Regex_au_plate_nsw
+      id_match:
+        type: any
+        ids:
+          - Pattern_au_plate_nsw
+          - Pattern_au_plate_vic
+          - Pattern_au_plate_qld
+          - Pattern_au_plate_sa
+          - Pattern_au_plate_wa
       matches:
-        - ref: Keyword_vehicle
-    - confidence_level: 65
-      id_match: Regex_au_plate_vic
-      matches:
-        - ref: Keyword_vehicle
-    - confidence_level: 65
-      id_match: Regex_au_plate_qld
-      matches:
-        - ref: Keyword_vehicle
+        - ref: Evidence_vehicle_terms
   regexes:
-    - id: Regex_au_plate_nsw
-      pattern: \b[A-Z]{2}\d{2}[A-Z]{2}\b
-    - id: Regex_au_plate_vic
-      pattern: \b\d[A-Z]{2}\d{3}\b
-    - id: Regex_au_plate_qld
-      pattern: \b\d{3}[A-Z]{2}\d\b
+    - id: Pattern_au_plate_nsw
+      pattern: \b[A-Z]{2}[\s\-]?\d{2}[\s\-]?[A-Z]{2}\b
+    - id: Pattern_au_plate_vic
+      pattern: \b\d[A-Z]{2}[\s\-]?\d{3}\b
+    - id: Pattern_au_plate_qld
+      pattern: \b\d{3}[\s\-]?[A-Z]{2}[\s\-]?\d\b
+    - id: Pattern_au_plate_sa
+      pattern: \bS\d{3}[\s\-]?[A-Z]{3}\b
+    - id: Pattern_au_plate_wa
+      pattern: \b1[A-Z]{3}[\s\-]?\d{3}\b
   keywords:
-    - id: Keyword_number_plate
+    - id: Evidence_registration_context
       groups:
         - match_style: word
           terms:
-            - number plate
             - registration
-            - registration number
+            - vehicle registration
             - rego
+            - registration number
             - licence plate
             - license plate
-            - vehicle registration
+            - number plate
             - plate number
-    - id: Keyword_vehicle
+            - registered vehicle
+    - id: Evidence_transport_agency
       groups:
         - match_style: word
           terms:
-            - VIN
-            - vehicle identification
-            - vehicle identification number
-            - chassis
-            - chassis number
+            - TMR
+            - RMS
+            - VicRoads
+            - Service NSW
+            - Service SA
+            - Department of Transport
+            - Service Tasmania
+            - MVR
+            - Access Canberra
+            - DPTI
+    - id: Evidence_vehicle_terms
+      groups:
+        - match_style: word
+          terms:
             - vehicle
-            - registration
-            - motor vehicle
             - car
             - truck
+            - motor vehicle
+            - VIN
+            - chassis
+            - automobile
+            - motorcycle
+            - trailer
+    - id: Evidence_serial_code_exclusion
+      type: any
+      min_matches: 0
+      max_matches: 0
+      groups:
+        - match_style: word
+          terms:
+            - serial
+            - code
+            - model
+            - part
+            - SKU
+    - id: Evidence_template_exclusion
+      type: any
+      min_matches: 0
+      max_matches: 0
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - example
+            - placeholder
+            - dummy
+            - mock
+            - tutorial
+            - demo
+            - training exercise
+            - test data
 created: '2026-02-08'
-updated: '2026-02-08'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT
