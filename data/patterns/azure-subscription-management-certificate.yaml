@@ -4,96 +4,142 @@ slug: azure-subscription-management-certificate
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Azure subscription management certificate patterns. This pattern is based on a Microsoft Purview built-in
-  sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this
-  version as a starting point for customisation.
-operation: >-
-  Matches Base64-encoded management certificates found in Azure publish settings files and subscription configuration.
-  These certificates provide full access to Azure subscription management APIs. Corroborative evidence: 8 keywords
-  within 300 characters. Keyword lists: credentials-api-keys.
+description: Detects Azure subscription management certificate patterns. This pattern
+  is based on a Microsoft Purview built-in sensitive information type. Users already
+  running Purview may prefer to enable the built-in SIT directly, or use this version
+  as a starting point for customisation.
+operation: 'Matches Base64-encoded management certificates found in Azure publish
+  settings files and subscription configuration. These certificates provide full access
+  to Azure subscription management APIs. Corroborative evidence: 8 keywords within
+  300 characters. Keyword lists: credentials-api-keys. Uses additional domain-context
+  evidence and explicit exclusion logic for template/sample/test text.'
 pattern: (?i)(?:ManagementCertificate|management[._-]?cert)\s*=\s*"?[A-Za-z0-9+/]{100,}={0,2}"?
 confidence: high
-confidence_justification: >-
-  High confidence: long Base64-encoded certificate value with management certificate context keywords provides strong
-  structural constraint.
+confidence_justification: 'High confidence: long Base64-encoded certificate value
+  with management certificate context keywords provides strong structural constraint.
+  Added context gating and exclusion rules improve precision and reduce incidental
+  matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - credentials
-  - security
+- credentials
+- security
 corroborative_evidence:
   keywords:
-    - management certificate
-    - subscription
-    - Azure
-    - ManagementCertificate
-    - publishsettings
-    - certificate
-    - subscription management
-    - service management
+  - management certificate
+  - subscription
+  - Azure
+  - ManagementCertificate
+  - publishsettings
+  - certificate
+  - subscription management
+  - service management
   proximity: 300
   keyword_lists:
-    - credentials-api-keys
+  - credentials-api-keys
 test_cases:
   should_match:
-    - value: >-
-        ManagementCertificate="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-      description: Management certificate in publish settings
-    - value: >-
-        management_cert="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv=="
-      description: Management certificate with mixed characters
-    - value: >-
-        ManagementCertificate="00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-      description: Management certificate placeholder
+  - value: ManagementCertificate="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    description: Management certificate in publish settings
+  - value: management_cert="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv=="
+    description: Management certificate with mixed characters
+  - value: ManagementCertificate="00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    description: Management certificate placeholder
   should_not_match:
-    - value: ManagementCertificate=""
-      description: Empty certificate value
-    - value: ManagementCertificate="short"
-      description: Value too short to be a certificate
+  - value: ManagementCertificate=""
+    description: Empty certificate value
+  - value: ManagementCertificate="short"
+    description: Value too short to be a certificate
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: Azure documentation describing management certificate format with example values.
-    mitigation: Check for common placeholder patterns and documentation context.
-  - description: Expired management certificates that no longer grant access.
-    mitigation: Flag for review regardless since the certificate format reveals subscription details.
+- description: Azure documentation describing management certificate format with example
+    values.
+  mitigation: Check for common placeholder patterns and documentation context.
+- description: Expired management certificates that no longer grant access.
+  mitigation: Flag for review regardless since the certificate format reveals subscription
+    details.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_azure_subscription_mgmt_cert
-      matches:
-        - ref: Keyword_azure_subscription_mgmt_cert
+  - confidence_level: 90
+    id_match: Regex_azure_subscription_mgmt_cert
+    matches:
+    - ref: Pattern_azure_subscription_management_certificate_label_context
+    - ref: Keyword_azure_subscription_management_certificate_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_subscription_management_certificate_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_azure_subscription_mgmt_cert
+    matches:
+    - ref: Keyword_azure_subscription_mgmt_cert
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_subscription_management_certificate_noise_exclusion
   regexes:
-    - id: Regex_azure_subscription_mgmt_cert
-      pattern: (?i)(?:ManagementCertificate|management[._-]?cert)\s*=\s*"?[A-Za-z0-9+/]{100,}={0,2}"?
+  - id: Regex_azure_subscription_mgmt_cert
+    pattern: (?i)(?:ManagementCertificate|management[._-]?cert)\s*=\s*"?[A-Za-z0-9+/]{100,}={0,2}"?
+  - id: Pattern_azure_subscription_management_certificate_label_context
+    pattern: (?i)\\b(?:azure\\s+subscription\\s+management\\s+certificate|azure|subscription|management|certificate)\\b
   keywords:
-    - id: Keyword_azure_subscription_mgmt_cert
-      groups:
-        - match_style: word
-          terms:
-            - management certificate
-            - subscription
-            - Azure
-            - ManagementCertificate
-            - publishsettings
-            - certificate
-            - subscription management
-            - service management
-            - publish settings
-            - X509
-            - management API
+  - id: Keyword_azure_subscription_mgmt_cert
+    groups:
+    - match_style: word
+      terms:
+      - management certificate
+      - subscription
+      - Azure
+      - ManagementCertificate
+      - publishsettings
+      - certificate
+      - subscription management
+      - service management
+      - publish settings
+      - X509
+      - management API
+  - id: Keyword_azure_subscription_management_certificate_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - azure subscription management certificate
+      - azure
+      - subscription
+      - management
+      - certificate
+      - field
+      - identifier
+      - reference
+  - id: Keyword_azure_subscription_management_certificate_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 risk_rating: 10
-risk_description: >-
-  Exposure of this credential could grant unauthorized access to cloud infrastructure, databases, or services.
-  Compromised credentials are a leading cause of data breaches and can result in full system takeover.
+risk_description: Exposure of this credential could grant unauthorized access to cloud
+  infrastructure, databases, or services. Compromised credentials are a leading cause
+  of data breaches and can result in full system takeover.
 sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
@@ -103,10 +149,10 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-subscription-management-certificate
-    title: Azure subscription management certificate entity definition - Microsoft Learn
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-subscription-management-certificate
+  title: Azure subscription management certificate entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

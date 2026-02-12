@@ -53,6 +53,7 @@ for (const file of keywordFiles) {
 const patternFiles = walkDir(join(DATA_DIR, 'patterns'))
 const patterns = []
 let resolvedCount = 0
+let unresolvedKeywordRefs = 0
 
 for (const file of patternFiles) {
   const raw = readFileSync(file, 'utf-8')
@@ -76,6 +77,7 @@ for (const file of patternFiles) {
         }
       } else {
         console.error(`  WARN: ${relative(DATA_DIR, file)} references unknown keyword list: ${ref}`)
+        unresolvedKeywordRefs++
       }
     }
     // Merge with any inline keywords
@@ -112,4 +114,8 @@ writeFileSync(OUT_FILE, JSON.stringify(output, null, 2))
 console.log(`Done: ${patterns.length} patterns, ${collections.length} collections, ${keywordDicts.length} keyword dictionaries → patterns.json`)
 if (resolvedCount > 0) {
   console.log(`  (${resolvedCount} patterns had keyword_lists references resolved)`)
+}
+if (unresolvedKeywordRefs > 0) {
+  console.error(`Compile failed: ${unresolvedKeywordRefs} unresolved keyword_list reference(s).`)
+  process.exit(1)
 }

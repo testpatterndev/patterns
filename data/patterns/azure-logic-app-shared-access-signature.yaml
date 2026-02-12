@@ -4,110 +4,156 @@ slug: azure-logic-app-shared-access-signature
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Azure Logic App shared access signature (SAS) URL patterns. This pattern is based on a Microsoft Purview
-  built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or
-  use this version as a starting point for customisation.
-operation: >-
-  Matches Logic App trigger URLs containing SAS tokens with sig parameter. These URLs allow unauthenticated invocation
-  of Logic App workflows. Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials-api-keys.
+description: Detects Azure Logic App shared access signature (SAS) URL patterns. This
+  pattern is based on a Microsoft Purview built-in sensitive information type. Users
+  already running Purview may prefer to enable the built-in SIT directly, or use this
+  version as a starting point for customisation.
+operation: 'Matches Logic App trigger URLs containing SAS tokens with sig parameter.
+  These URLs allow unauthenticated invocation of Logic App workflows. Corroborative
+  evidence: 8 keywords within 300 characters. Keyword lists: credentials-api-keys.
+  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
+  text.'
 pattern: (?i)https?://[^/]*logic\.azure\.com[^"'\s]*[?&]sig=[A-Za-z0-9%+/=_-]+
 confidence: high
-confidence_justification: >-
-  High confidence: logic.azure.com domain combined with sig parameter provides strong structural constraint unique to
-  Logic Apps.
+confidence_justification: 'High confidence: logic.azure.com domain combined with sig
+  parameter provides strong structural constraint unique to Logic Apps. Added context
+  gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - credentials
-  - security
+- credentials
+- security
 corroborative_evidence:
   keywords:
-    - Logic App
-    - logic app
-    - workflow
-    - trigger
-    - logic.azure.com
-    - SAS
-    - sig
-    - shared access signature
+  - Logic App
+  - logic app
+  - workflow
+  - trigger
+  - logic.azure.com
+  - SAS
+  - sig
+  - shared access signature
   proximity: 300
   keyword_lists:
-    - credentials-api-keys
+  - credentials-api-keys
 test_cases:
   should_match:
-    - value: https://prod-00.westus.logic.azure.com/workflows/aaaa0000/triggers/manual/paths/invoke?api-version=2016-10-01&sig=AAAA0000BBBB
-      description: Logic App trigger URL with SAS
-    - value: https://test-01.eastus.logic.azure.com/workflows/test/triggers/request?sig=0000000000000000
-      description: Logic App URL with test sig
-    - value: https://prod-42.northeurope.logic.azure.com:443/workflows/run?sig=ABCDEFghijklmnop%2B
-      description: Logic App URL with encoded sig parameter
+  - value: https://prod-00.westus.logic.azure.com/workflows/aaaa0000/triggers/manual/paths/invoke?api-version=2016-10-01&sig=AAAA0000BBBB
+    description: Logic App trigger URL with SAS
+  - value: https://test-01.eastus.logic.azure.com/workflows/test/triggers/request?sig=0000000000000000
+    description: Logic App URL with test sig
+  - value: https://prod-42.northeurope.logic.azure.com:443/workflows/run?sig=ABCDEFghijklmnop%2B
+    description: Logic App URL with encoded sig parameter
   should_not_match:
-    - value: https://prod-00.westus.logic.azure.com/workflows/aaaa0000/triggers/manual
-      description: Logic App URL without sig parameter
-    - value: https://myapp.azurewebsites.net?sig=test
-      description: Non-Logic App URL with sig parameter
+  - value: https://prod-00.westus.logic.azure.com/workflows/aaaa0000/triggers/manual
+    description: Logic App URL without sig parameter
+  - value: https://myapp.azurewebsites.net?sig=test
+    description: Non-Logic App URL with sig parameter
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Logic App documentation with example trigger URLs.
-    mitigation: >-
-      Check for common placeholder values in the sig parameter.
-  - description: >-
-      Expired Logic App SAS URLs that no longer provide access.
-    mitigation: >-
-      Flag for review regardless since the URL structure reveals workflow endpoints.
+- description: Logic App documentation with example trigger URLs.
+  mitigation: Check for common placeholder values in the sig parameter.
+- description: Expired Logic App SAS URLs that no longer provide access.
+  mitigation: Flag for review regardless since the URL structure reveals workflow
+    endpoints.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_azure_logic_app_sas
-      matches:
-        - ref: Keyword_azure_logic_app
+  - confidence_level: 90
+    id_match: Regex_azure_logic_app_sas
+    matches:
+    - ref: Pattern_azure_logic_app_shared_access_signature_label_context
+    - ref: Keyword_azure_logic_app_shared_access_signature_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_logic_app_shared_access_signature_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_azure_logic_app_sas
+    matches:
+    - ref: Keyword_azure_logic_app
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_logic_app_shared_access_signature_noise_exclusion
   regexes:
-    - id: Regex_azure_logic_app_sas
-      pattern: (?i)https?://[^/]*logic\.azure\.com[^"'\s]*[?&]sig=[A-Za-z0-9%+/=_-]+
+  - id: Regex_azure_logic_app_sas
+    pattern: (?i)https?://[^/]*logic\.azure\.com[^"'\s]*[?&]sig=[A-Za-z0-9%+/=_-]+
+  - id: Pattern_azure_logic_app_shared_access_signature_label_context
+    pattern: (?i)\\b(?:azure\\s+logic\\s+app\\s+shared\\s+access\\s+signature|azure|logic|app|shared|access|signature)\\b
   keywords:
-    - id: Keyword_azure_logic_app
-      groups:
-        - match_style: word
-          terms:
-            - Logic App
-            - logic app
-            - workflow
-            - trigger
-            - logic.azure.com
-            - SAS
-            - sig
-            - shared access signature
-            - workflow trigger
-            - HTTP trigger
-            - automation
-            - connector
+  - id: Keyword_azure_logic_app
+    groups:
+    - match_style: word
+      terms:
+      - Logic App
+      - logic app
+      - workflow
+      - trigger
+      - logic.azure.com
+      - SAS
+      - sig
+      - shared access signature
+      - workflow trigger
+      - HTTP trigger
+      - automation
+      - connector
+  - id: Keyword_azure_logic_app_shared_access_signature_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - azure logic app shared access signature
+      - azure
+      - logic
+      - app
+      - shared
+      - access
+      - signature
+      - field
+      - identifier
+      - reference
+  - id: Keyword_azure_logic_app_shared_access_signature_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 risk_rating: 10
-risk_description: >-
-  Exposure of this credential could grant unauthorized access to cloud infrastructure, databases, or services. Compromised
-  credentials are a leading cause of data breaches and can result in full system takeover.
+risk_description: Exposure of this credential could grant unauthorized access to cloud
+  infrastructure, databases, or services. Compromised credentials are a leading cause
+  of data breaches and can result in full system takeover.
 sensitivity_labels:
-  pspf: "PROTECTED"
-  qgiscf: "PROTECTED"
-  qgiscf_dlm: "PROTECTED"
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-logic-app-shared-access-signature
-    title: "Azure Logic App shared access signature entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-logic-app-shared-access-signature
+  title: Azure Logic App shared access signature entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

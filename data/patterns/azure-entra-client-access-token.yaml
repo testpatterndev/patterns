@@ -4,111 +4,158 @@ slug: azure-entra-client-access-token
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Microsoft Entra (formerly Azure AD) client access token patterns. This pattern is based on a Microsoft Purview
-  built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or
+description: Detects Microsoft Entra (formerly Azure AD) client access token patterns.
+  This pattern is based on a Microsoft Purview built-in sensitive information type.
+  Users already running Purview may prefer to enable the built-in SIT directly, or
   use this version as a starting point for customisation.
-operation: >-
-  Matches JWT-formatted access tokens issued by Microsoft Entra ID (Azure AD). These tokens typically start with eyJ
-  (Base64-encoded JWT header) and contain three dot-separated segments. Corroborative evidence: 8 keywords within 300
-  characters. Keyword lists: credentials-api-keys.
+operation: 'Matches JWT-formatted access tokens issued by Microsoft Entra ID (Azure
+  AD). These tokens typically start with eyJ (Base64-encoded JWT header) and contain
+  three dot-separated segments. Corroborative evidence: 8 keywords within 300 characters.
+  Keyword lists: credentials-api-keys. Uses additional domain-context evidence and
+  explicit exclusion logic for template/sample/test text.'
 pattern: \beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: JWT format is common across many identity providers. Corroborative evidence keywords specific to
-  Microsoft Entra improve accuracy.
+confidence_justification: 'Medium confidence: JWT format is common across many identity
+  providers. Corroborative evidence keywords specific to Microsoft Entra improve accuracy.
+  Added context gating and exclusion rules improve precision and reduce incidental
+  matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - credentials
-  - security
+- credentials
+- security
 corroborative_evidence:
   keywords:
-    - Entra
-    - Azure AD
-    - access_token
-    - bearer
-    - login.microsoftonline.com
-    - Microsoft identity
-    - OAuth
-    - client credentials
+  - Entra
+  - Azure AD
+  - access_token
+  - bearer
+  - login.microsoftonline.com
+  - Microsoft identity
+  - OAuth
+  - client credentials
   proximity: 300
   keyword_lists:
-    - credentials-api-keys
+  - credentials-api-keys
 test_cases:
   should_match:
-    - value: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiYXVkIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIn0.AAAAAAAAAAAAAAAAAAAAAAAA
-      description: JWT access token with Entra-like structure
-    - value: eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20ifQ.BBBBBBBBBBBBBBBBBBBBBBBB
-      description: JWT with Microsoft login issuer
-    - value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZXN0IjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCJ9.CCCCCCCCCCCCCCCCCCCCCCCC
-      description: JWT access token with test payload
+  - value: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiYXVkIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIn0.AAAAAAAAAAAAAAAAAAAAAAAA
+    description: JWT access token with Entra-like structure
+  - value: eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20ifQ.BBBBBBBBBBBBBBBBBBBBBBBB
+    description: JWT with Microsoft login issuer
+  - value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZXN0IjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCJ9.CCCCCCCCCCCCCCCCCCCCCCCC
+    description: JWT access token with test payload
   should_not_match:
-    - value: eyJhbGci
-      description: Truncated JWT header, not a complete token
-    - value: This is not a JWT token
-      description: Plain text, not a token
+  - value: eyJhbGci
+    description: Truncated JWT header, not a complete token
+  - value: This is not a JWT token
+    description: Plain text, not a token
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      JWT tokens from non-Microsoft identity providers that share the same format.
-    mitigation: >-
-      Check for Microsoft Entra specific claims (iss, aud) or corroborative keywords.
-  - description: >-
-      Expired or revoked access tokens in logs and audit trails.
-    mitigation: >-
-      Flag for review since the token structure may reveal tenant and application details.
+- description: JWT tokens from non-Microsoft identity providers that share the same
+    format.
+  mitigation: Check for Microsoft Entra specific claims (iss, aud) or corroborative
+    keywords.
+- description: Expired or revoked access tokens in logs and audit trails.
+  mitigation: Flag for review since the token structure may reveal tenant and application
+    details.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_azure_entra_client_access_token
-      matches:
-        - ref: Keyword_azure_entra_access_token
+  - confidence_level: 90
+    id_match: Regex_azure_entra_client_access_token
+    matches:
+    - ref: Pattern_azure_entra_client_access_token_label_context
+    - ref: Keyword_azure_entra_client_access_token_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_entra_client_access_token_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_azure_entra_client_access_token
+    matches:
+    - ref: Keyword_azure_entra_access_token
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_entra_client_access_token_noise_exclusion
   regexes:
-    - id: Regex_azure_entra_client_access_token
-      pattern: \beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b
+  - id: Regex_azure_entra_client_access_token
+    pattern: \beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b
+  - id: Pattern_azure_entra_client_access_token_label_context
+    pattern: (?i)\\b(?:microsoft\\s+entra\\s+client\\s+access\\s+token|microsoft|entra|client|access|token)\\b
   keywords:
-    - id: Keyword_azure_entra_access_token
-      groups:
-        - match_style: word
-          terms:
-            - Entra
-            - Azure AD
-            - access_token
-            - bearer
-            - login.microsoftonline.com
-            - Microsoft identity
-            - OAuth
-            - client credentials
-            - authorization
-            - id_token
-            - jwt
-            - openid
+  - id: Keyword_azure_entra_access_token
+    groups:
+    - match_style: word
+      terms:
+      - Entra
+      - Azure AD
+      - access_token
+      - bearer
+      - login.microsoftonline.com
+      - Microsoft identity
+      - OAuth
+      - client credentials
+      - authorization
+      - id_token
+      - jwt
+      - openid
+  - id: Keyword_azure_entra_client_access_token_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - microsoft entra client access token
+      - microsoft
+      - entra
+      - client
+      - access
+      - token
+      - field
+      - identifier
+      - reference
+  - id: Keyword_azure_entra_client_access_token_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 risk_rating: 10
-risk_description: >-
-  Exposure of this credential could grant unauthorized access to cloud infrastructure, databases, or services. Compromised
-  credentials are a leading cause of data breaches and can result in full system takeover.
+risk_description: Exposure of this credential could grant unauthorized access to cloud
+  infrastructure, databases, or services. Compromised credentials are a leading cause
+  of data breaches and can result in full system takeover.
 sensitivity_labels:
-  pspf: "PROTECTED"
-  qgiscf: "PROTECTED"
-  qgiscf_dlm: "PROTECTED"
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-ad-client-access-token
-    title: "Microsoft Entra client access token entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-ad-client-access-token
+  title: Microsoft Entra client access token entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

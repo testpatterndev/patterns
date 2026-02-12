@@ -4,105 +4,157 @@ slug: lv-drivers-license
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Latvia driver's license number patterns. This pattern is based on a Microsoft Purview built-in sensitive
-  information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as
-  a starting point for customisation.
-operation: >-
-  Matches 2 uppercase letters followed by 6 digits at word boundaries. Corroborative evidence: 5 keywords within 300
-  characters. Keyword lists: pii-civic-credentials.
+description: Detects Latvia driver's license number patterns. This pattern is based
+  on a Microsoft Purview built-in sensitive information type. Users already running
+  Purview may prefer to enable the built-in SIT directly, or use this version as a
+  starting point for customisation.
+operation: 'Matches 2 uppercase letters followed by 6 digits at word boundaries. Corroborative
+  evidence: 5 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
+  text.'
 pattern: \b[A-Z]{2}\d{6}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false
-  positive rates.
+confidence_justification: 'Medium confidence: pattern has structural constraints but
+  corroborative keywords are recommended to reduce false positive rates. Added context
+  gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - lv
-  - eu
+- lv
+- eu
 regulations:
-  - gdpr
+- gdpr
 data_categories:
-  - pii
-  - government-id
+- pii
+- government-id
 corroborative_evidence:
   keywords:
-    - driver
-    - licence
-    - license
-    - driving
-    - DL
+  - driver
+  - licence
+  - license
+  - driving
+  - DL
   proximity: 300
   keyword_lists:
-    - pii-civic-credentials
+  - pii-civic-credentials
 test_cases:
   should_match:
-    - value: AB123456
-      description: Standard Latvian driver's license with 2 letters and 6 digits
-    - value: XY987654
-      description: Another valid format with different letter prefix
-    - value: LV000123
-      description: Valid format with leading zeros in digit portion
+  - value: AB123456
+    description: Standard Latvian driver's license with 2 letters and 6 digits
+  - value: XY987654
+    description: Another valid format with different letter prefix
+  - value: LV000123
+    description: Valid format with leading zeros in digit portion
   should_not_match:
-    - value: A1234567
-      description: Only 1 letter instead of required 2
-    - value: ABC12345
-      description: 3 letters instead of required 2
+  - value: A1234567
+    description: Only 1 letter instead of required 2
+  - value: ABC12345
+    description: 3 letters instead of required 2
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Generic numeric sequences matching the driver's license format appearing in unrelated contexts.
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window to confirm driver's license context.
+- description: Generic numeric sequences matching the driver's license format appearing
+    in unrelated contexts.
+  mitigation: Require corroborative evidence keywords within the proximity window
+    to confirm driver's license context.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_lv_drivers_license
-      matches:
-        - ref: Keyword_lv_drivers_license
-    - confidence_level: 75
-      id_match: Regex_lv_drivers_license
+  - confidence_level: 90
+    id_match: Regex_lv_drivers_license
+    matches:
+    - ref: Pattern_lv_drivers_license_label_context
+    - ref: Keyword_lv_drivers_license_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_lv_drivers_license_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_lv_drivers_license
+    matches:
+    - ref: Keyword_lv_drivers_license
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_lv_drivers_license_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_lv_drivers_license
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_lv_drivers_license_noise_exclusion
   regexes:
-    - id: Regex_lv_drivers_license
-      pattern: \b[A-Z]{2}\d{6}\b
+  - id: Regex_lv_drivers_license
+    pattern: \b[A-Z]{2}\d{6}\b
+  - id: Pattern_lv_drivers_license_label_context
+    pattern: (?i)\\b(?:latvia\\s+driver's\\s+license\\s+number|latvia|driver|license|drivers)\\b
   keywords:
-    - id: Keyword_lv_drivers_license
-      groups:
-        - match_style: word
-          terms:
-            - vadītāja apliecība
-            - autovadītāja apliecība
-            - vadītāja apliecības numurs
-            - driver's license
-            - driver's licence
-            - driving licence
-            - driving license
-            - DL
-            - licence number
-            - license number
-            - CSDD
+  - id: Keyword_lv_drivers_license
+    groups:
+    - match_style: word
+      terms:
+      - vadītāja apliecība
+      - autovadītāja apliecība
+      - vadītāja apliecības numurs
+      - driver's license
+      - driver's licence
+      - driving licence
+      - driving license
+      - DL
+      - licence number
+      - license number
+      - CSDD
+  - id: Keyword_lv_drivers_license_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - latvia driver's license number
+      - latvia
+      - driver
+      - license
+      - drivers
+      - field
+      - identifier
+      - reference
+  - id: Keyword_lv_drivers_license_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 risk_rating: 6
-risk_description: >-
-  Driver's license numbers serve as government-issued identity verification and are used across many services. Exposure
-  can enable identity fraud, unauthorized account creation, and social engineering attacks.
+risk_description: Driver's license numbers serve as government-issued identity verification
+  and are used across many services. Exposure can enable identity fraud, unauthorized
+  account creation, and social engineering attacks.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: "SENSITIVE"
-  qgiscf_dlm: "SENSITIVE Personal-Privacy"
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-latvia-drivers-license-number
-    title: "Latvia driver's license number entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-latvia-drivers-license-number
+  title: Latvia driver's license number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

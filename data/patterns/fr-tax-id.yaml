@@ -4,114 +4,168 @@ slug: fr-tax-id
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects France Tax Identification Number (numéro SPI.) patterns. This pattern is based on a Microsoft Purview built-in
-  sensitive information type. Due to the numeric format, corroborative evidence keywords
-  are essential for reliable detection.
-operation: >-
-  Corroborative evidence: 5 keywords within 300 characters.
-  Keyword lists: tax-id, fr-financial.
-pattern: '\b\d{13}\b'
+description: Detects France Tax Identification Number (numéro SPI.) patterns. This
+  pattern is based on a Microsoft Purview built-in sensitive information type. Due
+  to the numeric format, corroborative evidence keywords are essential for reliable
+  detection.
+operation: 'Corroborative evidence: 5 keywords within 300 characters. Keyword lists:
+  tax-id, fr-financial. Uses additional domain-context evidence and explicit exclusion
+  logic for template/sample/test text.'
+pattern: \b\d{13}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: thirteen-digit numbers can appear in other contexts. Keywords such as 'numéro fiscal' or 'SPI' are required for reliable French tax ID detection.
+confidence_justification: 'Medium confidence: thirteen-digit numbers can appear in
+  other contexts. Keywords such as ''numéro fiscal'' or ''SPI'' are required for reliable
+  French tax ID detection. Added context gating and exclusion rules improve precision
+  and reduce incidental matches.'
 jurisdictions:
-  - fr
-  - eu
+- fr
+- eu
 regulations:
-  - gdpr
-  - code-general-des-impots
+- gdpr
+- code-general-des-impots
 data_categories:
-  - pii
-  - financial
-  - government-id
+- pii
+- financial
+- government-id
 corroborative_evidence:
   keywords:
-    - numéro fiscal
-    - SPI
-    - numéro de contribuable
-    - impôt
-    - tax identification
+  - numéro fiscal
+  - SPI
+  - numéro de contribuable
+  - impôt
+  - tax identification
   proximity: 300
   keyword_lists:
-    - tax-id
-    - fr-financial
+  - tax-id
+  - fr-financial
 test_cases:
   should_match:
-    - value: '1234567890123'
-      description: Thirteen-digit French tax identification number
-    - value: '9876543210987'
-      description: French numéro fiscal format
-    - value: '1122334455667'
-      description: French SPI number
+  - value: '1234567890123'
+    description: Thirteen-digit French tax identification number
+  - value: '9876543210987'
+    description: French numéro fiscal format
+  - value: '1122334455667'
+    description: French SPI number
   should_not_match:
-    - value: '123456789012'
-      description: Only 12 digits, too short for French TIN
-    - value: '12345678901234'
-      description: 14 digits, exceeds French TIN format
+  - value: '123456789012'
+    description: Only 12 digits, too short for French TIN
+  - value: '12345678901234'
+    description: 14 digits, exceeds French TIN format
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: Generic numeric sequences in non-tax contexts such as reference numbers or account identifiers
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window to distinguish
-      tax identifiers from general numeric data.
-  - description: Numbers from other identification schemes with similar digit patterns
-    mitigation: >-
-      Layer with jurisdiction-specific detection to prioritise matches in tax-related documents
-      and cross-reference with other identifier types.
+- description: Generic numeric sequences in non-tax contexts such as reference numbers
+    or account identifiers
+  mitigation: Require corroborative evidence keywords within the proximity window
+    to distinguish tax identifiers from general numeric data.
+- description: Numbers from other identification schemes with similar digit patterns
+  mitigation: Layer with jurisdiction-specific detection to prioritise matches in
+    tax-related documents and cross-reference with other identifier types.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_fr_tax_id
-      matches:
-        - ref: Keyword_fr_tax_id
-    - confidence_level: 75
-      id_match: Regex_fr_tax_id
+  - confidence_level: 90
+    id_match: Regex_fr_tax_id
+    matches:
+    - ref: Pattern_fr_tax_id_label_context
+    - ref: Keyword_fr_tax_id_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_fr_tax_id_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_fr_tax_id
+    matches:
+    - ref: Keyword_fr_tax_id
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_fr_tax_id_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_fr_tax_id
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_fr_tax_id_noise_exclusion
   regexes:
-    - id: Regex_fr_tax_id
-      pattern: '\b\d{13}\b'
+  - id: Regex_fr_tax_id
+    pattern: \b\d{13}\b
+  - id: Pattern_fr_tax_id_label_context
+    pattern: (?i)\\b(?:france\\s+tax\\s+identification\\s+number\\s+\(numéro\\s+spi\.\)|france|tax|num|spi)\\b
   keywords:
-    - id: Keyword_fr_tax_id
-      groups:
-        - match_style: word
-          terms:
-            - numéro fiscal
-            - SPI
-            - numéro de contribuable
-            - impôt
-            - tax identification
-            - identifiant fiscal
-            - numéro d'identification fiscale
-            - avis d'imposition
-            - déclaration de revenus
-            - centre des impôts
-            - direction générale des finances publiques
-            - contribuable
+  - id: Keyword_fr_tax_id
+    groups:
+    - match_style: word
+      terms:
+      - numéro fiscal
+      - SPI
+      - numéro de contribuable
+      - impôt
+      - tax identification
+      - identifiant fiscal
+      - numéro d'identification fiscale
+      - avis d'imposition
+      - déclaration de revenus
+      - centre des impôts
+      - direction générale des finances publiques
+      - contribuable
+  - id: Keyword_fr_tax_id_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - france tax identification number (numéro spi.)
+      - france
+      - tax
+      - num
+      - spi
+      - field
+      - identifier
+      - reference
+  - id: Keyword_fr_tax_id_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
   filters:
-    - id: Filter_fr_tax_id_same_digits
-      type: AllDigitsSameFilter
+  - id: Filter_fr_tax_id_same_digits
+    type: AllDigitsSameFilter
 risk_rating: 7
-risk_description: >-
-  Tax identification numbers link directly to an individual's financial records with government authorities. Exposure can facilitate tax fraud, unauthorized access to tax accounts, and financial identity theft.
+risk_description: Tax identification numbers link directly to an individual's financial
+  records with government authorities. Exposure can facilitate tax fraud, unauthorized
+  access to tax accounts, and financial identity theft.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: "SENSITIVE"
-  qgiscf_dlm: "SENSITIVE Financial"
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Financial
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-france-tax-identification-number
-    title: "France Tax Identification Number (numéro SPI.) entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-france-tax-identification-number
+  title: France Tax Identification Number (numéro SPI.) entity definition - Microsoft
+    Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

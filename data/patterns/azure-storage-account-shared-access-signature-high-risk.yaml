@@ -4,110 +4,161 @@ slug: azure-storage-account-shared-access-signature-high-risk
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Azure Storage Account Shared Access Signature (SAS) patterns for high-risk resources with write or delete
-  permissions. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running
-  Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
-operation: >-
-  Matches Azure Storage SAS tokens in URLs targeting core.windows.net endpoints where the sp (permissions) parameter
-  includes write (w), delete (d), or create (c) permissions. These represent higher risk than read-only SAS tokens.
-  Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials-api-keys.
+description: Detects Azure Storage Account Shared Access Signature (SAS) patterns
+  for high-risk resources with write or delete permissions. This pattern is based
+  on a Microsoft Purview built-in sensitive information type. Users already running
+  Purview may prefer to enable the built-in SIT directly, or use this version as a
+  starting point for customisation.
+operation: 'Matches Azure Storage SAS tokens in URLs targeting core.windows.net endpoints
+  where the sp (permissions) parameter includes write (w), delete (d), or create (c)
+  permissions. These represent higher risk than read-only SAS tokens. Corroborative
+  evidence: 8 keywords within 300 characters. Keyword lists: credentials-api-keys.
+  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
+  text.'
 pattern: (?i)https?://[^/]*\.(?:blob|queue|table|file)\.core\.windows\.net[^"'\s]*[?&]sp=[rwdlac]*[wdc][rwdlac]*[^"'\s]*[?&]sig=[A-Za-z0-9%+/=]+
 confidence: high
-confidence_justification: >-
-  High confidence: core.windows.net storage domain combined with write/delete permissions and sig parameter uniquely
-  identifies high-risk Azure Storage SAS tokens.
+confidence_justification: 'High confidence: core.windows.net storage domain combined
+  with write/delete permissions and sig parameter uniquely identifies high-risk Azure
+  Storage SAS tokens. Added context gating and exclusion rules improve precision and
+  reduce incidental matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - credentials
-  - security
+- credentials
+- security
 corroborative_evidence:
   keywords:
-    - Azure Storage
-    - SAS
-    - shared access signature
-    - write permission
-    - delete permission
-    - blob
-    - storage account
-    - core.windows.net
+  - Azure Storage
+  - SAS
+  - shared access signature
+  - write permission
+  - delete permission
+  - blob
+  - storage account
+  - core.windows.net
   proximity: 300
   keyword_lists:
-    - credentials-api-keys
+  - credentials-api-keys
 test_cases:
   should_match:
-    - value: https://myaccount.blob.core.windows.net/container?sv=2021-06-08&sp=rwdl&sig=AAAA0000%3D
-      description: Blob SAS with read/write/delete/list permissions
-    - value: https://myaccount.blob.core.windows.net/container?sv=2020-08-04&sp=wc&sig=000000%3D
-      description: Blob SAS with write/create permissions
-    - value: https://myaccount.table.core.windows.net/table?sv=2022-11-02&sp=rwd&sig=ABCDEFghij%3D
-      description: Table SAS with write and delete permissions
+  - value: https://myaccount.blob.core.windows.net/container?sv=2021-06-08&sp=rwdl&sig=AAAA0000%3D
+    description: Blob SAS with read/write/delete/list permissions
+  - value: https://myaccount.blob.core.windows.net/container?sv=2020-08-04&sp=wc&sig=000000%3D
+    description: Blob SAS with write/create permissions
+  - value: https://myaccount.table.core.windows.net/table?sv=2022-11-02&sp=rwd&sig=ABCDEFghij%3D
+    description: Table SAS with write and delete permissions
   should_not_match:
-    - value: https://myaccount.blob.core.windows.net/container?sv=2021-06-08&sp=rl&sig=AAAA%3D
-      description: Read-only SAS (not high risk)
-    - value: https://myaccount.blob.core.windows.net/container
-      description: Storage URL without SAS token
+  - value: https://myaccount.blob.core.windows.net/container?sv=2021-06-08&sp=rl&sig=AAAA%3D
+    description: Read-only SAS (not high risk)
+  - value: https://myaccount.blob.core.windows.net/container
+    description: Storage URL without SAS token
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Azure Storage documentation with example write-permission SAS URLs.
-    mitigation: >-
-      Check for common placeholder values and documentation context.
-  - description: >-
-      CI/CD pipeline artifacts containing build-time SAS tokens.
-    mitigation: >-
-      Check se= (expiry) parameter and verify the token scope.
+- description: Azure Storage documentation with example write-permission SAS URLs.
+  mitigation: Check for common placeholder values and documentation context.
+- description: CI/CD pipeline artifacts containing build-time SAS tokens.
+  mitigation: Check se= (expiry) parameter and verify the token scope.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_azure_storage_sas_high_risk
-      matches:
-        - ref: Keyword_azure_storage_sas_high_risk
+  - confidence_level: 90
+    id_match: Regex_azure_storage_sas_high_risk
+    matches:
+    - ref: Pattern_azure_storage_account_shared_access_signature_high_risk_label_context
+    - ref: Keyword_azure_storage_account_shared_access_signature_high_risk_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_storage_account_shared_access_signature_high_risk_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_azure_storage_sas_high_risk
+    matches:
+    - ref: Keyword_azure_storage_sas_high_risk
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_storage_account_shared_access_signature_high_risk_noise_exclusion
   regexes:
-    - id: Regex_azure_storage_sas_high_risk
-      pattern: (?i)https?://[^/]*\.(?:blob|queue|table|file)\.core\.windows\.net[^"'\s]*[?&]sp=[rwdlac]*[wdc][rwdlac]*[^"'\s]*[?&]sig=[A-Za-z0-9%+/=]+
+  - id: Regex_azure_storage_sas_high_risk
+    pattern: (?i)https?://[^/]*\.(?:blob|queue|table|file)\.core\.windows\.net[^"'\s]*[?&]sp=[rwdlac]*[wdc][rwdlac]*[^"'\s]*[?&]sig=[A-Za-z0-9%+/=]+
+  - id: Pattern_azure_storage_account_shared_access_signature_high_risk_label_context
+    pattern: (?i)\\b(?:azure\\s+storage\\s+account\\s+shared\\s+access\\s+signature\\s+for\\s+high\\s+risk\\s+resources|azure|storage|account|shared|access|signature|high|risk|resources)\\b
   keywords:
-    - id: Keyword_azure_storage_sas_high_risk
-      groups:
-        - match_style: word
-          terms:
-            - Azure Storage
-            - SAS
-            - shared access signature
-            - write permission
-            - delete permission
-            - blob
-            - storage account
-            - core.windows.net
-            - container
-            - high risk
-            - elevated access
+  - id: Keyword_azure_storage_sas_high_risk
+    groups:
+    - match_style: word
+      terms:
+      - Azure Storage
+      - SAS
+      - shared access signature
+      - write permission
+      - delete permission
+      - blob
+      - storage account
+      - core.windows.net
+      - container
+      - high risk
+      - elevated access
+  - id: Keyword_azure_storage_account_shared_access_signature_high_risk_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - azure storage account shared access signature for high risk resources
+      - azure
+      - storage
+      - account
+      - shared
+      - access
+      - signature
+      - high
+      - risk
+      - resources
+      - field
+      - identifier
+      - reference
+  - id: Keyword_azure_storage_account_shared_access_signature_high_risk_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 risk_rating: 10
-risk_description: >-
-  Exposure of this credential could grant unauthorized access to cloud infrastructure, databases, or services. Compromised
-  credentials are a leading cause of data breaches and can result in full system takeover.
+risk_description: Exposure of this credential could grant unauthorized access to cloud
+  infrastructure, databases, or services. Compromised credentials are a leading cause
+  of data breaches and can result in full system takeover.
 sensitivity_labels:
-  pspf: "PROTECTED"
-  qgiscf: "PROTECTED"
-  qgiscf_dlm: "PROTECTED"
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-storage-account-shared-access-signature-high-risk-resources
-    title: "Azure Storage account shared access signature for high risk resources entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-storage-account-shared-access-signature-high-risk-resources
+  title: Azure Storage account shared access signature for high risk resources entity
+    definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

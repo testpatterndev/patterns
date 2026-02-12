@@ -4,122 +4,171 @@ slug: ec-unique-id
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Cédula de Identidad patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
-operation: >-
-  Reference: https://learn.microsoft.com/en-us/purview/sit-defn-ecuador-unique-identification-number Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+description: Detects Cédula de Identidad patterns. This pattern is based on a Microsoft
+  Purview built-in sensitive information type. Users already running Purview may prefer
+  to enable the built-in SIT directly, or use this version as a starting point for
+  customisation.
+operation: 'Reference: https://learn.microsoft.com/en-us/purview/sit-defn-ecuador-unique-identification-number
+  Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Adds label-context matching and exclusion logic for sample/template/test placeholders.'
 pattern: \b\d{10}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false positive rates.
+confidence_justification: 'Medium confidence: pattern has structural constraints but
+  corroborative keywords are recommended to reduce false positive rates. Context label
+  evidence plus explicit template/example exclusion improves precision for high-risk
+  identifiers.'
 jurisdictions:
-  - ec
+- ec
 regulations:
-  - ecuador-pdp
+- ecuador-pdp
 data_categories:
-  - pii
-  - government-id
+- pii
+- government-id
 corroborative_evidence:
   keywords:
-    - cédula
-    - identidad
-    - identification
+  - cédula
+  - identidad
+  - identification
   proximity: 300
   keyword_lists:
-    - pii-civic-credentials
+  - pii-civic-credentials
 test_cases:
   should_match:
-    - value: "1712345678"
-      description: Ecuadorian ID from Pichincha province
-    - value: "0912345678"
-      description: Ecuadorian ID from Guayas province
-    - value: "0112345678"
-      description: Ecuadorian ID from Azuay province
+  - value: '1712345678'
+    description: Ecuadorian ID from Pichincha province
+  - value: 0912345678
+    description: Ecuadorian ID from Guayas province
+  - value: 0112345678
+    description: Ecuadorian ID from Azuay province
   should_not_match:
-    - value: "123456789"
-      description: Too few digits (9)
-    - value: "12345678901"
-      description: Too many digits (11)
+  - value: '123456789'
+    description: Too few digits (9)
+  - value: '12345678901'
+    description: Too many digits (11)
+  - value: sample template placeholder number 123456789
+    description: Template/sample context should be excluded even when numeric-like
+      values appear
 false_positives:
-  - description: >-
-      Ten-digit numeric sequences appear in phone numbers, account numbers, and other non-identity contexts.
-    mitigation: >-
-      Require corroborative evidence keywords such as "cédula de identidad" within the proximity window.
-  - description: >-
-      In multiple languages, similar terminology used in formal or administrative contexts (education, professional
-      documentation) that does not constitute sensitive data collection.
-    mitigation: >-
-      Layer with additional contextual signals such as structured identifiers, form fields, or database column headers
-      to distinguish sensitive records from general references.
+- description: Ten-digit numeric sequences appear in phone numbers, account numbers,
+    and other non-identity contexts.
+  mitigation: Require corroborative evidence keywords such as "cédula de identidad"
+    within the proximity window.
+- description: In multiple languages, similar terminology used in formal or administrative
+    contexts (education, professional documentation) that does not constitute sensitive
+    data collection.
+  mitigation: Layer with additional contextual signals such as structured identifiers,
+    form fields, or database column headers to distinguish sensitive records from
+    general references.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_ec_unique_id
-      matches:
-        - ref: Keyword_ec_unique_id_specific
-    - confidence_level: 75
-      id_match: Regex_ec_unique_id
-      matches:
-        - ref: Keyword_ec_unique_id_broad
-    - confidence_level: 65
-      id_match: Regex_ec_unique_id
+  - confidence_level: 90
+    id_match: Regex_ec_unique_id
+    matches:
+    - ref: Pattern_ec_unique_id_label_context
+    - ref: Keyword_ec_unique_id_specific
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ec_unique_id_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_ec_unique_id
+    matches:
+    - ref: Keyword_ec_unique_id_specific
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ec_unique_id_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_ec_unique_id
+    matches:
+    - ref: Keyword_ec_unique_id_broad
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ec_unique_id_noise_exclusion
+  - confidence_level: 65
+    id_match: Regex_ec_unique_id
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ec_unique_id_noise_exclusion
   regexes:
-    - id: Regex_ec_unique_id
-      pattern: \b\d{10}\b
+  - id: Regex_ec_unique_id
+    pattern: \b\d{10}\b
+  - id: Pattern_ec_unique_id_label_context
+    pattern: (?i)\\b(?:dula|identidad|unique)\\b
   keywords:
-    - id: Keyword_ec_unique_id_specific
-      groups:
-        - match_style: word
-          terms:
-            - cédula de identidad
-            - cedula de identidad
-            - cédula de ciudadanía
-            - cedula de ciudadania
-            - número de cédula
-            - numero de cedula
-            - cédula
-            - CI
-            - Registro Civil
-            - identificación ecuatoriana
-    - id: Keyword_ec_unique_id_broad
-      groups:
-        - match_style: word
-          terms:
-            - identificación
-            - identificacion
-            - national ID
-            - identity card
-            - identity number
-            - documento de identidad
-            - número de identificación
-            - numero de identificacion
-            - personal identification
+  - id: Keyword_ec_unique_id_specific
+    groups:
+    - match_style: word
+      terms:
+      - cédula de identidad
+      - cedula de identidad
+      - cédula de ciudadanía
+      - cedula de ciudadania
+      - número de cédula
+      - numero de cedula
+      - cédula
+      - CI
+      - Registro Civil
+      - identificación ecuatoriana
+  - id: Keyword_ec_unique_id_broad
+    groups:
+    - match_style: word
+      terms:
+      - identificación
+      - identificacion
+      - national ID
+      - identity card
+      - identity number
+      - documento de identidad
+      - número de identificación
+      - numero de identificacion
+      - personal identification
+  - id: Keyword_ec_unique_id_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
   filters:
-    - id: Filter_ec_unique_id_same_digits
-      type: AllDigitsSameFilter
+  - id: Filter_ec_unique_id_same_digits
+    type: AllDigitsSameFilter
 risk_rating: 9
-risk_description: >-
-  This identifier uniquely links to an individual and is a primary target for identity theft and fraud. Exposure can lead to unauthorized financial activity, impersonation, and significant personal harm.
+risk_description: This identifier uniquely links to an individual and is a primary
+  target for identity theft and fraud. Exposure can lead to unauthorized financial
+  activity, impersonation, and significant personal harm.
 sensitivity_labels:
-  pspf: "PROTECTED"
-  qgiscf: "PROTECTED"
-  qgiscf_dlm: "PROTECTED"
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-ecuador-unique-identification-number
-    title: "Ecuador Unique Identification Number entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-ecuador-unique-identification-number
+  title: Ecuador Unique Identification Number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

@@ -4,110 +4,161 @@ slug: de-identity-card
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Personalausweis patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
-operation: >-
-  Reference: https://learn.microsoft.com/en-us/purview/sit-defn-germany-identity-card-number Corroborative evidence: 3
-  keywords within 300 characters. Keyword lists: pii-civic-credentials.
+description: Detects Personalausweis patterns. This pattern is based on a Microsoft
+  Purview built-in sensitive information type. Users already running Purview may prefer
+  to enable the built-in SIT directly, or use this version as a starting point for
+  customisation.
+operation: 'Reference: https://learn.microsoft.com/en-us/purview/sit-defn-germany-identity-card-number
+  Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
+  text.'
 pattern: \b[CFGHJKLMNPRTVWXYZ][CFGHJKLMNPRTVWXYZ0-9]{8}\d?\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false
-  positive rates.
+confidence_justification: 'Medium confidence: pattern has structural constraints but
+  corroborative keywords are recommended to reduce false positive rates. Added context
+  gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - eu
-  - de
+- eu
+- de
 regulations:
-  - gdpr
+- gdpr
 data_categories:
-  - pii
-  - government-id
+- pii
+- government-id
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+  - identifier
+  - number
+  - ID
   proximity: 300
   keyword_lists:
-    - pii-civic-credentials
+  - pii-civic-credentials
 test_cases:
   should_match:
-    - value: CF1234567
-      description: German identity card number
-    - value: LM9876543
-      description: Alternate ID card format
-    - value: T12345678
-      description: Newer format with check digit
+  - value: CF1234567
+    description: German identity card number
+  - value: LM9876543
+    description: Alternate ID card format
+  - value: T12345678
+    description: Newer format with check digit
   should_not_match:
-    - value: A12345678
-      description: Invalid first character (A not in allowed set)
-    - value: CF123456
-      description: Only 7 characters after first instead of 8
-    - value: CF12345678A
-      description: Too many characters (11 instead of 9-10)
+  - value: A12345678
+    description: Invalid first character (A not in allowed set)
+  - value: CF123456
+    description: Only 7 characters after first instead of 8
+  - value: CF12345678A
+    description: Too many characters (11 instead of 9-10)
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Common words and phrases related to personalausweis appearing in policy documents, training materials, HR
-      templates, or compliance guidelines without actual personal data.
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than
-      general discussion.
-  - description: >-
-      In multiple EU languages, similar terminology used in formal or administrative contexts (education, professional
-      documentation) that does not constitute sensitive data collection.
-    mitigation: >-
-      Layer with additional contextual signals such as structured identifiers, form fields, or database column headers
-      to distinguish sensitive records from general references.
+- description: Common words and phrases related to personalausweis appearing in policy
+    documents, training materials, HR templates, or compliance guidelines without
+    actual personal data.
+  mitigation: Require corroborative evidence keywords within the proximity window
+    to confirm sensitive data context rather than general discussion.
+- description: In multiple EU languages, similar terminology used in formal or administrative
+    contexts (education, professional documentation) that does not constitute sensitive
+    data collection.
+  mitigation: Layer with additional contextual signals such as structured identifiers,
+    form fields, or database column headers to distinguish sensitive records from
+    general references.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_de_identity_card
-      matches:
-        - ref: Keyword_de_identity_card
-    - confidence_level: 75
-      id_match: Regex_de_identity_card
+  - confidence_level: 90
+    id_match: Regex_de_identity_card
+    matches:
+    - ref: Pattern_de_identity_card_label_context
+    - ref: Keyword_de_identity_card_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_de_identity_card_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_de_identity_card
+    matches:
+    - ref: Keyword_de_identity_card
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_de_identity_card_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_de_identity_card
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_de_identity_card_noise_exclusion
   regexes:
-    - id: Regex_de_identity_card
-      pattern: \b[CFGHJKLMNPRTVWXYZ][CFGHJKLMNPRTVWXYZ0-9]{8}\d?\b
+  - id: Regex_de_identity_card
+    pattern: \b[CFGHJKLMNPRTVWXYZ][CFGHJKLMNPRTVWXYZ0-9]{8}\d?\b
+  - id: Pattern_de_identity_card_label_context
+    pattern: (?i)\\b(?:personalausweis|identity|card)\\b
   keywords:
-    - id: Keyword_de_identity_card
-      groups:
-        - match_style: word
-          terms:
-            - Personalausweis
-            - Ausweisnummer
-            - Personalausweisnummer
-            - identity card
-            - identity card number
-            - ID card
-            - Ausweisdokument
-            - Identifikationsnummer
-            - Ausweis
-            - Bundespersonalausweis
+  - id: Keyword_de_identity_card
+    groups:
+    - match_style: word
+      terms:
+      - Personalausweis
+      - Ausweisnummer
+      - Personalausweisnummer
+      - identity card
+      - identity card number
+      - ID card
+      - Ausweisdokument
+      - Identifikationsnummer
+      - Ausweis
+      - Bundespersonalausweis
+  - id: Keyword_de_identity_card_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - personalausweis
+      - identity
+      - card
+      - field
+      - identifier
+      - reference
+  - id: Keyword_de_identity_card_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 risk_rating: 9
-risk_description: >-
-  This identifier uniquely links to an individual and is a primary target for identity theft and fraud. Exposure can
-  lead to unauthorized financial activity, impersonation, and significant personal harm.
+risk_description: This identifier uniquely links to an individual and is a primary
+  target for identity theft and fraud. Exposure can lead to unauthorized financial
+  activity, impersonation, and significant personal harm.
 sensitivity_labels:
-  pspf: "PROTECTED"
-  qgiscf: "PROTECTED"
-  qgiscf_dlm: "PROTECTED"
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-germany-identity-card-number
-    title: "Germany identity card number entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-germany-identity-card-number
+  title: Germany identity card number entity definition - Microsoft Learn
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

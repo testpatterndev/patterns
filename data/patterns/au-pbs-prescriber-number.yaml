@@ -4,150 +4,193 @@ slug: au-pbs-prescriber-number
 version: 1.1.0
 type: regex
 engine: universal
-description: >-
-  Detects PBS Prescriber Number patterns. A 7-digit number with check digit validation using weights [0,5,8,4,2,1],
-  mod 11.
-operation: >-
-  Regex pattern using universal engine. The top-level regex \b\d{7}\b matches any 7-digit number. Check digit
-  validated with weights [0,5,8,4,2,1], mod 11. The Purview engine uses two regexes: Pattern_pbs_labeled (labeled
-  format with prescriber/PBS prefix + 7 digits) and Pattern_pbs_prescriber (bare 7-digit format). Three confidence
-  tiers: High (85) requires PBS label + healthcare/pharmacy keywords with template exclusion logic; Medium (75)
-  requires PBS label keywords; Low (65) requires PBS label keywords only (minimum context). Evidence uses 2 keyword
-  groups (6 PBS label terms, 11 healthcare/pharmacy terms) within 300-character proximity. Keyword lists:
-  au-healthcare-identifiers, au-healthcare-medications.
+description: Detects PBS Prescriber Number patterns. A 7-digit number with check digit
+  validation using weights [0,5,8,4,2,1], mod 11.
+operation: 'Regex pattern using universal engine. The top-level regex \b\d{7}\b matches
+  any 7-digit number. Check digit validated with weights [0,5,8,4,2,1], mod 11. The
+  Purview engine uses two regexes: Pattern_pbs_labeled (labeled format with prescriber/PBS
+  prefix + 7 digits) and Pattern_pbs_prescriber (bare 7-digit format). Three confidence
+  tiers: High (85) requires PBS label + healthcare/pharmacy keywords with template
+  exclusion logic; Medium (75) requires PBS label keywords; Low (65) requires PBS
+  label keywords only (minimum context). Evidence uses 2 keyword groups (6 PBS label
+  terms, 11 healthcare/pharmacy terms) within 300-character proximity. Keyword lists:
+  au-healthcare-identifiers, au-healthcare-medications. Adds label-context matching
+  and exclusion logic for sample/template/test placeholders.'
 pattern: \b\d{7}\b
 confidence: low
-confidence_justification: >-
-  Low confidence: a bare 7-digit number is extremely common and will match phone numbers, postcodes, reference codes,
-  and many other numeric sequences. Corroborative evidence keywords such as PBS, prescriber, or pharmaceutical are
-  essential for reliable detection.
+confidence_justification: 'Low confidence: a bare 7-digit number is extremely common
+  and will match phone numbers, postcodes, reference codes, and many other numeric
+  sequences. Corroborative evidence keywords such as PBS, prescriber, or pharmaceutical
+  are essential for reliable detection. Context label evidence plus explicit template/example
+  exclusion improves precision for high-risk identifiers.'
 jurisdictions:
-  - au
+- au
 regulations:
-  - privacy-act-1988
+- privacy-act-1988
 data_categories:
-  - pii
-  - government-id
+- pii
+- government-id
 corroborative_evidence:
   keywords:
-    - prescriber
-    - PBS
-    - Pharmaceutical Benefits
+  - prescriber
+  - PBS
+  - Pharmaceutical Benefits
   proximity: 300
   keyword_lists:
-    - au-healthcare-identifiers
-    - au-healthcare-medications
+  - au-healthcare-identifiers
+  - au-healthcare-medications
 test_cases:
   should_match:
-    - value: '1234567'
-      description: Standard 7-digit prescriber number
-    - value: '0000001'
-      description: Low-range prescriber number
-    - value: '9876543'
-      description: High-range prescriber number
+  - value: '1234567'
+    description: Standard 7-digit prescriber number
+  - value: '0000001'
+    description: Low-range prescriber number
+  - value: '9876543'
+    description: High-range prescriber number
   should_not_match:
-    - value: '123456'
-      description: Only 6 digits instead of 7
-    - value: '12345678'
-      description: 8 digits instead of 7
-    - value: 123456A
-      description: Contains a letter instead of all digits
+  - value: '123456'
+    description: Only 6 digits instead of 7
+  - value: '12345678'
+    description: 8 digits instead of 7
+  - value: 123456A
+    description: Contains a letter instead of all digits
+  - value: sample template placeholder number 123456789
+    description: Template/sample context should be excluded even when numeric-like
+      values appear
 false_positives:
-  - description: >-
-      Common words and phrases related to pbs prescriber number appearing in policy documents, training materials, HR
-      templates, or compliance guidelines without actual personal data.
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than
-      general discussion.
-  - description: >-
-      In Australian English, similar terminology used in formal or administrative contexts (education, professional
-      documentation) that does not constitute sensitive data collection.
-    mitigation: >-
-      Layer with additional contextual signals such as structured identifiers, form fields, or database column headers
-      to distinguish sensitive records from general references.
+- description: Common words and phrases related to pbs prescriber number appearing
+    in policy documents, training materials, HR templates, or compliance guidelines
+    without actual personal data.
+  mitigation: Require corroborative evidence keywords within the proximity window
+    to confirm sensitive data context rather than general discussion.
+- description: In Australian English, similar terminology used in formal or administrative
+    contexts (education, professional documentation) that does not constitute sensitive
+    data collection.
+  mitigation: Layer with additional contextual signals such as structured identifiers,
+    form fields, or database column headers to distinguish sensitive records from
+    general references.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: wide
 risk_rating: 8
-risk_description: PBS prescriber exposure enables pharmaceutical fraud and prescription manipulation
+risk_description: PBS prescriber exposure enables pharmaceutical fraud and prescription
+  manipulation
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Personal-Privacy
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "CONFIDENTIAL"
-  ca_gov: "Protected B"
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Pattern_pbs_labeled
-      matches:
-        - ref: Evidence_healthcare_pharmacy
-      exclusion:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
-    - confidence_level: 75
-      id_match: Pattern_pbs_prescriber
-      matches:
-        - ref: Evidence_pbs_label
-        - ref: Evidence_healthcare_pharmacy
-    - confidence_level: 65
-      id_match: Pattern_pbs_prescriber
-      matches:
-        - ref: Evidence_pbs_label
+  - confidence_level: 90
+    id_match: Pattern_pbs_labeled
+    matches:
+    - ref: Pattern_au_pbs_prescriber_number_label_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_au_pbs_prescriber_number_noise_exclusion
+  - confidence_level: 85
+    id_match: Pattern_pbs_labeled
+    matches:
+    - ref: Evidence_healthcare_pharmacy
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_au_pbs_prescriber_number_noise_exclusion
+    exclusion:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      children:
+      - ref: Evidence_template_exclusion
+  - confidence_level: 75
+    id_match: Pattern_pbs_prescriber
+    matches:
+    - ref: Evidence_pbs_label
+    - ref: Evidence_healthcare_pharmacy
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_au_pbs_prescriber_number_noise_exclusion
+  - confidence_level: 65
+    id_match: Pattern_pbs_prescriber
+    matches:
+    - ref: Evidence_pbs_label
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_au_pbs_prescriber_number_noise_exclusion
   regexes:
-    - id: Pattern_pbs_prescriber
-      pattern: \b\d{7}\b
-    - id: Pattern_pbs_labeled
-      pattern: (?i)\b(?:prescriber|PBS|provider\s+no|prescriber\s+(?:number|no|ID))\s*[:#-]?\s*\d{7}\b
+  - id: Pattern_pbs_prescriber
+    pattern: \b\d{7}\b
+  - id: Pattern_pbs_labeled
+    pattern: (?i)\b(?:prescriber|PBS|provider\s+no|prescriber\s+(?:number|no|ID))\s*[:#-]?\s*\d{7}\b
+  - id: Pattern_au_pbs_prescriber_number_label_context
+    pattern: (?i)\\b(?:pbs|prescriber|provider\\s+number|prescriber\\s+number|provider\\s+id)\\b
   keywords:
-    - id: Evidence_pbs_label
-      groups:
-        - match_style: word
-          terms:
-            - prescriber
-            - PBS
-            - provider no
-            - prescriber number
-            - prescriber ID
-            - Pharmaceutical Benefits Scheme
-    - id: Evidence_healthcare_pharmacy
-      groups:
-        - match_style: word
-          terms:
-            - PBS
-            - Pharmaceutical Benefits
-            - prescriber
-            - prescription
-            - pharmacy
-            - dispensing
-            - medication
-            - drug
-            - pharmaceutical
-            - Schedule 8
-            - controlled substance
-    - id: Evidence_template_exclusion
-      groups:
-        - match_style: word
-          terms:
-            - template
-            - sample
-            - example
-            - placeholder
-            - dummy
-            - mock
-            - tutorial
-            - demo
-            - training exercise
-            - test data
+  - id: Evidence_pbs_label
+    groups:
+    - match_style: word
+      terms:
+      - prescriber
+      - PBS
+      - provider no
+      - prescriber number
+      - prescriber ID
+      - Pharmaceutical Benefits Scheme
+  - id: Evidence_healthcare_pharmacy
+    groups:
+    - match_style: word
+      terms:
+      - PBS
+      - Pharmaceutical Benefits
+      - prescriber
+      - prescription
+      - pharmacy
+      - dispensing
+      - medication
+      - drug
+      - pharmaceutical
+      - Schedule 8
+      - controlled substance
+  - id: Evidence_template_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - template
+      - sample
+      - example
+      - placeholder
+      - dummy
+      - mock
+      - tutorial
+      - demo
+      - training exercise
+      - test data
+  - id: Keyword_au_pbs_prescriber_number_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
 created: '2026-02-08'
 updated: '2026-02-12'
 author: testpattern-community

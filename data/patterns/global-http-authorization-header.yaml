@@ -4,110 +4,155 @@ slug: global-http-authorization-header
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects HTTP Authorization header patterns containing Bearer tokens, Basic credentials, and other authentication
-  schemes. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview
-  may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
-operation: >-
-  Matches HTTP Authorization headers with Bearer, Basic, and other authentication scheme values. Bearer tokens are
-  typically JWTs or opaque tokens; Basic auth contains Base64-encoded username:password pairs. Corroborative evidence: 8
-  keywords within 300 characters. Keyword lists: credentials-api-keys.
+description: Detects HTTP Authorization header patterns containing Bearer tokens,
+  Basic credentials, and other authentication schemes. This pattern is based on a
+  Microsoft Purview built-in sensitive information type. Users already running Purview
+  may prefer to enable the built-in SIT directly, or use this version as a starting
+  point for customisation.
+operation: 'Matches HTTP Authorization headers with Bearer, Basic, and other authentication
+  scheme values. Bearer tokens are typically JWTs or opaque tokens; Basic auth contains
+  Base64-encoded username:password pairs. Corroborative evidence: 8 keywords within
+  300 characters. Keyword lists: credentials-api-keys. Uses additional domain-context
+  evidence and explicit exclusion logic for template/sample/test text.'
 pattern: \bAuthorization:\s*(Bearer|Basic)\s+[A-Za-z0-9+/=._~-]{10,}
 confidence: high
-confidence_justification: >-
-  High confidence: Authorization header with Bearer or Basic scheme prefix followed by token value is a well-defined
-  HTTP authentication pattern.
+confidence_justification: 'High confidence: Authorization header with Bearer or Basic
+  scheme prefix followed by token value is a well-defined HTTP authentication pattern.
+  Added context gating and exclusion rules improve precision and reduce incidental
+  matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - credentials
-  - security
+- credentials
+- security
 corroborative_evidence:
   keywords:
-    - Authorization
-    - Bearer
-    - Basic
-    - token
-    - header
-    - HTTP
-    - authentication
-    - API
+  - Authorization
+  - Bearer
+  - Basic
+  - token
+  - header
+  - HTTP
+  - authentication
+  - API
   proximity: 300
   keyword_lists:
-    - credentials-api-keys
+  - credentials-api-keys
 test_cases:
   should_match:
-    - value: 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.AAAA0000.BBBB1111'
-      description: Bearer token with JWT format
-    - value: 'Authorization: Basic QUFBQUJCQUJCQ0NDQ0RERURFRUV='
-      description: Basic auth with Base64 credentials
-    - value: 'Authorization: Bearer AAAA0000BBBB1111CCCC2222DDDD3333'
-      description: Bearer token with opaque token format
+  - value: 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.AAAA0000.BBBB1111'
+    description: Bearer token with JWT format
+  - value: 'Authorization: Basic QUFBQUJCQUJCQ0NDQ0RERURFRUV='
+    description: Basic auth with Base64 credentials
+  - value: 'Authorization: Bearer AAAA0000BBBB1111CCCC2222DDDD3333'
+    description: Bearer token with opaque token format
   should_not_match:
-    - value: 'Authorization: '
-      description: Empty authorization header
-    - value: The Authorization header is required
-      description: Documentation reference without actual header
+  - value: 'Authorization: '
+    description: Empty authorization header
+  - value: The Authorization header is required
+    description: Documentation reference without actual header
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      API documentation and HTTP specification references showing Authorization header examples.
-    mitigation: >-
-      Check for common placeholder tokens and documentation context.
-  - description: >-
-      Log files containing Authorization headers with redacted or expired tokens.
-    mitigation: >-
-      Check for redaction markers like [REDACTED] or expired JWT timestamps.
+- description: API documentation and HTTP specification references showing Authorization
+    header examples.
+  mitigation: Check for common placeholder tokens and documentation context.
+- description: Log files containing Authorization headers with redacted or expired
+    tokens.
+  mitigation: Check for redaction markers like [REDACTED] or expired JWT timestamps.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_http_authorization_header
-      matches:
-        - ref: Keyword_http_authorization_header
+  - confidence_level: 90
+    id_match: Regex_http_authorization_header
+    matches:
+    - ref: Pattern_global_http_authorization_header_label_context
+    - ref: Keyword_global_http_authorization_header_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_http_authorization_header_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_http_authorization_header
+    matches:
+    - ref: Keyword_http_authorization_header
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_http_authorization_header_noise_exclusion
   regexes:
-    - id: Regex_http_authorization_header
-      pattern: \bAuthorization:\s*(Bearer|Basic)\s+[A-Za-z0-9+/=._~-]{10,}
+  - id: Regex_http_authorization_header
+    pattern: \bAuthorization:\s*(Bearer|Basic)\s+[A-Za-z0-9+/=._~-]{10,}
+  - id: Pattern_global_http_authorization_header_label_context
+    pattern: (?i)\\b(?:http\\s+authorization\\s+header|http|authorization|header)\\b
   keywords:
-    - id: Keyword_http_authorization_header
-      groups:
-        - match_style: word
-          terms:
-            - Authorization
-            - Bearer
-            - Basic
-            - token
-            - header
-            - HTTP
-            - authentication
-            - API
-            - JWT
-            - OAuth
-            - access token
+  - id: Keyword_http_authorization_header
+    groups:
+    - match_style: word
+      terms:
+      - Authorization
+      - Bearer
+      - Basic
+      - token
+      - header
+      - HTTP
+      - authentication
+      - API
+      - JWT
+      - OAuth
+      - access token
+  - id: Keyword_global_http_authorization_header_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - http authorization header
+      - http
+      - authorization
+      - header
+      - field
+      - identifier
+      - reference
+  - id: Keyword_global_http_authorization_header_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 risk_rating: 10
-risk_description: >-
-  Exposure of this credential could grant unauthorized access to cloud infrastructure, databases, or services. Compromised
-  credentials are a leading cause of data breaches and can result in full system takeover.
+risk_description: Exposure of this credential could grant unauthorized access to cloud
+  infrastructure, databases, or services. Compromised credentials are a leading cause
+  of data breaches and can result in full system takeover.
 sensitivity_labels:
-  pspf: "PROTECTED"
-  qgiscf: "PROTECTED"
-  qgiscf_dlm: "PROTECTED"
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-http-authorization-header
-    title: "Http authorization header entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-http-authorization-header
+  title: Http authorization header entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

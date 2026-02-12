@@ -4,123 +4,189 @@ slug: ca-bank-account
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Canada Bank Account Number patterns. This pattern is based on a Microsoft Purview built-in
-  sensitive information type. Financial account numbers require corroborative evidence for
-  reliable detection due to their generic numeric format.
-operation: >-
-  Corroborative evidence: 5 keywords within 300 characters.
-  Keyword lists: banking, ca-financial.
-pattern: '\b\d{7,12}\b'
+description: Detects Canada Bank Account Number patterns. This pattern is based on
+  a Microsoft Purview built-in sensitive information type. Financial account numbers
+  require corroborative evidence for reliable detection due to their generic numeric
+  format.
+operation: 'Corroborative evidence: 5 keywords within 300 characters. Keyword lists:
+  banking, ca-financial. Adds label-context matching and exclusion logic for sample/template/test
+  placeholders. Uses additional domain-context evidence and explicit exclusion logic
+  for template/sample/test text.'
+pattern: \b\d{7,12}\b
 confidence: low
-confidence_justification: >-
-  Low confidence: seven to twelve digit numbers are extremely common in non-financial contexts. Bank account keywords are essential for distinguishing financial identifiers from general numbers.
+confidence_justification: 'Low confidence: seven to twelve digit numbers are extremely
+  common in non-financial contexts. Bank account keywords are essential for distinguishing
+  financial identifiers from general numbers. Context label evidence plus explicit
+  template/example exclusion improves precision for high-risk identifiers. Added context
+  gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - ca
+- ca
 regulations:
-  - pipeda
-  - bank-act
+- pipeda
+- bank-act
 data_categories:
-  - pii
-  - financial
+- pii
+- financial
 corroborative_evidence:
   keywords:
-    - bank account
-    - account number
-    - chequing
-    - savings
-    - banking
+  - bank account
+  - account number
+  - chequing
+  - savings
+  - banking
   proximity: 300
   keyword_lists:
-    - banking
-    - ca-financial
+  - banking
+  - ca-financial
 test_cases:
   should_match:
-    - value: '1234567'
-      description: Seven-digit Canadian bank account number
-    - value: '123456789012'
-      description: Twelve-digit Canadian bank account number
-    - value: '987654321'
-      description: Nine-digit Canadian bank account
+  - value: '1234567'
+    description: Seven-digit Canadian bank account number
+  - value: '123456789012'
+    description: Twelve-digit Canadian bank account number
+  - value: '987654321'
+    description: Nine-digit Canadian bank account
   should_not_match:
-    - value: '123456'
-      description: Six digits, too short for Canadian bank account
-    - value: '1234567890123'
-      description: Thirteen digits, exceeds Canadian bank account format
+  - value: '123456'
+    description: Six digits, too short for Canadian bank account
+  - value: '1234567890123'
+    description: Thirteen digits, exceeds Canadian bank account format
+  - value: sample template placeholder number 123456789
+    description: Template/sample context should be excluded even when numeric-like
+      values appear
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: Generic numeric sequences such as reference numbers, invoice numbers, or identifiers from other domains
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window to distinguish
-      financial account numbers from general numeric data.
-  - description: Phone numbers, postal codes, or other structured numbers with similar digit counts
-    mitigation: >-
-      Layer with other detection patterns to deprioritise matches that overlap with phone number
-      or postal code formats.
+- description: Generic numeric sequences such as reference numbers, invoice numbers,
+    or identifiers from other domains
+  mitigation: Require corroborative evidence keywords within the proximity window
+    to distinguish financial account numbers from general numeric data.
+- description: Phone numbers, postal codes, or other structured numbers with similar
+    digit counts
+  mitigation: Layer with other detection patterns to deprioritise matches that overlap
+    with phone number or postal code formats.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_ca_bank_account
-      matches:
-        - ref: Keyword_ca_bank_account_specific
-    - confidence_level: 65
-      id_match: Regex_ca_bank_account
-      matches:
-        - ref: Keyword_ca_bank_account_general
+  - confidence_level: 95
+    id_match: Regex_ca_bank_account
+    matches:
+    - ref: Pattern_ca_bank_account_label_context
+    - ref: Keyword_ca_bank_account_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_bank_account_noise_exclusion
+  - confidence_level: 90
+    id_match: Regex_ca_bank_account
+    matches:
+    - ref: Pattern_ca_bank_account_label_context
+    - ref: Keyword_ca_bank_account_specific
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_bank_account_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_ca_bank_account
+    matches:
+    - ref: Keyword_ca_bank_account_specific
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_bank_account_noise_exclusion
+  - confidence_level: 65
+    id_match: Regex_ca_bank_account
+    matches:
+    - ref: Keyword_ca_bank_account_general
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_bank_account_noise_exclusion
   regexes:
-    - id: Regex_ca_bank_account
-      pattern: '\b\d{7,12}\b'
+  - id: Regex_ca_bank_account
+    pattern: \b\d{7,12}\b
+  - id: Pattern_ca_bank_account_label_context
+    pattern: (?i)\\b(?:canada|bank|account|bank\\s+account|account\\s+number|account\\s+no|routing)\\b
   keywords:
-    - id: Keyword_ca_bank_account_specific
-      groups:
-        - match_style: word
-          terms:
-            - bank account
-            - account number
-            - numéro de compte
-            - numero de compte
-            - compte bancaire
-            - chequing account
-            - savings account
-            - compte d'épargne
-            - compte chèques
-            - transit number
-            - numéro de transit
-    - id: Keyword_ca_bank_account_general
-      groups:
-        - match_style: word
-          terms:
-            - chequing
-            - savings
-            - banking
-            - deposit
-            - withdrawal
-            - financial institution
-            - institution financière
-            - bank
-            - banque
+  - id: Keyword_ca_bank_account_specific
+    groups:
+    - match_style: word
+      terms:
+      - bank account
+      - account number
+      - numéro de compte
+      - numero de compte
+      - compte bancaire
+      - chequing account
+      - savings account
+      - compte d'épargne
+      - compte chèques
+      - transit number
+      - numéro de transit
+  - id: Keyword_ca_bank_account_general
+    groups:
+    - match_style: word
+      terms:
+      - chequing
+      - savings
+      - banking
+      - deposit
+      - withdrawal
+      - financial institution
+      - institution financière
+      - bank
+      - banque
+  - id: Keyword_ca_bank_account_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+  - id: Keyword_ca_bank_account_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - canada bank account number
+      - canada
+      - bank
+      - account
+      - field
+      - identifier
+      - reference
 risk_rating: 9
-risk_description: >-
-  Financial account identifiers can be exploited for unauthorized transactions, account takeover, and financial fraud. Exposure of banking details poses immediate monetary risk and may violate financial data protection regulations.
+risk_description: Financial account identifiers can be exploited for unauthorized
+  transactions, account takeover, and financial fraud. Exposure of banking details
+  poses immediate monetary risk and may violate financial data protection regulations.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: "SENSITIVE"
-  qgiscf_dlm: "SENSITIVE Financial"
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Financial
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-canada-bank-account-number
-    title: "Canada Bank Account Number entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-canada-bank-account-number
+  title: Canada Bank Account Number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

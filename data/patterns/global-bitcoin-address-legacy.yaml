@@ -5,98 +5,145 @@ version: 1.0.0
 type: regex
 engine: universal
 description: Detects Bitcoin Address (Legacy) patterns.
-operation: >-
-  Validation: Base58Check encoding. Corroborative evidence: 3 keywords within 300 characters. Keyword lists:
-  financial-transaction.
-pattern: \b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b
+operation: 'Validation: Base58Check encoding. Corroborative evidence: 3 keywords within
+  300 characters. Keyword lists: financial-transaction. Uses additional domain-context
+  evidence and explicit exclusion logic for template/sample/test text.'
+pattern: \b[13][a-km-zA-HJ-NP-Z1-9]{24,33}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false
-  positive rates.
+confidence_justification: 'Medium confidence: pattern has structural constraints but
+  corroborative keywords are recommended to reduce false positive rates. Added context
+  gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - pci-dss
+- pci-dss
 data_categories:
-  - financial
+- financial
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+  - identifier
+  - number
+  - ID
   proximity: 300
   keyword_lists:
-    - financial-transaction
+  - financial-transaction
 test_cases:
   should_match:
-    - value: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
-      description: Bitcoin legacy address starting with 1
-    - value: 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy
-      description: Bitcoin P2SH address starting with 3
-    - value: 1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2
-      description: Standard Bitcoin address
+  - value: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+    description: Bitcoin legacy address starting with 1
+  - value: 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy
+    description: Bitcoin P2SH address starting with 3
+  - value: 1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2
+    description: Standard Bitcoin address
   should_not_match:
-    - value: 2A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
-      description: Invalid first character (2 instead of 1 or 3)
-    - value: 1A1zP1eP5QGefi2DMPTf
-      description: Too short (only 20 characters)
-    - value: 1A1zP1eP5QGefi2DMPTOL5SLmv7DivfNa
-      description: Contains invalid character O (excluded from base58)
+  - value: 2A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+    description: Invalid first character (2 instead of 1 or 3)
+  - value: 1A1zP1eP5QGefi2DMPTf
+    description: Too short (only 20 characters)
+  - value: 1A1zP1eP5QGefi2DMPTOL5SLmv7DivfNa
+    description: Contains invalid character O (excluded from base58)
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template
-      documents without actual transaction data.
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial
-      identifiers to confirm actual sensitive data.
-  - description: >-
-      In English (as the primary international business language), standard business terminology overlapping with
-      financial detection keywords in routine correspondence and documentation.
-    mitigation: >-
-      Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for
-      higher precision.
+- description: Financial terminology appearing in published reports, accounting textbooks,
+    regulatory guidance, or template documents without actual transaction data.
+  mitigation: Require corroborative evidence keywords within the proximity window.
+    Cross-reference with structured financial identifiers to confirm actual sensitive
+    data.
+- description: In English (as the primary international business language), standard
+    business terminology overlapping with financial detection keywords in routine
+    correspondence and documentation.
+  mitigation: Increase confidence threshold when scanning business correspondence.
+    Layer with transaction-specific patterns for higher precision.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_btc_legacy
-      matches:
-        - ref: Keyword_cryptocurrency
-    - confidence_level: 85
-      id_match: Regex_btc_bech32
-      matches:
-        - ref: Keyword_cryptocurrency
+  - confidence_level: 90
+    id_match: Regex_btc_legacy
+    matches:
+    - ref: Pattern_global_bitcoin_address_legacy_label_context
+    - ref: Keyword_global_bitcoin_address_legacy_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_bitcoin_address_legacy_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_btc_legacy
+    matches:
+    - ref: Keyword_cryptocurrency
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_bitcoin_address_legacy_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_btc_bech32
+    matches:
+    - ref: Keyword_cryptocurrency
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_bitcoin_address_legacy_noise_exclusion
   regexes:
-    - id: Regex_btc_legacy
-      pattern: \b[13][a-km-zA-HJ-NP-Z1-9]{24,33}\b
-    - id: Regex_btc_bech32
-      pattern: \bbc1[a-z0-9]{39,59}\b
+  - id: Regex_btc_legacy
+    pattern: \b[13][a-km-zA-HJ-NP-Z1-9]{24,33}\b
+  - id: Regex_btc_bech32
+    pattern: \bbc1[a-z0-9]{39,59}\b
+  - id: Pattern_global_bitcoin_address_legacy_label_context
+    pattern: (?i)\\b(?:bitcoin\\s+address\\s+\(legacy\)|bitcoin|address|legacy)\\b
   keywords:
-    - id: Keyword_cryptocurrency
-      groups:
-        - match_style: word
-          terms:
-            - bitcoin
-            - BTC
-            - cryptocurrency
-            - crypto
-            - wallet
-            - wallet address
-            - blockchain
-            - digital currency
-            - crypto wallet
+  - id: Keyword_cryptocurrency
+    groups:
+    - match_style: word
+      terms:
+      - bitcoin
+      - BTC
+      - cryptocurrency
+      - crypto
+      - wallet
+      - wallet address
+      - blockchain
+      - digital currency
+      - crypto wallet
+  - id: Keyword_global_bitcoin_address_legacy_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - bitcoin address (legacy)
+      - bitcoin
+      - address
+      - legacy
+      - field
+      - identifier
+      - reference
+  - id: Keyword_global_bitcoin_address_legacy_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 sensitivity_labels:
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-02-08'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

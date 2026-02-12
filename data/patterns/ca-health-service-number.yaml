@@ -4,128 +4,194 @@ slug: ca-health-service-number
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Canada Health Service Number patterns. This pattern is based on a Microsoft Purview built-in
-  sensitive information type. Due to the generic numeric format, corroborative evidence keywords
-  are essential for reliable detection.
-operation: >-
-  Corroborative evidence: 5 keywords within 300 characters.
-  Keyword lists: health-service, ca-health.
-pattern: '\b\d{10}\b'
+description: Detects Canada Health Service Number patterns. This pattern is based
+  on a Microsoft Purview built-in sensitive information type. Due to the generic numeric
+  format, corroborative evidence keywords are essential for reliable detection.
+operation: 'Corroborative evidence: 5 keywords within 300 characters. Keyword lists:
+  health-service, ca-health. Adds label-context matching and exclusion logic for sample/template/test
+  placeholders. Uses additional domain-context evidence and explicit exclusion logic
+  for template/sample/test text.'
+pattern: \b\d{10}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: ten-digit numbers are common in many contexts. Corroborative evidence keywords such as 'health card' or 'OHIP' are needed for reliable detection.
+confidence_justification: 'Medium confidence: ten-digit numbers are common in many
+  contexts. Corroborative evidence keywords such as ''health card'' or ''OHIP'' are
+  needed for reliable detection. Context label evidence plus explicit template/example
+  exclusion improves precision for high-risk identifiers. Added context gating and
+  exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - ca
+- ca
 regulations:
-  - pipeda
-  - health-information-acts
+- pipeda
+- health-information-acts
 data_categories:
-  - phi
-  - health
-  - government-id
+- phi
+- health
+- government-id
 corroborative_evidence:
   keywords:
-    - health card
-    - health service
-    - OHIP
-    - health number
-    - provincial health
+  - health card
+  - health service
+  - OHIP
+  - health number
+  - provincial health
   proximity: 300
   keyword_lists:
-    - health-service
-    - ca-health
+  - health-service
+  - ca-health
 test_cases:
   should_match:
-    - value: '1234567890'
-      description: Ten-digit health service number format
-    - value: '9876543210'
-      description: Ten-digit provincial health card number
-    - value: '5566778899'
-      description: Ten-digit health service identifier
+  - value: '1234567890'
+    description: Ten-digit health service number format
+  - value: '9876543210'
+    description: Ten-digit provincial health card number
+  - value: '5566778899'
+    description: Ten-digit health service identifier
   should_not_match:
-    - value: '123456789'
-      description: Nine digits, too short for health service number
-    - value: '12345678901'
-      description: Eleven digits, exceeds health service format
+  - value: '123456789'
+    description: Nine digits, too short for health service number
+  - value: '12345678901'
+    description: Eleven digits, exceeds health service format
+  - value: sample template placeholder number 123456789
+    description: Template/sample context should be excluded even when numeric-like
+      values appear
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: Generic numeric sequences matching the digit pattern in non-health contexts
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window to distinguish
-      health identifiers from general numeric data.
-  - description: Reference numbers or account identifiers from other domains with similar digit counts
-    mitigation: >-
-      Layer with document classification to prioritise matches in health and medical documents.
+- description: Generic numeric sequences matching the digit pattern in non-health
+    contexts
+  mitigation: Require corroborative evidence keywords within the proximity window
+    to distinguish health identifiers from general numeric data.
+- description: Reference numbers or account identifiers from other domains with similar
+    digit counts
+  mitigation: Layer with document classification to prioritise matches in health and
+    medical documents.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_ca_health_service_number
-      matches:
-        - ref: Keyword_ca_health_specific
-    - confidence_level: 75
-      id_match: Regex_ca_health_service_number
-      matches:
-        - ref: Keyword_ca_health_general
+  - confidence_level: 95
+    id_match: Regex_ca_health_service_number
+    matches:
+    - ref: Pattern_ca_health_service_number_label_context
+    - ref: Keyword_ca_health_service_number_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_health_service_number_noise_exclusion
+  - confidence_level: 90
+    id_match: Regex_ca_health_service_number
+    matches:
+    - ref: Pattern_ca_health_service_number_label_context
+    - ref: Keyword_ca_health_specific
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_health_service_number_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_ca_health_service_number
+    matches:
+    - ref: Keyword_ca_health_specific
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_health_service_number_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_ca_health_service_number
+    matches:
+    - ref: Keyword_ca_health_general
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_health_service_number_noise_exclusion
   regexes:
-    - id: Regex_ca_health_service_number
-      pattern: '\b\d{10}\b'
+  - id: Regex_ca_health_service_number
+    pattern: \b\d{10}\b
+  - id: Pattern_ca_health_service_number_label_context
+    pattern: (?i)\\b(?:canada|health|service|health\\s+number|insurance\\s+number|patient\\s+identifier|social\\s+welfare)\\b
   keywords:
-    - id: Keyword_ca_health_specific
-      groups:
-        - match_style: word
-          terms:
-            - health card
-            - health service number
-            - numéro de carte santé
-            - numero de carte sante
-            - carte santé
-            - carte sante
-            - OHIP
-            - RAMQ
-            - provincial health number
-            - health insurance number
-            - numéro d'assurance maladie
-            - numero d'assurance maladie
-    - id: Keyword_ca_health_general
-      groups:
-        - match_style: word
-          terms:
-            - health number
-            - provincial health
-            - health card number
-            - patient number
-            - numéro de santé
-            - santé
-            - health plan
-            - régime de santé
-            - medical
-            - médical
+  - id: Keyword_ca_health_specific
+    groups:
+    - match_style: word
+      terms:
+      - health card
+      - health service number
+      - numéro de carte santé
+      - numero de carte sante
+      - carte santé
+      - carte sante
+      - OHIP
+      - RAMQ
+      - provincial health number
+      - health insurance number
+      - numéro d'assurance maladie
+      - numero d'assurance maladie
+  - id: Keyword_ca_health_general
+    groups:
+    - match_style: word
+      terms:
+      - health number
+      - provincial health
+      - health card number
+      - patient number
+      - numéro de santé
+      - santé
+      - health plan
+      - régime de santé
+      - medical
+      - médical
+  - id: Keyword_ca_health_service_number_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+  - id: Keyword_ca_health_service_number_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - canada health service number
+      - canada
+      - health
+      - service
+      - field
+      - identifier
+      - reference
   filters:
-    - id: Filter_ca_health_same_digits
-      type: AllDigitsSameFilter
+  - id: Filter_ca_health_same_digits
+    type: AllDigitsSameFilter
 risk_rating: 8
-risk_description: >-
-  Health and medical information is among the most sensitive personal data under privacy laws globally. Unauthorized disclosure can result in discrimination, personal harm, and regulatory penalties under health privacy frameworks.
+risk_description: Health and medical information is among the most sensitive personal
+  data under privacy laws globally. Unauthorized disclosure can result in discrimination,
+  personal harm, and regulatory penalties under health privacy frameworks.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: "SENSITIVE"
-  qgiscf_dlm: "SENSITIVE Personal-Privacy"
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "CONFIDENTIAL"
-  ca_gov: "Protected B"
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-canada-health-service-number
-    title: "Canada Health Service Number entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-canada-health-service-number
+  title: Canada Health Service Number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

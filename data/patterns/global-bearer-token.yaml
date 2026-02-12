@@ -5,97 +5,137 @@ version: 1.0.0
 type: regex
 engine: universal
 description: Detects Bearer patterns.
-operation: 'Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials-tokens.'
+operation: 'Corroborative evidence: 8 keywords within 300 characters. Keyword lists:
+  credentials-tokens. Uses additional domain-context evidence and explicit exclusion
+  logic for template/sample/test text.'
 pattern: \b[Bb]earer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b
 confidence: high
-confidence_justification: >-
-  High confidence: structurally constrained pattern with corroborative keyword support reduces false positive rates
-  significantly.
+confidence_justification: 'High confidence: structurally constrained pattern with
+  corroborative keyword support reduces false positive rates significantly. Added
+  context gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - credentials
-  - security
+- credentials
+- security
 corroborative_evidence:
   keywords:
-    - api key
-    - api_key
-    - apikey
-    - access key
-    - secret key
-    - private key
-    - auth token
-    - authorization
+  - api key
+  - api_key
+  - apikey
+  - access key
+  - secret key
+  - private key
+  - auth token
+  - authorization
   proximity: 300
   keyword_lists:
-    - credentials-tokens
+  - credentials-tokens
 test_cases:
   should_match:
-    - value: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.reCjcZ0-m3Q
-      description: Bearer token with JWT
-    - value: bearer eyJhbGciOiJub25lIn0.eyJ0ZXN0IjoiMSJ9.abc
-      description: Lowercase bearer with JWT
-    - value: Bearer eyJ0eXAiOiJKV1QifQ.eyJpZCI6MSwiYWRtaW4iOnRydWV9.sig
-      description: Bearer token with type claim
+  - value: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.reCjcZ0-m3Q
+    description: Bearer token with JWT
+  - value: bearer eyJhbGciOiJub25lIn0.eyJ0ZXN0IjoiMSJ9.abc
+    description: Lowercase bearer with JWT
+  - value: Bearer eyJ0eXAiOiJKV1QifQ.eyJpZCI6MSwiYWRtaW4iOnRydWV9.sig
+    description: Bearer token with type claim
   should_not_match:
-    - value: 'Bearer single-segment-token'
-      description: Only one segment instead of three dot-separated
-    - value: Token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig
-      description: Wrong keyword (Token instead of Bearer)
-    - value: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0
-      description: Only two dot-separated segments instead of three
+  - value: Bearer single-segment-token
+    description: Only one segment instead of three dot-separated
+  - value: Token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig
+    description: Wrong keyword (Token instead of Bearer)
+  - value: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0
+    description: Only two dot-separated segments instead of three
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Authentication-related terminology in software documentation, security training materials, or system architecture
-      descriptions without actual credentials.
-    mitigation: >-
-      Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-      security terminology.
-  - description: >-
-      Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-      documentation.
-    mitigation: >-
-      Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce false
-      positives from technical writing.
+- description: Authentication-related terminology in software documentation, security
+    training materials, or system architecture descriptions without actual credentials.
+  mitigation: Require proximity to credential-specific patterns (API keys, connection
+    strings, tokens) rather than general security terminology.
+- description: Code snippets and configuration examples containing credential-related
+    keywords or placeholder values in developer documentation.
+  mitigation: Check for common placeholder patterns (example.com, localhost, 0000)
+    and documentation file types to reduce false positives from technical writing.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_bearer_token
-      matches:
-        - ref: Keyword_bearer_token
+  - confidence_level: 90
+    id_match: Regex_bearer_token
+    matches:
+    - ref: Pattern_global_bearer_token_label_context
+    - ref: Keyword_global_bearer_token_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_bearer_token_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_bearer_token
+    matches:
+    - ref: Keyword_bearer_token
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_bearer_token_noise_exclusion
   regexes:
-    - id: Regex_bearer_token
-      pattern: \b[Bb]earer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b
+  - id: Regex_bearer_token
+    pattern: \b[Bb]earer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b
+  - id: Pattern_global_bearer_token_label_context
+    pattern: (?i)\\b(?:bearer|token)\\b
   keywords:
-    - id: Keyword_bearer_token
-      groups:
-        - match_style: word
-          terms:
-            - bearer
-            - authorization
-            - auth token
-            - JWT
-            - access token
-            - token
-            - OAuth
-            - API
-            - header
-            - authentication
+  - id: Keyword_bearer_token
+    groups:
+    - match_style: word
+      terms:
+      - bearer
+      - authorization
+      - auth token
+      - JWT
+      - access token
+      - token
+      - OAuth
+      - API
+      - header
+      - authentication
+  - id: Keyword_global_bearer_token_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - bearer
+      - token
+      - field
+      - identifier
+      - reference
+  - id: Keyword_global_bearer_token_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 sensitivity_labels:
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-02-08'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

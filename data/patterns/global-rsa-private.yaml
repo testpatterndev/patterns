@@ -4,97 +4,141 @@ slug: global-rsa-private
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects RSA private key PEM headers in source code, configuration files, and documents. Private keys should never
-  appear in plaintext.
-operation: >-
-  Reference: https://www.rfc-editor.org/rfc/rfc7468 Corroborative evidence: 7 keywords within 300 characters. Keyword
-  lists: credentials-api-keys, credentials-passwords.
+description: Detects RSA private key PEM headers in source code, configuration files,
+  and documents. Private keys should never appear in plaintext.
+operation: 'Reference: https://www.rfc-editor.org/rfc/rfc7468 Corroborative evidence:
+  7 keywords within 300 characters. Keyword lists: credentials-api-keys, credentials-passwords.
+  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
+  text.'
 pattern: '-----BEGIN RSA PRIVATE KEY-----'
 confidence: high
-confidence_justification: >-
-  High confidence: structurally constrained pattern with corroborative keyword support reduces false positive rates
-  significantly.
+confidence_justification: 'High confidence: structurally constrained pattern with
+  corroborative keyword support reduces false positive rates significantly. Added
+  context gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - credentials
-  - security
+- credentials
+- security
 corroborative_evidence:
   keywords:
-    - private key
-    - secret key
-    - key file
-    - PEM
-    - certificate
-    - RSA
-    - cryptographic
+  - private key
+  - secret key
+  - key file
+  - PEM
+  - certificate
+  - RSA
+  - cryptographic
   proximity: 300
   keyword_lists:
-    - credentials-api-keys
-    - credentials-passwords
+  - credentials-api-keys
+  - credentials-passwords
 test_cases:
   should_match:
-    - value: '-----BEGIN RSA PRIVATE KEY-----'
-      description: RSA private key PEM header
-    - value: |-
-        -----BEGIN RSA PRIVATE KEY-----
-        MIIE...
-      description: RSA key with data following header
-    - value: |-
-        -----BEGIN RSA PRIVATE KEY-----
-        Proc-Type:
-      description: Encrypted RSA private key header
+  - value: '-----BEGIN RSA PRIVATE KEY-----'
+    description: RSA private key PEM header
+  - value: '-----BEGIN RSA PRIVATE KEY-----
+
+      MIIE...'
+    description: RSA key with data following header
+  - value: '-----BEGIN RSA PRIVATE KEY-----
+
+      Proc-Type:'
+    description: Encrypted RSA private key header
   should_not_match:
-    - value: '-----BEGIN PUBLIC KEY-----'
-      description: Public key, not private
-    - value: '-----BEGIN CERTIFICATE-----'
-      description: Certificate, not private key
+  - value: '-----BEGIN PUBLIC KEY-----'
+    description: Public key, not private
+  - value: '-----BEGIN CERTIFICATE-----'
+    description: Certificate, not private key
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: PEM-encoded certificates or public keys that use similar header formats
-    mitigation: >-
-      The pattern specifically matches the private key header text, but verify the full PEM block contains actual key
-      material.
+- description: PEM-encoded certificates or public keys that use similar header formats
+  mitigation: The pattern specifically matches the private key header text, but verify
+    the full PEM block contains actual key material.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_rsa_private
-      matches:
-        - ref: Keyword_rsa_private
+  - confidence_level: 90
+    id_match: Regex_rsa_private
+    matches:
+    - ref: Pattern_global_rsa_private_label_context
+    - ref: Keyword_global_rsa_private_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_rsa_private_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_rsa_private
+    matches:
+    - ref: Keyword_rsa_private
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_rsa_private_noise_exclusion
   regexes:
-    - id: Regex_rsa_private
-      pattern: '-----BEGIN RSA PRIVATE KEY-----'
+  - id: Regex_rsa_private
+    pattern: '-----BEGIN RSA PRIVATE KEY-----'
+  - id: Pattern_global_rsa_private_label_context
+    pattern: (?i)\\b(?:rsa\\s+private\\s+key\\s+header|rsa|private|key|header)\\b
   keywords:
-    - id: Keyword_rsa_private
-      groups:
-        - match_style: word
-          terms:
-            - private key
-            - RSA
-            - key file
-            - PEM
-            - certificate
-            - cryptographic
-            - encryption
-            - TLS
-            - SSL
-            - key pair
-            - ssh-keygen
+  - id: Keyword_rsa_private
+    groups:
+    - match_style: word
+      terms:
+      - private key
+      - RSA
+      - key file
+      - PEM
+      - certificate
+      - cryptographic
+      - encryption
+      - TLS
+      - SSL
+      - key pair
+      - ssh-keygen
+  - id: Keyword_global_rsa_private_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - rsa private key header
+      - rsa
+      - private
+      - key
+      - header
+      - field
+      - identifier
+      - reference
+  - id: Keyword_global_rsa_private_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 sensitivity_labels:
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-02-08'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

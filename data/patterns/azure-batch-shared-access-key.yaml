@@ -4,93 +4,143 @@ slug: azure-batch-shared-access-key
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Azure Batch account shared access key patterns. This pattern is based on a Microsoft Purview built-in
-  sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this
-  version as a starting point for customisation.
-operation: >-
-  Matches Base64-encoded Azure Batch shared access keys, typically 88 characters long, often found in connection strings
-  or configuration files. Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials-api-keys.
+description: Detects Azure Batch account shared access key patterns. This pattern
+  is based on a Microsoft Purview built-in sensitive information type. Users already
+  running Purview may prefer to enable the built-in SIT directly, or use this version
+  as a starting point for customisation.
+operation: 'Matches Base64-encoded Azure Batch shared access keys, typically 88 characters
+  long, often found in connection strings or configuration files. Corroborative evidence:
+  8 keywords within 300 characters. Keyword lists: credentials-api-keys. Uses additional
+  domain-context evidence and explicit exclusion logic for template/sample/test text.'
 pattern: (?i)(?:AccountKey|SharedAccessKey|batch[._-]?key)\s*=\s*[A-Za-z0-9+/]{43,88}={0,2}
 confidence: high
-confidence_justification: >-
-  High confidence: structurally constrained Base64 key pattern with Azure Batch context keywords reduces false positive
-  rates significantly.
+confidence_justification: 'High confidence: structurally constrained Base64 key pattern
+  with Azure Batch context keywords reduces false positive rates significantly. Added
+  context gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - credentials
-  - security
+- credentials
+- security
 corroborative_evidence:
   keywords:
-    - batch
-    - Azure Batch
-    - AccountKey
-    - SharedAccessKey
-    - batch account
-    - batch service
-    - api key
-    - access key
+  - batch
+  - Azure Batch
+  - AccountKey
+  - SharedAccessKey
+  - batch account
+  - batch service
+  - api key
+  - access key
   proximity: 300
   keyword_lists:
-    - credentials-api-keys
+  - credentials-api-keys
 test_cases:
   should_match:
-    - value: AccountKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
-      description: Standard Azure Batch account key (88 chars Base64)
-    - value: SharedAccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/ABCDEFGHIJKLMNOPQRSTUV==
-      description: Batch shared access key with mixed characters
-    - value: batch_key=0000000000000000000000000000000000000000000=
-      description: Batch key with numeric test value
+  - value: AccountKey=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
+    description: Standard Azure Batch account key (88 chars Base64)
+  - value: SharedAccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/ABCDEFGHIJKLMNOPQRSTUV==
+    description: Batch shared access key with mixed characters
+  - value: batch_key=0000000000000000000000000000000000000000000=
+    description: Batch key with numeric test value
   should_not_match:
-    - value: AccountKey=shortkey
-      description: Too short to be a valid Base64 key
-    - value: AccountName=mybatchaccount
-      description: Account name, not a key
+  - value: AccountKey=shortkey
+    description: Too short to be a valid Base64 key
+  - value: AccountName=mybatchaccount
+    description: Account name, not a key
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: Configuration templates with placeholder Base64 values for Azure Batch accounts.
-    mitigation: Check for common placeholder patterns and combine with Azure Batch specific context keywords.
-  - description: Other Azure service keys that use similar Base64 encoding format.
-    mitigation: Use corroborative keywords specific to Azure Batch to differentiate from other Azure services.
+- description: Configuration templates with placeholder Base64 values for Azure Batch
+    accounts.
+  mitigation: Check for common placeholder patterns and combine with Azure Batch specific
+    context keywords.
+- description: Other Azure service keys that use similar Base64 encoding format.
+  mitigation: Use corroborative keywords specific to Azure Batch to differentiate
+    from other Azure services.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_azure_batch_shared_access_key
-      matches:
-        - ref: Keyword_azure_batch
+  - confidence_level: 90
+    id_match: Regex_azure_batch_shared_access_key
+    matches:
+    - ref: Pattern_azure_batch_shared_access_key_label_context
+    - ref: Keyword_azure_batch_shared_access_key_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_batch_shared_access_key_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_azure_batch_shared_access_key
+    matches:
+    - ref: Keyword_azure_batch
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_batch_shared_access_key_noise_exclusion
   regexes:
-    - id: Regex_azure_batch_shared_access_key
-      pattern: (?i)(?:AccountKey|SharedAccessKey|batch[._-]?key)\s*=\s*[A-Za-z0-9+/]{43,88}={0,2}
+  - id: Regex_azure_batch_shared_access_key
+    pattern: (?i)(?:AccountKey|SharedAccessKey|batch[._-]?key)\s*=\s*[A-Za-z0-9+/]{43,88}={0,2}
+  - id: Pattern_azure_batch_shared_access_key_label_context
+    pattern: (?i)\\b(?:azure\\s+batch\\s+shared\\s+access\\s+key|azure|batch|shared|access|key)\\b
   keywords:
-    - id: Keyword_azure_batch
-      groups:
-        - match_style: word
-          terms:
-            - batch
-            - Azure Batch
-            - AccountKey
-            - SharedAccessKey
-            - batch account
-            - batch service
-            - api key
-            - access key
-            - batch pool
-            - batch job
-            - connection string
-            - shared key
+  - id: Keyword_azure_batch
+    groups:
+    - match_style: word
+      terms:
+      - batch
+      - Azure Batch
+      - AccountKey
+      - SharedAccessKey
+      - batch account
+      - batch service
+      - api key
+      - access key
+      - batch pool
+      - batch job
+      - connection string
+      - shared key
+  - id: Keyword_azure_batch_shared_access_key_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - azure batch shared access key
+      - azure
+      - batch
+      - shared
+      - access
+      - key
+      - field
+      - identifier
+      - reference
+  - id: Keyword_azure_batch_shared_access_key_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 risk_rating: 10
-risk_description: >-
-  Exposure of this credential could grant unauthorized access to cloud infrastructure, databases, or services.
-  Compromised credentials are a leading cause of data breaches and can result in full system takeover.
+risk_description: Exposure of this credential could grant unauthorized access to cloud
+  infrastructure, databases, or services. Compromised credentials are a leading cause
+  of data breaches and can result in full system takeover.
 sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
@@ -100,10 +150,10 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-batch-shared-access-key
-    title: Azure Batch shared access key entity definition - Microsoft Learn
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-batch-shared-access-key
+  title: Azure Batch shared access key entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT
