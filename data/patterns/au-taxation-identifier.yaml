@@ -1,0 +1,143 @@
+schema: testpattern/v1
+name: Australian Taxation Identifier
+slug: au-taxation-identifier
+version: 2.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Identifies Australian Tax File Numbers (TFNs) — unique nine-digit identifiers issued by the
+  Australian Taxation Office. Uses Func_australian_tax_file_number validator with AllDigitsSameFilter
+  and TextMatchFilter to exclude known test values.
+operation: >-
+  Validator-backed detection using Func_australian_tax_file_number with dual filters. Corroborative
+  evidence: 3 tiers with tax-registration-specific, broad taxation, and standalone keywords within
+  300 characters.
+pattern: \b\d{3}[\s\-]?\d{3}[\s\-]?\d{3}\b
+confidence: high
+confidence_justification: >-
+  High confidence when corroborative keywords present. Validator function, AllDigitsSameFilter, and
+  TextMatchFilter for known test values together provide strong precision.
+jurisdictions:
+  - au
+regulations:
+  - privacy-act-1988
+  - taxation-administration-act-1953
+data_categories:
+  - pii
+  - financial
+  - government-id
+corroborative_evidence:
+  keywords:
+    - tax file number
+    - TFN
+    - tax file no
+    - australian tax
+    - taxfile
+    - ATO
+  proximity: 300
+  keyword_lists:
+    - au-tax-registration-terms
+    - pii-civic-credentials
+test_cases:
+  should_match:
+    - value: 123 456 789
+      description: Standard spaced format
+    - value: 123-456-789
+      description: Hyphen-separated format
+    - value: '123456789'
+      description: Continuous digits
+  should_not_match:
+    - value: 12 345 678
+      description: Only 8 digits in 2-3-3 grouping
+    - value: '1234567890'
+      description: 10 digits, too long
+    - value: '000000000'
+      description: Excluded by TextMatchFilter
+    - value: '111111111'
+      description: Excluded by AllDigitsSameFilter
+false_positives:
+  - description: Generic nine-digit reference codes, invoice numbers, or account identifiers.
+    mitigation: Require tax-specific keywords in proximity. Filters exclude trivial and test values.
+  - description: Phone numbers formatted as nine consecutive digits.
+    mitigation: Layer with phone detection to deprioritise overlapping matches.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  Tax file number exposure enables identity fraud and unauthorised tax lodgements under Privacy Act 1988.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: "SENSITIVE"
+  qgiscf_dlm: "SENSITIVE Personal-Privacy"
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_taxation_id
+      matches:
+        - ref: Evidence_tax_registration_specific
+    - confidence_level: 75
+      id_match: Pattern_taxation_id
+      matches:
+        - ref: Evidence_tax_registration_broad
+    - confidence_level: 65
+      id_match: Pattern_taxation_id
+  regexes:
+    - id: Pattern_taxation_id
+      pattern: \b\d{3}[\s\-]?\d{3}[\s\-]?\d{3}\b
+      validators:
+        - ref: Func_australian_tax_file_number
+  keywords:
+    - id: Evidence_tax_registration_specific
+      groups:
+        - match_style: word
+          terms:
+            - tax file number
+            - TFN
+            - tax file no
+            - tax file no.
+            - T.F.N.
+            - taxfile
+            - tax file
+            - tax number
+    - id: Evidence_tax_registration_broad
+      groups:
+        - match_style: word
+          terms:
+            - australian tax
+            - Australian Taxation Office
+            - ATO
+            - superannuation
+            - tax return
+            - tax declaration
+            - income tax
+            - tax agent
+            - myGov
+            - myTax
+            - PAYG
+  filters:
+    - id: Guard_taxation_same_digits
+      type: AllDigitsSameFilter
+    - id: Guard_taxation_exclude_test
+      type: TextMatchFilter
+      direction: Full
+      logic: Exclude
+      terms:
+        - "000000000"
+        - "000 000 000"
+        - "123456789"
+        - "123 456 789"
+        - "987654321"
+        - "987 654 321"
+created: '2026-02-08'
+updated: '2026-02-12'
+author: testpattern-community
+license: MIT
