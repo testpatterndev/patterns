@@ -4,104 +4,168 @@ slug: ae-passport-number
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects UAE passport number patterns. This pattern is based on a Microsoft Purview built-in sensitive information type.
-  Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point
-  for customisation.
-operation: >-
-  Reference: https://learn.microsoft.com/en-us/purview/sit-defn-uae-passport-number Corroborative evidence: 3 keywords
-  within 300 characters. Keyword lists: pii-civic-credentials.
+description: Detects UAE passport number patterns. This pattern is based on a Microsoft
+  Purview built-in sensitive information type. Users already running Purview may prefer
+  to enable the built-in SIT directly, or use this version as a starting point for
+  customisation.
+operation: 'Reference: https://learn.microsoft.com/en-us/purview/sit-defn-uae-passport-number
+  Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Adds label-context matching and exclusion logic for sample/template/test placeholders.
+  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
+  text.'
 pattern: \b\d{7,9}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false
-  positive rates.
+confidence_justification: 'Medium confidence: pattern has structural constraints but
+  corroborative keywords are recommended to reduce false positive rates. Context label
+  evidence plus explicit template/example exclusion improves precision for high-risk
+  identifiers. Added context gating and exclusion rules improve precision and reduce
+  incidental matches.'
 jurisdictions:
-  - ae
+- ae
 regulations:
-  - pdpl-uae
+- pdpl-uae
 data_categories:
-  - pii
-  - government-id
+- pii
+- government-id
 corroborative_evidence:
   keywords:
-    - passport
-    - travel document
-    - passport number
+  - passport
+  - travel document
+  - passport number
   proximity: 300
   keyword_lists:
-    - pii-civic-credentials
+  - pii-civic-credentials
 test_cases:
   should_match:
-    - value: '1234567'
-      description: Seven-digit passport number
-    - value: '12345678'
-      description: Eight-digit passport number
-    - value: '123456789'
-      description: Nine-digit passport number
+  - value: '1234567'
+    description: Seven-digit passport number
+  - value: '12345678'
+    description: Eight-digit passport number
+  - value: '123456789'
+    description: Nine-digit passport number
   should_not_match:
-    - value: '123456'
-      description: Only 6 digits is too short
-    - value: '1234567890'
-      description: Ten digits is too long
+  - value: '123456'
+    description: Only 6 digits is too short
+  - value: '1234567890'
+    description: Ten digits is too long
+  - value: sample template placeholder number 123456789
+    description: Template/sample context should be excluded even when numeric-like
+      values appear
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Generic alphanumeric sequences matching passport format in unrelated contexts.
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window.
+- description: Generic alphanumeric sequences matching passport format in unrelated
+    contexts.
+  mitigation: Require corroborative evidence keywords within the proximity window.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_ae_passport
-      matches:
-        - ref: Keyword_ae_passport
-    - confidence_level: 65
-      id_match: Regex_ae_passport
+  - confidence_level: 95
+    id_match: Regex_ae_passport
+    matches:
+    - ref: Pattern_ae_passport_number_label_context
+    - ref: Keyword_ae_passport_number_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ae_passport_number_noise_exclusion
+  - confidence_level: 90
+    id_match: Regex_ae_passport
+    matches:
+    - ref: Pattern_ae_passport_number_label_context
+    - ref: Keyword_ae_passport
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ae_passport_number_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_ae_passport
+    matches:
+    - ref: Keyword_ae_passport
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ae_passport_number_noise_exclusion
+  - confidence_level: 65
+    id_match: Regex_ae_passport
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ae_passport_number_noise_exclusion
   regexes:
-    - id: Regex_ae_passport
-      pattern: \b\d{7,9}\b
+  - id: Regex_ae_passport
+    pattern: \b\d{7,9}\b
+  - id: Pattern_ae_passport_number_label_context
+    pattern: (?i)\\b(?:uae|passport|travel\\s+document|passport\\s+number|document\\s+number)\\b
   keywords:
-    - id: Keyword_ae_passport
-      groups:
-        - match_style: word
-          terms:
-            - passport
-            - passport number
-            - travel document
-            - passport no
-            - passport#
-            - جواز سفر
-            - رقم جواز السفر
-            - UAE passport
-            - emirates passport
-            - travel document number
+  - id: Keyword_ae_passport
+    groups:
+    - match_style: word
+      terms:
+      - passport
+      - passport number
+      - travel document
+      - passport no
+      - passport#
+      - جواز سفر
+      - رقم جواز السفر
+      - UAE passport
+      - emirates passport
+      - travel document number
+  - id: Keyword_ae_passport_number_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+  - id: Keyword_ae_passport_number_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - uae passport number
+      - uae
+      - passport
+      - field
+      - identifier
+      - reference
   filters:
-    - id: Filter_ae_passport_same_digits
-      type: AllDigitsSameFilter
+  - id: Filter_ae_passport_same_digits
+    type: AllDigitsSameFilter
 risk_rating: 8
-risk_description: >-
-  Passport numbers are high-value identity documents used for international travel and identity verification. Compromise
-  enables identity fraud, unauthorized border crossings, and creation of fraudulent documents.
+risk_description: Passport numbers are high-value identity documents used for international
+  travel and identity verification. Compromise enables identity fraud, unauthorized
+  border crossings, and creation of fraudulent documents.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: "SENSITIVE"
-  qgiscf_dlm: "SENSITIVE Personal-Privacy"
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-uae-passport-number
-    title: "UAE passport number entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-uae-passport-number
+  title: UAE passport number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

@@ -4,99 +4,150 @@ slug: azure-iaas-database-connection-string-sql
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Azure IaaS database and Azure SQL connection string patterns containing credentials. This pattern is based on
-  a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the
-  built-in SIT directly, or use this version as a starting point for customisation.
-operation: >-
-  Matches SQL Server-style connection strings containing Server, Database, and Password/Pwd parameters. Covers both
-  Azure SQL Database and IaaS SQL Server instances. Corroborative evidence: 8 keywords within 300 characters. Keyword
-  lists: credentials-api-keys, credentials-passwords.
-pattern: >-
-  (?i)(?:Server|Data Source)\s*=\s*[^;]+;\s*(?:Database|Initial Catalog)\s*=\s*[^;]+;\s*(?:User
+description: Detects Azure IaaS database and Azure SQL connection string patterns
+  containing credentials. This pattern is based on a Microsoft Purview built-in sensitive
+  information type. Users already running Purview may prefer to enable the built-in
+  SIT directly, or use this version as a starting point for customisation.
+operation: 'Matches SQL Server-style connection strings containing Server, Database,
+  and Password/Pwd parameters. Covers both Azure SQL Database and IaaS SQL Server
+  instances. Corroborative evidence: 8 keywords within 300 characters. Keyword lists:
+  credentials-api-keys, credentials-passwords. Uses additional domain-context evidence
+  and explicit exclusion logic for template/sample/test text.'
+pattern: (?i)(?:Server|Data Source)\s*=\s*[^;]+;\s*(?:Database|Initial Catalog)\s*=\s*[^;]+;\s*(?:User
   Id|Uid)\s*=\s*[^;]+;\s*(?:Password|Pwd)\s*=\s*[^;]+
 confidence: high
-confidence_justification: >-
-  High confidence: structurally constrained connection string format with multiple required parameters reduces false
-  positive rates significantly.
+confidence_justification: 'High confidence: structurally constrained connection string
+  format with multiple required parameters reduces false positive rates significantly.
+  Added context gating and exclusion rules improve precision and reduce incidental
+  matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - credentials
-  - security
+- credentials
+- security
 corroborative_evidence:
   keywords:
-    - connection string
-    - SQL Server
-    - Azure SQL
-    - database
-    - Data Source
-    - Server
-    - Password
-    - connectionString
+  - connection string
+  - SQL Server
+  - Azure SQL
+  - database
+  - Data Source
+  - Server
+  - Password
+  - connectionString
   proximity: 300
   keyword_lists:
-    - credentials-api-keys
-    - credentials-passwords
+  - credentials-api-keys
+  - credentials-passwords
 test_cases:
   should_match:
-    - value: Server=myserver.database.windows.net;Database=mydb;User Id=admin;Password=P@ssw0rd123
-      description: Azure SQL connection string
-    - value: Data Source=10.0.0.1;Initial Catalog=testdb;Uid=sa;Pwd=TestPassword123
-      description: IaaS SQL Server connection string
-    - value: Server=tcp:myserver.database.windows.net,1433;Database=mydb;User Id=admin@myserver;Password=S3cr3tP@ss
-      description: Azure SQL with TCP prefix and port
+  - value: Server=myserver.database.windows.net;Database=mydb;User Id=admin;Password=P@ssw0rd123
+    description: Azure SQL connection string
+  - value: Data Source=10.0.0.1;Initial Catalog=testdb;Uid=sa;Pwd=TestPassword123
+    description: IaaS SQL Server connection string
+  - value: Server=tcp:myserver.database.windows.net,1433;Database=mydb;User Id=admin@myserver;Password=S3cr3tP@ss
+    description: Azure SQL with TCP prefix and port
   should_not_match:
-    - value: Server=myserver;Database=mydb;Integrated Security=True
-      description: Windows authentication without password
-    - value: Server=myserver;Database=mydb
-      description: Connection string without credentials
+  - value: Server=myserver;Database=mydb;Integrated Security=True
+    description: Windows authentication without password
+  - value: Server=myserver;Database=mydb
+    description: Connection string without credentials
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: Documentation and tutorials containing example connection strings with placeholder credentials.
-    mitigation: Check for common placeholder values like P@ssw0rd, password123, and example server names.
-  - description: Application configuration files with encrypted or tokenized connection strings.
-    mitigation: Verify that the password field contains an actual credential rather than a key vault reference.
+- description: Documentation and tutorials containing example connection strings with
+    placeholder credentials.
+  mitigation: Check for common placeholder values like P@ssw0rd, password123, and
+    example server names.
+- description: Application configuration files with encrypted or tokenized connection
+    strings.
+  mitigation: Verify that the password field contains an actual credential rather
+    than a key vault reference.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_azure_iaas_db_connection_string
-      matches:
-        - ref: Keyword_azure_sql_connection
+  - confidence_level: 90
+    id_match: Regex_azure_iaas_db_connection_string
+    matches:
+    - ref: Pattern_azure_iaas_database_connection_string_sql_label_context
+    - ref: Keyword_azure_iaas_database_connection_string_sql_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_iaas_database_connection_string_sql_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_azure_iaas_db_connection_string
+    matches:
+    - ref: Keyword_azure_sql_connection
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_azure_iaas_database_connection_string_sql_noise_exclusion
   regexes:
-    - id: Regex_azure_iaas_db_connection_string
-      pattern: >-
-        (?i)(?:Server|Data Source)\s*=\s*[^;]+;\s*(?:Database|Initial Catalog)\s*=\s*[^;]+;\s*(?:User
-        Id|Uid)\s*=\s*[^;]+;\s*(?:Password|Pwd)\s*=\s*[^;]+
+  - id: Regex_azure_iaas_db_connection_string
+    pattern: (?i)(?:Server|Data Source)\s*=\s*[^;]+;\s*(?:Database|Initial Catalog)\s*=\s*[^;]+;\s*(?:User
+      Id|Uid)\s*=\s*[^;]+;\s*(?:Password|Pwd)\s*=\s*[^;]+
+  - id: Pattern_azure_iaas_database_connection_string_sql_label_context
+    pattern: (?i)\\b(?:azure\\s+iaas\\s+database\\s+connection\\s+string\\s+and\\s+azure\\s+sql\\s+connection\\s+string|azure|iaas|database|connection|string|sql)\\b
   keywords:
-    - id: Keyword_azure_sql_connection
-      groups:
-        - match_style: word
-          terms:
-            - connection string
-            - SQL Server
-            - Azure SQL
-            - database
-            - Data Source
-            - Server
-            - Password
-            - connectionString
-            - database.windows.net
-            - Initial Catalog
-            - SqlConnection
-            - connection timeout
+  - id: Keyword_azure_sql_connection
+    groups:
+    - match_style: word
+      terms:
+      - connection string
+      - SQL Server
+      - Azure SQL
+      - database
+      - Data Source
+      - Server
+      - Password
+      - connectionString
+      - database.windows.net
+      - Initial Catalog
+      - SqlConnection
+      - connection timeout
+  - id: Keyword_azure_iaas_database_connection_string_sql_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - azure iaas database connection string and azure sql connection string
+      - azure
+      - iaas
+      - database
+      - connection
+      - string
+      - sql
+      - field
+      - identifier
+      - reference
+  - id: Keyword_azure_iaas_database_connection_string_sql_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 risk_rating: 10
-risk_description: >-
-  Exposure of this credential could grant unauthorized access to cloud infrastructure, databases, or services.
-  Compromised credentials are a leading cause of data breaches and can result in full system takeover.
+risk_description: Exposure of this credential could grant unauthorized access to cloud
+  infrastructure, databases, or services. Compromised credentials are a leading cause
+  of data breaches and can result in full system takeover.
 sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
@@ -106,10 +157,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-iaas-database-connection-string-azure-sql-connection-string
-    title: Azure IAAS database connection string and Azure SQL connection string entity definition - Microsoft Learn
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-iaas-database-connection-string-azure-sql-connection-string
+  title: Azure IAAS database connection string and Azure SQL connection string entity
+    definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

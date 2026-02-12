@@ -4,105 +4,157 @@ slug: de-tax-id
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Steuer Id patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
-operation: >-
-  Validation: ISO 7064 Mod 11,10. Reference:
-  https://www.bzst.de/EN/Private_individuals/Tax_identification_number/tax_identification_number_node.html Corroborative
-  evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+description: Detects Steuer Id patterns. This pattern is based on a Microsoft Purview
+  built-in sensitive information type. Users already running Purview may prefer to
+  enable the built-in SIT directly, or use this version as a starting point for customisation.
+operation: 'Validation: ISO 7064 Mod 11,10. Reference: https://www.bzst.de/EN/Private_individuals/Tax_identification_number/tax_identification_number_node.html
+  Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
+  text.'
 pattern: \b\d{11}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false
-  positive rates.
+confidence_justification: 'Medium confidence: pattern has structural constraints but
+  corroborative keywords are recommended to reduce false positive rates. Added context
+  gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - eu
-  - de
+- eu
+- de
 regulations:
-  - gdpr
+- gdpr
 data_categories:
-  - pii
-  - government-id
+- pii
+- government-id
 corroborative_evidence:
   keywords:
-    - identifier
-    - number
-    - ID
+  - identifier
+  - number
+  - ID
   proximity: 300
   keyword_lists:
-    - pii-civic-credentials
+  - pii-civic-credentials
 test_cases:
   should_match:
-    - value: '12345678901'
-      description: Standard 11-digit German tax ID
-    - value: '65929970489'
-      description: Real-format Steuer-IdNr
-    - value: '00000000001'
-      description: Low-range tax ID
+  - value: '12345678901'
+    description: Standard 11-digit German tax ID
+  - value: '65929970489'
+    description: Real-format Steuer-IdNr
+  - value: '00000000001'
+    description: Low-range tax ID
   should_not_match:
-    - value: 1234567890
-      description: Only 10 digits instead of 11
-    - value: 123456789012
-      description: 12 digits instead of 11
-    - value: 1234567890A
-      description: Contains a letter instead of all digits
+  - value: 1234567890
+    description: Only 10 digits instead of 11
+  - value: 123456789012
+    description: 12 digits instead of 11
+  - value: 1234567890A
+    description: Contains a letter instead of all digits
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: Long numeric sequences in unrelated contexts (tracking numbers, serial codes) matching the Steuer Id format
-    mitigation: Use corroborative keywords and, where available, checksum validation to filter false matches.
+- description: Long numeric sequences in unrelated contexts (tracking numbers, serial
+    codes) matching the Steuer Id format
+  mitigation: Use corroborative keywords and, where available, checksum validation
+    to filter false matches.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: wide
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_de_tax_id
-      matches:
-        - ref: Keyword_de_tax_id
-    - confidence_level: 65
-      id_match: Regex_de_tax_id
+  - confidence_level: 80
+    id_match: Regex_de_tax_id
+    matches:
+    - ref: Pattern_de_tax_id_label_context
+    - ref: Keyword_de_tax_id_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_de_tax_id_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_de_tax_id
+    matches:
+    - ref: Keyword_de_tax_id
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_de_tax_id_noise_exclusion
+  - confidence_level: 65
+    id_match: Regex_de_tax_id
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_de_tax_id_noise_exclusion
   regexes:
-    - id: Regex_de_tax_id
-      pattern: \b\d{11}\b
+  - id: Regex_de_tax_id
+    pattern: \b\d{11}\b
+  - id: Pattern_de_tax_id_label_context
+    pattern: (?i)\\b(?:steuer\\s+id|steuer|tax)\\b
   keywords:
-    - id: Keyword_de_tax_id
-      groups:
-        - match_style: word
-          terms:
-            - Steueridentifikationsnummer
-            - Steuer-IdNr
-            - Steuer Id
-            - Steuernummer
-            - Identifikationsnummer
-            - tax identification number
-            - tax ID
-            - TIN
-            - Steuerliche Identifikationsnummer
-            - IdNr
-            - Bundeszentralamt für Steuern
+  - id: Keyword_de_tax_id
+    groups:
+    - match_style: word
+      terms:
+      - Steueridentifikationsnummer
+      - Steuer-IdNr
+      - Steuer Id
+      - Steuernummer
+      - Identifikationsnummer
+      - tax identification number
+      - tax ID
+      - TIN
+      - Steuerliche Identifikationsnummer
+      - IdNr
+      - Bundeszentralamt für Steuern
+  - id: Keyword_de_tax_id_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - steuer id
+      - steuer
+      - tax
+      - field
+      - identifier
+      - reference
+  - id: Keyword_de_tax_id_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
   filters:
-    - id: Filter_de_tax_id_same_digits
-      type: AllDigitsSameFilter
+  - id: Filter_de_tax_id_same_digits
+    type: AllDigitsSameFilter
 risk_rating: 7
-risk_description: >-
-  Tax identification numbers link directly to an individual's financial records with government authorities. Exposure
-  can facilitate tax fraud, unauthorized access to tax accounts, and financial identity theft.
+risk_description: Tax identification numbers link directly to an individual's financial
+  records with government authorities. Exposure can facilitate tax fraud, unauthorized
+  access to tax accounts, and financial identity theft.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: "SENSITIVE"
-  qgiscf_dlm: "SENSITIVE Financial"
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Financial
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-germany-tax-identification-number
-    title: "Germany tax identification number entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-germany-tax-identification-number
+  title: Germany tax identification number entity definition - Microsoft Learn
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

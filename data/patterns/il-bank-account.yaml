@@ -4,111 +4,178 @@ slug: il-bank-account
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Israel Bank Account Number patterns. This pattern is based on a Microsoft Purview built-in
-  sensitive information type. Financial account numbers require corroborative evidence for
-  reliable detection due to their generic numeric format.
-operation: >-
-  Corroborative evidence: 5 keywords within 300 characters.
-  Keyword lists: banking, il-financial.
-pattern: '\b\d{2}-?\d{3}-?\d{8}\b'
+description: Detects Israel Bank Account Number patterns. This pattern is based on
+  a Microsoft Purview built-in sensitive information type. Financial account numbers
+  require corroborative evidence for reliable detection due to their generic numeric
+  format.
+operation: 'Corroborative evidence: 5 keywords within 300 characters. Keyword lists:
+  banking, il-financial. Adds label-context matching and exclusion logic for sample/template/test
+  placeholders. Uses additional domain-context evidence and explicit exclusion logic
+  for template/sample/test text.'
+pattern: \b\d{2}-?\d{3}-?\d{8}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: the 2-3-8 digit grouping pattern provides some structure. Bank-related keywords in Hebrew or English improve detection accuracy.
+confidence_justification: 'Medium confidence: the 2-3-8 digit grouping pattern provides
+  some structure. Bank-related keywords in Hebrew or English improve detection accuracy.
+  Context label evidence plus explicit template/example exclusion improves precision
+  for high-risk identifiers. Added context gating and exclusion rules improve precision
+  and reduce incidental matches.'
 jurisdictions:
-  - il
+- il
 regulations:
-  - privacy-protection-law
+- privacy-protection-law
 data_categories:
-  - pii
-  - financial
+- pii
+- financial
 corroborative_evidence:
   keywords:
-    - bank account
-    - חשבון בנק
-    - מספר חשבון
-    - branch
-    - סניף
+  - bank account
+  - חשבון בנק
+  - מספר חשבון
+  - branch
+  - סניף
   proximity: 300
   keyword_lists:
-    - banking
-    - il-financial
+  - banking
+  - il-financial
 test_cases:
   should_match:
-    - value: '12-345-12345678'
-      description: Israeli bank account with hyphen separators
-    - value: '1234512345678'
-      description: Israeli bank account continuous digits
-    - value: '98-765-98765432'
-      description: Israeli bank account format
+  - value: 12-345-12345678
+    description: Israeli bank account with hyphen separators
+  - value: '1234512345678'
+    description: Israeli bank account continuous digits
+  - value: 98-765-98765432
+    description: Israeli bank account format
   should_not_match:
-    - value: '12-345-1234567'
-      description: Only 7 digits in account section, too short
-    - value: '12-345-123456789'
-      description: 9 digits in account section, too long
+  - value: 12-345-1234567
+    description: Only 7 digits in account section, too short
+  - value: 12-345-123456789
+    description: 9 digits in account section, too long
+  - value: sample template placeholder number 123456789
+    description: Template/sample context should be excluded even when numeric-like
+      values appear
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: Generic numeric sequences such as reference numbers, invoice numbers, or identifiers from other domains
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window to distinguish
-      financial account numbers from general numeric data.
-  - description: Phone numbers, postal codes, or other structured numbers with similar digit counts
-    mitigation: >-
-      Layer with other detection patterns to deprioritise matches that overlap with phone number
-      or postal code formats.
+- description: Generic numeric sequences such as reference numbers, invoice numbers,
+    or identifiers from other domains
+  mitigation: Require corroborative evidence keywords within the proximity window
+    to distinguish financial account numbers from general numeric data.
+- description: Phone numbers, postal codes, or other structured numbers with similar
+    digit counts
+  mitigation: Layer with other detection patterns to deprioritise matches that overlap
+    with phone number or postal code formats.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_il_bank_account
-      matches:
-        - ref: Keyword_il_bank_account
-    - confidence_level: 75
-      id_match: Regex_il_bank_account
+  - confidence_level: 95
+    id_match: Regex_il_bank_account
+    matches:
+    - ref: Pattern_il_bank_account_label_context
+    - ref: Keyword_il_bank_account_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_il_bank_account_noise_exclusion
+  - confidence_level: 90
+    id_match: Regex_il_bank_account
+    matches:
+    - ref: Pattern_il_bank_account_label_context
+    - ref: Keyword_il_bank_account
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_il_bank_account_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_il_bank_account
+    matches:
+    - ref: Keyword_il_bank_account
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_il_bank_account_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_il_bank_account
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_il_bank_account_noise_exclusion
   regexes:
-    - id: Regex_il_bank_account
-      pattern: '\b\d{2}-?\d{3}-?\d{8}\b'
+  - id: Regex_il_bank_account
+    pattern: \b\d{2}-?\d{3}-?\d{8}\b
+  - id: Pattern_il_bank_account_label_context
+    pattern: (?i)\\b(?:israel|bank|account|bank\\s+account|account\\s+number|account\\s+no|routing)\\b
   keywords:
-    - id: Keyword_il_bank_account
-      groups:
-        - match_style: word
-          terms:
-            - bank account
-            - account number
-            - חשבון בנק
-            - מספר חשבון
-            - סניף
-            - מספר סניף
-            - חשבון
-            - בנק
-            - bank number
-            - branch number
-            - bank account number
-            - פרטי חשבון
+  - id: Keyword_il_bank_account
+    groups:
+    - match_style: word
+      terms:
+      - bank account
+      - account number
+      - חשבון בנק
+      - מספר חשבון
+      - סניף
+      - מספר סניף
+      - חשבון
+      - בנק
+      - bank number
+      - branch number
+      - bank account number
+      - פרטי חשבון
+  - id: Keyword_il_bank_account_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+  - id: Keyword_il_bank_account_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - israel bank account number
+      - israel
+      - bank
+      - account
+      - field
+      - identifier
+      - reference
   filters:
-    - id: Filter_il_bank_same
-      type: AllDigitsSameFilter
+  - id: Filter_il_bank_same
+    type: AllDigitsSameFilter
 risk_rating: 9
-risk_description: >-
-  Financial account identifiers can be exploited for unauthorized transactions, account takeover, and financial fraud. Exposure of banking details poses immediate monetary risk and may violate financial data protection regulations.
+risk_description: Financial account identifiers can be exploited for unauthorized
+  transactions, account takeover, and financial fraud. Exposure of banking details
+  poses immediate monetary risk and may violate financial data protection regulations.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: "SENSITIVE"
-  qgiscf_dlm: "SENSITIVE Financial"
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Financial
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-israel-bank-account-number
-    title: "Israel Bank Account Number entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-israel-bank-account-number
+  title: Israel Bank Account Number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

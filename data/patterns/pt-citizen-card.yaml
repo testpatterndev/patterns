@@ -4,102 +4,160 @@ slug: pt-citizen-card
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Cartão de Cidadão patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
-operation: >-
-  Reference: https://learn.microsoft.com/en-us/purview/sit-defn-portugal-citizen-card-number Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+description: Detects Cartão de Cidadão patterns. This pattern is based on a Microsoft
+  Purview built-in sensitive information type. Users already running Purview may prefer
+  to enable the built-in SIT directly, or use this version as a starting point for
+  customisation.
+operation: 'Reference: https://learn.microsoft.com/en-us/purview/sit-defn-portugal-citizen-card-number
+  Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
+  text.'
 pattern: \b\d{8}\s?\d\s?[A-Z]{2}\d\b
 confidence: high
-confidence_justification: >-
-  High confidence: pattern has strong structural constraints (specific format, prefix, or character class restrictions) that significantly reduce false positive rates.
+confidence_justification: 'High confidence: pattern has strong structural constraints
+  (specific format, prefix, or character class restrictions) that significantly reduce
+  false positive rates. Added context gating and exclusion rules improve precision
+  and reduce incidental matches.'
 jurisdictions:
-  - eu
-  - pt
+- eu
+- pt
 regulations:
-  - gdpr
+- gdpr
 data_categories:
-  - pii
-  - government-id
+- pii
+- government-id
 corroborative_evidence:
   keywords:
-    - cartão de cidadão
-    - citizen card
-    - bilhete de identidade
+  - cartão de cidadão
+  - citizen card
+  - bilhete de identidade
   proximity: 300
   keyword_lists:
-    - pii-civic-credentials
+  - pii-civic-credentials
 test_cases:
   should_match:
-    - value: "12345678 9 ZZ4"
-      description: Portuguese citizen card with spaces
-    - value: "987654321AB2"
-      description: Portuguese citizen card without spaces
-    - value: "45678901 2 CD3"
-      description: Another citizen card format
+  - value: 12345678 9 ZZ4
+    description: Portuguese citizen card with spaces
+  - value: 987654321AB2
+    description: Portuguese citizen card without spaces
+  - value: 45678901 2 CD3
+    description: Another citizen card format
   should_not_match:
-    - value: "1234567 9 ZZ4"
-      description: Too few digits in first group
-    - value: "12345678 9 Z4"
-      description: Only one letter
+  - value: 1234567 9 ZZ4
+    description: Too few digits in first group
+  - value: 12345678 9 Z4
+    description: Only one letter
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      The mixed alphanumeric format with specific structure is relatively distinctive.
-    mitigation: >-
-      The structured format with embedded letters provides good validation. Keyword context further improves accuracy.
-  - description: >-
-      In multiple languages, similar terminology used in formal or administrative contexts (education, professional
-      documentation) that does not constitute sensitive data collection.
-    mitigation: >-
-      Layer with additional contextual signals such as structured identifiers, form fields, or database column headers
-      to distinguish sensitive records from general references.
+- description: The mixed alphanumeric format with specific structure is relatively
+    distinctive.
+  mitigation: The structured format with embedded letters provides good validation.
+    Keyword context further improves accuracy.
+- description: In multiple languages, similar terminology used in formal or administrative
+    contexts (education, professional documentation) that does not constitute sensitive
+    data collection.
+  mitigation: Layer with additional contextual signals such as structured identifiers,
+    form fields, or database column headers to distinguish sensitive records from
+    general references.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_pt_citizen_card
-      matches:
-        - ref: Keyword_pt_citizen_card
-    - confidence_level: 75
-      id_match: Regex_pt_citizen_card
+  - confidence_level: 90
+    id_match: Regex_pt_citizen_card
+    matches:
+    - ref: Pattern_pt_citizen_card_label_context
+    - ref: Keyword_pt_citizen_card_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_pt_citizen_card_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_pt_citizen_card
+    matches:
+    - ref: Keyword_pt_citizen_card
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_pt_citizen_card_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_pt_citizen_card
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_pt_citizen_card_noise_exclusion
   regexes:
-    - id: Regex_pt_citizen_card
-      pattern: \b\d{8}\s?\d\s?[A-Z]{2}\d\b
+  - id: Regex_pt_citizen_card
+    pattern: \b\d{8}\s?\d\s?[A-Z]{2}\d\b
+  - id: Pattern_pt_citizen_card_label_context
+    pattern: (?i)\\b(?:cartão\\s+de\\s+cidadão|cart|cidad|citizen|card)\\b
   keywords:
-    - id: Keyword_pt_citizen_card
-      groups:
-        - match_style: word
-          terms:
-            - cartão de cidadão
-            - citizen card
-            - bilhete de identidade
-            - número de identificação
-            - cartão do cidadão
-            - documento de identificação
-            - CC
-            - BI
-            - identificação civil
+  - id: Keyword_pt_citizen_card
+    groups:
+    - match_style: word
+      terms:
+      - cartão de cidadão
+      - citizen card
+      - bilhete de identidade
+      - número de identificação
+      - cartão do cidadão
+      - documento de identificação
+      - CC
+      - BI
+      - identificação civil
+  - id: Keyword_pt_citizen_card_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - cartão de cidadão
+      - cart
+      - cidad
+      - citizen
+      - card
+      - field
+      - identifier
+      - reference
+  - id: Keyword_pt_citizen_card_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 risk_rating: 5
-risk_description: >-
-  This sensitive information type identifies data that could be misused if exposed to unauthorized parties. Proper classification and protection are required to prevent data breaches and comply with applicable regulations.
+risk_description: This sensitive information type identifies data that could be misused
+  if exposed to unauthorized parties. Proper classification and protection are required
+  to prevent data breaches and comply with applicable regulations.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: "SENSITIVE"
-  qgiscf_dlm: "SENSITIVE"
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-portugal-citizen-card-number
-    title: "Portugal Citizen Card Number entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-portugal-citizen-card-number
+  title: Portugal Citizen Card Number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

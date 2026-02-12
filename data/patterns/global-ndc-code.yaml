@@ -5,114 +5,161 @@ version: 1.0.0
 type: regex
 engine: universal
 description: Detects NDC patterns.
-operation: >-
-  Reference: https://www.fda.gov/media/173715/download Corroborative evidence: 19 keywords within 300 characters.
-  Keyword lists: healthcare-codes, au-healthcare-medications.
+operation: 'Reference: https://www.fda.gov/media/173715/download Corroborative evidence:
+  19 keywords within 300 characters. Keyword lists: healthcare-codes, au-healthcare-medications.
+  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
+  text.'
 pattern: \b(\d{4}-\d{4}-\d{2}|\d{5}-\d{3}-\d{2}|\d{5}-\d{4}-\d{1})\b
 confidence: high
-confidence_justification: >-
-  High confidence: structurally constrained pattern with corroborative keyword support reduces false positive rates
-  significantly.
+confidence_justification: 'High confidence: structurally constrained pattern with
+  corroborative keyword support reduces false positive rates significantly. Added
+  context gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - phi
-  - healthcare
+- phi
+- healthcare
 corroborative_evidence:
   keywords:
-    - MRN
-    - medical record number
-    - patient ID
-    - NPI
-    - DEA
-    - medicare
-    - medicaid
-    - insurance ID
-    - member ID
-    - beneficiary
-    - ICD-10
-    - ICD-9
-    - CPT
-    - NDC
-    - SNOMED
-    - HCPCS
-    - diagnosis code
-    - procedure code
-    - drug code
+  - MRN
+  - medical record number
+  - patient ID
+  - NPI
+  - DEA
+  - medicare
+  - medicaid
+  - insurance ID
+  - member ID
+  - beneficiary
+  - ICD-10
+  - ICD-9
+  - CPT
+  - NDC
+  - SNOMED
+  - HCPCS
+  - diagnosis code
+  - procedure code
+  - drug code
   proximity: 300
   keyword_lists:
-    - healthcare-codes
-    - au-healthcare-medications
+  - healthcare-codes
+  - au-healthcare-medications
 test_cases:
   should_match:
-    - value: 0002-3227-01
-      description: NDC in 4-4-2 format
-    - value: 12345-678-90
-      description: NDC in 5-3-2 format
-    - value: 12345-6789-0
-      description: NDC in 5-4-1 format
+  - value: 0002-3227-01
+    description: NDC in 4-4-2 format
+  - value: 12345-678-90
+    description: NDC in 5-3-2 format
+  - value: 12345-6789-0
+    description: NDC in 5-4-1 format
   should_not_match:
-    - value: '12345-678'
-      description: Only 2 groups instead of 3 (missing package segment)
-    - value: '123-4567-01'
-      description: Wrong digit count in first group (3 instead of 4 or 5)
-    - value: '12345-67890-1'
-      description: Too many digits in second group
+  - value: 12345-678
+    description: Only 2 groups instead of 3 (missing package segment)
+  - value: 123-4567-01
+    description: Wrong digit count in first group (3 instead of 4 or 5)
+  - value: 12345-67890-1
+    description: Too many digits in second group
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Medical terminology in health education materials, research publications, clinical guidelines, or public health
-      documents without patient-specific data.
-    mitigation: >-
-      Require corroborative evidence keywords confirming patient context. Look for co-occurrence with patient
-      identifiers such as medical record numbers or dates of birth.
-  - description: General wellness and fitness content using medical vocabulary without constituting protected health information.
-    mitigation: >-
-      Layer with patient identifier patterns or healthcare-specific document structure detection to distinguish clinical
-      records from general health content.
+- description: Medical terminology in health education materials, research publications,
+    clinical guidelines, or public health documents without patient-specific data.
+  mitigation: Require corroborative evidence keywords confirming patient context.
+    Look for co-occurrence with patient identifiers such as medical record numbers
+    or dates of birth.
+- description: General wellness and fitness content using medical vocabulary without
+    constituting protected health information.
+  mitigation: Layer with patient identifier patterns or healthcare-specific document
+    structure detection to distinguish clinical records from general health content.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 sensitivity_labels:
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "CONFIDENTIAL"
-  ca_gov: "Protected B"
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_ndc_code
-      matches:
-        - ref: Keyword_ndc
-    - confidence_level: 65
-      id_match: Regex_ndc_code
+  - confidence_level: 90
+    id_match: Regex_ndc_code
+    matches:
+    - ref: Pattern_global_ndc_code_label_context
+    - ref: Keyword_global_ndc_code_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_ndc_code_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_ndc_code
+    matches:
+    - ref: Keyword_ndc
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_ndc_code_noise_exclusion
+  - confidence_level: 65
+    id_match: Regex_ndc_code
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_ndc_code_noise_exclusion
   regexes:
-    - id: Regex_ndc_code
-      pattern: \b(\d{4}-\d{4}-\d{2}|\d{5}-\d{3}-\d{2}|\d{5}-\d{4}-\d{1})\b
+  - id: Regex_ndc_code
+    pattern: \b(\d{4}-\d{4}-\d{2}|\d{5}-\d{3}-\d{2}|\d{5}-\d{4}-\d{1})\b
+  - id: Pattern_global_ndc_code_label_context
+    pattern: (?i)\\b(?:ndc)\\b
   keywords:
-    - id: Keyword_ndc
-      groups:
-        - match_style: word
-          terms:
-            - NDC
-            - national drug code
-            - drug code
-            - medication
-            - prescription
-            - pharmaceutical
-            - dosage
-            - drug product
-            - labeler
-            - package code
-            - formulary
-            - pharmacy
-            - dispensing
+  - id: Keyword_ndc
+    groups:
+    - match_style: word
+      terms:
+      - NDC
+      - national drug code
+      - drug code
+      - medication
+      - prescription
+      - pharmaceutical
+      - dosage
+      - drug product
+      - labeler
+      - package code
+      - formulary
+      - pharmacy
+      - dispensing
+  - id: Keyword_global_ndc_code_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - ndc
+      - field
+      - identifier
+      - reference
+  - id: Keyword_global_ndc_code_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 created: '2026-02-08'
-updated: '2026-02-08'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

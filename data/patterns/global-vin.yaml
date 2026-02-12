@@ -5,100 +5,151 @@ version: 1.0.0
 type: regex
 engine: universal
 description: Detects Vehicle Identification Number patterns. Excludes I, O, Q characters
-operation: >-
-  Validation: Check digit at position 9 (weights: 8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2). Excludes I, O, Q characters.
-  Reference: https://en.wikipedia.org/wiki/Vehicle_identification_number Corroborative evidence: 4 keywords within 300
-  characters. Keyword lists: pii-civic-credentials.
+operation: 'Validation: Check digit at position 9 (weights: 8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2).
+  Excludes I, O, Q characters. Reference: https://en.wikipedia.org/wiki/Vehicle_identification_number
+  Corroborative evidence: 4 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
+  text.'
 pattern: \b[A-HJ-NPR-Z0-9]{17}\b
 confidence: high
-confidence_justification: >-
-  High confidence: validated with Check digit at position 9 (weights: 8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2) and supported
-  by corroborative keyword evidence.
+confidence_justification: 'High confidence: validated with Check digit at position
+  9 (weights: 8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2) and supported by corroborative keyword
+  evidence. Added context gating and exclusion rules improve precision and reduce
+  incidental matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - device-id
+- device-id
 corroborative_evidence:
   keywords:
-    - device
-    - identifier
-    - serial number
-    - hardware
+  - device
+  - identifier
+  - serial number
+  - hardware
   proximity: 300
   keyword_lists:
-    - pii-civic-credentials
+  - pii-civic-credentials
 test_cases:
   should_match:
-    - value: 1HGBH41JXMN109186
-      description: Honda Civic VIN (excludes I, O, Q)
-    - value: WVWZZZ3CZWE123456
-      description: Volkswagen Golf VIN
-    - value: 5YJSA1E26MF123456
-      description: Tesla Model S VIN
+  - value: 1HGBH41JXMN109186
+    description: Honda Civic VIN (excludes I, O, Q)
+  - value: WVWZZZ3CZWE123456
+    description: Volkswagen Golf VIN
+  - value: 5YJSA1E26MF123456
+    description: Tesla Model S VIN
   should_not_match:
-    - value: 1HGBH41JXMN10918
-      description: Only 16 characters instead of 17
-    - value: 1HGBH41JXMN1091861
-      description: 18 characters instead of 17
-    - value: 1HGBH4IJXMN109186
-      description: Contains letter I (excluded from VIN)
+  - value: 1HGBH41JXMN10918
+    description: Only 16 characters instead of 17
+  - value: 1HGBH41JXMN1091861
+    description: 18 characters instead of 17
+  - value: 1HGBH4IJXMN109186
+    description: Contains letter I (excluded from VIN)
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Technical identifiers appearing in public documentation, network configuration guides, or example configurations
-      without representing actual infrastructure.
-    mitigation: >-
-      Cross-reference with known documentation patterns and reserved address ranges. Require proximity to
-      infrastructure-specific context.
-  - description: Placeholder and example values commonly used in technical tutorials and vendor documentation.
-    mitigation: Maintain exclusion lists for well-known example values (RFC 5737 documentation addresses, example MAC addresses).
+- description: Technical identifiers appearing in public documentation, network configuration
+    guides, or example configurations without representing actual infrastructure.
+  mitigation: Cross-reference with known documentation patterns and reserved address
+    ranges. Require proximity to infrastructure-specific context.
+- description: Placeholder and example values commonly used in technical tutorials
+    and vendor documentation.
+  mitigation: Maintain exclusion lists for well-known example values (RFC 5737 documentation
+    addresses, example MAC addresses).
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 risk_rating: 6
-risk_description: VIN exposure enables vehicle fraud, odometer tampering, and insurance scams
+risk_description: VIN exposure enables vehicle fraud, odometer tampering, and insurance
+  scams
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
   qgiscf_dlm: OFFICIAL
-  us_gov: "CUI"
-  uk_gov: "OFFICIAL"
-  nz_gov: "IN-CONFIDENCE"
-  ca_gov: "Protected A"
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_vin
-      matches:
-        - ref: Keyword_vehicle
-    - confidence_level: 75
-      id_match: Regex_vin
-      matches:
-        - ref: Keyword_vehicle
+  - confidence_level: 90
+    id_match: Regex_vin
+    matches:
+    - ref: Pattern_global_vin_label_context
+    - ref: Keyword_global_vin_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_vin_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_vin
+    matches:
+    - ref: Keyword_vehicle
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_vin_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_vin
+    matches:
+    - ref: Keyword_vehicle
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_vin_noise_exclusion
   regexes:
-    - id: Regex_vin
-      pattern: \b[A-HJ-NPR-Z0-9]{17}\b
+  - id: Regex_vin
+    pattern: \b[A-HJ-NPR-Z0-9]{17}\b
+  - id: Pattern_global_vin_label_context
+    pattern: (?i)\\b(?:vehicle\\s+identification\\s+number|vehicle|vin)\\b
   keywords:
-    - id: Keyword_vehicle
-      groups:
-        - match_style: word
-          terms:
-            - VIN
-            - vehicle identification
-            - vehicle identification number
-            - chassis
-            - chassis number
-            - vehicle
-            - registration
-            - motor vehicle
-            - car
-            - truck
+  - id: Keyword_vehicle
+    groups:
+    - match_style: word
+      terms:
+      - VIN
+      - vehicle identification
+      - vehicle identification number
+      - chassis
+      - chassis number
+      - vehicle
+      - registration
+      - motor vehicle
+      - car
+      - truck
+  - id: Keyword_global_vin_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - vehicle identification number
+      - vehicle
+      - vin
+      - field
+      - identifier
+      - reference
+  - id: Keyword_global_vin_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 created: '2026-02-08'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

@@ -4,112 +4,181 @@ slug: fi-health-insurance
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Finland European Health Insurance Number patterns. This pattern is based on a Microsoft Purview built-in
-  sensitive information type. Due to the generic numeric format, corroborative evidence keywords
-  are essential for reliable detection.
-operation: >-
-  Corroborative evidence: 5 keywords within 300 characters.
-  Keyword lists: ehic, fi-health.
-pattern: '\b\d{10}\b'
+description: Detects Finland European Health Insurance Number patterns. This pattern
+  is based on a Microsoft Purview built-in sensitive information type. Due to the
+  generic numeric format, corroborative evidence keywords are essential for reliable
+  detection.
+operation: 'Corroborative evidence: 5 keywords within 300 characters. Keyword lists:
+  ehic, fi-health. Adds label-context matching and exclusion logic for sample/template/test
+  placeholders. Uses additional domain-context evidence and explicit exclusion logic
+  for template/sample/test text.'
+pattern: \b\d{10}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: ten-digit numbers appear in many contexts. Keywords like 'Kela' or 'EHIC' are needed to confirm this is a Finnish health insurance number.
+confidence_justification: 'Medium confidence: ten-digit numbers appear in many contexts.
+  Keywords like ''Kela'' or ''EHIC'' are needed to confirm this is a Finnish health
+  insurance number. Context label evidence plus explicit template/example exclusion
+  improves precision for high-risk identifiers. Added context gating and exclusion
+  rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - fi
-  - eu
+- fi
+- eu
 regulations:
-  - gdpr
-  - eu-health-insurance-regulation
+- gdpr
+- eu-health-insurance-regulation
 data_categories:
-  - phi
-  - health
-  - government-id
+- phi
+- health
+- government-id
 corroborative_evidence:
   keywords:
-    - EHIC
-    - health insurance
-    - Kela
-    - sairausvakuutus
-    - terveydenhuolto
+  - EHIC
+  - health insurance
+  - Kela
+  - sairausvakuutus
+  - terveydenhuolto
   proximity: 300
   keyword_lists:
-    - ehic
-    - fi-health
+  - ehic
+  - fi-health
 test_cases:
   should_match:
-    - value: '1234567890'
-      description: Ten-digit Finnish EHIC number format
-    - value: '9876543210'
-      description: Ten-digit health insurance identifier
-    - value: '5566778899'
-      description: Ten-digit Kela insurance number
+  - value: '1234567890'
+    description: Ten-digit Finnish EHIC number format
+  - value: '9876543210'
+    description: Ten-digit health insurance identifier
+  - value: '5566778899'
+    description: Ten-digit Kela insurance number
   should_not_match:
-    - value: '123456789'
-      description: Nine digits, too short for Finnish EHIC
-    - value: '12345678901'
-      description: Eleven digits, exceeds Finnish EHIC format
+  - value: '123456789'
+    description: Nine digits, too short for Finnish EHIC
+  - value: '12345678901'
+    description: Eleven digits, exceeds Finnish EHIC format
+  - value: sample template placeholder number 123456789
+    description: Template/sample context should be excluded even when numeric-like
+      values appear
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: Generic numeric sequences matching the digit pattern in non-health contexts
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window to distinguish
-      health identifiers from general numeric data.
-  - description: Reference numbers or account identifiers from other domains with similar digit counts
-    mitigation: >-
-      Layer with document classification to prioritise matches in health and medical documents.
+- description: Generic numeric sequences matching the digit pattern in non-health
+    contexts
+  mitigation: Require corroborative evidence keywords within the proximity window
+    to distinguish health identifiers from general numeric data.
+- description: Reference numbers or account identifiers from other domains with similar
+    digit counts
+  mitigation: Layer with document classification to prioritise matches in health and
+    medical documents.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_fi_health_insurance
-      matches:
-        - ref: Keyword_fi_health_insurance
-    - confidence_level: 65
-      id_match: Regex_fi_health_insurance
+  - confidence_level: 95
+    id_match: Regex_fi_health_insurance
+    matches:
+    - ref: Pattern_fi_health_insurance_label_context
+    - ref: Keyword_fi_health_insurance_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_fi_health_insurance_noise_exclusion
+  - confidence_level: 90
+    id_match: Regex_fi_health_insurance
+    matches:
+    - ref: Pattern_fi_health_insurance_label_context
+    - ref: Keyword_fi_health_insurance
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_fi_health_insurance_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_fi_health_insurance
+    matches:
+    - ref: Keyword_fi_health_insurance
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_fi_health_insurance_noise_exclusion
+  - confidence_level: 65
+    id_match: Regex_fi_health_insurance
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_fi_health_insurance_noise_exclusion
   regexes:
-    - id: Regex_fi_health_insurance
-      pattern: \b\d{10}\b
+  - id: Regex_fi_health_insurance
+    pattern: \b\d{10}\b
+  - id: Pattern_fi_health_insurance_label_context
+    pattern: (?i)\\b(?:finland|european|health|insurance|health\\s+number|insurance\\s+number|patient\\s+identifier|social\\s+welfare)\\b
   keywords:
-    - id: Keyword_fi_health_insurance
-      groups:
-        - match_style: word
-          terms:
-            - EHIC
-            - health insurance
-            - Kela
-            - sairausvakuutus
-            - terveydenhuolto
-            - Kela-kortti
-            - sairasvakuutuskortti
-            - eurooppalainen sairaanhoitokortti
-            - vakuutusnumero
-            - sairausvakuutustunnus
-            - terveyskortti
+  - id: Keyword_fi_health_insurance
+    groups:
+    - match_style: word
+      terms:
+      - EHIC
+      - health insurance
+      - Kela
+      - sairausvakuutus
+      - terveydenhuolto
+      - Kela-kortti
+      - sairasvakuutuskortti
+      - eurooppalainen sairaanhoitokortti
+      - vakuutusnumero
+      - sairausvakuutustunnus
+      - terveyskortti
+  - id: Keyword_fi_health_insurance_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+  - id: Keyword_fi_health_insurance_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - finland european health insurance number
+      - finland
+      - european
+      - health
+      - insurance
+      - field
+      - identifier
+      - reference
   filters:
-    - id: Filter_fi_health_insurance_same_digits
-      type: AllDigitsSameFilter
+  - id: Filter_fi_health_insurance_same_digits
+    type: AllDigitsSameFilter
 risk_rating: 8
-risk_description: >-
-  Health and medical information is among the most sensitive personal data under privacy laws globally. Unauthorized disclosure can result in discrimination, personal harm, and regulatory penalties under health privacy frameworks.
+risk_description: Health and medical information is among the most sensitive personal
+  data under privacy laws globally. Unauthorized disclosure can result in discrimination,
+  personal harm, and regulatory penalties under health privacy frameworks.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: "SENSITIVE"
-  qgiscf_dlm: "SENSITIVE Personal-Privacy"
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "CONFIDENTIAL"
-  ca_gov: "Protected B"
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-finland-european-health-insurance-number
-    title: "Finland European Health Insurance Number entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-finland-european-health-insurance-number
+  title: Finland European Health Insurance Number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

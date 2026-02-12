@@ -4,133 +4,181 @@ slug: ca-phin
 version: 1.0.0
 type: regex
 engine: universal
-description: >-
-  Detects Canada Personal Health Identification Number (PHIN) patterns. This pattern is based on a Microsoft Purview built-in
-  sensitive information type. Due to the generic numeric format, corroborative evidence keywords
-  are essential for reliable detection.
-operation: >-
-  Corroborative evidence: 5 keywords within 300 characters.
-  Keyword lists: phin, ca-health.
-pattern: '\b\d{9}\b'
+description: Detects Canada Personal Health Identification Number (PHIN) patterns.
+  This pattern is based on a Microsoft Purview built-in sensitive information type.
+  Due to the generic numeric format, corroborative evidence keywords are essential
+  for reliable detection.
+operation: 'Corroborative evidence: 5 keywords within 300 characters. Keyword lists:
+  phin, ca-health. Adds label-context matching and exclusion logic for sample/template/test
+  placeholders.'
+pattern: \b\d{9}\b
 confidence: medium
-confidence_justification: >-
-  Medium confidence: nine-digit numbers are extremely common. PHIN detection requires corroborative evidence such as 'personal health identification number' or 'Manitoba Health' nearby.
+confidence_justification: 'Medium confidence: nine-digit numbers are extremely common.
+  PHIN detection requires corroborative evidence such as ''personal health identification
+  number'' or ''Manitoba Health'' nearby. Context label evidence plus explicit template/example
+  exclusion improves precision for high-risk identifiers.'
 jurisdictions:
-  - ca
+- ca
 regulations:
-  - pipeda
-  - health-information-acts
+- pipeda
+- health-information-acts
 data_categories:
-  - phi
-  - health
-  - government-id
+- phi
+- health
+- government-id
 corroborative_evidence:
   keywords:
-    - PHIN
-    - personal health
-    - health identification
-    - Manitoba Health
-    - health number
+  - PHIN
+  - personal health
+  - health identification
+  - Manitoba Health
+  - health number
   proximity: 300
   keyword_lists:
-    - phin
-    - ca-health
+  - phin
+  - ca-health
 test_cases:
   should_match:
-    - value: '123456789'
-      description: Nine-digit PHIN format
-    - value: '987654321'
-      description: Nine-digit personal health identification number
-    - value: '112233445'
-      description: Nine-digit health ID number
+  - value: '123456789'
+    description: Nine-digit PHIN format
+  - value: '987654321'
+    description: Nine-digit personal health identification number
+  - value: '112233445'
+    description: Nine-digit health ID number
   should_not_match:
-    - value: '12345678'
-      description: Eight digits, too short for PHIN
-    - value: '1234567890'
-      description: Ten digits, exceeds PHIN format
+  - value: '12345678'
+    description: Eight digits, too short for PHIN
+  - value: '1234567890'
+    description: Ten digits, exceeds PHIN format
+  - value: sample template placeholder number 123456789
+    description: Template/sample context should be excluded even when numeric-like
+      values appear
 false_positives:
-  - description: Generic numeric sequences matching the digit pattern in non-health contexts
-    mitigation: >-
-      Require corroborative evidence keywords within the proximity window to distinguish
-      health identifiers from general numeric data.
-  - description: Reference numbers or account identifiers from other domains with similar digit counts
-    mitigation: >-
-      Layer with document classification to prioritise matches in health and medical documents.
+- description: Generic numeric sequences matching the digit pattern in non-health
+    contexts
+  mitigation: Require corroborative evidence keywords within the proximity window
+    to distinguish health identifiers from general numeric data.
+- description: Reference numbers or account identifiers from other domains with similar
+    digit counts
+  mitigation: Layer with document classification to prioritise matches in health and
+    medical documents.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_ca_phin
-      matches:
-        - ref: Keyword_ca_phin_specific
-    - confidence_level: 75
-      id_match: Regex_ca_phin
-      matches:
-        - ref: Keyword_ca_phin_broad
-    - confidence_level: 65
-      id_match: Regex_ca_phin
+  - confidence_level: 90
+    id_match: Regex_ca_phin
+    matches:
+    - ref: Pattern_ca_phin_label_context
+    - ref: Keyword_ca_phin_specific
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_phin_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_ca_phin
+    matches:
+    - ref: Keyword_ca_phin_specific
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_phin_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_ca_phin
+    matches:
+    - ref: Keyword_ca_phin_broad
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_phin_noise_exclusion
+  - confidence_level: 65
+    id_match: Regex_ca_phin
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_ca_phin_noise_exclusion
   regexes:
-    - id: Regex_ca_phin
-      pattern: '\b\d{9}\b'
+  - id: Regex_ca_phin
+    pattern: \b\d{9}\b
+  - id: Pattern_ca_phin_label_context
+    pattern: (?i)\\b(?:canada|personal|health|phin|health\\s+number|insurance\\s+number|patient\\s+identifier|social\\s+welfare|identity\\s+number|national\\s+id|personal\\s+id|citizen\\s+number)\\b
   keywords:
-    - id: Keyword_ca_phin_specific
-      groups:
-        - match_style: word
-          terms:
-            - PHIN
-            - personal health identification number
-            - personal health number
-            - health identification number
-            - Manitoba Health
-            - Manitoba health number
-            - health card number
-            - numéro de santé
-            - carte santé
-    - id: Keyword_ca_phin_broad
-      groups:
-        - match_style: word
-          terms:
-            - personal health
-            - health identification
-            - health number
-            - health card
-            - health insurance
-            - provincial health
-            - patient number
-            - patient ID
-            - health services
-  filters:
-    - id: Filter_ca_phin_same_digits
-      type: AllDigitsSameFilter
-    - id: Filter_ca_phin_exclude_test
-      type: TextMatchFilter
-      direction: Full
-      logic: Exclude
+  - id: Keyword_ca_phin_specific
+    groups:
+    - match_style: word
       terms:
-        - "000000000"
-        - "123456789"
+      - PHIN
+      - personal health identification number
+      - personal health number
+      - health identification number
+      - Manitoba Health
+      - Manitoba health number
+      - health card number
+      - numéro de santé
+      - carte santé
+  - id: Keyword_ca_phin_broad
+    groups:
+    - match_style: word
+      terms:
+      - personal health
+      - health identification
+      - health number
+      - health card
+      - health insurance
+      - provincial health
+      - patient number
+      - patient ID
+      - health services
+  - id: Keyword_ca_phin_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+  filters:
+  - id: Filter_ca_phin_same_digits
+    type: AllDigitsSameFilter
+  - id: Filter_ca_phin_exclude_test
+    type: TextMatchFilter
+    direction: Full
+    logic: Exclude
+    terms:
+    - '000000000'
+    - '123456789'
 risk_rating: 8
-risk_description: >-
-  Health and medical information is among the most sensitive personal data under privacy laws globally. Unauthorized disclosure can result in discrimination, personal harm, and regulatory penalties under health privacy frameworks.
+risk_description: Health and medical information is among the most sensitive personal
+  data under privacy laws globally. Unauthorized disclosure can result in discrimination,
+  personal harm, and regulatory penalties under health privacy frameworks.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: "SENSITIVE"
-  qgiscf_dlm: "SENSITIVE Personal-Privacy"
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "CONFIDENTIAL"
-  ca_gov: "Protected B"
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-canada-personal-health-identification-number
-    title: "Canada Personal Health Identification Number (PHIN) entity definition - Microsoft Learn"
+- url: https://learn.microsoft.com/en-us/purview/sit-defn-canada-personal-health-identification-number
+  title: Canada Personal Health Identification Number (PHIN) entity definition - Microsoft
+    Learn
 created: '2026-02-09'
-updated: '2026-02-09'
+updated: '2026-02-12'
 author: testpattern-community
 source: microsoft
 license: MIT

@@ -5,97 +5,138 @@ version: 1.0.0
 type: regex
 engine: universal
 description: Detects Mongodb patterns.
-operation: 'Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials-connection.'
+operation: 'Corroborative evidence: 8 keywords within 300 characters. Keyword lists:
+  credentials-connection. Uses additional domain-context evidence and explicit exclusion
+  logic for template/sample/test text.'
 pattern: mongodb(\+srv)?://[^:]+:[^@]+@[^/]+
 confidence: high
-confidence_justification: >-
-  High confidence: structurally constrained pattern with corroborative keyword support reduces false positive rates
-  significantly.
+confidence_justification: 'High confidence: structurally constrained pattern with
+  corroborative keyword support reduces false positive rates significantly. Added
+  context gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - credentials
-  - security
+- credentials
+- security
 corroborative_evidence:
   keywords:
-    - api key
-    - api_key
-    - apikey
-    - access key
-    - secret key
-    - private key
-    - auth token
-    - authorization
+  - api key
+  - api_key
+  - apikey
+  - access key
+  - secret key
+  - private key
+  - auth token
+  - authorization
   proximity: 300
   keyword_lists:
-    - credentials-connection
+  - credentials-connection
 test_cases:
   should_match:
-    - value: mongodb://user:pass@localhost
-      description: MongoDB connection string
-    - value: mongodb+srv://admin:secret@cluster.mongodb.net
-      description: MongoDB Atlas SRV connection
-    - value: mongodb://app:password@db.example.com
-      description: Remote MongoDB connection
+  - value: mongodb://user:pass@localhost
+    description: MongoDB connection string
+  - value: mongodb+srv://admin:secret@cluster.mongodb.net
+    description: MongoDB Atlas SRV connection
+  - value: mongodb://app:password@db.example.com
+    description: Remote MongoDB connection
   should_not_match:
-    - value: 'mongodb://localhost/mydb'
-      description: Missing credentials (no user:pass@ section)
-    - value: 'mongo://user:pass@localhost'
-      description: Wrong scheme (mongo instead of mongodb)
-    - value: 'mongodb://user@localhost'
-      description: Missing password in credentials
+  - value: mongodb://localhost/mydb
+    description: Missing credentials (no user:pass@ section)
+  - value: mongo://user:pass@localhost
+    description: Wrong scheme (mongo instead of mongodb)
+  - value: mongodb://user@localhost
+    description: Missing password in credentials
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Authentication-related terminology in software documentation, security training materials, or system architecture
-      descriptions without actual credentials.
-    mitigation: >-
-      Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-      security terminology.
-  - description: >-
-      Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-      documentation.
-    mitigation: >-
-      Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce false
-      positives from technical writing.
+- description: Authentication-related terminology in software documentation, security
+    training materials, or system architecture descriptions without actual credentials.
+  mitigation: Require proximity to credential-specific patterns (API keys, connection
+    strings, tokens) rather than general security terminology.
+- description: Code snippets and configuration examples containing credential-related
+    keywords or placeholder values in developer documentation.
+  mitigation: Check for common placeholder patterns (example.com, localhost, 0000)
+    and documentation file types to reduce false positives from technical writing.
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: specific
 sensitivity_labels:
-  us_gov: "CUI Specified"
-  uk_gov: "OFFICIAL-SENSITIVE"
-  nz_gov: "RESTRICTED"
-  ca_gov: "Protected B"
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_mongodb_connection
-      matches:
-        - ref: Keyword_mongodb
+  - confidence_level: 90
+    id_match: Regex_mongodb_connection
+    matches:
+    - ref: Pattern_global_mongodb_connection_string_label_context
+    - ref: Keyword_global_mongodb_connection_string_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_mongodb_connection_string_noise_exclusion
+  - confidence_level: 85
+    id_match: Regex_mongodb_connection
+    matches:
+    - ref: Keyword_mongodb
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_mongodb_connection_string_noise_exclusion
   regexes:
-    - id: Regex_mongodb_connection
-      pattern: mongodb(\+srv)?://[^:]+:[^@]+@[^/]+
+  - id: Regex_mongodb_connection
+    pattern: mongodb(\+srv)?://[^:]+:[^@]+@[^/]+
+  - id: Pattern_global_mongodb_connection_string_label_context
+    pattern: (?i)\\b(?:mongodb|connection|string)\\b
   keywords:
-    - id: Keyword_mongodb
-      groups:
-        - match_style: word
-          terms:
-            - mongodb
-            - mongo
-            - connection string
-            - database
-            - cluster
-            - replica set
-            - atlas
-            - credentials
-            - password
-            - authentication
+  - id: Keyword_mongodb
+    groups:
+    - match_style: word
+      terms:
+      - mongodb
+      - mongo
+      - connection string
+      - database
+      - cluster
+      - replica set
+      - atlas
+      - credentials
+      - password
+      - authentication
+  - id: Keyword_global_mongodb_connection_string_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - mongodb
+      - connection
+      - string
+      - field
+      - identifier
+      - reference
+  - id: Keyword_global_mongodb_connection_string_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 created: '2026-02-08'
-updated: '2026-02-08'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT

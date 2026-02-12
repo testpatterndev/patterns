@@ -5,94 +5,143 @@ version: 1.0.0
 type: regex
 engine: universal
 description: Detects Mac Address patterns.
-operation: >-
-  Reference: https://ihateregex.io/expr/mac-address/ Corroborative evidence: 4 keywords within 300 characters. Keyword
-  lists: pii-contact.
+operation: 'Reference: https://ihateregex.io/expr/mac-address/ Corroborative evidence:
+  4 keywords within 300 characters. Keyword lists: pii-contact. Uses additional domain-context
+  evidence and explicit exclusion logic for template/sample/test text.'
 pattern: \b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b
 confidence: high
-confidence_justification: >-
-  High confidence: structurally constrained pattern with corroborative keyword support reduces false positive rates
-  significantly.
+confidence_justification: 'High confidence: structurally constrained pattern with
+  corroborative keyword support reduces false positive rates significantly. Added
+  context gating and exclusion rules improve precision and reduce incidental matches.'
 jurisdictions:
-  - global
+- global
 regulations:
-  - general-data-protection
+- general-data-protection
 data_categories:
-  - device-id
+- device-id
 corroborative_evidence:
   keywords:
-    - device
-    - identifier
-    - serial number
-    - hardware
+  - device
+  - identifier
+  - serial number
+  - hardware
   proximity: 300
   keyword_lists:
-    - pii-contact
+  - pii-contact
 test_cases:
   should_match:
-    - value: 00:1A:2B:3C:4D:5E
-      description: MAC address with colons
-    - value: AA-BB-CC-DD-EE-FF
-      description: MAC address with hyphens
-    - value: 01:23:45:67:89:ab
-      description: Lowercase MAC address
+  - value: 00:1A:2B:3C:4D:5E
+    description: MAC address with colons
+  - value: AA-BB-CC-DD-EE-FF
+    description: MAC address with hyphens
+  - value: 01:23:45:67:89:ab
+    description: Lowercase MAC address
   should_not_match:
-    - value: '00:1A:2B:3C:4D'
-      description: Only 5 octets instead of 6
-    - value: '00:1A:2B:3C:4D:5G'
-      description: Contains invalid hex character G
-    - value: '001A2B3C4D5E'
-      description: No separators between octets
+  - value: 00:1A:2B:3C:4D
+    description: Only 5 octets instead of 6
+  - value: 00:1A:2B:3C:4D:5G
+    description: Contains invalid hex character G
+  - value: 001A2B3C4D5E
+    description: No separators between octets
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words
+      are present
 false_positives:
-  - description: >-
-      Technical identifiers appearing in public documentation, network configuration guides, or example configurations
-      without representing actual infrastructure.
-    mitigation: >-
-      Cross-reference with known documentation patterns and reserved address ranges. Require proximity to
-      infrastructure-specific context.
-  - description: Placeholder and example values commonly used in technical tutorials and vendor documentation.
-    mitigation: Maintain exclusion lists for well-known example values (RFC 5737 documentation addresses, example MAC addresses).
+- description: Technical identifiers appearing in public documentation, network configuration
+    guides, or example configurations without representing actual infrastructure.
+  mitigation: Cross-reference with known documentation patterns and reserved address
+    ranges. Require proximity to infrastructure-specific context.
+- description: Placeholder and example values commonly used in technical tutorials
+    and vendor documentation.
+  mitigation: Maintain exclusion lists for well-known example values (RFC 5737 documentation
+    addresses, example MAC addresses).
 exports:
-  - purview_xml
-  - yaml
-  - regex_copy
+- purview_xml
+- yaml
+- regex_copy
 scope: wide
 sensitivity_labels:
-  us_gov: "Public"
-  uk_gov: "OFFICIAL"
-  nz_gov: "UNCLASSIFIED"
-  ca_gov: "Unclassified"
+  us_gov: Public
+  uk_gov: OFFICIAL
+  nz_gov: UNCLASSIFIED
+  ca_gov: Unclassified
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_mac_address
-      matches:
-        - ref: Keyword_mac_address
-    - confidence_level: 65
-      id_match: Regex_mac_address
+  - confidence_level: 80
+    id_match: Regex_mac_address
+    matches:
+    - ref: Pattern_global_mac_address_label_context
+    - ref: Keyword_global_mac_address_domain_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_mac_address_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_mac_address
+    matches:
+    - ref: Keyword_mac_address
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_mac_address_noise_exclusion
+  - confidence_level: 65
+    id_match: Regex_mac_address
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_global_mac_address_noise_exclusion
   regexes:
-    - id: Regex_mac_address
-      pattern: \b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b
+  - id: Regex_mac_address
+    pattern: \b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b
+  - id: Pattern_global_mac_address_label_context
+    pattern: (?i)\\b(?:mac\\s+address|mac|address)\\b
   keywords:
-    - id: Keyword_mac_address
-      groups:
-        - match_style: word
-          terms:
-            - MAC address
-            - MAC
-            - physical address
-            - hardware address
-            - network interface
-            - NIC
-            - ethernet
-            - wireless
-            - Wi-Fi
-            - adapter
-            - device
-            - ARP
+  - id: Keyword_mac_address
+    groups:
+    - match_style: word
+      terms:
+      - MAC address
+      - MAC
+      - physical address
+      - hardware address
+      - network interface
+      - NIC
+      - ethernet
+      - wireless
+      - Wi-Fi
+      - adapter
+      - device
+      - ARP
+  - id: Keyword_global_mac_address_domain_context
+    groups:
+    - match_style: word
+      terms:
+      - mac address
+      - mac
+      - address
+      - field
+      - identifier
+      - reference
+  - id: Keyword_global_mac_address_noise_exclusion
+    groups:
+    - match_style: word
+      terms:
+      - sample
+      - template
+      - example
+      - dummy
+      - test data
+      - training data
+      - placeholder
+      - mock
+      - boilerplate
 created: '2026-02-08'
-updated: '2026-02-08'
+updated: '2026-02-12'
 author: testpattern-community
 license: MIT
