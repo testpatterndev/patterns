@@ -1,0 +1,141 @@
+schema: testpattern/v1
+name: Payment Card PAN
+slug: global-payment-card-pan
+version: 2.0.0
+type: regex
+engine: universal
+description: >-
+  Identifies payment card Primary Account Numbers (PANs) for Visa, Mastercard (including 2-series BINs),
+  American Express, and Discover. Uses Func_credit_card Luhn validator with AllDigitsSameFilter.
+operation: >-
+  BIN-prefix regex matching major card network formats validated by Func_credit_card. Includes
+  Mastercard 2-series BINs (2221-2720). Corroborative evidence: 3 tiers with card-brand, payment-context,
+  and standalone detection within 300 characters. AllDigitsSameFilter removes trivial matches.
+pattern: '\b(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2}|3[47]\d{2}|6(?:011|5\d{2}))\d{4}\d{4}\d{1,4}\b'
+confidence: high
+confidence_justification: >-
+  High confidence: card BIN prefixes combined with Luhn validation produce very few false positives.
+  Mastercard 2-series BINs (issued since 2017) are included for comprehensive coverage.
+jurisdictions:
+  - global
+regulations:
+  - pci-dss
+  - gdpr
+  - ccpa
+data_categories:
+  - pii
+  - financial
+corroborative_evidence:
+  keywords:
+    - payment card
+    - card number
+    - Visa
+    - Mastercard
+    - American Express
+    - Amex
+    - Discover
+    - PAN
+    - PCI
+  proximity: 300
+  keyword_lists:
+    - financial-payment-card-terms
+test_cases:
+  should_match:
+    - value: '4111111111111111'
+      description: Visa test card (16 digits starting with 4)
+    - value: '5500000000000004'
+      description: Mastercard test card (16 digits starting with 55)
+    - value: '2221000000000000'
+      description: Mastercard 2-series test card
+    - value: '340000000000009'
+      description: American Express test card (15 digits starting with 34)
+  should_not_match:
+    - value: '1234567890123456'
+      description: Starts with 1, not a valid card prefix
+    - value: '411111111111'
+      description: Only 12 digits, too short
+    - value: '9999999999999999'
+      description: Invalid BIN prefix
+false_positives:
+  - description: Generic numeric sequences resembling card numbers.
+    mitigation: Luhn validation and BIN prefix filtering. Corroborative keywords in proximity.
+  - description: Test card numbers in documentation or code.
+    mitigation: AllDigitsSameFilter removes trivial sequences.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  Payment card PAN exposure enables direct financial fraud. PCI-DSS mandates protection of cardholder data.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: "SENSITIVE"
+  qgiscf_dlm: "SENSITIVE Financial"
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_payment_card_pan
+      matches:
+        - ref: Evidence_card_brand
+    - confidence_level: 75
+      id_match: Pattern_payment_card_pan
+      matches:
+        - ref: Evidence_payment_context
+    - confidence_level: 65
+      id_match: Pattern_payment_card_pan
+  regexes:
+    - id: Pattern_payment_card_pan
+      pattern: '\b(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2}|3[47]\d{2}|6(?:011|5\d{2}))\d{4}\d{4}\d{1,4}\b'
+      validators:
+        - ref: Func_credit_card
+  keywords:
+    - id: Evidence_card_brand
+      groups:
+        - match_style: word
+          terms:
+            - payment card
+            - card number
+            - card no
+            - card PAN
+            - Visa
+            - Mastercard
+            - American Express
+            - Amex
+            - Discover
+            - Diners Club
+            - JCB
+            - cardholder
+            - PCI
+    - id: Evidence_payment_context
+      groups:
+        - match_style: word
+          terms:
+            - payment
+            - transaction
+            - purchase
+            - billing
+            - account number
+            - expiry
+            - expiration
+            - CVV
+            - CVC
+            - security code
+            - verification code
+  filters:
+    - id: Guard_payment_card_same_digits
+      type: AllDigitsSameFilter
+references:
+  - url: https://learn.microsoft.com/en-us/purview/sit-defn-credit-card-number
+    title: "Credit Card Number entity definition - Microsoft Learn"
+created: '2026-02-09'
+updated: '2026-02-12'
+author: testpattern-community
+license: MIT

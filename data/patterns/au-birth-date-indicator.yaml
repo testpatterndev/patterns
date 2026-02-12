@@ -1,0 +1,149 @@
+schema: testpattern/v1
+name: Australian Birth Date Indicator
+slug: au-birth-date-indicator
+version: 2.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Identifies date-of-birth references in Australian documents using multiple structural date regex
+  patterns (numeric slash, numeric dot, written month, ISO format) combined with birth-record and
+  personal-information keywords.
+operation: >-
+  Multi-format date regex matching: DD/MM/YYYY, DD.MM.YYYY, DD Month YYYY, and YYYY-MM-DD (ISO).
+  Corroborative evidence: 4 tiers with birth-record-specific and personal-information keywords within
+  300 characters.
+pattern: \b(?:0?[1-9]|[12][0-9]|3[01])[\/\-](?:0?[1-9]|1[012])[\/\-](?:19|20)\d{2}\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: date formats are common in many contexts. Birth-record keywords are essential to
+  distinguish DOB from invoice dates, event dates, and other temporal references.
+jurisdictions:
+  - au
+regulations:
+  - privacy-act-1988
+data_categories:
+  - government-id
+  - pii
+corroborative_evidence:
+  keywords:
+    - DOB
+    - date of birth
+    - birth date
+    - born
+    - born on
+    - birthday
+    - d.o.b
+    - d.o.b.
+  proximity: 300
+  keyword_lists:
+    - birth-record-labels
+    - birth-record-context
+test_cases:
+  should_match:
+    - value: 'DOB: 15/03/1990'
+      description: Numeric slash format with DOB label
+    - value: 'Born on 1st January 1985'
+      description: Written month format with ordinal
+    - value: 'Date of birth: 25.12.2000'
+      description: Dot-separated format
+    - value: 'Birth date: 1990-03-15'
+      description: ISO format
+  should_not_match:
+    - value: 'Invoice date: 15/03/2024'
+      description: Date in non-DOB financial context
+    - value: 'Due date: 01/01/2025'
+      description: Payment due date, not birth date
+    - value: unrelated generic text
+      description: No date pattern present
+false_positives:
+  - description: Non-DOB dates such as invoice dates, event dates, and document timestamps.
+    mitigation: Require birth-record keywords in proximity. Personal-information context provides lower tier.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: wide
+risk_rating: 7
+risk_description: Date of birth is a key identity verification factor enabling fraud when combined with other PII.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_date_slash
+      matches:
+        - ref: Evidence_birth_record
+    - confidence_level: 85
+      id_match: Pattern_date_dot
+      matches:
+        - ref: Evidence_birth_record
+    - confidence_level: 85
+      id_match: Pattern_date_written_month
+      matches:
+        - ref: Evidence_birth_record
+    - confidence_level: 85
+      id_match: Pattern_date_iso
+      matches:
+        - ref: Evidence_birth_record
+    - confidence_level: 75
+      id_match: Pattern_date_slash
+      matches:
+        - ref: Evidence_personal_information
+    - confidence_level: 65
+      id_match: Pattern_date_slash
+  regexes:
+    - id: Pattern_date_slash
+      pattern: \b(?:0?[1-9]|[12][0-9]|3[01])[\/\-](?:0?[1-9]|1[012])[\/\-](?:19|20)\d{2}\b
+    - id: Pattern_date_dot
+      pattern: \b(?:0?[1-9]|[12][0-9]|3[01])\.(?:0?[1-9]|1[012])\.(?:19|20)\d{2}\b
+    - id: Pattern_date_written_month
+      pattern: >-
+        \b(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:19|20)\d{2}\b
+    - id: Pattern_date_iso
+      pattern: \b(?:19|20)\d{2}[\-\/](?:0[1-9]|1[012])[\-\/](?:0[1-9]|[12]\d|3[01])\b
+  keywords:
+    - id: Evidence_birth_record
+      groups:
+        - match_style: word
+          terms:
+            - DOB
+            - 'DOB:'
+            - date of birth
+            - 'date of birth:'
+            - DateOfBirth
+            - birth date
+            - birthdate
+            - born
+            - born on
+            - birthday
+            - d.o.b
+            - d.o.b.
+    - id: Evidence_personal_information
+      groups:
+        - match_style: word
+          terms:
+            - personal details
+            - personal information
+            - personal data
+            - identification
+            - identity
+            - demographics
+            - patient details
+            - client details
+            - customer details
+            - member details
+            - employee details
+created: '2026-02-08'
+updated: '2026-02-12'
+author: testpattern-community
+license: MIT
+references:
+  - https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-personal-information

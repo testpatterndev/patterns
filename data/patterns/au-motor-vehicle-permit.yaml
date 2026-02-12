@@ -1,0 +1,211 @@
+schema: testpattern/v1
+name: Australian Motor Vehicle Permit
+slug: au-motor-vehicle-permit
+version: 2.0.0
+type: regex
+engine: universal
+description: >-
+  Identifies Australian driver's licence numbers across all 8 states and territories using
+  state-specific digit/letter formats. State context provided via regex-based jurisdiction matching
+  rather than keyword lists. Includes generic fallback tier.
+operation: >-
+  State-specific regexes for each jurisdiction's licence format combined with a consolidated permit-term
+  keyword list and jurisdiction agency keyword list. State context uses regex patterns for state names
+  and abbreviations rather than keyword lists. 3 confidence tiers: state-specific + permit terms +
+  state regex (85), state-specific + permit terms (75), generic + permit terms (65).
+pattern: \b(?:\d{6,10}|[A-Z]\d{5,6}|\d{4}[A-Z]{2})\b
+confidence: low
+confidence_justification: >-
+  Low confidence: generic digit patterns match many non-licence identifiers. State-specific regex
+  combined with permit-term and jurisdiction-agency keywords essential for reliable detection.
+jurisdictions:
+  - au
+regulations:
+  - privacy-act-1988
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - drivers licence
+    - driver licence
+    - drivers license
+    - driver license
+    - DL
+    - licence number
+    - license number
+    - driving licence
+    - motor vehicle permit
+  proximity: 300
+  keyword_lists:
+    - au-vehicle-permit-terms
+    - pii-civic-credentials
+test_cases:
+  should_match:
+    - value: '12345678'
+      description: NSW format (8 digits)
+    - value: '123456789'
+      description: QLD/VIC format (9 digits)
+    - value: A12345
+      description: SA format (letter + 5 digits)
+    - value: A123456
+      description: TAS format (letter + 6 digits)
+    - value: '1234567'
+      description: WA/NT/TAS format (7 digits)
+    - value: '1234567890'
+      description: ACT format (10 digits)
+  should_not_match:
+    - value: 12345
+      description: Too few digits (5 instead of minimum 6)
+    - value: 12345678901
+      description: Too many digits (11 instead of maximum 10)
+    - value: AB12345
+      description: Two leading letters not valid for any state
+false_positives:
+  - description: Generic numeric sequences matching licence digit counts.
+    mitigation: Require permit-term keywords and state context for reliable detection.
+  - description: Policy documents discussing licence formats without actual data.
+    mitigation: Layer with form-field or database-column context signals.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: wide
+risk_rating: 8
+risk_description: Driver's licence exposure enables identity fraud across all 8 Australian states/territories.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_permit_nsw
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_nsw
+    - confidence_level: 85
+      id_match: Pattern_permit_vic
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_vic
+    - confidence_level: 85
+      id_match: Pattern_permit_qld
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_qld
+    - confidence_level: 85
+      id_match: Pattern_permit_sa
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_sa
+    - confidence_level: 85
+      id_match: Pattern_permit_wa
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_wa
+    - confidence_level: 85
+      id_match: Pattern_permit_tas
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_tas
+    - confidence_level: 85
+      id_match: Pattern_permit_nt
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_nt
+    - confidence_level: 85
+      id_match: Pattern_permit_act
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_act
+    - confidence_level: 75
+      id_match: Pattern_permit_generic
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Evidence_permit_agency
+    - confidence_level: 65
+      id_match: Pattern_permit_generic
+      matches:
+        - ref: Evidence_permit_terms
+  regexes:
+    - id: Pattern_permit_nsw
+      pattern: \b(?:\d{8}|\d{4}[A-Z]{2})\b
+    - id: Pattern_permit_vic
+      pattern: \b\d{8,10}\b
+    - id: Pattern_permit_qld
+      pattern: \b\d{8,9}\b
+    - id: Pattern_permit_sa
+      pattern: \b[A-Z]\d{5,6}\b
+    - id: Pattern_permit_wa
+      pattern: \b\d{7}\b
+    - id: Pattern_permit_tas
+      pattern: \b(?:\d{7}|[A-Z]\d{5,6})\b
+    - id: Pattern_permit_nt
+      pattern: \b\d{6,8}\b
+    - id: Pattern_permit_act
+      pattern: \b\d{8,10}\b
+    - id: Pattern_permit_generic
+      pattern: \b(?:\d{6,10}|[A-Z]\d{5,6}|\d{4}[A-Z]{2})\b
+    - id: Pattern_jurisdiction_nsw
+      pattern: (?i)\b(?:NSW|New\s+South\s+Wales|Service\s+NSW|Roads?\s+and\s+Maritime)\b
+    - id: Pattern_jurisdiction_vic
+      pattern: (?i)\b(?:VIC|Victoria|VicRoads)\b
+    - id: Pattern_jurisdiction_qld
+      pattern: (?i)\b(?:QLD|Queensland|TMR|Transport\s+and\s+Main\s+Roads)\b
+    - id: Pattern_jurisdiction_sa
+      pattern: (?i)\b(?:SA|South\s+Australia|Service\s+SA)\b
+    - id: Pattern_jurisdiction_wa
+      pattern: (?i)\b(?:WA|Western\s+Australia|Department\s+of\s+Transport)\b
+    - id: Pattern_jurisdiction_tas
+      pattern: (?i)\b(?:TAS|Tasmania|Service\s+Tasmania)\b
+    - id: Pattern_jurisdiction_nt
+      pattern: (?i)\b(?:NT|Northern\s+Territory|Motor\s+Vehicle\s+Registry|MVR)\b
+    - id: Pattern_jurisdiction_act
+      pattern: (?i)\b(?:ACT|Australian\s+Capital\s+Territory|Access\s+Canberra)\b
+  keywords:
+    - id: Evidence_permit_terms
+      groups:
+        - match_style: word
+          terms:
+            - drivers licence
+            - driver licence
+            - drivers license
+            - driver license
+            - DL
+            - licence number
+            - license number
+            - driving licence
+            - driving license
+            - motor vehicle permit
+            - licence no
+            - permit number
+    - id: Evidence_permit_agency
+      groups:
+        - match_style: word
+          terms:
+            - Service NSW
+            - VicRoads
+            - TMR
+            - Transport and Main Roads
+            - Service SA
+            - Department of Transport
+            - Service Tasmania
+            - Motor Vehicle Registry
+            - MVR
+            - Access Canberra
+            - Roads and Maritime
+            - RMS
+created: '2026-02-08'
+updated: '2026-02-12'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://learn.microsoft.com/en-us/purview/sit-defn-australia-drivers-license-number
+    title: Australia drivers license number entity definition - Microsoft Learn
