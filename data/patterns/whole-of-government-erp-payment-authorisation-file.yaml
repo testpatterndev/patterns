@@ -1,0 +1,145 @@
+schema: testpattern/v1
+name: Whole-of-Government ERP Payment Authorisation File
+slug: whole-of-government-erp-payment-authorisation-file
+version: 1.0.0
+type: regex
+engine: universal
+description: Detects bulk payment authorisation files extracted from government ERP systems (SAP, Oracle, TechnologyOne) containing
+  payee bank accounts, payment amounts, and authorisation codes for batch processing.
+operation: 'Regex for ABA/BECS file format: Type 0 header record pattern or structured fixed-width payment records with BSB
+  and transaction codes. Keyword proximity: payment file / ABA file / BECS / batch payment / EFT file terms within 300 characters
+  of authorisation/approval context. Boosted by ERP system names (SAP, Oracle, TechnologyOne).'
+pattern: ^0\s*.{17}\d{3}-\d{3}
+confidence: high
+confidence_justification: 'High confidence: ABA/BECS file format patterns combined with ERP system context and payment authorisation
+  markers are highly specific to government payment files. The structured fixed-width format is distinctive.'
+jurisdictions:
+- au
+regulations:
+- qgiscf
+- financial-accountability-act-2009-qld
+data_categories:
+- financial
+- government
+corroborative_evidence:
+  keywords:
+  - payment file
+  - ABA file
+  - BECS
+  - direct entry
+  - batch payment
+  - EFT file
+  - authorised
+  - approved
+  - certified
+  - released for payment
+  - SAP
+  - Oracle
+  - TechnologyOne
+  - ERP
+  - payment run
+  - remittance
+  proximity: 300
+test_cases:
+  should_match:
+  - value: 'PROTECTED — ERP Payment Authorisation File. Source: SAP Payment Run PR-2026-0451. Batch payment file (ABA format)
+      authorised for processing. Contains 1,247 payment records totalling $34,567,890.45. BSB/Account details for all payees
+      included. Dual authorisation: Approved by J. Smith and B. Williams. Released for BECS direct entry.'
+    description: SAP payment authorisation file with batch details
+  - value: '0                 064-000Department of Health      0123456Payment File       280226
+
+      1064-000 12345678 530000003450000Employee Payment    J Smith            064-000 98765432
+
+      1084-004 87654321 530000004520000Employee Payment    M Jones            084-004 11223344'
+    description: Raw ABA file format with header and payment records
+  should_not_match:
+  - value: 'Payment request form. Please approve payment of $12,450 to Supplier ABC Pty Ltd. Purchase order: PO-2026-001234.
+      Single payment — not a batch file.'
+    description: Individual payment request — not a bulk authorisation file
+  - value: ABA file format specification. The Type 0 record contains the header with BSB, account name, and file description.
+      Used for training purposes.
+    description: ABA file format documentation — training material
+false_positives:
+- description: Individual payment requests and purchase order approvals
+  mitigation: Require bulk indicators (batch, multiple records, payment run) rather than single payment context
+- description: ABA/BECS file format specifications and training documentation
+  mitigation: Exclude documents containing 'specification', 'format guide', 'training', 'example file' without real payment
+    data
+exports:
+- purview_xml
+- yaml
+scope: document
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  pattern_tiers:
+  - tier: high
+    confidence: 85
+    description: ABA/BECS format + payment authorisation + PROTECTED marker
+  - tier: medium
+    confidence: 65
+    description: Batch payment terms + BSB patterns + ERP system reference
+  regexes:
+  - pattern: ^0\s*.{17}\d{3}-\d{3}
+    description: ABA Type 0 header record
+  - pattern: ^1\d{3}-\d{3}\s*\d{6,10}
+    description: ABA Type 1 detail record with BSB and account
+  - pattern: \b\d{3}-?\d{3}\b
+    description: BSB format
+  - pattern: PR-\d{4}-\d{4,6}
+    description: Payment run reference number
+  keywords:
+  - group: primary
+    values:
+    - payment file
+    - ABA file
+    - BECS
+    - direct entry
+    - batch payment
+    - EFT file
+    - payment run
+  - group: authorisation
+    values:
+    - authorised
+    - approved
+    - certified
+    - released for payment
+    - dual authorisation
+    - payment authorisation
+  - group: erp_systems
+    values:
+    - SAP
+    - Oracle
+    - TechnologyOne
+    - ERP
+    - payment module
+  - group: markers
+    values:
+    - PROTECTED
+    - confidential
+    - restricted
+    - not for distribution
+  filters:
+  - type: exclude_keywords
+    values:
+    - specification
+    - format guide
+    - training
+    - example file
+    - template
+    - how to
+    - payment request form
+    - single payment
+risk_rating: 9
+risk_description: Bulk payment authorisation files from government ERP systems containing payee bank accounts, amounts, and
+  authorisation codes; interception enables payment redirection.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED Financial
+references: []
+created: '2026-02-20'
+updated: '2026-02-20'
+author: qld-gov-dlp
+source: qld-custom
+license: MIT
