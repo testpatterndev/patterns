@@ -1,0 +1,137 @@
+schema: testpattern/v1
+name: Bank Account with Payment Authorisation Token
+slug: bank-account-with-payment-authorisation-token
+version: 1.0.0
+type: regex
+engine: universal
+description: Detects government bank account details (BSB + account number) combined with payment authorisation credentials,
+  approval tokens, or signing authorities that together enable the initiation of payments.
+operation: Regex for BSB format within 300 characters of account number pattern and authorisation/approval context keywords.
+  High confidence when PROTECTED header present. Distinguished from routine BSB+account (SENS_Fin) by requiring authorisation/signing
+  context.
+pattern: \b\d{3}-?\d{3}\b
+confidence: high
+confidence_justification: 'High confidence: BSB + account number + payment authorisation credentials is a highly specific
+  combination. The requirement for authorisation context (not just banking details) distinguishes this from routine SENS_Fin
+  BSB detection.'
+jurisdictions:
+- au
+regulations:
+- qgiscf
+- financial-accountability-act-2009-qld
+data_categories:
+- financial
+- government
+corroborative_evidence:
+  keywords:
+  - authorisation
+  - authorised
+  - approval
+  - approved
+  - signing authority
+  - payment token
+  - EFT
+  - batch payment
+  - BECS
+  - direct entry
+  - ABA file
+  - payment instruction
+  - bank account
+  - BSB
+  proximity: 300
+test_cases:
+  should_match:
+  - value: 'PROTECTED — Payment Authorisation File. BSB: 064-000, Account: 12345678. Payment token: AUTH-2026-00451. Authorised
+      signatory: J. Smith (Delegate Level 3). Batch payment approved for $2,450,000 via BECS direct entry. Released for processing.'
+    description: Payment authorisation with BSB, account, and approval token
+  - value: 'EFT Payment Instruction — PROTECTED. Account BSB 084-004 Account No 98765432. Signing authority: Dual authorisation
+      required. First approver: A. Jones (approved). Second approver: B. Williams (approved). Payment amount: $890,000. ABA
+      file generated.'
+    description: Dual-authorised payment with BSB and signing authority
+  should_not_match:
+  - value: 'Please update your bank details for salary payments. BSB: ___ Account: ___. Submit to HR with a void cheque or
+      bank statement.'
+    description: Blank bank details form — no authorisation context
+  - value: 'Supplier registration: Company ABC Pty Ltd. BSB: 062-000, Account: 11223344. ABN: 12 345 678 901. For accounts
+      payable setup only.'
+    description: Routine supplier bank details without payment authorisation
+false_positives:
+- description: Routine bank detail collection forms for HR or accounts payable
+  mitigation: Require authorisation/approval context (not just BSB + account) to distinguish from SENS_Fin patterns
+- description: Published banking details for government payment receipt (e.g., fine payments)
+  mitigation: Exclude documents containing 'pay your', 'payment to government', 'revenue account' indicating inbound payments
+exports:
+- purview_xml
+- yaml
+scope: document
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  pattern_tiers:
+  - tier: high
+    confidence: 85
+    description: BSB + account + authorisation/token + PROTECTED marker
+  - tier: medium
+    confidence: 65
+    description: BSB + account + authorisation context without marker
+  regexes:
+  - pattern: \b\d{3}-?\d{3}\b
+    description: BSB format (e.g., 064-000 or 064000)
+  - pattern: \b\d{6,10}\b
+    description: Bank account number (6-10 digits)
+  - pattern: AUTH-\d{4}-\d{4,6}
+    description: Payment authorisation token format
+  keywords:
+  - group: primary
+    values:
+    - BSB
+    - bank account
+    - account number
+    - payment
+  - group: authorisation
+    values:
+    - authorisation
+    - authorised
+    - approval
+    - approved
+    - signing authority
+    - payment token
+    - signatory
+    - delegate
+  - group: payment_methods
+    values:
+    - EFT
+    - batch payment
+    - BECS
+    - direct entry
+    - ABA file
+    - payment instruction
+    - released for processing
+  - group: markers
+    values:
+    - PROTECTED
+    - confidential
+    - restricted
+    - dual authorisation
+  filters:
+  - type: exclude_keywords
+    values:
+    - template
+    - please provide
+    - update your bank details
+    - pay your
+    - payment to government
+    - supplier registration form
+risk_rating: 10
+risk_description: Government bank account details combined with payment authorisation credentials that together enable initiation
+  of payments; disclosure causes direct financial loss.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED Financial
+references: []
+created: '2026-02-20'
+updated: '2026-02-20'
+author: qld-gov-dlp
+source: qld-custom
+license: MIT
