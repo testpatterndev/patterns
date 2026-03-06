@@ -1,0 +1,166 @@
+schema: testpattern/v1
+name: Court Filing Reference
+slug: court-filing-reference
+version: 1.0.0
+type: keyword_proximity
+engine: universal
+description: Detects court filing references from Queensland courts (Magistrates Court, District Court, Supreme Court) containing proceeding numbers, party names, and registry details. Unpublished filings contain personal details of parties, allegations, and evidence that are not yet in the public domain.
+operation: 'Keyword proximity: primary keywords (court filing, proceeding number, registry, plaintiff, defendant, applicant, respondent, cause number) within 300 characters of Queensland court reference formats (MAG-NNNN-NN, DC-NNNN-NN, SC-NNNN-NN). Negative keyword exclusion for published judgments and court directories.'
+pattern: (?i)\b(court\s+filing|proceeding\s+number|cause\s+number|registry\s+(?:number|reference)|(?:MAG|DC|SC)-\d{4}-\d{2,6}|(?:plaintiff|defendant|applicant|respondent)\s+(?:name|details))\b
+confidence: high
+confidence_justification: 'High confidence: requires co-occurrence of court filing terminology with Queensland court reference number formats. These formats and filing-specific terms rarely co-occur outside genuine court documents.'
+jurisdictions:
+  - au
+regulations:
+  - qgiscf
+  - uniform-civil-procedure-rules-1999-qld
+  - criminal-code-act-1899-qld
+data_categories:
+  - law-enforcement
+  - government
+corroborative_evidence:
+  keywords:
+    - SENSITIVE
+    - Legal
+    - court filing
+    - proceeding number
+    - registry
+    - plaintiff
+    - defendant
+    - applicant
+    - respondent
+    - Magistrates Court
+    - District Court
+    - Supreme Court
+    - initiating application
+    - statement of claim
+  proximity: 300
+  keyword_lists:
+    - law-enforcement
+    - government-services
+test_cases:
+  should_match:
+    - value: 'SENSITIVE Legal. Court Filing — Queensland Magistrates Court. Proceeding Number: MAG-2026-04281. Registry: Brisbane. Plaintiff: State of Queensland. Defendant: [Name]. Charge: Criminal Code s.339 — Assault of a Public Officer. First appearance: 18 March 2026. Bail application to be heard. Filed by Office of the Director of Public Prosecutions.'
+      description: Magistrates Court criminal filing with proceeding number and party details
+    - value: 'Supreme Court of Queensland — Initiating Application. Cause Number: SC-2025-1847. Registry: Townsville. Applicant: Director-General, Department of Child Safety. Respondent: [Name]. Application for child protection order under Child Protection Act 1999 s.59. Affidavit of caseworker attached. Matter listed for directions hearing 22 March 2026.'
+      description: Supreme Court child protection filing with cause number
+    - value: 'District Court of Queensland — Statement of Claim. Proceeding Number: DC-2026-0392. Registry: Cairns. Plaintiff: [Name]. Defendant: Queensland Health. Claim for damages arising from medical negligence at Cairns Hospital. Particulars of negligence: failure to diagnose appendicitis on presentation 14 August 2025. Damages claimed: $485,000.'
+      description: District Court civil claim filing against Queensland Health
+  should_not_match:
+    - value: 'Published Judgment: Smith v State of Queensland [2025] QSC 184. The Supreme Court found the defendant liable for negligence. The full judgment is available on the Queensland Courts website.'
+      description: Published Supreme Court judgment available on courts website
+    - value: The Queensland Courts Directory lists the Brisbane Magistrates Court at 363 George Street, Brisbane QLD 4000. Registry hours are 8:30am to 4:30pm Monday to Friday.
+      description: Public court directory information
+    - value: The Queensland Law Society Journal published an article analysing recent District Court decisions on medical negligence claims, noting an increase in proceeding numbers filed in 2025.
+      description: Legal journal article discussing court statistics
+false_positives:
+  - description: Published court judgments and decisions already in the public domain
+    mitigation: 'Negative keyword exclusion: ''published judgment'', ''published decision'', ''available on'', ''QSC'', ''QCA'', ''QDC'' (judgment citation formats).'
+  - description: Court directories, registry contact details, and public information
+    mitigation: 'Negative keyword exclusion: ''directory'', ''registry hours'', ''contact details'', ''court location'''
+  - description: Legal journal articles discussing court statistics and case law
+    mitigation: 'Negative keyword exclusion: ''journal'', ''law society'', ''article'', ''analysing'', ''recent decisions'''
+  - description: Court forms templates without party details
+    mitigation: 'Require proximity to actual party names or specific proceeding numbers, not blank form fields.'
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  pattern_tiers:
+    - tier: high
+      confidence: 85
+      description: Court reference number regex match with 2+ primary keywords and filing details
+    - tier: medium
+      confidence: 75
+      description: 2+ primary keywords with court registry reference within 300 characters
+    - tier: low
+      confidence: 65
+      description: 1 primary keyword with court reference number regex match
+  regexes:
+    - name: magistrates_court_ref
+      pattern: \bMAG-\d{4}-\d{2,6}\b
+    - name: district_court_ref
+      pattern: \bDC-\d{4}-\d{2,6}\b
+    - name: supreme_court_ref
+      pattern: \bSC-\d{4}-\d{2,6}\b
+    - name: court_filing_terms
+      pattern: (?i)\b(court\s+filing|proceeding\s+number|cause\s+number|registry\s+(?:number|reference)|initiating\s+application|statement\s+of\s+claim)\b
+  keywords:
+    - name: primary_keywords
+      words:
+        - court filing
+        - proceeding number
+        - cause number
+        - registry number
+        - registry reference
+        - initiating application
+        - statement of claim
+        - originating application
+        - notice of claim
+        - filed by
+    - name: classification_markers
+      words:
+        - SENSITIVE
+        - Legal
+        - OFFICIAL
+        - Magistrates Court
+        - District Court
+        - Supreme Court
+        - Queensland Courts
+    - name: corroborative_terms
+      words:
+        - plaintiff
+        - defendant
+        - applicant
+        - respondent
+        - first appearance
+        - directions hearing
+        - affidavit
+        - particulars
+        - damages claimed
+        - bail application
+        - listed for hearing
+        - ODPP
+    - name: negative_keywords
+      words:
+        - published judgment
+        - published decision
+        - available on
+        - directory
+        - registry hours
+        - contact details
+        - court location
+        - journal
+        - law society
+        - article
+        - analysing
+        - recent decisions
+        - textbook
+        - academic
+  filters:
+    - type: exclude
+      description: Exclude published judgments, directories, and legal journal articles
+      keywords:
+        - published judgment
+        - published decision
+        - directory
+        - registry hours
+        - journal
+        - law society
+        - textbook
+        - academic
+risk_rating: 7
+risk_description: Unpublished court filings contain personal details of parties, specific allegations, witness details, and evidence not yet in the public domain. Disclosure could prejudice proceedings or expose parties to reputational harm before matters are determined.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Legal
+references: []
+created: '2026-03-06'
+updated: '2026-03-06'
+author: qld-gov-dlp
+source: qld-custom
+license: MIT
