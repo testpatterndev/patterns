@@ -1,0 +1,207 @@
+schema: testpattern/v1
+name: Date of birth
+slug: global-top500-003-date-of-birth
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects date-of-birth references in documents across multiple date formats (numeric slash, dot,
+  hyphen, written month, ISO). Requires birth-record keywords in proximity to distinguish DOB
+  from invoice dates, event dates, and other temporal references. No Microsoft built-in SIT
+  exists for unstructured DOB detection.
+operation: >-
+  Multi-format date regex matching: DD/MM/YYYY, MM/DD/YYYY, DD-MM-YYYY, DD.MM.YYYY,
+  DD Month YYYY, and YYYY-MM-DD (ISO). Corroborative evidence: 3 tiers with birth-record
+  keywords and exclusion logic (high), personal-information keywords (medium), and broad
+  context (low) within 300 characters.
+pattern: >-
+  \b(?:(?:0?[1-9]|[12][0-9]|3[01])[\/\-\.](?:0?[1-9]|1[012])[\/\-\.](?:19|20)\d{2}|(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:19|20)\d{2}|(?:19|20)\d{2}[\-\/](?:0[1-9]|1[012])[\-\/](?:0[1-9]|[12]\d|3[01]))\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: date formats appear in every business document. Birth-record keywords
+  are essential to distinguish DOB from the thousands of other dates in any corpus.
+jurisdictions:
+  - global
+regulations:
+  - GDPR
+  - CCPA
+  - HIPAA
+  - PIPEDA
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - NIST CSF
+data_categories:
+  - pii
+corroborative_evidence:
+  keywords:
+    - DOB
+    - date of birth
+    - birth date
+    - born
+    - born on
+    - birthday
+    - d.o.b
+    - d.o.b.
+  proximity: 300
+  keyword_lists:
+    - pii-personal
+test_cases:
+  should_match:
+    - value: 'DOB: 15/03/1990'
+      description: Numeric slash format with DOB label
+    - value: 'Date of birth: 03/15/1990'
+      description: US-style MM/DD/YYYY with label
+    - value: 'Born on 1st January 1985'
+      description: Written month format with ordinal
+    - value: 'Date of birth: 25.12.2000'
+      description: Dot-separated format
+    - value: 'Birth date: 1990-03-15'
+      description: ISO format
+  should_not_match:
+    - value: 'Invoice date: 15/03/2024'
+      description: Date in non-DOB financial context
+    - value: 'Due date: 01/01/2025'
+      description: Payment due date
+    - value: unrelated generic text
+      description: No date pattern present
+false_positives:
+  - description: Non-DOB dates such as invoice dates, event dates, document timestamps, and meeting dates.
+    mitigation: Require birth-record keywords (DOB, date of birth, born) in proximity. Without these keywords the pattern fires at low confidence only.
+  - description: Historical dates in news articles or academic papers that happen to match the date format.
+    mitigation: Corroborative evidence keywords distinguish personal records from historical references.
+  - description: Dates in financial documents (settlement dates, maturity dates, filing dates).
+    mitigation: Filter excludes common business date labels via TextMatchFilter on the matched context.
+exports:
+  - purview_xml
+  - gcp_dlp
+  - macie
+  - zscaler
+  - paloalto
+  - netskope
+  - yaml
+  - regex_copy
+scope: wide
+risk_rating: 7
+risk_description: Date of birth is a key identity verification factor used in fraud, identity theft, and social engineering attacks.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_date_all
+      matches:
+        - ref: Evidence_birth_record
+          min_count: 2
+          unique_results: true
+        - ref: Evidence_data_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_date_all
+      matches:
+        - ref: Evidence_birth_record
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      id_match: Pattern_date_all
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+  filters:
+    - id: Guard_dob_exclude_business_dates
+      type: TextMatchFilter
+      direction: Full
+      logic: Exclude
+      terms:
+        - invoice date
+        - due date
+        - payment date
+        - expiry date
+        - expiration date
+        - start date
+        - end date
+        - effective date
+        - settlement date
+        - maturity date
+        - closing date
+        - issue date
+        - filing date
+        - report date
+  regexes:
+    - id: Pattern_date_all
+      pattern: >-
+        \b(?:(?:0?[1-9]|[12][0-9]|3[01])[\/\-\.](?:0?[1-9]|1[012])[\/\-\.](?:19|20)\d{2}|(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:19|20)\d{2}|(?:19|20)\d{2}[\-\/](?:0[1-9]|1[012])[\-\/](?:0[1-9]|[12]\d|3[01]))\b
+  keywords:
+    - id: Evidence_birth_record
+      groups:
+        - match_style: word
+          terms:
+            - DOB
+            - date of birth
+            - birth date
+            - birthdate
+            - born
+            - born on
+            - birthday
+            - d.o.b
+            - d.o.b.
+            - DateOfBirth
+    - id: Evidence_data_record_context
+      groups:
+        - match_style: word
+          terms:
+            - field
+            - column
+            - row
+            - entry
+            - record
+            - value
+            - form
+            - register
+            - database
+            - extract
+            - export
+            - spreadsheet
+            - table
+            - schedule
+            - appendix
+            - attachment
+            - registry
+    - id: Evidence_template_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - test
+            - example
+            - sample
+            - dummy
+            - placeholder
+            - template
+            - mock
+            - training data
+sensitivity_labels:
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+created: '2026-03-15'
+updated: '2026-03-15'
+changelog:
+  - version: 1.0.0
+    date: '2026-03-15'
+    description: Initial release — global DOB identifier pattern with 3-tier progressive gating
+author: testpattern-community
+license: MIT
+references:
+  - https://learn.microsoft.com/en-us/answers/questions/2153006/microsoft-purview-custom-sit-date-of-birth
+  - https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/personal-information-what-is-it/what-is-personal-data/
