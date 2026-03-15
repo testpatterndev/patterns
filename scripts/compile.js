@@ -86,6 +86,27 @@ for (const file of patternFiles) {
     resolvedCount++
   }
 
+  // Resolve purview.shared_keywords references
+  if (data.purview?.shared_keywords) {
+    if (!data.purview.keywords) data.purview.keywords = []
+    for (const ref of data.purview.shared_keywords) {
+      const terms = keywordMap.get(ref.dict)
+      if (terms) {
+        data.purview.keywords.push({
+          id: ref.as,
+          shared: true,
+          groups: [{
+            match_style: ref.match_style || 'word',
+            terms: terms.map(t => typeof t === 'string' ? t : String(t))
+          }]
+        })
+      } else {
+        console.error(`  WARN: ${relative(DATA_DIR, file)} references unknown shared keyword dict: ${ref.dict}`)
+        unresolvedKeywordRefs++
+      }
+    }
+  }
+
   patterns.push(data)
 }
 
