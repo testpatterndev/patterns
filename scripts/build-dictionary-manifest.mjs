@@ -25,7 +25,7 @@ const DICTIONARY_REGISTRY = [
     description: 'Universal false positive suppression terms',
     scope: 'universal',
     matchStyle: 'word',
-    sources: ['template-exclusion']
+    sources: ['template-exclusion', 'noise-exclusion']
   },
   {
     placeholder: '{{DICT_EN_GOVERNMENT_EXCLUSION}}',
@@ -222,6 +222,7 @@ for (const entry of DICTIONARY_REGISTRY) {
     description: entry.description,
     scope: entry.scope,
     matchStyle: entry.matchStyle,
+    sources: entry.sources,
     hash,
     requiredBy,
     termCount: terms.length,
