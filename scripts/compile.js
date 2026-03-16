@@ -123,12 +123,28 @@ for (const file of collectionFiles) {
   }
 }
 
+// ── Load dictionary manifest (if present) ──
+let dictionaryManifest = null
+const manifestPath = join(DATA_DIR, 'dictionary-manifest.json')
+if (existsSync(manifestPath)) {
+  try { dictionaryManifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) } catch { /* skip */ }
+}
+
+// ── Load classification results (if present) ──
+let classificationResults = null
+const classResultsPath = join(DATA_DIR, 'classification-results.json')
+if (existsSync(classResultsPath)) {
+  try { classificationResults = JSON.parse(readFileSync(classResultsPath, 'utf-8')) } catch { /* skip */ }
+}
+
 const output = {
   version: '1.0.0',
   generated: new Date().toISOString(),
   patterns,
   collections,
-  keywords: keywordDicts
+  keywords: keywordDicts,
+  dictionaryManifest,
+  classificationResults
 }
 
 writeFileSync(OUT_FILE, JSON.stringify(output, null, 2))
