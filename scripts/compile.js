@@ -95,6 +95,7 @@ for (const file of patternFiles) {
         data.purview.keywords.push({
           id: ref.as,
           shared: true,
+          dictSlug: ref.dict,
           groups: [{
             match_style: ref.match_style || 'word',
             terms: terms.map(t => typeof t === 'string' ? t : String(t))
