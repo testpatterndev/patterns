@@ -5,7 +5,7 @@
  * references. Targets three keyword types:
  *
  *   1. Evidence_template_exclusion  → shared dict: template-exclusion
- *   2. Keyword_*_noise_exclusion    → shared dict: noise-exclusion
+ *   2. Keyword_*_noise_exclusion    → shared dict: template-exclusion
  *   3. Evidence_data_record_context → shared dict: data-record-context
  *
  * Usage:
@@ -166,7 +166,7 @@ for (const file of files) {
         continue
       }
       sharedEntries.push({
-        dict: 'noise-exclusion',
+        dict: 'template-exclusion',
         as: 'Keyword_noise_exclusion',
         match_style: 'word'
       })

@@ -25,7 +25,7 @@ const DICTIONARY_REGISTRY = [
     description: 'Universal false positive suppression terms',
     scope: 'universal',
     matchStyle: 'word',
-    sources: ['template-exclusion', 'noise-exclusion']
+    sources: ['template-exclusion']
   },
   {
     placeholder: '{{DICT_EN_GOVERNMENT_EXCLUSION}}',
