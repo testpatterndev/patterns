@@ -82,6 +82,22 @@ const DICTIONARY_REGISTRY = [
     scope: 'au',
     matchStyle: 'word',
     sources: ['au-family-names-top-tier']
+  },
+  {
+    placeholder: '{{DICT_AU_FORENAMES}}',
+    name: 'TestPattern - Australian Forenames',
+    description: 'Consolidated Australian forenames from BDM, QLD Unclaimed Money Register, and cultural sources',
+    scope: 'au',
+    matchStyle: 'word',
+    sources: ['au-forenames-australian']
+  },
+  {
+    placeholder: '{{DICT_AU_SURNAMES}}',
+    name: 'TestPattern - Australian Surnames',
+    description: 'Consolidated Australian surnames from immigration, QLD Unclaimed Money Register, and cultural sources',
+    scope: 'au',
+    matchStyle: 'word',
+    sources: ['au-surnames-australian']
   }
 ]
 
