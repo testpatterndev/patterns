@@ -27,9 +27,9 @@ npm run compile
 
 ```
 data/
-  patterns/     1,407 detection pattern YAML files
-  collections/  14 curated pattern bundles
-  keywords/     105 keyword dictionary YAMLs
+  patterns/     1,479 detection pattern YAML files
+  collections/  15 curated pattern bundles
+  keywords/     121 keyword dictionary YAMLs
   reference/    Large consolidated reference lists (JSON)
 scripts/
   compile.js    YAML → patterns.json compiler
