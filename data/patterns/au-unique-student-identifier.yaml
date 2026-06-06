@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Unique Student Identifier
 slug: au-unique-student-identifier
-version: 1.1.0
+version: 1.2.0
 type: regex
 engine: universal
 description: Detects Unique Student Identifier (USI) patterns. A 10-character alphanumeric code (uppercase letters and digits) mandatory since January 2023 for higher education in Australia.
@@ -51,6 +51,10 @@ test_cases:
       description: 11 characters instead of 10
     - value: abc1234567
       description: Lowercase letters (pattern requires uppercase)
+    - value: '0412345678'
+      description: Australian mobile phone number should be excluded in AU packages
+    - value: '0000000000'
+      description: Placeholder numeric value is excluded by sentinel filter
 false_positives:
   - description: Common words and phrases related to unique student identifier appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -58,6 +62,17 @@ false_positives:
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Australian mobile and fixed-line telephone numbers can satisfy the broad 10-character alphanumeric USI anchor.
+    mitigation: Use the AU regional phone-number NONE-of gate for Australian packages and keep USI/education context mandatory for deployed policies.
+regional_tuning:
+  - jurisdiction: au
+    signal: au-mobile-number-overmatch-numeric-id-20260525
+    action: exclude-regex
+    id: Regex_au_mobile_number_exclusion
+    pattern: (?:^|[^0-9])(?:04[0-9]{8}|(?:\+?61[\s.-]?4(?:[\s.-]?[0-9]){8}))(?:$|[^0-9])
+    defaultDecision: modify
+    risk: regional-phone-number-overmatch
+    reason: Aggregate Australian tenant analysis found AU mobile-shaped literals overmatching broad 10-character identifier patterns.
 exports:
   - purview_xml
   - yaml
@@ -131,7 +146,18 @@ purview:
             - RTO
             - registered training organisation
             - AVETMISS
+  filters:
+    - id: Guard_usi_same_digits
+      type: AllDigitsSameFilter
+    - id: Guard_usi_exclude_test
+      type: TextMatchFilter
+      direction: Full
+      logic: Exclude
+      terms:
+        - "0000000000"
+        - "1111111111"
+        - "1234567890"
 created: '2026-02-08'
-updated: '2026-02-12'
+updated: '2026-06-06'
 author: testpattern-community
 license: MIT

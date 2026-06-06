@@ -1,11 +1,11 @@
 schema: testpattern/v1
 name: Whole-of-Government ERP Payment Authorisation File
 slug: whole-of-government-erp-payment-authorisation-file
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: Detects bulk payment authorisation files extracted from government ERP systems (SAP, Oracle, TechnologyOne) containing payee bank accounts, payment amounts, and authorisation codes for batch processing.
-operation: 'Regex for ABA/BECS file format: Type 0 header record pattern or structured fixed-width payment records with BSB and transaction codes. Keyword proximity: payment file / ABA file / BECS / batch payment / EFT file terms within 300 characters of authorisation/approval context. Boosted by ERP system names (SAP, Oracle, TechnologyOne).'
+operation: 'Regex for ABA/BECS file format: Type 0 header record pattern or structured fixed-width payment records with BSB and transaction codes. Keyword proximity: payment file / ABA file / BECS / batch payment / EFT file terms within 300 characters of authorisation/approval context. Boosted by ERP system names (SAP, Oracle, TechnologyOne). Sentinel/test filters suppress placeholder banking strings seen in templates and noisy tenant exports.'
 pattern: ^0\s*.{17}\d{3}-\d{3}
 confidence: high
 confidence_justification: 'High confidence: ABA/BECS file format patterns combined with ERP system context and payment authorisation markers are highly specific to government payment files. The structured fixed-width format is distinctive.'
@@ -56,11 +56,15 @@ test_cases:
       description: Individual payment request — not a bulk authorisation file
     - value: ABA file format specification. The Type 0 record contains the header with BSB, account name, and file description. Used for training purposes.
       description: ABA file format documentation — training material
+    - value: 'ERP payment template. BSB 000-000 account 00000000 amount $0.00. Training example only.'
+      description: Placeholder banking values are excluded from payment-file evidence
 false_positives:
   - description: Individual payment requests and purchase order approvals
     mitigation: Require bulk indicators (batch, multiple records, payment run) rather than single payment context
   - description: ABA/BECS file format specifications and training documentation
     mitigation: Exclude documents containing 'specification', 'format guide', 'training', 'example file' without real payment data
+  - description: Placeholder BSB/account values in ERP templates or testing artefacts.
+    mitigation: Exclude all-same-digit and trivial sequential payment identifiers.
 exports:
   - purview_xml
   - yaml
@@ -165,6 +169,21 @@ purview:
             - how to
             - payment request form
             - single payment
+  filters:
+    - id: Guard_erp_payment_same_digits
+      type: AllDigitsSameFilter
+    - id: Guard_erp_payment_exclude_test
+      type: TextMatchFilter
+      direction: Full
+      logic: Exclude
+      terms:
+        - "000000"
+        - "000-000"
+        - "00000000"
+        - "000000000"
+        - "123456"
+        - "123-456"
+        - "123456789"
 
 risk_rating: 8
 risk_description: Bulk payment authorisation files from government ERP systems containing payee bank accounts, amounts, and authorisation codes; interception enables payment redirection. Legislative review (Mar 2026) established BIL:2 — Financial Accountability Act 2009 (Qld) contains no secrecy provisions or criminal penalties. No specific statutory mandate for PROTECTED classification of this document type. Operational sensitivity managed through access controls and existing financial accountability frameworks.
@@ -174,7 +193,7 @@ sensitivity_labels:
   qgiscf_dlm: "SENSITIVE Financial"
 references: []
 created: '2026-02-20'
-updated: '2026-03-06'
+updated: '2026-06-06'
 author: qld-gov-dlp
 source: qld-custom
 license: MIT
