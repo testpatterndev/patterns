@@ -8,7 +8,7 @@ description: Identifies dns zone files patterns in security and access control c
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 6 keywords within 300 characters. Uses additional domain-context
   evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?im)\b(?:\$ORIGIN|\$TTL|SOA|IN\s+(?:A|AAAA|CNAME|MX|NS|TXT|SRV))\b
+pattern: \$ORIGIN\b|\$TTL\b|\bIN\s+SOA\b|\bIN\s+A\s+\d{1,3}(?:\.\d{1,3}){3}\b|\bIN\s+(?:AAAA|CNAME|MX|NS|PTR|SRV|TXT)\b
 confidence: medium
 confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
@@ -29,23 +29,23 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: DNS zone files
-      description: Exact phrase marker match
-    - value: dns zone files
-      description: Case-insensitive phrase match
-    - value: DNS zone files
-      description: Normalized whitespace phrase
-    - value: structured sample with matching anchors
-      description: Structural anchor sample
+    - value: '$TTL 86400'
+      description: Zone-file TTL directive
+    - value: '$ORIGIN example.com.'
+      description: Zone-file ORIGIN directive
+    - value: www IN A 192.0.2.1
+      description: A record line
+    - value: example.com. IN SOA ns1.example.com. admin.example.com.
+      description: SOA record line
   should_not_match:
-    - value: unrelated generic text
-      description: No relevant phrase context
-    - value: placeholder value 12345
-      description: Random text should not match phrase marker
+    - value: we met in a meeting room
+      description: Lowercase "in a" prose must not match (IN is case-sensitive)
+    - value: the soa architecture team reviewed it
+      description: Lowercase "soa" prose must not match
     - value: generic policy prose without anchors
-      description: Should reject generic mentions without structural anchor terms
+      description: Should reject generic mentions without zone-file structure
     - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+      description: Template/sample context should be excluded
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -104,9 +104,9 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_dns_zone
-      pattern: (?im)\b(?:\$ORIGIN|\$TTL|SOA|IN\s+(?:A|AAAA|CNAME|MX|NS|TXT|SRV))\b
+      pattern: \$ORIGIN\b|\$TTL\b|\bIN\s+SOA\b|\bIN\s+A\s+\d{1,3}(?:\.\d{1,3}){3}\b|\bIN\s+(?:AAAA|CNAME|MX|NS|PTR|SRV|TXT)\b
     - id: Pattern_global_top500_312_dns_zone_files_label_context
-      pattern: (?i)\\b(?:dns\\s+zone\\s+files|dns|zone|files|top500)\\b
+      pattern: (?i)\b(?:dns\s+zone\s+files|dns|zone|files|top500)\b
   keywords:
     - id: Keyword_dns_zone
       groups:
