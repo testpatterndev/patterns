@@ -7,8 +7,11 @@ engine: universal
 description: >-
   Detects Slack Token patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use
   this version as a starting point for customisation.
-operation: 'Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.'
-pattern: \bxox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24}\b
+operation: >-
+  Detects current Slack token forms: bot (xoxb-, two numeric segments + 24-34 char suffix),
+  user/legacy-user (xoxp-/xoxe-, three numeric segments + 28-34 char suffix) and legacy
+  workspace/refresh tokens (xoxa-/xoxr-). Corroborative evidence: keywords within 300 characters.
+pattern: (?<![A-Za-z0-9])(?:xoxb-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,34}|xox[pe]-[0-9]{10,13}-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{28,34}|xox[ar]-(?:[0-9]-)?[0-9a-zA-Z]{8,48})(?![A-Za-z0-9])
 confidence: high
 confidence_justification: >-
   High confidence: structurally constrained pattern with corroborative keyword support reduces false positive rates significantly. Added context gating and exclusion rules improve precision and reduce
@@ -43,19 +46,21 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: xoxb-1234567890-1234567890-ABCDEFGHIJKLMNOPabcdefgh
-      description: Slack bot token
-    - value: xoxp-1234567890-1234567890-ABCDEFGHIJKLMNOPabcdefgh
-      description: Slack user token
-    - value: xoxa-1234567890-1234567890-ABCDEFGHIJKLMNOPabcdefgh
-      description: Slack app token
+    - value: xoxb-1234567890-1234567890123-ABCDEFGHIJKLMNOPQRSTUVWXYZ012345
+      description: Modern Slack bot token (xoxb-, 33-char suffix)
+    - value: xoxp-1234567890-1234567890-1234567890123-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123
+      description: Slack user token (xoxp-, three numeric segments)
+    - value: xoxe-1234567890123-1234567890-1234567890-ABCDEFGHIJKLMNOPQRSTUVWXYZ01
+      description: Slack legacy user/refresh token (xoxe-)
+    - value: 'SLACK_BOT_TOKEN=xoxb-1234567890-1234567890-ABCDEFGHIJKLMNOPabcdefgh'
+      description: Labelled bot token with minimum 24-char suffix
   should_not_match:
     - value: xoxc-1234567890-1234567890-ABCDEFGHIJKLMNOPabcdefgh
-      description: Invalid token type prefix (xoxc not in valid set)
-    - value: xoxs-123456789-1234567890-ABCDEFGHIJKLMNOPabcdefgh
+      description: Invalid token type prefix (xoxc not a real Slack token type)
+    - value: xoxb-123456789-1234567890-ABCDEFGHIJKLMNOPabcdefgh
       description: First numeric segment too short (9 digits instead of 10-13)
-    - value: xoxs-1234567890-1234567890-ABCDEFGHIJKLMNOPabcdefg
-      description: Last segment too short (23 characters instead of 24)
+    - value: xoxb-1234567890-1234567890-ABCDEFGHIJKLMNOPabcdef
+      description: Bot suffix too short (23 characters instead of 24+)
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -103,7 +108,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_slack_token
-      pattern: \bxox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24}\b
+      pattern: (?<![A-Za-z0-9])(?:xoxb-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,34}|xox[pe]-[0-9]{10,13}-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{28,34}|xox[ar]-(?:[0-9]-)?[0-9a-zA-Z]{8,48})(?![A-Za-z0-9])
     - id: Pattern_global_slack_token_label_context
       pattern: (?i)\b(?:slack\s+token|slack|token)\b
   keywords:
@@ -146,7 +151,7 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-slack-access-token
     title: Slack access token entity definition - Microsoft Learn
 created: '2026-02-08'
-updated: '2026-02-12'
+updated: '2026-06-13'
 author: testpattern-community
 source: microsoft
 license: MIT

@@ -1,0 +1,89 @@
+schema: testpattern/v1
+name: Passport Machine-Readable Zone (MRZ, ICAO 9303)
+slug: global-passport-mrz
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects the Machine-Readable Zone (MRZ) of an ICAO 9303 travel document, the OCR-B text printed at the bottom of
+  passport data pages and scanned at border control. This pattern focuses on the TD3 passport format (two lines of 44
+  characters): line 1 begins 'P' + document subtype + 3-letter issuing state + the holder's names, and line 2 packs
+  the document number, check digits, nationality, date of birth, sex and expiry. MRZ leakage via scans, photocopies
+  and OCR exports is one of the highest-value passport data exposure vectors because it concentrates every identity
+  field in a single fixed-width block.
+operation: >-
+  Reference: https://en.wikipedia.org/wiki/Machine-readable_passport
+  Primary match is the TD3 second line (44 fixed-width [A-Z0-9<] characters: document number + check digit +
+  nationality + DOB + check + sex + expiry + check + optional data + check + composite check). A secondary regex
+  matches the TD3 first line ('P' + subtype + issuing state + name field). The MRZ alphabet is uppercase A-Z, digits
+  0-9 and the filler '<' only.
+pattern: (?<![A-Z0-9<])(?:[A-Z0-9<]{9}[0-9<][A-Z<]{3}[0-9<]{6}[0-9<][MFXmfx<][0-9<]{6}[0-9<][A-Z0-9<]{14}[0-9<][0-9<]|P[A-Z<][A-Z]{3}[A-Z]+<<[A-Z<]{2,})(?![A-Za-z0-9])
+confidence: high
+confidence_justification: >-
+  High confidence: the TD3 second line is a 44-character fixed-width structure with field-typed positions (filler
+  characters, sex marker, six-digit dates and trailing check digits) that essentially never occurs by chance in
+  natural text or ordinary identifiers.
+jurisdictions:
+  - global
+regulations:
+  - GDPR
+  - "CCPA/CPRA"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - passport
+    - MRZ
+    - machine readable zone
+    - machine-readable zone
+    - travel document
+    - ICAO
+    - issuing country
+    - date of expiry
+  proximity: 300
+test_cases:
+  should_match:
+    - value: L898902C36UTO7408122F1204159ZE184226B<<<<<10
+      description: TD3 line 2 (document number, nationality UTO, DOB, sex F, expiry, check digits) - ICAO sample
+    - value: AB21234567FRA8001019M3001012<<<<<<<<<<<<<<04
+      description: TD3 line 2 with FRA nationality, sex M, optional field filler and check digits
+    - value: P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<
+      description: TD3 line 1, document type P, issuing state UTO, surname/given-name with filler
+  should_not_match:
+    - value: P<
+      description: Bare document-type marker without the full MRZ line structure
+    - value: PASSPORT NUMBER L898902C3 ISSUED BY UTOPIA AUTHORITY
+      description: Prose containing passport tokens but not the fixed-width MRZ structure
+    - value: 1234567890123456789012345678901234567890ABCD
+      description: 44 characters but not a valid MRZ field layout (no sex marker or date structure in position)
+false_positives:
+  - description: Long runs of uppercase letters, digits and '<' that coincidentally satisfy the fixed-width field layout.
+    mitigation: Require corroborative passport/MRZ keywords within 300 characters; optionally validate the ICAO check digits.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  An MRZ exposure leaks the holder's full name, nationality, document number, date of birth, sex and expiry in one
+  block - enough for identity theft, synthetic-identity fraud and account takeover. Scans and OCR exports of passport
+  pages are a common breach vector.
+sensitivity_labels:
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://en.wikipedia.org/wiki/Machine-readable_passport
+    title: Machine-readable passport / ICAO 9303 TD3 MRZ format
+  - url: https://www.icao.int/publications/pages/publication.aspx?docnum=9303
+    title: ICAO Doc 9303 Machine Readable Travel Documents

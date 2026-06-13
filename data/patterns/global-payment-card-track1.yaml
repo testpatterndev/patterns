@@ -1,0 +1,88 @@
+schema: testpattern/v1
+name: Payment Card Magnetic Stripe Track 1
+slug: global-payment-card-track1
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects ISO/IEC 7813 magnetic-stripe Track 1 (format code B) data for payment
+  cards: a start sentinel %B, the primary account number, the cardholder name,
+  expiry date, service code and discretionary data. Storing full track data after
+  authorization is prohibited by PCI DSS 4.0 Requirement 3.3.1.
+operation: >-
+  Track 1 format-B structure: start sentinel %B, 13-19 digit PAN, field separator ^,
+  cardholder name (NAME/SURNAME), field separator ^, 4-digit expiry (YYMM), 3-digit
+  service code and discretionary data, end sentinel ?. The literal ^ characters are
+  magnetic-stripe field separators, not regex anchors. Corroborative evidence:
+  keywords within 300 characters.
+pattern: '%B\d{13,19}\^[A-Za-z][^\^]{1,25}\^\d{4}\d{3}[A-Za-z0-9]{0,40}\?'
+confidence: high
+confidence_justification: >-
+  High confidence: the full Track 1 framing (%B start sentinel, two ^ field
+  separators, fixed expiry+service-code structure and ? end sentinel) wrapped around
+  a 13-19 digit PAN is a highly distinctive structure that does not occur in ordinary
+  prose, making false positives extremely unlikely.
+jurisdictions:
+  - global
+regulations:
+  - PCI-DSS
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - financial
+corroborative_evidence:
+  keywords:
+    - track 1
+    - track data
+    - magnetic stripe
+    - magstripe
+    - card present
+    - sensitive authentication data
+    - SAD
+    - PAN
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '%B4111111111111111^DOE/JOHN^25051010000000000000000?'
+      description: Track 1 format-B with 16-digit fake Visa PAN, name, expiry 2505, service 101
+    - value: 'TRACK1=%B5500005555555559^SMITH/JANE Q^26129990000?'
+      description: Labelled Track 1 with fake Mastercard PAN and full sentinels
+    - value: '%B340000000000009^CARDHOLDER/TEST^271010100?'
+      description: Track 1 with 15-digit fake Amex PAN
+  should_not_match:
+    - value: '%A4111111111111111^DOE/JOHN^2505101?'
+      description: Format code A, not B (not a financial Track 1)
+    - value: '4111111111111111 expiry 2505 cvv 123'
+      description: Bare PAN and fields without the Track 1 sentinel framing
+    - value: Track 1 magnetic stripe data must never be stored after authorization
+      description: Prose describing track data, no actual encoded track
+false_positives:
+  - description: Test or sample magnetic-stripe strings embedded in QA fixtures or payment-terminal documentation.
+    mitigation: Require corroborative keywords and treat known test PANs (e.g. 4111 1111 1111 1111) as samples; confirm with surrounding transaction context.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 10
+risk_description: >-
+  Full Track 1 data enables cloning of a counterfeit magnetic-stripe card. Storing it
+  after authorization is explicitly prohibited by PCI DSS and is a frequent target of
+  point-of-sale memory-scraping malware.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI-DSS-v4_0_1.pdf
+    title: PCI DSS v4.0.1 - Requirement 3.3.1 (sensitive authentication data)
+  - url: https://en.wikipedia.org/wiki/ISO/IEC_7813
+    title: ISO/IEC 7813 - financial transaction card magnetic stripe tracks

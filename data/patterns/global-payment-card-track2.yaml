@@ -1,0 +1,89 @@
+schema: testpattern/v1
+name: Payment Card Magnetic Stripe Track 2
+slug: global-payment-card-track2
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects ISO/IEC 7813 magnetic-stripe Track 2 data for payment cards: a start
+  sentinel ;, the primary account number, a field separator =, expiry (YYMM),
+  service code and discretionary data, end sentinel ?. Also detects the common
+  no-sentinel database form PAN=YYMM... Storing full track data after authorization
+  is prohibited by PCI DSS 4.0 Requirement 3.3.1.
+operation: >-
+  Track 2 sentinel form: ; start sentinel, 13-19 digit PAN, separator =, 4-digit
+  expiry (YYMM), 3-digit service code, optional discretionary digits, ? end sentinel.
+  No-sentinel form: a 13-19 digit PAN, =, then 7 or more digits (expiry+service code
+  +discretionary), bounded so a stray number=number pair does not match.
+  Corroborative evidence: keywords within 300 characters.
+pattern: ';\d{13,19}=\d{4}\d{3}\d*\?|(?<![0-9;])\d{13,19}=\d{7,40}(?![0-9])'
+confidence: high
+confidence_justification: >-
+  High confidence: the sentinel form is unmistakable, and the no-sentinel form
+  requires a 13-19 digit account number immediately followed by = and at least 7
+  further digits (expiry, service code and discretionary), a structure that does not
+  occur in ordinary text, making false positives unlikely.
+jurisdictions:
+  - global
+regulations:
+  - PCI-DSS
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - financial
+corroborative_evidence:
+  keywords:
+    - track 2
+    - track data
+    - magnetic stripe
+    - magstripe
+    - card present
+    - sensitive authentication data
+    - SAD
+    - PAN
+  proximity: 300
+test_cases:
+  should_match:
+    - value: ';4111111111111111=250510100000000000?'
+      description: Track 2 sentinel form, fake 16-digit Visa PAN, expiry 2505 service 101
+    - value: 'TRACK2=;5500005555555559=26129990000000?'
+      description: Labelled Track 2 sentinel form, fake Mastercard PAN
+    - value: 'pan=4012888888881881=2611101000000'
+      description: No-sentinel database form, fake PAN = expiry+service+discretionary
+  should_not_match:
+    - value: ';4111111111111111=2505?'
+      description: Sentinel form missing service-code digits (only 4 after =)
+    - value: 'order 12345=67890 ref'
+      description: Short number=number pair, not a 13-19 digit PAN with 7+ trailing digits
+    - value: Track 2 data and the PAN must be truncated before storage
+      description: Prose mentioning track 2, no encoded track
+false_positives:
+  - description: Long numeric identifiers joined by = in exported config or log lines that coincidentally resemble PAN=digits.
+    mitigation: Require corroborative keywords; validate the PAN portion with a Luhn check before alerting.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 10
+risk_description: >-
+  Track 2 contains the PAN, expiry and service code needed to clone a magnetic-stripe
+  card and is the most commonly harvested field in point-of-sale breaches. Storing it
+  after authorization is prohibited by PCI DSS.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI-DSS-v4_0_1.pdf
+    title: PCI DSS v4.0.1 - Requirement 3.3.1 (sensitive authentication data)
+  - url: https://en.wikipedia.org/wiki/ISO/IEC_7813
+    title: ISO/IEC 7813 - financial transaction card magnetic stripe tracks

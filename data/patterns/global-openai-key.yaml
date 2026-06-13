@@ -5,12 +5,16 @@ version: 1.0.0
 type: regex
 engine: universal
 description: Detects Openai Key patterns.
-operation: 'Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.'
-pattern: \bsk-[A-Za-z0-9\s]{48,52}\b
-confidence: low
+operation: >-
+  Detects legacy OpenAI keys (sk- + 48 base62 chars) and modern project/service-account/admin keys
+  (sk-proj-/sk-svcacct-/sk-admin- + long base64url body, usually containing the T3BlbkFJ marker).
+  Corroborative evidence: keywords within 300 characters. Keyword lists: credentials.
+pattern: (?<![A-Za-z0-9])sk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{20,}|(?<![A-Za-z0-9])sk-[A-Za-z0-9]{48}(?![A-Za-z0-9])
+confidence: medium
 confidence_justification: >-
-  Low confidence: generic pattern format that may match unrelated data. Corroborative evidence keywords are essential for reliable detection. Added context gating and exclusion rules improve precision
-  and reduce incidental matches.
+  Medium confidence: the modern sk-proj-/sk-svcacct-/sk-admin- prefixes (often carrying the T3BlbkFJ
+  marker) are distinctive, while the legacy sk- + 48-char form is more generic; corroborative
+  OpenAI keywords and exclusion rules keep false positives low.
 jurisdictions:
   - global
 regulations:
@@ -42,18 +46,22 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: sk-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
-      description: OpenAI API key
-    - value: sk-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkl
-      description: Alternate OpenAI key format
-    - value: sk-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUV
-      description: Mixed-case OpenAI key
+      description: Legacy OpenAI API key (sk- + 48 chars)
+    - value: 'OPENAI_API_KEY=sk-proj-ABCDEFGHIJ1234567890T3BlbkFJABCDEFGHIJ1234567890_-abcdEFGH'
+      description: Modern project key (sk-proj-) carrying the T3BlbkFJ marker
+    - value: sk-svcacct-zZyYxXwWvVuUtTsSrRqQpP0123456789_-T3BlbkFJABCDEFGHIJKLMNOPqrstuvwx
+      description: Service-account key (sk-svcacct-)
+    - value: sk-admin-aB3dE6gH9jK2mN5pQ8sT1uV4wX7yZ0aB3dE6gH9jK2mN5p
+      description: Admin key (sk-admin-)
   should_not_match:
     - value: sk-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstu
-      description: Too few characters after prefix (47 instead of 48)
+      description: Too few characters after legacy prefix (47 instead of 48)
     - value: sk-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvw
-      description: Too many characters after prefix (49 instead of 48)
+      description: Too many characters after legacy prefix (49 instead of 48)
     - value: pk-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
       description: Wrong prefix (pk instead of sk)
+    - value: sk-proj-short
+      description: Modern project prefix but body too short
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -106,7 +114,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_openai_key
-      pattern: \bsk-[A-Za-z0-9\s]{48,52}\b
+      pattern: (?<![A-Za-z0-9])sk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{20,}|(?<![A-Za-z0-9])sk-[A-Za-z0-9]{48}(?![A-Za-z0-9])
     - id: Pattern_global_openai_key_label_context
       pattern: (?i)\b(?:openai\s+key|openai|key)\b
   keywords:
@@ -132,6 +140,9 @@ purview:
             - openai
             - key
 created: '2026-02-08'
-updated: '2026-02-12'
+updated: '2026-06-13'
 author: testpattern-community
 license: MIT
+references:
+  - url: https://help.openai.com/en/articles/4936850-where-do-i-find-my-openai-api-key
+    title: Where do I find my OpenAI API key

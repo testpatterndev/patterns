@@ -1,0 +1,82 @@
+schema: testpattern/v1
+name: Geographic Coordinates (DMS / MGRS)
+slug: global-gps-coordinates-dms
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects geographic coordinates written in degrees-minutes-seconds (DMS) form with a hemisphere letter
+  (e.g. 40 deg 26' 46" N) and in Military Grid Reference System (MGRS) form (e.g. 4QFJ 12345 67890). The registry
+  already covers decimal-degree coordinates; this adds the DMS and MGRS notations commonly found in mapping exports,
+  surveying records, defence/geospatial documents and EXIF-derived location data.
+operation: >-
+  Reference: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion
+  First alternative matches DMS: degrees + minutes + seconds (optional decimal) with degree/minute/second marks and a
+  trailing N/S/E/W hemisphere letter. Second alternative matches MGRS: grid zone designator (1-2 digit zone + band
+  letter) + 100km square (two letters) + an even run of easting/northing digits.
+pattern: \b\d{1,3}\s?[°º]\s?\d{1,2}\s?['′]\s?\d{1,2}(?:\.\d+)?\s?["″]?\s?[NSEWnsew]\b|(?<![A-Za-z0-9])\d{1,2}[C-HJ-NP-Xc-hj-np-x][A-HJ-NP-Za-hj-np-z][A-HJ-NP-Va-hj-np-v]\s?\d{2,5}\s?\d{2,5}(?![A-Za-z0-9])
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the DMS branch is well constrained by the degree/minute/second marks and a hemisphere letter, but
+  the MGRS branch can collide with other letter-then-digit identifiers. Corroborative location keywords within 300
+  characters improve precision for bulk scanning.
+jurisdictions:
+  - global
+regulations:
+  - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - location
+  - pii
+corroborative_evidence:
+  keywords:
+    - coordinates
+    - latitude
+    - longitude
+    - GPS
+    - location
+    - geolocation
+    - grid reference
+    - MGRS
+  proximity: 300
+test_cases:
+  should_match:
+    - value: 40° 26' 46" N
+      description: DMS latitude with degree/minute/second marks and N hemisphere
+    - value: '151° 12′ 33.4″ E'
+      description: DMS with prime/double-prime marks and decimal seconds, E hemisphere
+    - value: 4QFJ 12345 67890
+      description: MGRS reference, grid zone 4Q, square FJ, easting/northing
+  should_not_match:
+    - value: 40.4461, -79.9822
+      description: Decimal-degree coordinates, covered by the decimal-degrees pattern not this one
+    - value: 40 26 46
+      description: Three numbers with no degree marks or hemisphere - not DMS
+    - value: the survey crew recorded the grid reference in the field notebook
+      description: Prose mention of a grid reference with no actual coordinate
+false_positives:
+  - description: MGRS-like tokens (zone digits + two letters + digit runs) appearing in part numbers or codes.
+    mitigation: Require corroborative location keywords (coordinates, latitude, grid reference, MGRS) within 300 characters.
+  - description: Temperature or angle values written with a degree mark but no minutes/seconds or hemisphere.
+    mitigation: The DMS branch requires minutes, seconds and a hemisphere letter, excluding bare degree values.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: wide
+sensitivity_labels:
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion
+    title: Geographic coordinate conversion (DMS notation) - Wikipedia
+  - url: https://en.wikipedia.org/wiki/Military_Grid_Reference_System
+    title: Military Grid Reference System (MGRS) - Wikipedia

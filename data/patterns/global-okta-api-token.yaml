@@ -1,0 +1,80 @@
+schema: testpattern/v1
+name: Okta API Token
+slug: global-okta-api-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Okta API tokens, which begin with 00 and are followed by 40 base64url
+  characters. Because the structure is short and generic, corroborative Okta context
+  is important to confirm a real token. A leaked token grants Okta admin API access.
+operation: 'Token format 00 followed by exactly 40 base64url characters ([A-Za-z0-9_-]). Corroborative evidence: Okta keywords within 300 characters are strongly recommended to suppress false positives.'
+pattern: (?<![A-Za-z0-9_-])00[A-Za-z0-9_-]{40}(?![A-Za-z0-9_-])
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the 00 prefix plus 40 base64url chars is not highly distinctive and
+  can collide with other 42-char identifiers, so Okta corroborative keywords are required
+  for reliable detection.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - okta
+    - okta.com
+    - SSWS
+    - api token
+    - api_token
+    - OKTA_API_TOKEN
+    - authorization
+  proximity: 300
+test_cases:
+  should_match:
+    - value: 'Authorization: SSWS 00ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn'
+      description: Okta API token with SSWS scheme, 00 prefix + 40 chars
+    - value: 'OKTA_API_TOKEN=001234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcd'
+      description: Labelled Okta token in an env assignment
+    - value: 00zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIhH_-
+      description: Okta token with - and _ in the body
+  should_not_match:
+    - value: 00aBcDeFgHiJkLmNoPqRsTuVwXyZ012345
+      description: Too short to be a valid Okta token (under 40 body chars)
+    - value: 11ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn
+      description: Wrong prefix (11 instead of 00)
+    - value: configure the okta api token in your SSWS authorization header
+      description: Prose mention without a token value
+false_positives:
+  - description: Other 42-character identifiers that happen to start with 00 (e.g. some hashes or IDs).
+    mitigation: Require corroborative Okta keywords (okta, SSWS) within proximity before alerting.
+  - description: Documentation or examples showing placeholder 00... strings.
+    mitigation: Check for placeholder markers (example, xxxx) and require Okta context.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: wide
+risk_rating: 9
+risk_description: >-
+  A leaked Okta API token can grant administrative access to an organization's identity
+  provider, enabling user impersonation, MFA reset and broad downstream account takeover.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://developer.okta.com/docs/guides/create-an-api-token/
+    title: Create an API token - Okta Developer

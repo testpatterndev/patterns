@@ -1,0 +1,77 @@
+schema: testpattern/v1
+name: Grafana API Key
+slug: global-grafana-api-key
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Grafana Cloud API tokens (glc_ prefix) and Grafana service account tokens
+  (glsa_ prefix). A leaked token grants access to dashboards, data sources and, for
+  Grafana Cloud, metrics/logs ingestion endpoints.
+operation: 'Prefixed token formats glc_ (base64 body) and glsa_ (<32 alnum>_<8 hex>). Corroborative evidence: keywords within 300 characters.'
+pattern: (?<![A-Za-z0-9])(?:glc_[A-Za-z0-9+/]{32,400}={0,3}|glsa_[A-Za-z0-9]{32}_[a-f0-9]{8})(?![A-Za-z0-9])
+confidence: high
+confidence_justification: >-
+  High confidence: the glc_ and glsa_ prefixes with their fixed structures are highly
+  specific to Grafana Cloud and Grafana service account tokens.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - grafana
+    - grafana cloud
+    - service account token
+    - api key
+    - GRAFANA_TOKEN
+    - dashboard
+    - prometheus
+  proximity: 300
+test_cases:
+  should_match:
+    - value: glsa_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345_abcdef01
+      description: Grafana service account token, glsa_ + 32 alnum + _ + 8 hex
+    - value: 'GRAFANA_TOKEN=glc_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh0123456789+/ABCDEF=='
+      description: Grafana Cloud API token, glc_ + base64 body
+    - value: glc_aB3dE6gH9jK2mN5pQ8sT1uV4wX7yZ0aB3dE6gH9jK2mN5pQ8sT
+      description: Another Grafana Cloud token body
+  should_not_match:
+    - value: glsa_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345
+      description: Grafana service account token missing the _<8 hex> suffix
+    - value: glx_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh0123456789
+      description: Wrong prefix (glx_ is not a Grafana token type)
+    - value: paste your grafana service account token into the data source config
+      description: Prose mention without a token value
+false_positives:
+  - description: Documentation or examples showing placeholder glc_/glsa_ strings.
+    mitigation: Require corroborative keywords and check for placeholder markers (example, xxxx).
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  A leaked Grafana token enables reading and modifying dashboards and data sources and,
+  for Grafana Cloud, pushing or querying metrics and logs that may contain sensitive data.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://grafana.com/docs/grafana/latest/administration/service-accounts/
+    title: Service accounts - Grafana

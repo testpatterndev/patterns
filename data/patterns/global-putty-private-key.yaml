@@ -1,0 +1,85 @@
+schema: testpattern/v1
+name: PuTTY Private Key (PPK)
+slug: global-putty-private-key
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects the header line of a PuTTY private key file (.ppk), as produced by PuTTYgen. The header begins with
+  'PuTTY-User-Key-File-' followed by the format version (2 or 3) and the SSH key algorithm. A leaked .ppk grants
+  SSH access to whatever hosts trust the corresponding public key.
+operation: >-
+  Reference: https://tartarus.org/~simon/putty-snapshots/htmldoc/AppendixC.html
+  Matches the 'PuTTY-User-Key-File-N:' header line (N = 2 or 3) optionally followed by the SSH algorithm name.
+  Corroborative evidence: keywords within 300 characters.
+pattern: 'PuTTY-User-Key-File-[23]:\s*(?:ssh-(?:rsa|dss|ed25519|ed448)|ecdsa-sha2-nistp\d{3})?'
+confidence: high
+confidence_justification: >-
+  High confidence: the 'PuTTY-User-Key-File-' prefix with a version digit and colon is a fixed, distinctive marker of
+  a private key file and almost never appears outside of an actual .ppk file.
+jurisdictions:
+  - global
+regulations:
+  - GDPR
+  - "CCPA/CPRA"
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - PCI-DSS
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - private key
+    - PuTTY
+    - ppk
+    - PuTTYgen
+    - ssh key
+    - key file
+    - passphrase
+  proximity: 300
+test_cases:
+  should_match:
+    - value: 'PuTTY-User-Key-File-2: ssh-rsa'
+      description: PPK v2 header with ssh-rsa algorithm
+    - value: 'PuTTY-User-Key-File-3: ssh-ed25519'
+      description: PPK v3 header with ssh-ed25519 algorithm
+    - value: |-
+        PuTTY-User-Key-File-3: ecdsa-sha2-nistp256
+        Encryption: none
+        Comment: imported-openssh-key
+      description: PPK v3 header with ECDSA algorithm and following metadata lines
+  should_not_match:
+    - value: 'PuTTY-User-Key-File-1: ssh-rsa'
+      description: Version 1 is not a real PPK format version
+    - value: '-----BEGIN OPENSSH PRIVATE KEY-----'
+      description: OpenSSH private key, not a PuTTY .ppk file
+    - value: convert the OpenSSH key to a PuTTY user key file before connecting
+      description: Prose mention of a PuTTY key file without the actual header
+false_positives:
+  - description: Documentation or tutorials that quote the PPK header line without real key material.
+    mitigation: Require corroborative keywords and confirm the Public-Lines / Private-Lines base64 body follows.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 10
+risk_description: >-
+  A leaked PuTTY private key file grants SSH access to every host that trusts the matching public key, enabling lateral
+  movement, data exfiltration and persistence across the affected infrastructure.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://tartarus.org/~simon/putty-snapshots/htmldoc/AppendixC.html
+    title: PuTTY documentation - PPK file format (Appendix C)

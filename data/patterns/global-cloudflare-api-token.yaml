@@ -1,0 +1,77 @@
+schema: testpattern/v1
+name: Cloudflare API Token
+slug: global-cloudflare-api-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Cloudflare API tokens - 40-character tokens that authenticate to the Cloudflare API.
+  Because the raw token has no distinctive prefix, this pattern gates on nearby Cloudflare context to keep false positives low.
+operation: >-
+  Matches a 40-character base62/underscore/hyphen token. The bare format is generic, so a fixed-length Cloudflare
+  context label (cloudflare / cf_api_token / CLOUDFLARE_API_TOKEN) must appear immediately before the value. Corroborative evidence: keywords within 300 characters.
+pattern: (?i)(?:cloudflare|cf[_-]?api[_-]?token|cf[_-]?token)(?:[_-]?api[_-]?token)?["'\s:=]{1,5}(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{40}(?![A-Za-z0-9_-])
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the 40-character token body is generic, so detection requires an adjacent Cloudflare context label. This cuts false positives at the cost of missing unlabelled tokens.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+  - Computer Fraud and Abuse Act
+  - Computer Misuse Act 1990
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - cloudflare
+    - cf_api_token
+    - CLOUDFLARE_API_TOKEN
+    - api.cloudflare.com
+    - bearer
+    - api token
+  proximity: 300
+test_cases:
+  should_match:
+    - value: 'CLOUDFLARE_API_TOKEN=v1A2b3C4d5E6f7G8h9I0jK1lM2nO3pQ4rS5tU6v7'
+      description: Cloudflare API token in labelled env var (context + 40 chars)
+    - value: 'cloudflare: aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcd'
+      description: 40-char Cloudflare token with cloudflare label
+    - value: 'cf_api_token = zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIhHgG'
+      description: cf_api_token label followed by 40-char token
+  should_not_match:
+    - value: 'cloudflare: shorttoken123'
+      description: Token too short even with Cloudflare context
+    - value: aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcd
+      description: 40-char string with no Cloudflare context (too generic)
+    - value: rotate the cloudflare api token in the dashboard
+      description: Prose mention without a token value
+false_positives:
+  - description: 40-char hashes or IDs appearing near the word cloudflare in documentation.
+    mitigation: Require the context label adjacency (already enforced) plus corroborative keywords; exclude placeholder markers.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 8
+risk_description: >-
+  A leaked Cloudflare API token can alter DNS, firewall rules, Workers and zone settings, enabling traffic interception or full site takeover.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
+    title: Create a Cloudflare API token
