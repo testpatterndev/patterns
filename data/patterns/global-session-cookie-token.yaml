@@ -1,0 +1,88 @@
+schema: testpattern/v1
+name: High-Value Session Cookie Token
+slug: global-session-cookie-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects high-value session cookies by name-plus-value: framework and SSO session
+  cookies (ESTSAUTH / ESTSAUTHPERSISTENT, JSESSIONID, PHPSESSID, connect.sid,
+  _session_id, sessionid) assigned a long token value. A captured session cookie lets
+  an attacker resume an authenticated session and bypass MFA entirely.
+operation: >-
+  A known session-cookie name, an = or : assignment, then a 16+ character token value
+  drawn from the cookie value charset (letters, digits, percent, dot, underscore,
+  hyphen). The name list targets cookies that carry live authenticated sessions and
+  are prime session-hijacking targets. Corroborative evidence: keywords within 300
+  characters.
+pattern: '(?<![A-Za-z0-9_])(?:ESTSAUTHPERSISTENT|ESTSAUTH|JSESSIONID|PHPSESSID|connect\.sid|_session_id|sessionid|SSESS[a-f0-9]{8,})\s*[=:]\s*[A-Za-z0-9%._-]{16,}'
+confidence: high
+confidence_justification: >-
+  High confidence: requiring a specific high-value session-cookie name immediately
+  assigned a 16+ character token value is a distinctive structure. Documentation that
+  merely names these cookies without a real value will not match.
+jurisdictions:
+  - global
+regulations:
+  - GDPR
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - session cookie
+    - session token
+    - set-cookie
+    - session hijack
+    - cookie theft
+    - MFA bypass
+    - token theft
+    - authentication
+  proximity: 300
+test_cases:
+  should_match:
+    - value: 'JSESSIONID=A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4'
+      description: Java servlet session cookie with 32-char fake value
+    - value: 'set-cookie: PHPSESSID=0123456789abcdef0123456789abcdef'
+      description: PHP session cookie in a Set-Cookie header, fake value
+    - value: 'ESTSAUTHPERSISTENT: AQABAAEAAAD-fakeMicrosoftEntraSessionTokenValue123'
+      description: Microsoft Entra persistent auth cookie with fake token value
+  should_not_match:
+    - value: 'JSESSIONID=short'
+      description: Token value too short (under 16 chars)
+    - value: 'COLORID=A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4'
+      description: Unknown cookie name, not a tracked session cookie
+    - value: The JSESSIONID cookie identifies the user session on the server
+      description: Prose naming the cookie with no assigned token value
+false_positives:
+  - description: Example or expired cookie values in API documentation, HAR captures used for debugging, or test fixtures.
+    mitigation: Require corroborative session/cookie-theft keywords and treat obvious placeholders (all zeros, "example") as non-sensitive.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  A live session cookie can be replayed to hijack an authenticated session, bypassing
+  passwords and multi-factor authentication. Stolen session tokens are a primary
+  objective of modern phishing and info-stealer toolkits.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://owasp.org/www-community/attacks/Session_hijacking_attack
+    title: OWASP - session hijacking attack
+  - url: https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-token-protection
+    title: Microsoft Entra - token protection and session token theft

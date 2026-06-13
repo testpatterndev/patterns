@@ -1,0 +1,77 @@
+schema: testpattern/v1
+name: HashiCorp Vault Service / Batch Token
+slug: global-hashicorp-vault-service-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects HashiCorp Vault service tokens (hvs. prefix) and batch tokens (hvb. prefix). These
+  tokens authenticate to a Vault server and can read secrets, keys and credentials; a leak is a critical exposure.
+operation: >-
+  Prefixed token format hvs. or hvb. followed by ~90 base62 characters (period and hyphen permitted in the body).
+  Corroborative evidence: keywords within 300 characters.
+pattern: (?<![A-Za-z0-9._-])hv[sb]\.[A-Za-z0-9._-]{60,120}(?![A-Za-z0-9._-])
+confidence: high
+confidence_justification: >-
+  High confidence: the distinctive hvs./hvb. prefix with a long high-entropy body makes false positives extremely unlikely.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+  - Computer Fraud and Abuse Act
+  - Computer Misuse Act 1990
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - vault
+    - hashicorp
+    - vault token
+    - VAULT_TOKEN
+    - service token
+    - batch token
+  proximity: 300
+test_cases:
+  should_match:
+    - value: hvs.CAESIABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG
+      description: Vault service token, hvs. prefix + long body
+    - value: 'VAULT_TOKEN=hvb.0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcde'
+      description: Labelled Vault batch token (hvb.) in env var
+    - value: hvs.aB3dE6gH9jK2mN5pQ8sTuVwXyZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx
+      description: Mixed-case Vault service token
+  should_not_match:
+    - value: hvs.tooShort
+      description: Too short to be a Vault token body
+    - value: hvx.CAESIABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG
+      description: Wrong middle letter (not s or b) - not a service/batch token
+    - value: rotate the hashicorp vault service token before the audit
+      description: Prose mention without a token value
+false_positives:
+  - description: Long dotted identifiers that coincidentally begin with hvs. or hvb. in documentation.
+    mitigation: Require corroborative Vault keywords and exclude placeholder markers (example, xxxx).
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 10
+risk_description: >-
+  A leaked Vault token can read every secret the token's policy permits - database credentials, cloud keys, certificates - enabling broad lateral movement.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://developer.hashicorp.com/vault/docs/concepts/tokens
+    title: Vault tokens concepts

@@ -1,0 +1,88 @@
+schema: testpattern/v1
+name: Card Verification Value (Labelled)
+slug: global-card-verification-value
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects a labelled card verification value: a CVV / CVV2 / CVC / CVC2 / CID / CSC
+  keyword (or the spelled-out "card verification value/code" / "card security code")
+  immediately followed by a 3 or 4 digit value. The CVV is sensitive authentication
+  data that PCI DSS 4.0 Requirement 3.3.1 prohibits storing after authorization.
+operation: >-
+  A CVV-family label (CVV, CVV2, CVC, CVC2, CID, CSC, or the full phrase) followed by
+  up to 8 separator characters and a 3 or 4 digit code, bounded so it does not match
+  inside a longer number. The label requirement keeps confidence reasonable because a
+  bare 3-4 digit number is otherwise indistinguishable from ordinary data.
+  Corroborative evidence: keywords within 300 characters.
+pattern: '(?<![A-Za-z])(?:CVV2?|CVC2?|CID|CSC|CVD|card\s+verification\s+(?:value|code)|card\s+security\s+code|security\s+code)[\s:#=]{0,8}\d{3,4}(?![0-9])'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the value itself (3-4 digits) is generic, but requiring an
+  adjacent CVV/CVC/CID-family label substantially reduces false positives. Not high
+  because the label-plus-short-number structure can still appear in forms and test
+  fixtures.
+jurisdictions:
+  - global
+regulations:
+  - PCI-DSS
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - financial
+corroborative_evidence:
+  keywords:
+    - card verification value
+    - card verification code
+    - card security code
+    - cvv
+    - cvc
+    - cid
+    - sensitive authentication data
+    - cardholder
+  proximity: 300
+test_cases:
+  should_match:
+    - value: 'CVV: 123'
+      description: CVV label with colon separator and 3-digit value
+    - value: 'cvv2=4567'
+      description: CVV2 label, 4-digit Amex-style code, lowercase
+    - value: 'Card Verification Value 321'
+      description: Spelled-out label followed by 3-digit value
+  should_not_match:
+    - value: 'CVV: 12'
+      description: Only 2 digits, too short for a CVV
+    - value: 'invoice 123456'
+      description: Bare number with no CVV-family label
+    - value: The CVV is the three-digit code printed on the signature panel
+      description: Prose explaining what a CVV is, no value present
+false_positives:
+  - description: Web forms, test fixtures or documentation that show a CVV label next to a placeholder 3-4 digit number.
+    mitigation: Require corroborative cardholder/PAN context within proximity and exclude obvious placeholders (000, 123, 999, xxx).
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  The card verification value is the key field for card-not-present fraud. PCI DSS
+  prohibits storing it after authorization, so any stored, labelled CVV is both a
+  fraud risk and a compliance violation.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI-DSS-v4_0_1.pdf
+    title: PCI DSS v4.0.1 - Requirement 3.3.1 (sensitive authentication data)
+  - url: https://www.pcisecuritystandards.org/glossary/
+    title: PCI SSC glossary - card verification value (CAV2/CVC2/CVV2/CID)

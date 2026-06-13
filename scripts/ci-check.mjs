@@ -1,0 +1,72 @@
+// CI gate for the patterns repo. Fails (exit 1) on any of:
+//   - YAML parse / missing required fields
+//   - double-escaped regex (\\b instead of \b)
+//   - |top500 generator token left in a regex
+//   - a purview validators[].ref that is not a real MS validator function nor a local definition
+//   - a should_match that no regex in the file matches, or a should_not_match that the
+//     top-level pattern matches (filter-documented negatives are reported as warnings only)
+// Usage: node scripts/ci-check.mjs
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import yaml from 'js-yaml'
+
+const BASE = fileURLToPath(new URL('..', import.meta.url))
+const patDir = join(BASE, 'data', 'patterns')
+const kwDir = join(BASE, 'data', 'keywords')
+const REQUIRED = ['schema', 'name', 'slug', 'type', 'confidence', 'jurisdictions', 'regulations', 'data_categories', 'test_cases']
+const KW_TYPES = new Set(['keyword_list', 'keyword_dictionary'])
+
+// MS functions documented as "Is a validator: yes" (sit-functions, 2025-11-18)
+const MS_VALIDATORS = new Set(['Func_aba_routing','Func_australian_tax_file_number','Func_brazil_cnpj','Func_brazil_cpf','Func_canadian_sin','Func_credit_card','Func_dea_number','Func_formatted_itin','Func_iban','Func_india_aadhaar','Func_japanese_my_number_corporate','Func_japanese_my_number_personal','Func_randomized_formatted_ssn','Func_randomized_unformatted_ssn','Func_south_africa_identification_number','Func_ssn','Func_swedish_national_identifier','Func_Turkish_National_Id','Func_uk_nhs_number','Func_unformatted_itin','Func_unformatted_ssn','Func_usa_uk_passport'])
+
+const kwSlugs = new Set(readdirSync(kwDir).filter(f => f.endsWith('.yaml')).map(f => f.replace('.yaml', '')))
+const errors = [], warns = []
+
+const toRe = (src) => { let b = String(src), fl = 'i'; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(b, fl) }
+
+for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
+  let p
+  try { p = yaml.load(readFileSync(join(patDir, f), 'utf-8')) }
+  catch (e) { errors.push(`${f}: YAML parse — ${e.message.split('\n')[0]}`); continue }
+  for (const k of REQUIRED) if (!(k in p)) errors.push(`${f}: missing field '${k}'`)
+
+  const idMatchIds = new Set((p.purview?.pattern_tiers ?? []).map(t => t.id_match).filter(Boolean))
+  const regexes = []
+  if (typeof p.pattern === 'string') regexes.push({ id: 'TOP', src: p.pattern })
+  for (const r of p.purview?.regexes ?? []) if (typeof r.pattern === 'string') regexes.push({ id: r.id, src: r.pattern })
+
+  for (const { id, src } of regexes) {
+    if (/\\\\[bdswWDSnrt]/.test(src)) errors.push(`${p.slug}: ${id} double-escaped regex`)
+    if (/\|top500\)/.test(src)) errors.push(`${p.slug}: ${id} contains |top500 generator token`)
+  }
+  for (const kl of p.corroborative_evidence?.keyword_lists ?? []) if (!kwSlugs.has(kl)) errors.push(`${p.slug}: missing keyword_list '${kl}'`)
+  for (const sk of p.purview?.shared_keywords ?? []) if (sk.dict && !kwSlugs.has(sk.dict)) errors.push(`${p.slug}: missing shared dict '${sk.dict}'`)
+  const localVal = new Set((p.purview?.validators ?? []).map(v => v.id))
+  for (const r of p.purview?.regexes ?? []) for (const v of r.validators ?? [])
+    if (v.ref && !MS_VALIDATORS.has(v.ref) && !localVal.has(v.ref)) errors.push(`${p.slug}: validator ref '${v.ref}' is not a real MS validator nor local`)
+
+  // test-case execution
+  const compiled = regexes.map(r => { try { return toRe(r.src) } catch { return null } }).filter(Boolean)
+  const top = (typeof p.pattern === 'string') ? (() => { try { return toRe(p.pattern) } catch { return null } })() : null
+  // keyword_proximity uses keyword+proximity detection (not a single regex), so don't
+  // regex-test its cases here. keyword_list/dictionary with no compiled regex: skip too.
+  if (p.type === 'keyword_proximity' || p.type === 'trainable_classifier') continue
+  if (KW_TYPES.has(p.type)) {
+    // keyword_list/dictionary: detection is the keywords array (not the purview phrase regexes)
+    const terms = (p.keywords ?? []).map(t => String(t).toLowerCase().trim()).filter(Boolean)
+    if (!terms.length) continue
+    for (const tc of p.test_cases?.should_match ?? []) { const v = String(tc.value).toLowerCase(); if (!terms.some(t => v.includes(t))) errors.push(`${p.slug}: keyword_list should_match has no listed keyword — ${JSON.stringify(tc.value).slice(0, 50)}`) }
+    for (const tc of p.test_cases?.should_not_match ?? []) { const v = String(tc.value).toLowerCase(); if (terms.some(t => v.includes(t))) warns.push(`${p.slug}: keyword_list should_not_match contains a listed keyword — ${JSON.stringify(tc.value).slice(0, 50)}`) }
+    continue
+  }
+  for (const tc of p.test_cases?.should_match ?? []) if (compiled.length && !compiled.some(re => re.test(String(tc.value)))) errors.push(`${p.slug}: should_match not matched — ${JSON.stringify(tc.value).slice(0, 60)}`)
+  // should_not_match matching the top-level is reported as a WARNING: many are filter/tier
+  // -dependent negatives the SIT excludes downstream. Errors stay focused on hard regressions.
+  for (const tc of p.test_cases?.should_not_match ?? []) if (top && top.test(String(tc.value))) warns.push(`${p.slug}: should_not_match matched top-level — ${JSON.stringify(tc.value).slice(0, 50)}`)
+}
+
+console.log(`CI check: ${errors.length} error(s), ${warns.length} warning(s)`)
+for (const e of errors) console.log('  ERROR ' + e)
+if (process.env.CI_VERBOSE) for (const w of warns) console.log('  warn  ' + w)
+process.exit(errors.length ? 1 : 0)

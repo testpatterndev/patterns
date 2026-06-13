@@ -1,0 +1,77 @@
+schema: testpattern/v1
+name: Terraform Cloud / Enterprise API Token
+slug: global-terraform-cloud-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects HashiCorp Terraform Cloud / Terraform Enterprise API tokens (atlasv1 format). These
+  tokens authenticate to the Terraform Cloud API and can read/write workspace state and variables; a leak can expose all infrastructure secrets.
+operation: >-
+  Token format is 14 lowercase alphanumeric characters, then the literal .atlasv1. marker, then a 60-70 character
+  base64url-style body. Corroborative evidence: keywords within 300 characters.
+pattern: (?<![A-Za-z0-9])[A-Za-z0-9]{14}\.atlasv1\.[A-Za-z0-9\-_=]{60,70}(?![A-Za-z0-9])
+confidence: high
+confidence_justification: >-
+  High confidence: the embedded .atlasv1. marker between two structured segments is highly distinctive and makes false positives extremely unlikely.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+  - Computer Fraud and Abuse Act
+  - Computer Misuse Act 1990
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - terraform
+    - terraform cloud
+    - atlasv1
+    - TF_TOKEN
+    - app.terraform.io
+    - credentials.tfrc.json
+  proximity: 300
+test_cases:
+  should_match:
+    - value: aBcDeFgHiJkLmN.atlasv1.0123456789abcdefABCDEF0123456789abcdefABCDEF0123456789abcdef0123
+      description: Terraform Cloud token, 14-char id + .atlasv1. + body
+    - value: 'TF_TOKEN_app_terraform_io=12345678901234.atlasv1.zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIhHgGfFeEdDcCbBaA0123456789'
+      description: Labelled Terraform token in TF_TOKEN env var
+    - value: ABCDEFGHIJKLMN.atlasv1.aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789-_=ABCDEFGHIJKLMNOPQRST012345
+      description: Terraform token with hyphen/underscore/equals in body
+  should_not_match:
+    - value: aBcDeFgHiJkLmN.atlasv1.tooShort
+      description: Body too short to be a Terraform Cloud token
+    - value: aBcDeFgHiJkLmN.atlasv2.0123456789abcdefABCDEF0123456789abcdefABCDEF0123456789abcdef0123
+      description: Wrong marker (atlasv2) - not a Terraform Cloud token
+    - value: store your terraform cloud token in the credentials file
+      description: Prose mention without a token value
+false_positives:
+  - description: Dotted strings that coincidentally contain .atlasv1. in unrelated data.
+    mitigation: Require corroborative Terraform keywords and exclude placeholder markers.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  A leaked Terraform Cloud token can read and modify infrastructure state and workspace variables, exposing cloud provider credentials for the entire estate.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://developer.hashicorp.com/terraform/cloud-docs/users-teams-organizations/api-tokens
+    title: Terraform Cloud API tokens

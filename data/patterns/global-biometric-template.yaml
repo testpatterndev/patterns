@@ -1,0 +1,95 @@
+schema: testpattern/v1
+name: Encoded Biometric Template
+slug: global-biometric-template
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects encoded biometric template artifacts rather than the word "fingerprint". Matches the
+  ISO/IEC 19794 family modality magic markers (FMR\0 finger minutiae, FIR\0 finger image, FAC\0 face,
+  IIR\0 iris — also the ANSI/INCITS 378 FMR header) and base64 blobs explicitly labelled as a
+  biometric / fingerprint / iris / face template. Real biometric exfiltration moves as encoded
+  templates, not plaintext.
+operation: >-
+  Two branches. (1) Magic-marker: a 3-character ISO/IEC 19794 modality code (FMR/FIR/FAC/IIR)
+  immediately followed by a NUL byte, the file signature of an encoded biometric record. (2)
+  Labelled-base64: a biometric-template label within a short gap of a substantial base64 blob.
+  Corroborative evidence keywords within 300 characters raise confidence.
+pattern: '(?<![A-Za-z0-9])(?:(?:FMR|FIR|FAC|IIR)\x00|(?:biometric|fingerprint|finger minutiae|iris|face|facial|palm)[\s_-]?template[\s\S]{0,40}?[A-Za-z0-9+/]{40,}={0,2})'
+confidence: high
+confidence_justification: >-
+  High confidence. The FMR/FIR/FAC/IIR + NUL signature is a standards-defined biometric record header
+  that does not occur in ordinary text, and the labelled-base64 branch requires an explicit
+  biometric-template label adjacent to a long base64 blob. False positives are unlikely outside
+  documentation that deliberately quotes these markers.
+jurisdictions:
+  - global
+  - eu
+regulations:
+  - GDPR
+  - CCPA/CPRA
+frameworks:
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - biometric
+  - pii
+corroborative_evidence:
+  keywords:
+    - biometric
+    - template
+    - minutiae
+    - enrollment
+    - fingerprint
+    - iris
+    - facial recognition
+    - ISO 19794
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "FMR\0\x01\x00\x00 minutiae record exported from the enrollment device"
+      description: ISO 19794-2 / ANSI 378 finger minutiae magic marker FMR\0
+    - value: "Header bytes FAC\0 begin the ISO 19794-5 face record."
+      description: ISO 19794-5 face record magic marker FAC\0
+    - value: 'fingerprint template: TUZSAGVuY29kZWRiaW9tZXRyaWN0ZW1wbGF0ZWJsb2JkYXRh1234=='
+      description: Labelled-base64 fingerprint template blob
+    - value: 'biometric_template QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5YWJj'
+      description: Labelled-base64 biometric template blob (underscore separator)
+  should_not_match:
+    - value: 'Please collect the visitor fingerprint at the front desk on arrival.'
+      description: Prose mention of fingerprint without an encoded template blob or marker
+    - value: 'The FMRI scanner is scheduled for maintenance next Tuesday.'
+      description: Near-miss ("FMRI" word) with no NUL byte and no template blob
+    - value: 'The design template was approved by the marketing team yesterday.'
+      description: Generic "template" with no biometric label and no base64 blob
+false_positives:
+  - description: >-
+      Documentation that quotes the FMR/FIR/FAC/IIR magic markers, or a biometric-template label that
+      happens to sit near an unrelated long base64 string.
+    mitigation: >-
+      Require corroborative keywords (minutiae, enrollment, ISO 19794) within the proximity window and
+      treat hits inside obvious documentation/spec text as informational.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  Biometric templates are irrevocable identifiers — unlike a password, a leaked fingerprint or iris
+  template cannot be reset, enabling permanent impersonation and cross-system tracking.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://www.iso.org/standard/38746.html
+    title: ISO/IEC 19794-2 — Biometric data interchange formats, Part 2 finger minutiae data (FMR)
+  - url: https://templates.machinezoo.com/ansi378-2009
+    title: ANSI INCITS 378-2009 fingerprint template format (FMR magic header)

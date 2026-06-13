@@ -1,0 +1,109 @@
+schema: testpattern/v1
+name: U.S. CUI Banner Marking (32 CFR 2002)
+slug: us-cui-banner-marking
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Controlled Unclassified Information (CUI) banner and portion markings as defined by 32 CFR 2002.20 and the
+  NARA CUI Registry. A CUI banner is the control marking "CUI" optionally followed by category markings (CUI//SP-PRVCY)
+  and limited-dissemination controls (//NOFORN, //FEDCON, //FED ONLY, //NOCON, //DL ONLY, //REL TO ...), with elements
+  separated by double slashes. The bare token "CUI" is too common to match alone, so a match requires either the "//"
+  banner structure or the spelled-out phrase "Controlled Unclassified Information".
+operation: >-
+  Two regexes. The first matches a structured CUI banner: "CUI" with at least one "//" category or limited-dissemination
+  segment. The second matches the spelled-out control phrase "Controlled Unclassified Information". Corroborative
+  handling keywords within 300 characters reinforce the marking context.
+pattern: \bCUI//(?:SP-)?[A-Z]{2,}[A-Z0-9/-]*(?://(?:NOFORN|FEDCON|FED ONLY|NOCON|DL ONLY|REL TO [A-Z, ]+))?\b
+confidence: high
+confidence_justification: >-
+  High confidence: the "//" banner structure and the registry-defined dissemination tokens are highly specific to CUI
+  markings, and the spelled-out phrase is unambiguous. Requiring structure or the full phrase eliminates matches on the
+  bare three-letter token "CUI".
+jurisdictions:
+  - us
+regulations:
+  - "NIST SP 800-171"
+  - "32 CFR 2002"
+  - FISMA
+frameworks:
+  - NIST CSF
+  - ISO 27001
+  - SOC 2
+data_categories:
+  - government
+  - security-classification
+corroborative_evidence:
+  keywords:
+    - controlled unclassified information
+    - CUI
+    - limited dissemination
+    - dissemination control
+    - NOFORN
+    - FEDCON
+    - basic
+    - specified
+    - designating authority
+    - safeguarding
+    - decontrol
+    - CUI registry
+  proximity: 300
+test_cases:
+  should_match:
+    - value: CUI//SP-PRVCY//NOFORN
+      description: Full CUI banner with privacy category and NOFORN dissemination control
+    - value: 'Banner: CUI//PRVCY//FEDCON'
+      description: CUI banner with category and FEDCON control
+    - value: This document contains Controlled Unclassified Information per agency policy
+      description: Spelled-out CUI control phrase
+  should_not_match:
+    - value: The cui dataset was uploaded to the cluster
+      description: Bare token "cui" with no banner structure or full phrase
+    - value: SECRET//NOFORN
+      description: National-security classification banner, not a CUI marking
+    - value: Please review the controlled access list before the meeting
+      description: Prose using "controlled" without the CUI phrase or banner
+false_positives:
+  - description: >-
+      Strings of the shape "CUI//..." appearing in unrelated path-like or URL-like text where slashes separate
+      uppercase tokens.
+    mitigation: >-
+      Require corroborative CUI handling keywords (controlled unclassified information, limited dissemination,
+      designating authority) within the proximity window.
+  - description: Training material or policy documents quoting CUI marking examples rather than applying them.
+    mitigation: Combine with document-classification metadata and exclude known example/training file paths.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  CUI banner markings identify federal information requiring safeguarding under 32 CFR 2002 and NIST SP 800-171.
+  Improper disclosure can violate agency control agreements, jeopardise contracts, and expose sensitive but unclassified
+  government data such as privacy, law-enforcement, or critical-infrastructure information.
+sensitivity_labels:
+  pspf: "PROTECTED"
+  qgiscf: "PROTECTED"
+  qgiscf_dlm: "PROTECTED Government"
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+references:
+  - url: https://www.ecfr.gov/current/title-32/subtitle-B/chapter-XX/part-2002/subpart-B/section-2002.20
+    title: "32 CFR 2002.20 Marking - eCFR"
+  - url: https://www.archives.gov/cui/registry/limited-dissemination
+    title: "CUI Limited Dissemination Control Markings - National Archives"
+created: '2026-06-13'
+updated: '2026-06-13'
+author: testpattern-community
+license: MIT
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 90
+  regexes:
+    - id: Regex_cui_banner_structured
+      pattern: \bCUI//(?:SP-)?[A-Z]{2,}[A-Z0-9/-]*(?://(?:NOFORN|FEDCON|FED ONLY|NOCON|DL ONLY|REL TO [A-Z, ]+))?\b
+    - id: Regex_cui_phrase
+      pattern: \bcontrolled\s+unclassified\s+information\b
