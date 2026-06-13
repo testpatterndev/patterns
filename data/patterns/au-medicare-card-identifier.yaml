@@ -5,13 +5,14 @@ version: 2.0.0
 type: regex
 engine: universal
 description: >-
-  Identifies Australian Medicare card numbers using Func_australian_medical_account_number validation.
-  Filters same-digit sequences. Requires corroborative health-scheme keywords for reliable detection.
+  Identifies Australian Medicare card numbers (10-11 digits, first digit 2-6). Filters same-digit
+  sequences. Requires corroborative health-scheme keywords for reliable detection.
 operation: >-
-  Validator-backed detection using Func_australian_medical_account_number with AllDigitsSameFilter.
-  Corroborative evidence: 3 tiers with health-scheme-specific and broad health keywords within 300
-  characters.
-pattern: '\b\d{8}\b'
+  Structural detection of a 10-11 digit Medicare card number (first digit 2-6) with AllDigitsSameFilter
+  and health-scheme corroborative keywords. Note: Func_australian_medical_account_number is a Purview
+  detection function, not a usable validator, so the checksum is not enforced in the exported SIT.
+  Corroborative evidence: 3 tiers with health-scheme-specific and broad health keywords within 300 characters.
+pattern: '\b[2-6]\d{3}[\s-]?\d{5}[\s-]?\d(?:[\s-]?\d)?\b'
 confidence: medium
 confidence_justification: >-
   Medium confidence: eight-digit numbers are common. Validator function and health-scheme keywords
@@ -48,17 +49,19 @@ corroborative_evidence:
     - au-health-scheme-terms
 test_cases:
   should_match:
-    - value: '12345678'
-      description: Eight-digit Medicare provider number format
-    - value: '98765432'
-      description: Eight-digit medical account number
+    - value: '2123456701'
+      description: Ten-digit Medicare card number (first digit 2-6)
+    - value: '3456 78901 2'
+      description: Ten-digit Medicare card with display spacing
+    - value: '41234567890'
+      description: Eleven-digit Medicare card with IRN
   should_not_match:
-    - value: '1234567'
-      description: Seven digits, too short
-    - value: '123456789'
-      description: Nine digits, too long
-    - value: '11111111'
-      description: All same digits filtered
+    - value: '1234567890'
+      description: First digit 1, not a valid Medicare prefix (2-6)
+    - value: '234567'
+      description: Too short for a Medicare card number
+    - value: '234567890123'
+      description: Twelve digits, too long
 false_positives:
   - description: Generic eight-digit reference numbers in non-health contexts.
     mitigation: Require health-scheme keywords in proximity. AllDigitsSameFilter removes trivial matches.
@@ -99,9 +102,7 @@ purview:
       id_match: Pattern_medicare_card
   regexes:
     - id: Pattern_medicare_card
-      pattern: '\b\d{8}\b'
-      validators:
-        - ref: Func_australian_medical_account_number
+      pattern: '\b[2-6]\d{3}[\s-]?\d{5}[\s-]?\d(?:[\s-]?\d)?\b'
   keywords:
     - id: Evidence_health_scheme_specific
       groups:
