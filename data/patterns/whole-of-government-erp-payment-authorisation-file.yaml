@@ -6,7 +6,7 @@ type: regex
 engine: universal
 description: Detects bulk payment authorisation files extracted from government ERP systems (SAP, Oracle, TechnologyOne) containing payee bank accounts, payment amounts, and authorisation codes for batch processing.
 operation: 'Regex for ABA/BECS file format: Type 0 header record pattern or structured fixed-width payment records with BSB and transaction codes. Keyword proximity: payment file / ABA file / BECS / batch payment / EFT file terms within 300 characters of authorisation/approval context. Boosted by ERP system names (SAP, Oracle, TechnologyOne). Sentinel/test filters suppress placeholder banking strings seen in templates and noisy tenant exports.'
-pattern: ^0\s*.{17}\d{3}-\d{3}
+pattern: \b0\s{6,}.{0,20}\d{3}-\d{3}
 confidence: high
 confidence_justification: 'High confidence: ABA/BECS file format patterns combined with ERP system context and payment authorisation markers are highly specific to government payment files. The structured fixed-width format is distinctive.'
 jurisdictions:
@@ -51,13 +51,15 @@ test_cases:
         1064-000 12345678 530000003450000Employee Payment    J Smith            064-000 98765432
         1084-004 87654321 530000004520000Employee Payment    M Jones            084-004 11223344
       description: Raw ABA file format with header and payment records
+    - value: 'PROTECTED — Oracle ERP batch payment authorisation. Payment run reference PR-2026-1180 certified and released for payment. ABA file generated for BECS direct entry covering 842 payee records. Dual authorisation: approved by the Director of Finance.'
+      description: Oracle ERP bulk authorisation file with payment run reference
   should_not_match:
-    - value: 'Payment request form. Please approve payment of $12,450 to Supplier ABC Pty Ltd. Purchase order: PO-2026-001234. Single payment — not a batch file.'
-      description: Individual payment request — not a bulk authorisation file
+    - value: 'Payment request form. Please approve a single payment to Supplier ABC Pty Ltd against the attached invoice. This is an individual payment request, not a bulk authorisation or batch file.'
+      description: Individual payment request prose — not a bulk authorisation file, no ABA records or BSB
     - value: ABA file format specification. The Type 0 record contains the header with BSB, account name, and file description. Used for training purposes.
       description: ABA file format documentation — training material
-    - value: 'ERP payment template. BSB 000-000 account 00000000 amount $0.00. Training example only.'
-      description: Placeholder banking values are excluded from payment-file evidence
+    - value: 'ERP payment template. Enter the payee BSB and account number in the highlighted fields before submitting. Training example only — no live banking values populated.'
+      description: Placeholder ERP template prose with no populated BSB or account values
 false_positives:
   - description: Individual payment requests and purchase order approvals
     mitigation: Require bulk indicators (batch, multiple records, payment run) rather than single payment context
@@ -111,9 +113,9 @@ purview:
             - Filter_whole_of_government_erp_payment_authorisation_file_exclusion
   regexes:
     - id: Pattern_whole_of_government_erp_payment_authorisation_file_aba_type_0_header_record
-      pattern: ^0\s*.{17}\d{3}-\d{3}
+      pattern: \b0\s{6,}.{0,20}\d{3}-\d{3}
     - id: Pattern_whole_of_government_erp_payment_authorisation_file_aba_type_1_detail_record_with_bsb_and_ac
-      pattern: ^1\d{3}-\d{3}\s*\d{6,10}
+      pattern: \b1\d{3}-\d{3}\s+\d{6,10}
     - id: Pattern_whole_of_government_erp_payment_authorisation_file_bsb_format
       pattern: \b\d{3}-?\d{3}\b
     - id: Pattern_whole_of_government_erp_payment_authorisation_file_payment_run_reference_number
