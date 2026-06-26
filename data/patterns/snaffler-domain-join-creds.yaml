@@ -1,0 +1,148 @@
+schema: testpattern/v1
+name: MDT Domain Join Credentials in CustomSettings.ini
+slug: snaffler-domain-join-creds
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects Microsoft Deployment Toolkit (MDT) customsettings.ini files that embed
+  domain join credentials, including DomainAdminPassword and DomainAdmin account
+  values used during automated OS deployments. Mirrors Snaffler rule
+  KeepDomainJoinCredsByName / KeepDomainJoinCredsByPath.
+operation: >-
+  Matches two distinct MDT answer-file patterns: a DomainAdminPassword or
+  AdminPassword assignment (primary id_match, high specificity), and a DomainAdmin
+  account assignment. Both appear in the [Default] section of customsettings.ini
+  and related MDT task-sequence answer files. The password form is the primary
+  signal; the account name form is gated to 75+ with MDT-context evidence.
+pattern: '(?:DomainAdminPassword|AdminPassword)\s*=\s*\S{4,}'
+confidence: high
+confidence_justification: >-
+  High confidence: DomainAdminPassword= in an ini-format file is the canonical MDT
+  credential pattern with negligible false-positive surface outside deployment
+  tooling. AdminPassword= is slightly broader but gated with MDT context evidence
+  at the 75+ tier.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - customsettings
+    - JoinDomain
+    - DomainAdminDomain
+    - MachineObjectOU
+    - DeployRoot
+    - DomainAdmin
+    - TaskSequenceID
+  proximity: 300
+test_cases:
+  should_match:
+    - value: 'DomainAdminPassword=P@ssw0rd123'
+      description: Direct DomainAdminPassword assignment in MDT customsettings.ini
+    - value: "AdminPassword=Str0ngP@ss!"
+      description: AdminPassword assignment used in MDT unattend/customsettings blocks
+    - value: "[Default]\nJoinDomain=corp.local\nDomainAdmin=svcMDT\nDomainAdminDomain=CORP\nDomainAdminPassword=S3cr3tDeploy\nMachineObjectOU=OU=Workstations,DC=corp,DC=local"
+      description: Full MDT customsettings.ini Default section with domain join credentials
+    - value: 'DomainAdminPassword = SuperSecret99'
+      description: DomainAdminPassword with spaces around equals sign
+  should_not_match:
+    - value: 'DomainAdminPassword='
+      description: Empty assignment — no password value present
+    - value: 'DomainAdminPassword=abc'
+      description: Value too short (fewer than 4 non-whitespace chars)
+    - value: 'JoinDomain=corp.local'
+      description: Domain join config with no password field
+false_positives:
+  - description: MDT documentation or training materials showing sample customsettings.ini
+      with placeholder passwords like PLACEHOLDER or password123.
+    mitigation: Check for common placeholder tokens; require proximity to at least
+      one MDT-specific field (JoinDomain, DeployRoot, MachineObjectOU).
+  - description: INI files from other deployment tools that happen to use AdminPassword=
+      for unrelated purposes such as BIOS or firmware configuration.
+    mitigation: Gate AdminPassword form at 75+ with MDT-specific corroborative
+      evidence (JoinDomain, MachineObjectOU, DeployRoot).
+exports:
+  - purview_xml
+  - yaml
+scope: specific
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      id_match: Regex_snaffler_domain_admin_password
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_domain_admin_password
+      matches:
+        - ref: Keyword_snaffler_mdt_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_domain_admin_account
+      matches:
+        - ref: Keyword_snaffler_mdt_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_domain_admin_password
+      matches:
+        - ref: Keyword_snaffler_mdt_context
+        - ref: Keyword_snaffler_mdt_deploy_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_snaffler_domain_admin_password
+      pattern: '(?:DomainAdminPassword|AdminPassword)\s*=\s*\S{4,}'
+    - id: Regex_snaffler_domain_admin_account
+      pattern: 'DomainAdmin\s*=\s*[^\s;]{2,}'
+  keywords:
+    - id: Keyword_snaffler_mdt_context
+      groups:
+        - match_style: word
+          terms:
+            - JoinDomain
+            - DomainAdminDomain
+            - customsettings
+            - DomainAdmin
+            - MachineObjectOU
+            - TaskSequenceID
+    - id: Keyword_snaffler_mdt_deploy_context
+      groups:
+        - match_style: word
+          terms:
+            - DeployRoot
+            - MDT
+            - MachineObjectOU
+            - TaskSequenceID
+            - OSInstall
+created: '2026-06-26'
+updated: '2026-06-26'
+author: testpattern-community
+license: MIT

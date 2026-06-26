@@ -1,0 +1,200 @@
+schema: testpattern/v1
+name: Shell History Files with Embedded Credentials
+slug: snaffler-shell-history-creds
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects credentials embedded in shell history files (.bash_history, .zsh_history,
+  ConsoleHost_History.txt) including exported environment variable secrets, mysql
+  command-line passwords, curl basic auth credentials, and sshpass invocations.
+  Mirrors Snaffler rule KeepShellHistoryByName.
+operation: >-
+  Four distinct shell history credential forms are matched: shell export statements
+  setting environment variables with names containing PASS/TOKEN/SECRET/KEY, mysql
+  command-line -p password flags, curl -u user:password basic-auth arguments, and
+  sshpass -p invocations. All four are high-value signals in shell history files
+  where plaintext credentials are common. Each is wired as an id_match so any one
+  independently triggers detection.
+pattern: 'export\s+[A-Za-z_]*(?:PASS|TOKEN|SECRET|KEY)[A-Za-z_]*=\S{4,}'
+confidence: high
+confidence_justification: >-
+  High confidence: export of an environment variable whose name contains PASS,
+  TOKEN, SECRET or KEY followed by a non-whitespace value is a canonical
+  shell credential anti-pattern. mysql -p with inline password and sshpass -p
+  are equally unambiguous. curl -u is slightly broader but gated with evidence.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - export
+    - mysql
+    - curl
+    - sshpass
+    - history
+    - bash_history
+    - zsh_history
+  proximity: 300
+test_cases:
+  should_match:
+    - value: 'export DB_PASSWORD=S3cr3t!'
+      description: Shell export of a PASSWORD env var with a plaintext credential value
+    - value: 'mysql -uroot -pP@ssw0rd dbname'
+      description: mysql command-line with inline -p password flag
+    - value: "curl https://api.example.com/data -u admin:HunterTwo99"
+      description: curl basic-auth -u user:password argument
+    - value: "sshpass -p 'Secret1' ssh user@host.example.com"
+      description: sshpass invocation with plaintext -p password
+    - value: 'export API_SECRET=abcdef1234567890'
+      description: Shell export of a SECRET env var
+  should_not_match:
+    - value: 'cd /home/user'
+      description: Plain shell navigation command with no credential
+    - value: 'ls -la'
+      description: Directory listing command with no credential
+    - value: 'export PATH=/usr/local/bin:$PATH'
+      description: PATH export — var name does not contain PASS/TOKEN/SECRET/KEY
+false_positives:
+  - description: Shell history entries that set PASS/TOKEN/SECRET/KEY env vars to
+      variable references rather than literal values, e.g. export DB_PASSWORD=$VAULT_SECRET.
+    mitigation: The variable-reference form ($VAR) still begins with $ so \S{4,}
+      still matches; treat as lower severity but still noteworthy.
+  - description: mysql commands that use -p without an inline password (prompts interactively),
+      e.g. mysql -uroot -p dbname where -p is the last flag before the db name.
+    mitigation: The pattern requires \S{3,} immediately after -p with no space,
+      which distinguishes inline passwords from the interactive -p flag.
+exports:
+  - purview_xml
+  - yaml
+scope: specific
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      id_match: Regex_snaffler_shell_export_cred
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_snaffler_mysql_inline_pass
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_snaffler_sshpass_inline
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_shell_export_cred
+      matches:
+        - ref: Keyword_snaffler_shell_history_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_mysql_inline_pass
+      matches:
+        - ref: Keyword_snaffler_shell_history_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_curl_basic_auth
+      matches:
+        - ref: Keyword_snaffler_shell_history_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_sshpass_inline
+      matches:
+        - ref: Keyword_snaffler_shell_history_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_shell_export_cred
+      matches:
+        - ref: Keyword_snaffler_shell_history_context
+        - ref: Keyword_snaffler_shell_cred_verbs
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_mysql_inline_pass
+      matches:
+        - ref: Keyword_snaffler_shell_history_context
+        - ref: Keyword_snaffler_shell_cred_verbs
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_snaffler_shell_export_cred
+      pattern: 'export\s+[A-Za-z_]*(?:PASS|TOKEN|SECRET|KEY)[A-Za-z_]*=\S{4,}'
+    - id: Regex_snaffler_mysql_inline_pass
+      pattern: 'mysql\s+[\s\S]{0,40}-p\S{3,}'
+    - id: Regex_snaffler_curl_basic_auth
+      pattern: 'curl[\s\S]{0,120}-u\s+[^\s:]+:[^\s]{3,}'
+    - id: Regex_snaffler_sshpass_inline
+      pattern: 'sshpass\s+-p\s+\S{3,}'
+  keywords:
+    - id: Keyword_snaffler_shell_history_context
+      groups:
+        - match_style: word
+          terms:
+            - export
+            - mysql
+            - curl
+            - sshpass
+            - history
+            - bash_history
+            - zsh_history
+    - id: Keyword_snaffler_shell_cred_verbs
+      groups:
+        - match_style: word
+          terms:
+            - password
+            - secret
+            - token
+            - credential
+            - ssh
+created: '2026-06-26'
+updated: '2026-06-26'
+author: testpattern-community
+license: MIT

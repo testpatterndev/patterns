@@ -1,0 +1,156 @@
+schema: testpattern/v1
+name: Microsoft Defender Sensor Configuration with Credentials
+slug: snaffler-defender-config
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects Microsoft Defender for Identity (MDI) SensorConfiguration.json files
+  containing DirectoryServicesAccount credentials and Microsoft Defender for
+  Endpoint (MDE) mdatp_managed.json files containing onboardingInfo blobs, both
+  of which represent high-value security tool configuration secrets. Mirrors
+  Snaffler rule KeepDefenderConfigByName.
+operation: >-
+  Two distinct Defender configuration secrets are matched: MDI sensor JSON
+  containing a DirectoryServicesAccount object followed within 200 characters by
+  a Password or EncryptedPassword field with a non-empty value (primary id_match),
+  and MDE onboarding JSON containing an onboardingInfo field with a long base64-
+  or token-style value (40+ characters). Both are gated with Defender-specific
+  evidence keywords. Note: these formats are plausible based on published MDI/MDE
+  documentation but the exact on-disk JSON structure is not publicly documented
+  — treat as indicative rather than definitive.
+pattern: '"DirectoryServicesAccount"[\s\S]{0,200}"(?:Password|EncryptedPassword)"\s*:\s*"[^"]{6,}"'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the DirectoryServicesAccount + Password co-occurrence is
+  specific to MDI sensor config and highly unlikely in other JSON files. The
+  onboardingInfo form is less structurally constrained. Both patterns are flagged
+  as plausible-but-unverified against actual Defender on-disk formats; false
+  positives are possible if other security tools use similar field names.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - DirectoryServicesAccount
+    - onboardingInfo
+    - SensorConfiguration
+    - mdatp
+    - cloudService
+    - DefenderForIdentity
+    - MicrosoftDefender
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '{"DirectoryServicesAccount": {"Username": "svc-mdi@corp.local", "Password": "S3cr3tMDIp@ss", "IsManagedPassword": false}}'
+      description: MDI SensorConfiguration.json with DirectoryServicesAccount Password field
+    - value: '{"DirectoryServicesAccount":{"Username":"corp\\svcMDI","EncryptedPassword":"AQAAANCMnd8BFdERjHoAwE/B","IsManagedPassword":false}}'
+      description: MDI SensorConfiguration.json with EncryptedPassword (DPAPI-encrypted) field
+    - value: '{"onboardingInfo": "eyJPbmJvYXJkaW5nSW5mbyI6eyJUZW5hbnRJZCI6ImV4YW1wbGUtdGVuYW50LWlkLTEyMzQ1Njc4OTAifX0="}'
+      description: MDE mdatp_managed.json with onboardingInfo base64 blob (40+ chars)
+    - value: '{"onboardingInfo":"dGVzdC1vbmJvYXJkaW5nLWluZm8tYmxvYi10aGF0LWlzLWxvbmctZW5vdWdoLXRvLW1hdGNoLXBhdHRlcm4="}'
+      description: MDE onboardingInfo with longer base64 onboarding token
+  should_not_match:
+    - value: '{"DirectoryServicesAccount": {"Username": "corp\\svc", "Password": "abc"}}'
+      description: Password value too short (fewer than 6 chars)
+    - value: '{"onboardingInfo": "short"}'
+      description: onboardingInfo value too short (fewer than 40 chars)
+    - value: '{"username": "admin", "password": "Password123"}'
+      description: Generic JSON credentials without DirectoryServicesAccount or onboardingInfo
+false_positives:
+  - description: Other Microsoft security product JSON configurations that use
+      DirectoryServicesAccount as a field name for non-MDI purposes.
+    mitigation: Require proximity to MDI-specific field names (SensorConfiguration,
+      SensorId, cloudService) or mdatp-specific terms.
+  - description: JSON test fixtures, mock data, or developer environment configs
+      that use DirectoryServicesAccount as sample data.
+    mitigation: Check for placeholder values and documentation file contexts;
+      note that exact MDI/MDE on-disk JSON format is not publicly documented.
+  - description: The onboardingInfo pattern may match any long base64-like JSON
+      value in a field named onboardingInfo in other contexts.
+    mitigation: Gate onboardingInfo form at 75+ with MDE/mdatp-specific evidence
+      (mdatp, cloudService, DefenderForEndpoint).
+exports:
+  - purview_xml
+  - yaml
+scope: specific
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      id_match: Regex_snaffler_mdi_directory_pass
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_mdi_directory_pass
+      matches:
+        - ref: Keyword_snaffler_defender_mdi_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_mde_onboarding_blob
+      matches:
+        - ref: Keyword_snaffler_defender_mde_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_mdi_directory_pass
+      matches:
+        - ref: Keyword_snaffler_defender_mdi_context
+        - ref: Keyword_snaffler_defender_mde_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_snaffler_mdi_directory_pass
+      pattern: '"DirectoryServicesAccount"[\s\S]{0,200}"(?:Password|EncryptedPassword)"\s*:\s*"[^"]{6,}"'
+    - id: Regex_snaffler_mde_onboarding_blob
+      pattern: '"onboardingInfo"\s*:\s*"[^"]{40,}"'
+  keywords:
+    - id: Keyword_snaffler_defender_mdi_context
+      groups:
+        - match_style: word
+          terms:
+            - DirectoryServicesAccount
+            - SensorConfiguration
+            - DefenderForIdentity
+            - SensorId
+            - cloudService
+    - id: Keyword_snaffler_defender_mde_context
+      groups:
+        - match_style: word
+          terms:
+            - onboardingInfo
+            - mdatp
+            - cloudService
+            - DefenderForEndpoint
+            - MicrosoftDefender
+created: '2026-06-26'
+updated: '2026-06-26'
+author: testpattern-community
+license: MIT

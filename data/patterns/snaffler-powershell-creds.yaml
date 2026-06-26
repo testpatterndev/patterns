@@ -1,0 +1,153 @@
+schema: testpattern/v1
+name: PowerShell Credential Objects with Plaintext Password
+slug: snaffler-powershell-creds
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects PowerShell credential constructs that embed plaintext passwords, including
+  ConvertTo-SecureString with -AsPlainText and [Net.NetworkCredential]::new() calls.
+  Mirrors Snaffler rule KeepPsCredentials.
+operation: >-
+  Matches two distinct PowerShell patterns used to create credential objects from
+  plaintext passwords: the ConvertTo-SecureString combined with -AsPlainText -Force
+  idiom, and the [Net.NetworkCredential]::new() constructor. These patterns appear in
+  automation scripts and runbooks where passwords are hardcoded rather than prompted.
+pattern: 'ConvertTo-SecureString[\s\S]{0,80}-AsPlainText'
+confidence: high
+confidence_justification: >-
+  High confidence: ConvertTo-SecureString with -AsPlainText is the canonical PowerShell
+  plaintext-password anti-pattern, explicitly warned against in Microsoft documentation.
+  [Net.NetworkCredential]::new() with inline strings is equally specific.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - PCI-DSS
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - ConvertTo-SecureString
+    - -Force
+    - Get-Credential
+    - password
+    - AsPlainText
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '$pw = ConvertTo-SecureString "P@ssw0rd1" -AsPlainText -Force'
+      description: Classic PowerShell ConvertTo-SecureString with plaintext password and Force flag
+    - value: '$cred = New-Object PSCredential("svcAdmin", (ConvertTo-SecureString "Hunter2" -AsPlainText -Force))'
+      description: PSCredential creation wrapping ConvertTo-SecureString plaintext
+    - value: '[Net.NetworkCredential]::new("admin", "S3cr3tPass")'
+      description: NetworkCredential constructor with inline username and password
+    - value: '[System.Net.NetworkCredential]::new("user@corp.com", "TopS3cr3t")'
+      description: Fully qualified System.Net.NetworkCredential constructor with plaintext password
+  should_not_match:
+    - value: Get-Credential
+      description: Get-Credential alone prompts interactively and contains no hardcoded password
+    - value: '# Use Get-Credential for interactive prompts; avoid storing passwords in scripts'
+      description: Security guidance comment with no actual password or SecureString conversion
+false_positives:
+  - description: Security training or documentation examples showing the anti-pattern to avoid, containing sample command syntax without real passwords.
+    mitigation: Check for placeholder password values (password123, example, PLACEHOLDER) and documentation file types.
+  - description: Scripts that reference ConvertTo-SecureString with -AsPlainText to convert from an environment variable rather than a hardcoded literal.
+    mitigation: The environment variable form ($env:PASSWORD) is still a risk but lower severity than literal strings; flag for review.
+exports:
+  - purview_xml
+  - yaml
+scope: specific
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      id_match: Regex_snaffler_cts_plaintext
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_snaffler_net_credential_new
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_cts_plaintext
+      matches:
+        - ref: Keyword_snaffler_ps_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_net_credential_new
+      matches:
+        - ref: Keyword_snaffler_ps_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_cts_plaintext
+      matches:
+        - ref: Keyword_snaffler_ps_creds_evidence
+        - ref: Keyword_snaffler_ps_force_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_net_credential_new
+      matches:
+        - ref: Keyword_snaffler_ps_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_snaffler_cts_plaintext
+      pattern: 'ConvertTo-SecureString[\s\S]{0,80}-AsPlainText'
+    - id: Regex_snaffler_net_credential_new
+      pattern: '\[(?:System\.Net\.|Net\.)NetworkCredential\]::new\('
+  keywords:
+    - id: Keyword_snaffler_ps_creds_evidence
+      groups:
+        - match_style: word
+          terms:
+            - ConvertTo-SecureString
+            - AsPlainText
+            - NetworkCredential
+            - PSCredential
+            - password
+            - credential
+    - id: Keyword_snaffler_ps_force_context
+      groups:
+        - match_style: word
+          terms:
+            - -Force
+            - -AsPlainText
+            - Get-Credential
+created: '2026-06-26'
+updated: '2026-06-26'
+author: testpattern-community
+license: MIT
