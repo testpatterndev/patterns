@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: npm Access Token
 slug: global-npm-access-token
-version: 1.0.0
+version: 1.1.1
 type: regex
 engine: universal
 description: >-
@@ -43,6 +43,10 @@ test_cases:
       description: npm token in .npmrc authToken form
     - value: npm_aB3dE6gH9jK2mN5pQ8sTuVwXyZ0123456789
       description: Mixed-case npm access token
+    - value: //registry.npmjs.org/:_authToken=npm_AbCd1234EfGh5678IjKl9012MnOp3456
+      description: .npmrc _authToken line with scoped npm token (Snaffler KeepShellRcFilesByName)
+    - value: //pkgs.dev.azure.com/org/_packaging/feed/npm/registry/:_authToken=AbCd1234EfGh5678IjKl9012
+      description: Path-scoped Azure Artifacts registry with embedded slashes in path (Snaffler parity)
   should_not_match:
     - value: npm_tooShort1234
       description: Too short to be an npm access token
@@ -50,6 +54,8 @@ test_cases:
       description: GitHub token prefix, not npm
     - value: install the package and set your npm token in CI
       description: Prose mention without a token value
+    - value: //registry.npmjs.org/:always-auth=true
+      description: .npmrc always-auth directive — no _authToken value present
 false_positives:
   - description: Documentation or examples showing placeholder npm_ strings.
     mitigation: Require corroborative npm/registry keywords and exclude placeholder markers.
@@ -67,9 +73,72 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-06-13'
-updated: '2026-06-13'
+updated: '2026-06-26'
 author: testpattern-community
 license: MIT
 references:
   - url: https://docs.npmjs.com/about-access-tokens
     title: About npm access tokens
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      id_match: Regex_npm_access_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_npm_access_token
+      matches:
+        - ref: Keyword_npm_token_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_npm_npmrc_auth_token
+      matches:
+        - ref: Keyword_npm_token_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_npm_access_token
+      pattern: (?<![A-Za-z0-9_])npm_[A-Za-z0-9]{36}(?![A-Za-z0-9])
+    - id: Regex_npm_npmrc_auth_token
+      pattern: //[^\s]{1,255}/:_authToken=[A-Za-z0-9+/=_.-]{16,}
+  keywords:
+    - id: Keyword_npm_token_evidence
+      groups:
+        - match_style: string
+          terms:
+            - registry.npmjs.org
+            - //registry
+            - always-auth
+            - .npmrc
+            - npm
+changelog:
+  - version: 1.1.1
+    date: '2026-06-26'
+    note: >-
+      Broadened Regex_npm_npmrc_auth_token to allow path segments (/) in registry
+      hostname path by replacing [^/\s] with [^\s]. Enables Azure Artifacts and
+      other path-scoped registry URLs. Snaffler fidelity fix.
+  - version: 1.1.0
+    date: '2026-06-26'
+    note: >-
+      Added .npmrc _authToken= line form (Regex_npm_npmrc_auth_token) as a new purview.regexes
+      entry with a 75-confidence tier using Keyword_npm_token_evidence evidence and
+      Keyword_noise_exclusion filter. Mirrors Snaffler rule KeepShellRcFilesByName (.npmrc facet).
+      Also added initial purview block with 65/75 tiers for the existing npm_ prefix regex.

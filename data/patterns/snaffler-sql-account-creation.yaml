@@ -1,0 +1,109 @@
+schema: testpattern/v1
+name: SQL Account Creation with Password
+slug: snaffler-sql-account-creation
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects SQL statements that create database user accounts or logins with
+  embedded passwords, covering SQL Server CREATE LOGIN, MySQL CREATE USER IDENTIFIED BY,
+  and PostgreSQL CREATE USER WITH PASSWORD. Mirrors Snaffler rule KeepSqlAccountCreation.
+operation: >-
+  Matches CREATE USER or CREATE LOGIN statements that include a password clause
+  (IDENTIFIED BY or WITH PASSWORD). Uses [\s\S]{0,200} to span potential line
+  breaks between the CREATE clause and the password keyword. PDF-safe.
+pattern: CREATE\s+(?:USER|LOGIN)\s+[\s\S]{0,200}(?:IDENTIFIED BY|WITH PASSWORD)
+confidence: high
+confidence_justification: >-
+  High confidence: the combination of SQL account-creation keywords and an explicit
+  password clause is highly specific to credential-bearing SQL scripts. DDL without
+  password clauses (CREATE TABLE, CREATE INDEX) does not match.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+data_categories:
+  - credentials
+corroborative_evidence:
+  keywords:
+    - GRANT
+    - ALTER LOGIN
+    - sp_addlogin
+    - sysadmin
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "CREATE LOGIN svc_app WITH PASSWORD = 'S3rv1ce!2024';"
+      description: SQL Server CREATE LOGIN with password
+    - value: "CREATE USER 'app'@'%' IDENTIFIED BY 'p4ss';"
+      description: MySQL CREATE USER IDENTIFIED BY
+    - value: "CREATE USER etl_user WITH PASSWORD 'Etl$ecret2024';"
+      description: PostgreSQL CREATE USER WITH PASSWORD
+  should_not_match:
+    - value: "CREATE TABLE Users (id INT, name VARCHAR(50));"
+      description: DDL table creation, no password clause
+    - value: "CREATE INDEX idx_login ON users(login);"
+      description: Index DDL, not account creation
+false_positives:
+  - description: SQL migration scripts or database setup documentation that include CREATE USER statements with placeholder or masked passwords for illustrative purposes.
+    mitigation: Require proximity to operational SQL keywords (GRANT, ALTER LOGIN, sp_addlogin) that indicate production-grade credential scripts rather than documentation.
+  - description: ORM or framework generated SQL in test fixtures that creates test accounts with known weak passwords.
+    mitigation: Template exclusion keywords at 65-tier catch common test/example/placeholder markers.
+exports:
+  - purview_xml
+  - yaml
+scope: specific
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      id_match: Regex_snaffler_sql_account_creation
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_sql_account_creation
+      matches:
+        - ref: Keyword_snaffler_sql_account_creation_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_sql_account_creation
+      matches:
+        - ref: Keyword_snaffler_sql_account_creation_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_snaffler_sql_account_creation
+      pattern: CREATE\s+(?:USER|LOGIN)\s+[\s\S]{0,200}(?:IDENTIFIED BY|WITH PASSWORD)
+  keywords:
+    - id: Keyword_snaffler_sql_account_creation_evidence
+      groups:
+        - match_style: string
+          terms:
+            - GRANT
+            - ALTER LOGIN
+            - sp_addlogin
+            - sysadmin
+created: '2026-06-26'
+updated: '2026-06-26'
+author: testpattern-community
+license: MIT
