@@ -1,0 +1,117 @@
+schema: testpattern/v1
+name: Firefox Encrypted Login Entry
+slug: snaffler-firefox-logins
+version: 1.0.1
+type: regex
+engine: boost_regex
+description: >-
+  Detects Firefox logins.json encrypted password entries in the JSON format used
+  by Firefox's NSS (Network Security Services) credential store. Mirrors Snaffler
+  rule KeepFFRegexRed.
+operation: >-
+  Matches the encryptedPassword JSON field containing a base64-encoded NSS-encrypted
+  credential value of at least 16 characters. Firefox stores credentials in logins.json
+  with NSS/3DES encryption producing base64 ciphertext.
+pattern: '"encryptedPassword"\s*:\s*"[A-Za-z0-9+/=]{16,}"'
+confidence: high
+confidence_justification: >-
+  High confidence: the encryptedPassword JSON key combined with the base64 value
+  constraint is highly specific to Firefox logins.json. The field name is not
+  used in other common credential formats.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+data_categories:
+  - credentials
+corroborative_evidence:
+  keywords:
+    - encryptedUsername
+    - formSubmitURL
+    - guid
+    - timeCreated
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '{"encryptedUsername":"MDIEEPgAAA==","encryptedPassword":"MFoECNQ3Mk7Yo7yEECabcdefghijklmnop","guid":"{abc}"}'
+      description: Firefox logins.json entry
+    - value: '"encryptedPassword":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="'
+      description: Long base64 Firefox password
+    - value: '"encryptedPassword":"MDoEEPgAAAAAAAAAAAAAAAAAAAEwFDAN"'
+      description: Typical NSS-encrypted value
+    - value: '"encryptedPassword" : "MFoECNQ3Mk7+Yo7yEECabcdefghij1234=="'
+      description: encryptedPassword with spaces around JSON colon (Snaffler parity)
+  should_not_match:
+    - value: '"encryptedPassword":""'
+      description: Empty value, under 16 chars
+    - value: '"password":"hunter2"'
+      description: Plaintext field name, not encryptedPassword
+false_positives:
+  - description: Security research or malware analysis reports that quote Firefox logins.json content as examples without actual stolen credentials.
+    mitigation: Require proximity to additional logins.json fields (encryptedUsername, formSubmitURL, guid) to confirm file context.
+  - description: Backup or archive files containing encrypted Firefox profiles that are legitimately owned by the user.
+    mitigation: Scope detection to unexpected locations such as email attachments, cloud storage, or code repositories rather than standard browser profile paths.
+exports:
+  - purview_xml
+  - yaml
+scope: specific
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      id_match: Regex_snaffler_firefox_logins
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_firefox_logins
+      matches:
+        - ref: Keyword_snaffler_firefox_logins_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_firefox_logins
+      matches:
+        - ref: Keyword_snaffler_firefox_logins_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_snaffler_firefox_logins
+      pattern: '"encryptedPassword"\s*:\s*"[A-Za-z0-9+/=]{16,}"'
+  keywords:
+    - id: Keyword_snaffler_firefox_logins_evidence
+      groups:
+        - match_style: string
+          terms:
+            - encryptedUsername
+            - formSubmitURL
+            - guid
+            - timeCreated
+created: '2026-06-26'
+updated: '2026-06-26'
+changelog:
+  - version: 1.0.1
+    date: '2026-06-26'
+    note: >-
+      Broadened encryptedPassword regex to allow optional whitespace around JSON
+      colon. Snaffler fidelity fix.
+author: testpattern-community
+license: MIT

@@ -1,0 +1,230 @@
+schema: testpattern/v1
+name: Cisco Network Config Credentials
+slug: snaffler-cisco-config-creds
+version: 1.0.1
+type: regex
+engine: boost_regex
+description: >-
+  Detects credentials and sensitive configuration directives in Cisco IOS/NX-OS
+  configuration files, including enable passwords/secrets, SNMP community strings
+  with write access, PAC keys, and NVRAM/LDAP authentication indicators.
+  Mirrors Snaffler rule KeepNetConfigCreds.
+operation: >-
+  Five regexes covering the key Cisco credential surface: (1) enable password or
+  secret directive; (2) SNMP community string with RW (write) access; (3) PAC key
+  with type indicator; (4) NVRAM config last updated marker; (5) LDAP simple-bind
+  encrypted authentication marker. Corroborative evidence: routing/interface
+  keywords within 300 characters.
+pattern: enable\s+(?:password|secret)\s+\S
+confidence: high
+confidence_justification: >-
+  High confidence: the combination of Cisco-specific IOS directives (enable secret,
+  snmp-server community RW, pac key) with network infrastructure corroborative
+  keywords (hostname, interface, ip route) makes false positives extremely unlikely
+  outside genuine Cisco configuration files.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+  - Computer Fraud and Abuse Act
+  - Computer Misuse Act 1990
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+data_categories:
+  - credentials
+  - network infrastructure
+  - security
+corroborative_evidence:
+  keywords:
+    - service password-encryption
+    - hostname
+    - interface
+    - ip route
+    - version 1
+    - no ip domain-lookup
+    - spanning-tree
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "hostname CORE-SW1\nenable secret 5 $1$mERr$hx5rVt7rPNoS4wqbXKX7m0\nservice password-encryption"
+      description: Cisco IOS enable secret with MD5 hash and hostname context
+    - value: "snmp-server community S3cr3tStr RW\nsnmp-server community public RO"
+      description: SNMP community string with RW (write) access privilege
+    - value: "snmp-server community private view ALL RW"
+      description: SNMP community string with intermediate view token before RW (Snaffler parity)
+    - value: "pac key 7 045802150C2E1D1C5A\nip route 0.0.0.0 0.0.0.0 192.168.1.1"
+      description: PAC key with obfuscation type 7 in routing context
+    - value: "NVRAM config last updated 09:14:23 UTC Mon Jun 10 2024\nhostname ROUTER-01"
+      description: NVRAM config last updated marker with hostname
+    - value: "simple-bind authenticated encrypt\nldap-server host 10.1.1.50"
+      description: LDAP simple-bind encrypted authentication directive
+  should_not_match:
+    - value: "the network device must have an enable-secret configured per the security policy"
+      description: Prose mention of enable-secret requirement without an actual IOS directive (hyphenated, no space before value)
+    - value: "the snmp-server community string should be changed from the default RW setting"
+      description: Documentation prose about SNMP without a live community string value
+false_positives:
+  - description: Sanitised configuration exports or documentation samples that include IOS syntax without live credential values.
+    mitigation: Require proximity to corroborative network keywords (hostname, interface, ip route) to confirm genuine Cisco config context. Template exclusion catches placeholder markers.
+  - description: Security hardening guides or audit checklists that quote Cisco commands as examples.
+    mitigation: The regex requires a non-whitespace character immediately after the enable password/secret keyword, ensuring a value is actually present.
+exports:
+  - purview_xml
+  - yaml
+scope: specific
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      id_match: Regex_cisco_enable_secret
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_cisco_enable_secret
+      matches:
+        - ref: Keyword_snaffler_cisco_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_cisco_enable_secret
+      matches:
+        - ref: Keyword_snaffler_cisco_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_cisco_snmp_rw
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_cisco_snmp_rw
+      matches:
+        - ref: Keyword_snaffler_cisco_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_cisco_snmp_rw
+      matches:
+        - ref: Keyword_snaffler_cisco_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_cisco_pac_key
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_cisco_pac_key
+      matches:
+        - ref: Keyword_snaffler_cisco_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_cisco_pac_key
+      matches:
+        - ref: Keyword_snaffler_cisco_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_cisco_nvram_marker
+      matches:
+        - ref: Keyword_snaffler_cisco_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_cisco_ldap_simplebind
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_cisco_ldap_simplebind
+      matches:
+        - ref: Keyword_snaffler_cisco_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_cisco_ldap_simplebind
+      matches:
+        - ref: Keyword_snaffler_cisco_creds_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_cisco_enable_secret
+      pattern: enable\s+(?:password|secret)\s+\S
+    - id: Regex_cisco_snmp_rw
+      pattern: snmp-server\s+community\s+[^\s]{1,64}(?:\s+[^\s]{1,32}){0,2}\s+RW\b
+    - id: Regex_cisco_pac_key
+      pattern: pac key [0-7]
+    - id: Regex_cisco_nvram_marker
+      pattern: NVRAM config last updated
+    - id: Regex_cisco_ldap_simplebind
+      pattern: simple-bind authenticated encrypt
+  keywords:
+    - id: Keyword_snaffler_cisco_creds_evidence
+      groups:
+        - match_style: string
+          terms:
+            - service password-encryption
+            - hostname
+            - interface
+            - ip route
+            - version 1
+            - no ip domain-lookup
+            - spanning-tree
+created: '2026-06-26'
+updated: '2026-06-26'
+changelog:
+  - version: 1.0.1
+    date: '2026-06-26'
+    note: >-
+      Broadened Regex_cisco_snmp_rw to allow intermediate tokens (e.g. view ALL)
+      between community string and RW keyword. Snaffler fidelity fix.
+author: testpattern-community
+license: MIT

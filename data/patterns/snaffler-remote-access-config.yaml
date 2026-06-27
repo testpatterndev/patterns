@@ -1,0 +1,195 @@
+schema: testpattern/v1
+name: Remote Access Tool Credential Files
+slug: snaffler-remote-access-config
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects passwords and credentials stored in remote access configuration files
+  including RDCMan .rdg files (logonCredentials blocks), mRemoteNG confCons.xml
+  (Node Password attributes), and OpenVPN .ovpn files with embedded auth directives.
+  MobaXterm .ini files are a Snaffler filename target only — passwords are stored
+  obfuscated (proprietary XOR cipher) with no plaintext fingerprint detectable by
+  content regex. Mirrors Snaffler rules KeepRemoteAccessConfByExtension and KeepRemoteAccessConfByName.
+operation: >-
+  Three distinct credential forms are matched: RDCMan .rdg logonCredentials blocks
+  containing a password child element (high specificity), mRemoteNG confCons.xml
+  Node elements with a base64-encoded Password attribute (high specificity), and
+  OpenVPN config files containing auth-user-pass, key, or cert directives (weak
+  signal, gated at 75+ with remote-access evidence). The RDCMan and mRemoteNG
+  patterns are the primary id_match forms.
+pattern: '<logonCredentials[\s\S]{0,150}<password>[\s\S]{0,200}</password>'
+confidence: high
+confidence_justification: >-
+  High confidence: RDCMan logonCredentials/password and mRemoteNG Node Password
+  attribute patterns are highly specific to remote access management tools. The
+  OpenVPN directive form is weak and gated strictly with contextual evidence.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+data_categories:
+  - credentials
+  - security
+  - network
+corroborative_evidence:
+  keywords:
+    - RDCMan
+    - RDGManager
+    - mRemoteNG
+    - OpenVPN
+    - logonCredentials
+    - confCons
+    - rdg
+    - ovpn
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '<logonCredentials inherit="None"><profileName scope="Local">admin</profileName><userName>Administrator</userName><password>AQAAANCMnd8BFdERjHoAwE</password></logonCredentials>'
+      description: RDCMan .rdg logonCredentials block with DPAPI-encrypted password
+    - value: "<logonCredentials>\n  <userName>svcRDP</userName>\n  <password>P@ssword123!</password>\n</logonCredentials>"
+      description: Multiline RDCMan logonCredentials block with plaintext password
+    - value: '<Node Name="Server01" Hostname="10.0.0.1" Username="admin" Password="dGVzdHBhc3M=" Protocol="RDP" />'
+      description: mRemoteNG confCons.xml Node element with base64-encoded Password attribute
+    - value: 'auth-user-pass credentials.txt'
+      description: OpenVPN config referencing an auth-user-pass credentials file
+  should_not_match:
+    - value: '<logonCredentials inherit="FromParent" />'
+      description: RDCMan logonCredentials that inherits from parent with no inline password
+    - value: '<Node Name="Test" Hostname="example.com" />'
+      description: mRemoteNG Node element with no Password attribute
+false_positives:
+  - description: XML files from other tools that coincidentally use logonCredentials
+      or password elements but are not remote desktop configuration files.
+    mitigation: Require proximity to RDCMan/mRemoteNG-specific elements or
+      .rdg/.rdgm file context evidence.
+  - description: OpenVPN config files that reference auth-user-pass with an external
+      credential file rather than inline credentials.
+    mitigation: The directive itself indicates a credential file is in use; treat
+      as a finding regardless of whether credentials are inline.
+  - description: >-
+      MobaXterm .ini files are not content-detectable by regex. MobaXterm stores
+      session passwords using a proprietary XOR-based obfuscation cipher — the stored
+      values are encoded byte sequences, not plaintext. There is no reliable plaintext
+      credential field fingerprint in MobaXterm.ini content. MobaXterm remains a valid
+      Snaffler filename target (KeepRemoteAccessConfByExtension) but is excluded from
+      this pattern's content-matching regexes.
+    mitigation: Rely on filename-based detection (MobaXterm.ini, MobaXterm.mxm)
+      rather than content regex for MobaXterm credential discovery.
+exports:
+  - purview_xml
+  - yaml
+scope: specific
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      id_match: Regex_snaffler_rdcman_logon
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_snaffler_mremoteng_node
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_rdcman_logon
+      matches:
+        - ref: Keyword_snaffler_remote_access_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_mremoteng_node
+      matches:
+        - ref: Keyword_snaffler_remote_access_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snaffler_openvpn_directive
+      matches:
+        - ref: Keyword_snaffler_remote_access_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_rdcman_logon
+      matches:
+        - ref: Keyword_snaffler_remote_access_context
+        - ref: Keyword_snaffler_rdcman_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_mremoteng_node
+      matches:
+        - ref: Keyword_snaffler_remote_access_context
+        - ref: Keyword_snaffler_mremoteng_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_snaffler_rdcman_logon
+      pattern: '<logonCredentials[\s\S]{0,150}<password>[\s\S]{0,200}</password>'
+    - id: Regex_snaffler_mremoteng_node
+      pattern: '<Node[\s\S]{0,300}Password="[A-Za-z0-9+/=]{8,}"'
+    - id: Regex_snaffler_openvpn_directive
+      pattern: '(?:auth-user-pass|<key>|<cert>)'
+  keywords:
+    - id: Keyword_snaffler_remote_access_context
+      groups:
+        - match_style: word
+          terms:
+            - RDCMan
+            - mRemoteNG
+            - OpenVPN
+            - logonCredentials
+            - confCons
+            - rdg
+            - ovpn
+    - id: Keyword_snaffler_rdcman_specific
+      groups:
+        - match_style: word
+          terms:
+            - RDGManager
+            - RDCMan
+            - logonCredentials
+            - rdg
+    - id: Keyword_snaffler_mremoteng_specific
+      groups:
+        - match_style: word
+          terms:
+            - mRemoteNG
+            - confCons
+            - mremote
+created: '2026-06-26'
+updated: '2026-06-26'
+author: testpattern-community
+license: MIT

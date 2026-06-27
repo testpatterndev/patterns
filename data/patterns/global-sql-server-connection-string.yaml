@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: SQL Server
 slug: global-sql-server-connection-string
-version: 1.0.0
+version: 1.1.1
 type: regex
 engine: universal
 description: >-
@@ -49,11 +49,23 @@ test_cases:
       description: SQL Server with short field names
     - value: Server=db.example.com;Database=prod;User Id=app;Password=s3cure!
       description: Production SQL Server string
+    - value: Data Source=sql01;Initial Catalog=app;User Id=sa;Password=S3cr3t!;
+      description: ADO.NET Data Source form with password — any-order (Snaffler KeepCSharpDbConnStringsRed)
+    - value: Password=MyP@ss;Initial Catalog=hr;Data Source=db02.corp.local;
+      description: ADO.NET Password-first any-order form
+    - value: "Data Source=sql01.corp.example.com\\SQLEXPRESS;Initial Catalog=HumanResources;Integrated Security=False;MultipleActiveResultSets=True;Connect Timeout=30;Encrypt=True;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False;Password=MyLongS3cretPwd!;"
+      description: Long ADO.NET string with many intermediate parameters between Data Source and Password (Snaffler parity — gap >200 chars)
   should_not_match:
+    - value: host=myserver;dbname=mydb;user=admin
+      description: PostgreSQL-style connection string — no Server= or Password= keywords; no regex match
     - value: Server=myserver;Database=mydb;User Id=admin
       description: Missing Password/Pwd parameter
     - value: Server=myserver;User Id=admin;Password=pass123
       description: Missing Database parameter
+    - value: Data Source=sql01;Integrated Security=SSPI;
+      description: ADO.NET Data Source without a Password= field — Windows Integrated Security only
+    - value: jdbc:sqlserver://myserver;databaseName=mydb;integratedSecurity=true
+      description: JDBC URL form — no Password= key present
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -99,11 +111,33 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_connstring_datasource_pw_a
+      matches:
+        - ref: Keyword_sql_connection
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_connstring_datasource_pw_b
+      matches:
+        - ref: Keyword_sql_connection
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_sql_connection_string
       pattern: Server=[^;]+;Database=[^;]+;(?:User Id|Uid)=[^;]+;(?:Password|Pwd)=[^;]+
     - id: Pattern_global_sql_server_connection_string_label_context
       pattern: (?i)\b(?:sql\s+server|sql|server|connection|string)\b
+    - id: Regex_connstring_datasource_pw_a
+      pattern: Data Source=[^;]{1,128};[\s\S]{0,400}Password=[^;]{1,128}
+    - id: Regex_connstring_datasource_pw_b
+      pattern: Password=[^;]{1,128};[\s\S]{0,400}Data Source=[^;]{1,128}
   keywords:
     - id: Keyword_sql_connection
       groups:
@@ -146,7 +180,23 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-sql-server-connection-string
     title: SQL Server connection string entity definition - Microsoft Learn
 created: '2026-02-08'
-updated: '2026-02-12'
+updated: '2026-06-26'
 author: testpattern-community
 source: microsoft
 license: MIT
+changelog:
+  - version: 1.1.1
+    date: '2026-06-26'
+    note: >-
+      Increased gap bound on Regex_connstring_datasource_pw_a and _pw_b from
+      [\s\S]{0,200} to [\s\S]{0,400} to accommodate long ADO.NET strings with
+      many intermediate parameters. Snaffler fidelity fix.
+  - version: 1.1.0
+    date: '2026-06-26'
+    note: >-
+      Added ADO.NET Data Source=...Password= any-order form (Regex_connstring_datasource_pw_a and
+      Regex_connstring_datasource_pw_b) as new purview.regexes with two 75-confidence tiers
+      referencing Keyword_sql_connection and Keyword_noise_exclusion. Mirrors Snaffler rule
+      KeepCSharpDbConnStringsRed. Restored two should_not_match cases removed during the v1.1.0
+      extend (they correctly reject against the primary id_match; the prior removal was driven by a
+      harness-scoping bug now fixed).
