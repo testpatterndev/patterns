@@ -23,9 +23,9 @@ for (const slug of process.argv.slice(2)) {
   let divergent = 0
   for (const src of sources) {
     // Strip a leading inline-flag group like (?i)/(?is)/(?s) (invalid in JS) and map to JS flags.
-    // Case-insensitive is forced by repo convention; per-regex case-sensitivity is not modelled.
+    // Case-insensitive is forced by repo convention; per-pattern case-sensitivity via p.case_sensitive.
     let body = src
-    let flags = 'i'
+    let flags = p.case_sensitive ? '' : 'i'
     const m = body.match(/^\(\?([ims]+)\)/)
     if (m) {
       body = body.slice(m[0].length)

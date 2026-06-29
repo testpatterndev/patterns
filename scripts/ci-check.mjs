@@ -23,7 +23,7 @@ const MS_VALIDATORS = new Set(['Func_aba_routing','Func_australian_tax_file_numb
 const kwSlugs = new Set(readdirSync(kwDir).filter(f => f.endsWith('.yaml')).map(f => f.replace('.yaml', '')))
 const errors = [], warns = []
 
-const toRe = (src) => { let b = String(src), fl = 'i'; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(b, fl) }
+const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(b, fl) }
 
 for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   let p
@@ -47,8 +47,8 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
     if (v.ref && !MS_VALIDATORS.has(v.ref) && !localVal.has(v.ref)) errors.push(`${p.slug}: validator ref '${v.ref}' is not a real MS validator nor local`)
 
   // test-case execution
-  const compiled = regexes.map(r => { try { return toRe(r.src) } catch { return null } }).filter(Boolean)
-  const top = (typeof p.pattern === 'string') ? (() => { try { return toRe(p.pattern) } catch { return null } })() : null
+  const compiled = regexes.map(r => { try { return toRe(r.src, p.case_sensitive) } catch { return null } }).filter(Boolean)
+  const top = (typeof p.pattern === 'string') ? (() => { try { return toRe(p.pattern, p.case_sensitive) } catch { return null } })() : null
   // keyword_proximity uses keyword+proximity detection (not a single regex), so don't
   // regex-test its cases here. keyword_list/dictionary with no compiled regex: skip too.
   if (p.type === 'keyword_proximity' || p.type === 'trainable_classifier') continue
