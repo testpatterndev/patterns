@@ -1,0 +1,118 @@
+schema: testpattern/v1
+name: Australian Marking - SENSITIVE
+slug: au-marking-sensitive
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects the Australian Government SENSITIVE tier in both email and document forms: Commonwealth
+  OFFICIAL: Sensitive (including its IMM/caveat variants such as Personal-Privacy, Legal-Privilege,
+  Legislative-Secrecy) and the Queensland (QGISCF) standalone SENSITIVE marking. Regex logic ported
+  from Microsoft's canonical PSPF SIT guidance; matched case-sensitively.
+operation: >-
+  Tier 90 matches the OFFICIAL: Sensitive stem (sweeping all IMM/caveat variants). Tier 75 matches
+  the Queensland standalone SENSITIVE marking, gated by Australian-government corroborative context.
+pattern: '\bOFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive'
+confidence: high
+confidence_justification: >-
+  High confidence on the OFFICIAL: Sensitive stem (case-sensitive, structured + banner). Standalone
+  SENSITIVE (QLD) is lower confidence (75) and requires government context to control false positives.
+jurisdictions:
+  - au
+regulations:
+  - "Criminal Code Act 1995 (Cth)"
+frameworks:
+  - PSPF
+  - QGISCF
+data_categories:
+  - government
+  - security-classification
+case_sensitive: true
+corroborative_evidence:
+  keywords:
+    - Queensland
+    - QGISCF
+    - Australian Government
+    - PSPF
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Report [SEC=OFFICIAL:Sensitive]"
+      description: Email subject marking
+    - value: "This page is OFFICIAL: Sensitive"
+      description: Document banner
+    - value: "[SEC=OFFICIAL:Sensitive, ACCESS=Legal-Privilege]"
+      description: IMM variant swept into the SENSITIVE bucket
+    - value: "Queensland record marked SENSITIVE under QGISCF"
+      description: QLD standalone SENSITIVE with context
+  should_not_match:
+    - value: "this is a sensitive topic for discussion"
+      description: lowercase English word (case-sensitive exclusion)
+    - value: "Memo [SEC=OFFICIAL]"
+      description: plain OFFICIAL belongs to au-marking-official
+    - value: "Briefing [SEC=PROTECTED]"
+      description: PROTECTED belongs to au-marking-protected
+false_positives:
+  - description: Uppercase SENSITIVE in non-marking headings (e.g. "COMMERCIALLY SENSITIVE").
+    mitigation: QLD tier requires Australian-government corroborative evidence within 300 characters.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  SENSITIVE / OFFICIAL: Sensitive marking indicates information needing limited dissemination.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: "SENSITIVE Government"
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "SENSITIVE"
+  ca_gov: "Protected B"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 90
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 90
+      id_match: Regex_au_sensitive_official
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_sensitive_qld
+      matches:
+        - ref: Keyword_au_gov_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_sensitive_official
+      pattern: '\bOFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive'
+    - id: Regex_au_sensitive_qld
+      pattern: '\bSENSITIVE\b'
+  keywords:
+    - id: Keyword_au_gov_context
+      groups:
+        - match_style: word
+          terms:
+            - Queensland
+            - QGISCF
+            - Australian Government
+            - Commonwealth
+            - PSPF
+            - department
+            - agency
+created: '2026-06-29'
+updated: '2026-06-29'
+author: testpattern-community
+license: MIT
