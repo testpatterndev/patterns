@@ -1,0 +1,102 @@
+schema: testpattern/v1
+name: Australian Marking - OFFICIAL
+slug: au-marking-official
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects the Australian Government OFFICIAL protective marking (PSPF / QGISCF) in both email
+  forms ([SEC=OFFICIAL] subject markings, X-Protective-Marking headers) and visible document
+  banners. Excludes UNOFFICIAL and OFFICIAL: Sensitive (handled by au-marking-sensitive). Regex
+  logic ported from Microsoft's canonical PSPF SIT guidance; matched case-sensitively so the
+  lowercase English word "official" does not trigger.
+operation: >-
+  Case-sensitive match of OFFICIAL as a protective marking. Tier 95 requires the structured
+  SEC=OFFICIAL form; tier 85 matches the OFFICIAL banner. A negative lookahead drops
+  OFFICIAL: Sensitive to au-marking-sensitive.
+pattern: '\bOFFICIAL\b(?!(?:[ ]|:[ ]?)Sensitive)'
+confidence: high
+confidence_justification: >-
+  High confidence: case-sensitive uppercase OFFICIAL plus the structured SEC= form make this a
+  reliable marking detector. The English word "official" (lowercase) is excluded by case.
+jurisdictions:
+  - au
+regulations:
+  - "Criminal Code Act 1995 (Cth)"
+frameworks:
+  - PSPF
+  - QGISCF
+data_categories:
+  - government
+  - security-classification
+case_sensitive: true
+corroborative_evidence:
+  keywords:
+    - PSPF
+    - protective marking
+    - Australian Government
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Quarterly briefing [SEC=OFFICIAL]"
+      description: Email subject marking
+    - value: "X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=OFFICIAL"
+      description: x-header form
+    - value: "This document is classified OFFICIAL by the department"
+      description: Document banner
+  should_not_match:
+    - value: "visit our official website for more information"
+      description: lowercase English word (case-sensitive exclusion)
+    - value: "Report [SEC=OFFICIAL:Sensitive]"
+      description: OFFICIAL Sensitive belongs to au-marking-sensitive
+    - value: "This email is UNOFFICIAL"
+      description: UNOFFICIAL must not match OFFICIAL
+false_positives:
+  - description: Uppercase use of OFFICIAL in non-marking contexts (e.g. "OFFICIAL OPENING").
+    mitigation: Corroborative PSPF/government evidence and the structured SEC= tier raise confidence; banner tier stays at 85.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+risk_rating: 6
+risk_description: OFFICIAL marking indicates routine Australian Government information.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 95
+      id_match: Regex_au_official_struct
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_au_official_banner
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_official_struct
+      pattern: '\[?SEC=OFFICIAL\b(?!(?::[ ]?|[ ])Sensitive)'
+    - id: Regex_au_official_banner
+      pattern: '\bOFFICIAL\b(?!(?:[ ]|:[ ]?)Sensitive)'
+created: '2026-06-29'
+updated: '2026-06-29'
+author: testpattern-community
+license: MIT
