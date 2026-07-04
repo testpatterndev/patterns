@@ -37,7 +37,11 @@ function purviewBanned(src) {
   if (/(?<!\\)\^|(?<!\\)\$/.test(s)) issues.push('^/$ anchor')
   const captures = (s.replace(/\(\?[:=!<]/g, '(?x').match(/\((?!\?)/g) || []).length
   if (captures > 1) issues.push(`${captures} capturing groups`)
-  if (/\(\?<[=!][^)]*[*+{]/.test(s)) issues.push('variable-length lookbehind')
+  // Boost.RegEx allows FIXED-length lookbehinds (e.g. `\s{3}`) — only variable-length
+  // quantifiers (*, +, ?, {n,}, {n,m}) inside the body are banned. Note this also flags a
+  // `?` belonging to a nested (?:...) group inside the lookbehind body; that's acceptable
+  // since a nested group makes the lookbehind's length variable-risk regardless.
+  if (/\(\?<[=!][^)]*(?:[*+?]|\{\d+,)/.test(s)) issues.push('variable-length lookbehind')
   return issues
 }
 
