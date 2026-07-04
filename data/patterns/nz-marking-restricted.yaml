@@ -1,0 +1,178 @@
+schema: testpattern/v1
+name: New Zealand Marking - RESTRICTED
+slug: nz-marking-restricted
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects the New Zealand Government RESTRICTED national-security classification under the
+  Protective Security Requirements (PSR) classification system: the verified control/dissemination
+  marking separator (RESTRICTED//..., e.g. RESTRICTED//REL TO NZL, GBR), the legacy SEEMail bracket
+  trigger-word convention ([RESTRICTED]), and the bare ALL-CAPS document-banner form gated by New
+  Zealand government context and a collocation-noise exclusion. Regex logic verified directly
+  against official PSR marking-format guidance (protectivesecurity.govt.nz); matched
+  case-sensitively.
+operation: >-
+  Tier 85 matches the verified national-security marking format: RESTRICTED followed immediately by
+  the double-forward-slash control/dissemination-marking separator. Tier 85 (separate id) also
+  matches the legacy SEEMail bracket form [RESTRICTED]. Tier 65 matches the bare RESTRICTED banner,
+  gated by New Zealand government/PSR corroborative context and a NOT-exclusion for common
+  non-government "RESTRICTED" collocations (RESTRICTED AREA, AGE RESTRICTED, etc).
+pattern: '\bRESTRICTED//|\[RESTRICTED\]'
+confidence: high
+confidence_justification: >-
+  High confidence on the `//` national-security-marking form and the legacy-bracket form: both are
+  structurally distinctive, case-sensitive tokens with low natural-English collision risk, and the
+  `//` separator convention is directly verified against the official PSR marking-format guidance
+  (not inferred). The bare RESTRICTED banner (65) is a common English word used constantly outside
+  government context (RESTRICTED AREA, AGE RESTRICTED, RESTRICTED ACCESS, etc.), so it is the widest
+  tier and is gated by New Zealand government/PSR corroborative evidence plus a dedicated
+  NOT-exclusion for the most common non-government collocations.
+jurisdictions:
+  - nz
+regulations:
+  - "Privacy Act 2020 (NZ)"
+frameworks:
+  - PSR
+data_categories:
+  - government
+  - security
+case_sensitive: true
+corroborative_evidence:
+  keywords:
+    - New Zealand
+    - PSR
+    - Protective Security Requirements
+    - Cabinet
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Cover sheet: RESTRICTED//REL TO NZL, GBR — do not release outside Five Eyes partners."
+      description: Verified national-security marking format — RESTRICTED classification with a REL TO releasability marking, double-forward-slash separated per PSR marking-format guidance
+    - value: "Briefing note marked RESTRICTED//REL TO NZL,\nAUS, GBR for distribution to accredited staff only."
+      description: PDF-wrapped dissemination list — the line wrap falls after the RESTRICTED// trigger, which remains an unbroken token per PSR guidance (the classification and control/dissemination markings render in the same style/font, immediately adjoining)
+    - value: "Subject: [RESTRICTED] Draft briefing paper for review"
+      description: Legacy SEEMail bracket trigger-word form
+    - value: "This RESTRICTED briefing must be handled under New Zealand Government PSR requirements."
+      description: Bare banner form gated by New Zealand government/PSR corroborative evidence within 300 characters
+  should_not_match:
+    - value: "please restrict access to senior staff until further notice"
+      description: lowercase English word (case-sensitive exclusion)
+    - value: "RESTRICTED AREA — HARD HAT ZONE, authorised personnel only beyond this point"
+      description: bare tier excluded by the RESTRICTED-collocation NOT-group
+    - value: "This film is AGE RESTRICTED and unsuitable for viewers under 18."
+      description: bare tier excluded by the RESTRICTED-collocation NOT-group
+    - value: "RESTRICTED (sample) — replace with your organisation's classified content"
+      description: bare tier excluded by the template/noise NOT-group (documentation/sample content)
+false_positives:
+  - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare RESTRICTED banner tier relies on.
+    mitigation: Treat banner-tier-only (65) hits as lower confidence when the surrounding text is itself all-caps; the `//` and legacy-bracket tiers (85) remain the reliable signal.
+  - description: >-
+      RESTRICTED is an extremely common English word in everyday non-government usage (RESTRICTED
+      AREA, RESTRICTED ACCESS, ACCESS RESTRICTED, AGE RESTRICTED, RESTRICTED STOCK, RESTRICTED USE,
+      USE RESTRICTED), all of which are more common in general text than the PSR classification
+      marking.
+    mitigation: The bare tier (65) requires New Zealand government/PSR corroborative evidence and excludes this collocation set via a dedicated NOT-group. The `//` and bracket tiers (85) are unaffected — they are structurally distinctive and do not require the gate.
+  - description: >-
+      The SEEMail square-bracket trigger-word convention ([RESTRICTED]) is being decommissioned
+      during 2026 as the Secure Government Email (SGE) Framework replaces SEEMail. RESTRICTED is
+      confirmed as one of SEEMail's five bracket trigger words (the complete list is [SEEMAIL],
+      [TRUSTED], [RESTRICTED], [SENSITIVE], [IN-CONFIDENCE] — verified directly against the PSR
+      marking-guidance page), so this tier reflects a real, current, if soon-to-be-legacy convention.
+    mitigation: Weight the bracket tier (85) as a transitional/legacy indicator; the `//` and gated bare-banner tiers reflect the durable PSR marking convention and are expected to remain valid after SEEMail's decommissioning.
+  - description: >-
+      The `\bRESTRICTED//` trigger requires the double-forward-slash to immediately follow the
+      classification word with no space. No verified source shows a spaced variant (e.g.
+      "RESTRICTED //"); if one exists in the wild it would not be matched by this tier.
+    mitigation: No mitigation implemented; documented as a known coverage gap rather than broadening the regex on unverified syntax.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  RESTRICTED is the lowest of the four New Zealand national-security classification tiers,
+  indicating information whose compromise would be likely to adversely affect the national
+  interest.
+sensitivity_labels:
+  psr: RESTRICTED
+  pspf: "OFFICIAL: Sensitive"
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  au_gov: "OFFICIAL: Sensitive"
+  ca_gov: "Protected C"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+    - dict: nz-government-context
+      as: Keyword_nz_gov_context
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_nz_restricted_nsi
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_nz_restricted_bracket
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_nz_restricted_bare
+      matches:
+        - ref: Keyword_nz_gov_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_restricted_collocation_exclusion
+  regexes:
+    - id: Regex_nz_restricted_nsi
+      pattern: '\bRESTRICTED//'
+    - id: Regex_nz_restricted_bracket
+      pattern: '\[RESTRICTED\]'
+    - id: Regex_nz_restricted_bare
+      pattern: '\bRESTRICTED\b'
+  keywords:
+    - id: Keyword_restricted_collocation_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - text: RESTRICTED AREA
+              case_sensitive: true
+            - text: RESTRICTED ACCESS
+              case_sensitive: true
+            - text: ACCESS RESTRICTED
+              case_sensitive: true
+            - text: AGE RESTRICTED
+              case_sensitive: true
+            - text: RESTRICTED STOCK
+              case_sensitive: true
+            - text: RESTRICTED USE
+              case_sensitive: true
+            - text: USE RESTRICTED
+              case_sensitive: true
+created: '2026-07-04'
+updated: '2026-07-04'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-04'
+    description: Initial release — verified `//` national-security-marking, legacy SEEMail-bracket, and government-context-gated bare-banner RESTRICTED tiers per direct verification against protectivesecurity.govt.nz marking guidance.
+author: testpattern-community
+license: MIT

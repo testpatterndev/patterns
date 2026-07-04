@@ -1,0 +1,148 @@
+schema: testpattern/v1
+name: New Zealand Marking - CONFIDENTIAL
+slug: nz-marking-confidential
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects the New Zealand Government CONFIDENTIAL national-security classification under the
+  Protective Security Requirements (PSR) classification system: the verified control/dissemination
+  marking separator (CONFIDENTIAL//..., e.g. CONFIDENTIAL//NZEO) and a gated bracket form
+  ([CONFIDENTIAL]). Deliberately narrow v1: no bare-word tier (CONFIDENTIAL is overwhelmingly common
+  as generic business/legal boilerplate — NDAs, email footers, "STRICTLY CONFIDENTIAL", "PRIVATE AND
+  CONFIDENTIAL" — and would swamp any bare-word detector), and the bracket tier is hard-gated by New
+  Zealand government context because, unlike its sibling markings, [CONFIDENTIAL] is not a verified
+  SEEMail trigger word. Regex logic verified directly against official PSR marking-format guidance
+  (protectivesecurity.govt.nz); matched case-sensitively.
+operation: >-
+  Tier 85 matches the verified national-security marking format: CONFIDENTIAL followed immediately
+  by the double-forward-slash control/dissemination-marking separator. Tier 75 matches the bracket
+  form [CONFIDENTIAL], but only when gated by New Zealand government/PSR corroborative context,
+  since this bracket form (unlike [RESTRICTED]/[SENSITIVE]/[IN-CONFIDENCE]) is not an attested
+  official convention on its own. There is no bare CONFIDENTIAL tier.
+pattern: '\bCONFIDENTIAL//'
+confidence: high
+confidence_justification: >-
+  High confidence on the `//` national-security-marking form: a structurally distinctive,
+  case-sensitive token with low natural-English collision risk, directly verified against the
+  official PSR marking-format guidance (not inferred). The gated bracket tier (75) is lower
+  evidence — no primary source attests [CONFIDENTIAL] as a real marking convention the way
+  [RESTRICTED]/[SENSITIVE]/[IN-CONFIDENCE] are attested as SEEMail trigger words — so it requires
+  positive New Zealand government/PSR corroborative evidence rather than firing on the bracket
+  alone. There is deliberately no bare-word tier: "CONFIDENTIAL" alone is one of the most common
+  words in generic business/legal boilerplate and would produce overwhelming noise.
+jurisdictions:
+  - nz
+regulations:
+  - "Privacy Act 2020 (NZ)"
+frameworks:
+  - PSR
+data_categories:
+  - government
+  - security
+case_sensitive: true
+corroborative_evidence:
+  keywords:
+    - New Zealand
+    - PSR
+    - Protective Security Requirements
+    - Cabinet
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "This cable is classified CONFIDENTIAL//NZEO — do not release outside New Zealand."
+      description: Verified national-security marking format — CONFIDENTIAL classification with the NZEO (New Zealand Eyes Only) dissemination marking, double-forward-slash separated per PSR marking-format guidance
+    - value: "Annex marked CONFIDENTIAL//REL TO NZL,\nAUS and restricted to accredited staff only."
+      description: PDF-wrapped dissemination list — the line wrap falls after the CONFIDENTIAL// trigger, which remains an unbroken token per PSR guidance
+    - value: "Subject: [CONFIDENTIAL] Cabinet paper — handle per New Zealand Government PSR classification requirements"
+      description: Gated bracket form — New Zealand Government/PSR corroborative context present within 300 characters
+    - value: "New Zealand Government agencies must handle this [CONFIDENTIAL] briefing under PSR requirements."
+      description: Gated bracket form, second worked example — PSR corroborative context present
+  should_not_match:
+    - value: "STRICTLY CONFIDENTIAL — do not distribute beyond this list"
+      description: no bare-word tier — bare/title-case "CONFIDENTIAL" boilerplate never matches (locked design decision)
+    - value: "PRIVATE AND CONFIDENTIAL — see the attached NDA for full terms"
+      description: no bare-word tier — common legal/NDA boilerplate never matches
+    - value: "[CONFIDENTIAL] — please treat this business proposal accordingly"
+      description: bracket form present but excluded by the missing New Zealand government/PSR AND-gate (no corroborative context nearby)
+    - value: "please keep this confidential between us until the announcement"
+      description: lowercase English word (case-sensitive exclusion)
+false_positives:
+  - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the CONFIDENTIAL tokens rely on.
+    mitigation: Treat hits as lower confidence when the surrounding text is itself all-caps; the `//` tier (85) remains the most reliable signal since it additionally requires the structural separator.
+  - description: >-
+      CONFIDENTIAL is one of the most common words in generic business and legal boilerplate:
+      NDAs, email footers/disclaimers, and stock phrases like "STRICTLY CONFIDENTIAL" or "PRIVATE
+      AND CONFIDENTIAL" vastly outnumber genuine PSR classification use.
+    mitigation: A bare CONFIDENTIAL tier is deliberately omitted (locked design decision) rather than attempting to gate it — none of "CONFIDENTIAL" alone, "STRICTLY CONFIDENTIAL", or "PRIVATE AND CONFIDENTIAL" will fire this SIT under any tier.
+  - description: >-
+      Unlike [RESTRICTED], [SENSITIVE], and [IN-CONFIDENCE] — confirmed as the complete SEEMail
+      bracket trigger-word set ([SEEMAIL], [TRUSTED], [RESTRICTED], [SENSITIVE], [IN-CONFIDENCE],
+      verified directly against the PSR marking-guidance page) — [CONFIDENTIAL] is NOT a SEEMail
+      trigger word, and structurally cannot be: SEEMail's classification ceiling is RESTRICTED/
+      SENSITIVE (the "Restricted group" service tier), so it never carries CONFIDENTIAL-classified
+      content in the first place. Any "[CONFIDENTIAL]" bracket found in the wild is far more likely
+      to be informal business bracket-tag notation than a genuine PSR marking.
+    mitigation: The bracket tier is hard-gated by New Zealand government/PSR corroborative evidence specifically because no attested official convention exists for it, unlike its sibling markings' bracket tiers (which carry real, if legacy, SEEMail provenance).
+  - description: >-
+      This is a deliberately narrow v1 for CONFIDENTIAL. Structured detection beyond the verified
+      `//` form awaits clarity on the Secure Government Email (SGE) Framework's own marking-rendering
+      conventions (SEEMail's replacement, rolling out during 2026), which had no published marking
+      syntax at the time of writing.
+    mitigation: Revisit this SIT once SGE marking conventions (if any) are published; the `//` tier is expected to remain valid regardless of the SEEMail-to-SGE transition.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  CONFIDENTIAL is the second-lowest of the four New Zealand national-security classification tiers,
+  indicating information whose compromise would cause significant damage to the national interest.
+sensitivity_labels:
+  psr: CONFIDENTIAL
+  pspf: PROTECTED
+  us_gov: CONFIDENTIAL
+  uk_gov: "OFFICIAL-SENSITIVE"
+  au_gov: PROTECTED
+  ca_gov: Confidential
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+    - dict: nz-government-context
+      as: Keyword_nz_gov_context
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_nz_confidential_nsi
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_nz_confidential_bracket
+      matches:
+        - ref: Keyword_nz_gov_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_nz_confidential_nsi
+      pattern: '\bCONFIDENTIAL//'
+    - id: Regex_nz_confidential_bracket
+      pattern: '\[CONFIDENTIAL\]'
+created: '2026-07-04'
+updated: '2026-07-04'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-04'
+    description: Initial release — verified `//` national-security-marking tier and a government-context-gated bracket tier; deliberately narrow v1 with no bare-word tier per locked design decision.
+author: testpattern-community
+license: MIT

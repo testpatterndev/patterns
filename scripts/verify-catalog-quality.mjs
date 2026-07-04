@@ -49,6 +49,11 @@ const STRUCTURAL_DICT_STRENGTH = new Map([
 //    (endorsed form, legacy SEEMail bracket form) are gated only by a template-exclusion NOT-group,
 //    not a positive keyword ref — the case-sensitive ALL-CAPS/structural marking regex itself is the
 //    high-confidence evidence, matching every other protective-marking SIT's design in this repo.
+//  - nz-marking-{restricted,confidential}: same rationale as nz-marking-{in-confidence,sensitive}.
+//    Their 85-tiers (the verified `//` national-security-marking form, and RESTRICTED's legacy
+//    SEEMail bracket form) are gated only by the template-exclusion NOT-group — the structural
+//    regex is the evidence. (confidential's 75 bracket tier is genuinely AND-gated by
+//    nz-government-context and does not need this exclusion; only its ungated 85-tier does.)
 const EXCLUDED_FILES = new Set([
   'au-marking-official.yaml',
   'au-marking-protected.yaml',
@@ -58,7 +63,9 @@ const EXCLUDED_FILES = new Set([
   'snaffler-domain-join-creds.yaml',
   'snaffler-ftp-credentials.yaml',
   'nz-marking-in-confidence.yaml',
-  'nz-marking-sensitive.yaml'
+  'nz-marking-sensitive.yaml',
+  'nz-marking-restricted.yaml',
+  'nz-marking-confidential.yaml'
 ])
 
 function loadYaml(filePath) {
