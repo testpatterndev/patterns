@@ -54,6 +54,10 @@ const STRUCTURAL_DICT_STRENGTH = new Map([
 //    SEEMail bracket form) are gated only by the template-exclusion NOT-group — the structural
 //    regex is the evidence. (confidential's 75 bracket tier is genuinely AND-gated by
 //    nz-government-context and does not need this exclusion; only its ungated 85-tier does.)
+//  - nz-marking-secret-topsecret: same rationale again. Both 85-tiers (the verified `//`
+//    national-security-marking form, and the TOP SECRET banner-words phrase) are gated only by
+//    the template-exclusion NOT-group — the structural regex is the evidence. Its 75 bare-SECRET
+//    tier is genuinely AND-gated by nz-government-context and does not need this exclusion.
 const EXCLUDED_FILES = new Set([
   'au-marking-official.yaml',
   'au-marking-protected.yaml',
@@ -65,7 +69,8 @@ const EXCLUDED_FILES = new Set([
   'nz-marking-in-confidence.yaml',
   'nz-marking-sensitive.yaml',
   'nz-marking-restricted.yaml',
-  'nz-marking-confidential.yaml'
+  'nz-marking-confidential.yaml',
+  'nz-marking-secret-topsecret.yaml'
 ])
 
 function loadYaml(filePath) {
