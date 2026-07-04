@@ -81,7 +81,7 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
     const terms = (p.keywords ?? []).map(t => String(t).toLowerCase().trim()).filter(Boolean)
     if (!terms.length) continue
     for (const tc of p.test_cases?.should_match ?? []) { const v = String(tc.value).toLowerCase(); if (!terms.some(t => v.includes(t))) errors.push(`${p.slug}: keyword_list should_match has no listed keyword — ${JSON.stringify(tc.value).slice(0, 50)}`) }
-    for (const tc of p.test_cases?.should_not_match ?? []) { const v = String(tc.value).toLowerCase(); if (terms.some(t => v.includes(t))) warns.push(`${p.slug}: keyword_list should_not_match contains a listed keyword — ${JSON.stringify(tc.value).slice(0, 50)}`) }
+    for (const tc of p.test_cases?.should_not_match ?? []) { const v = String(tc.value).toLowerCase(); if (terms.some(t => v.includes(t))) errors.push(`${p.slug}: keyword_list should_not_match contains a listed keyword — ${JSON.stringify(tc.value).slice(0, 50)}`) }
     continue
   }
   for (const tc of p.test_cases?.should_match ?? []) if (compiled.length && !compiled.some(re => re.test(String(tc.value)))) errors.push(`${p.slug}: should_match not matched — ${JSON.stringify(tc.value).slice(0, 60)}`)
