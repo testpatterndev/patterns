@@ -1,0 +1,163 @@
+schema: testpattern/v1
+name: Unique Student Identifier
+slug: au-unique-student-identifier
+version: 1.2.0
+type: regex
+engine: universal
+description: Detects Unique Student Identifier (USI) patterns. A 10-character alphanumeric code (uppercase letters and digits) mandatory since January 2023 for higher education in Australia.
+operation: >-
+  Regex pattern using universal engine. The top-level regex \b[A-Z0-9]{10}\b matches exactly 10 uppercase alphanumeric characters. The Purview engine uses two regexes: Pattern_usi_labeled (labeled
+  format with USI/Unique Student Identifier/student identifier prefix + 10 alphanumeric chars) and Pattern_au_usi (bare 10-char format). Three confidence tiers: High (85) requires USI terms +
+  education context keywords with template exclusion logic; Medium (75) requires USI terms + education context keywords; Low (65) requires USI terms only. Evidence uses 2 keyword groups (7 USI terms,
+  13 education context terms) within 300-character proximity. Keyword lists: au-identity-usi, industry-education.
+pattern: \b[A-Z0-9]{10}\b
+confidence: low
+confidence_justification: >-
+  Low confidence: a 10-character uppercase alphanumeric pattern is extremely broad and will match tracking numbers, serial codes, product IDs, and many other identifiers. Corroborative evidence
+  keywords such as USI, student identifier, or TAFE are essential for reliable detection.
+jurisdictions:
+  - au
+regulations:
+  - AML/CTF Act (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - ISO 27001
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - USI
+    - unique student identifier
+    - student identifier
+  proximity: 300
+  keyword_lists:
+    - au-identity-usi
+    - industry-education
+test_cases:
+  should_match:
+    - value: ABC1234567
+      description: USI with mixed letters and digits
+    - value: 2K48TF3GHP
+      description: Standard USI format
+    - value: A1B2C3D4E5
+      description: Alternating format USI
+  should_not_match:
+    - value: ABC12345
+      description: Only 8 characters instead of 10
+    - value: ABC12345678
+      description: 11 characters instead of 10
+    - value: ABC-123456
+      description: Hyphen breaks the 10-character contiguous alphanumeric run
+    - value: '0412 345 678'
+      description: Australian mobile phone number (spaced) is not a 10-char contiguous USI; AU packages also gate phone-shaped literals via the regional exclusion
+    - value: '0000-000000'
+      description: Placeholder sentinel value (separated) is not a 10-char contiguous USI and is also excluded by the sentinel filter
+false_positives:
+  - description: Common words and phrases related to unique student identifier appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
+    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
+    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
+  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
+    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Australian mobile and fixed-line telephone numbers can satisfy the broad 10-character alphanumeric USI anchor.
+    mitigation: Use the AU regional phone-number NONE-of gate for Australian packages and keep USI/education context mandatory for deployed policies.
+regional_tuning:
+  - jurisdiction: au
+    signal: au-mobile-number-overmatch-numeric-id-20260525
+    action: exclude-regex
+    id: Regex_au_mobile_number_exclusion
+    pattern: (?:^|[^0-9])(?:04[0-9]{8}|(?:\+?61[\s.-]?4(?:[\s.-]?[0-9]){8}))(?:$|[^0-9])
+    defaultDecision: modify
+    risk: regional-phone-number-overmatch
+    reason: Aggregate Australian tenant analysis found AU mobile-shaped literals overmatching broad 10-character identifier patterns.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: wide
+risk_rating: 6
+risk_description: USI exposure enables education records access and vocational training fraud
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Government
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_usi_labeled
+      matches:
+        - ref: Evidence_usi_terms
+        - ref: Evidence_education_context
+      excludes:
+        - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_au_usi
+      matches:
+        - ref: Evidence_usi_terms
+        - ref: Evidence_education_context
+    - confidence_level: 65
+      id_match: Pattern_au_usi
+      matches:
+        - ref: Evidence_usi_terms
+  regexes:
+    - id: Pattern_au_usi
+      pattern: \b[A-Z0-9]{10}\b
+    - id: Pattern_usi_labeled
+      pattern: (?i)\b(?:USI|Unique\s+Student\s+Identifier|student\s+(?:identifier|ID))\s*[:#-]?\s*[A-Z0-9]{10}\b
+  keywords:
+    - id: Evidence_usi_terms
+      groups:
+        - match_style: word
+          terms:
+            - USI
+            - unique student identifier
+            - student identifier
+            - VET
+            - vocational education
+            - TAFE
+            - training
+    - id: Evidence_education_context
+      groups:
+        - match_style: word
+          terms:
+            - student
+            - university
+            - college
+            - TAFE
+            - enrolment
+            - enrollment
+            - education
+            - training
+            - course
+            - qualification
+            - RTO
+            - registered training organisation
+            - AVETMISS
+  filters:
+    - id: Guard_usi_same_digits
+      type: AllDigitsSameFilter
+    - id: Guard_usi_exclude_test
+      type: TextMatchFilter
+      direction: Full
+      logic: Exclude
+      terms:
+        - "0000000000"
+        - "1111111111"
+        - "1234567890"
+created: '2026-02-08'
+updated: '2026-06-06'
+author: testpattern-community
+license: MIT
