@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: AI Data-Exfiltration Marker
 slug: ai-data-exfiltration-marker
-version: 0.1.0
+version: 0.2.0
 type: regex
 engine: universal
 description: >-
@@ -15,7 +15,7 @@ operation: >-
   AI-context markers. Filters exclude allow-listed corporate hosts and obvious test text. Three tiers
   (65 regex only; 75 + AI context; 85 + AI context with corporate-host exclusion).
 pattern: '!\[[^\]]*\]\(\s*https?://[^)\s]+[?#&][^)\s]*=[^)\s]{16,}\)'
-confidence: high
+confidence: low
 confidence_justification: >-
   High/precision-gated: fires on outbound content, so tuned for low FP. Requires an external host plus
   a long encoded payload; corporate-host and test-text exclusions remove the named FP traps.
@@ -34,7 +34,7 @@ corroborative_evidence:
   keyword_lists: [ai-context-markers]
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 65
   regexes:
     - id: Regex_md_image_exfil
       pattern: '!\[[^\]]*\]\(\s*https?://[^)\s]+[?#&][^)\s]*=[^)\s]{16,}\)'
@@ -47,7 +47,8 @@ purview:
       as: Evidence_ai_context
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
+    - confidence_level: 65
+      discovery_only: true
       id_match: Regex_md_image_exfil
       matches:
         - ref: Evidence_ai_context
@@ -56,21 +57,12 @@ purview:
           max_matches: 0
           children:
             - ref: Keyword_corporate_hosts
-    - confidence_level: 75
-      id_match: Regex_md_image_exfil
-      matches:
-        - ref: Evidence_ai_context
-    - confidence_level: 65
-      id_match: Regex_md_image_exfil
-    - confidence_level: 65
-      id_match: Regex_md_reflink_exfil
-    - confidence_level: 65
-      id_match: Regex_html_img_exfil
   keywords:
     - id: Keyword_corporate_hosts
       groups:
         - match_style: word
           terms: [sharepoint.com, teams.microsoft.com, office.com, office365.com]
+      strength: specific
   filters:
     - id: Guard_exfil_exclude_test
       type: TextMatchFilter
@@ -101,6 +93,18 @@ false_positives:
   - description: Security-research, training, or detection-engineering content that quotes EchoLeak-style exfiltration carriers verbatim as examples.
     mitigation: Exclude documents containing example/test markers (example.com, PLACEHOLDER) via the existing TextMatchFilter and gate on AI-context markers absent in prose discussion.
 created: '2026-06-08'
-updated: '2026-06-08'
+updated: '2026-07-04'
+changelog:
+  - version: 0.2.0
+    date: '2026-07-04'
+    description: Downgraded weak high-confidence tier to 65 because independent specific/domain evidence was insufficient.; Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
 author: testpattern-community
 license: MIT
+remediation:
+  catalog_quality_2026_06_02:
+    status: applied
+    changes:
+      - 'Downgraded weak high-confidence tier to 65 because independent specific/domain evidence was insufficient.'
+      - 'Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.'
+      - 'Collapsed 5 duplicate 65-confidence tier(s) into the strictest canonical tier.'
+      - 'Aligned recommended_confidence to 65.'
