@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: AI Data-Exfiltration Marker
 slug: ai-data-exfiltration-marker
-version: 0.2.0
+version: 0.3.0
 type: regex
 engine: universal
 description: >-
@@ -15,7 +15,7 @@ operation: >-
   AI-context markers. Filters exclude allow-listed corporate hosts and obvious test text. Three tiers
   (65 regex only; 75 + AI context; 85 + AI context with corporate-host exclusion).
 pattern: '!\[[^\]]*\]\(\s*https?://[^)\s]+[?#&][^)\s]*=[^)\s]{16,}\)'
-confidence: low
+confidence: high
 confidence_justification: >-
   High/precision-gated: fires on outbound content, so tuned for low FP. Requires an external host plus
   a long encoded payload; corporate-host and test-text exclusions remove the named FP traps.
@@ -34,7 +34,7 @@ corroborative_evidence:
   keyword_lists: [ai-context-markers]
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
   regexes:
     - id: Regex_md_image_exfil
       pattern: '!\[[^\]]*\]\(\s*https?://[^)\s]+[?#&][^)\s]*=[^)\s]{16,}\)'
@@ -47,8 +47,7 @@ purview:
       as: Evidence_ai_context
       match_style: word
   pattern_tiers:
-    - confidence_level: 65
-      discovery_only: true
+    - confidence_level: 85
       id_match: Regex_md_image_exfil
       matches:
         - ref: Evidence_ai_context
@@ -57,6 +56,16 @@ purview:
           max_matches: 0
           children:
             - ref: Keyword_corporate_hosts
+    - confidence_level: 75
+      id_match: Regex_md_image_exfil
+      matches:
+        - ref: Evidence_ai_context
+    - confidence_level: 65
+      id_match: Regex_md_image_exfil
+    - confidence_level: 65
+      id_match: Regex_md_reflink_exfil
+    - confidence_level: 65
+      id_match: Regex_html_img_exfil
   keywords:
     - id: Keyword_corporate_hosts
       groups:
@@ -95,6 +104,9 @@ false_positives:
 created: '2026-06-08'
 updated: '2026-07-04'
 changelog:
+  - version: 0.3.0
+    date: '2026-07-04'
+    description: 'Revert Task 5b weak-high downgrade: restore 5-tier structure (85/75/65x3) and confidence:high — the tier collapse had orphaned 2 of 3 attack-vector id_match regexes (md-reflink, html-img), and the demoted 85 tier had adequate independent evidence for a structural security pattern'
   - version: 0.2.0
     date: '2026-07-04'
     description: Downgraded weak high-confidence tier to 65 because independent specific/domain evidence was insufficient.; Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
@@ -102,9 +114,24 @@ author: testpattern-community
 license: MIT
 remediation:
   catalog_quality_2026_06_02:
-    status: applied
+    status: reverted
     changes:
       - 'Downgraded weak high-confidence tier to 65 because independent specific/domain evidence was insufficient.'
       - 'Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.'
       - 'Collapsed 5 duplicate 65-confidence tier(s) into the strictest canonical tier.'
       - 'Aligned recommended_confidence to 65.'
+    reverted_by: catalog_quality_2026_07_04_task6
+    revert_reason: >-
+      The "duplicate 65-confidence tier" collapse merged three tiers with three DIFFERENT id_match
+      regexes (Regex_md_image_exfil, Regex_md_reflink_exfil, Regex_html_img_exfil covering the
+      markdown-image, markdown-reflink, and HTML-img exfiltration carriers respectively) into a single
+      tier keyed to Regex_md_image_exfil only, silently dropping Purview detection coverage for two of
+      the pattern's three documented attack-vector regexes. Separately, the 85-tier (id_match plus
+      Evidence_ai_context plus corporate-host exclusion) was demoted as "insufficient independent
+      evidence," but this is a structural security-marker pattern, not a topic-phrase pattern: the base
+      regex is already high-precision (external host + markdown-image syntax + 16+ char encoded query
+      parameter), Evidence_ai_context draws from a dedicated domain dictionary, and the corporate-host
+      exclusion removes the single most common benign case. The pattern's own confidence_justification
+      ("tuned for low FP... exclusions remove the named FP traps") and false_positives note ("the 65
+      regex-only tier is advisory") both argued for the original 5-tier/high-confidence design, which
+      this revert restores in full.

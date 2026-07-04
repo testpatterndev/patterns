@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Recommendation letters
 slug: global-top500-351-recommendation-letters
-version: 1.1.0
+version: 1.2.0
 type: regex
 engine: boost_regex
 description: >-
@@ -11,7 +11,7 @@ operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
 pattern: >-
-  (?is)\b(?:recommendation\s+letter|letter\s+of\s+reference|referee\s+report|academic\s+reference|character\s+reference|professional\s+reference|endorsement\s+letter|reference\s+check|faculty\s+recommendation|supervisor\s+reference|personal\s+statement)\b
+  (?is)\b(?:recommendation\s+letters?|letter\s+of\s+reference|referee\s+report|academic\s+reference|character\s+reference|professional\s+reference|endorsement\s+letter|faculty\s+recommendation|supervisor\s+reference)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
@@ -33,6 +33,8 @@ test_cases:
   should_match:
     - value: recommendation letter
       description: Primary topic phrase match
+    - value: recommendation letters
+      description: Plural form as used in structured document labels and real-world usage; regressed to 0 detections before this fix because the base regex required a singular, non-continuing "letter"
     - value: letter of reference
       description: Case-insensitive topic phrase match
     - value: referee report
@@ -46,6 +48,10 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: student grant
       description: Generic word pair from old broad template should not match
+    - value: reference check results
+      description: Generic vendor/HR term removed from the regex (2026-07 FP fix) after proving overbroad — matched in unrelated vendor due-diligence decoy documents
+    - value: personal statement
+      description: Generic term removed from the regex (2026-07 FP fix) — not specific to the recommendation-letters domain
 false_positives:
   - description: Common words and phrases related to recommendation letters appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -101,7 +107,7 @@ purview:
   regexes:
     - id: Regex_recommendation_letters
       pattern: >-
-        (?is)\b(?:recommendation\s+letter|letter\s+of\s+reference|referee\s+report|academic\s+reference|character\s+reference|professional\s+reference|endorsement\s+letter|reference\s+check|faculty\s+recommendation|supervisor\s+reference|personal\s+statement)\b
+        (?is)\b(?:recommendation\s+letters?|letter\s+of\s+reference|referee\s+report|academic\s+reference|character\s+reference|professional\s+reference|endorsement\s+letter|faculty\s+recommendation|supervisor\s+reference)\b
     - id: Pattern_global_top500_351_recommendation_letters_label_context
       pattern: (?i)\b(?:recommendation\s+letters)\b
   keywords:
@@ -110,6 +116,7 @@ purview:
         - match_style: word
           terms:
             - recommendation letter
+            - recommendation letters
             - letter of reference
             - referee report
             - academic reference
@@ -117,10 +124,8 @@ purview:
             - professional reference
             - endorsement letter
             - recommender
-            - reference check
             - faculty recommendation
             - supervisor reference
-            - personal statement
       strength: specific
     - id: Keyword_global_top500_351_recommendation_letters_domain_context
       groups:
@@ -133,6 +138,9 @@ purview:
 created: '2026-02-08'
 updated: '2026-07-04'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-04'
+    description: 'Narrow overbroad phrases (FALSE_POSITIVE verdict: ps=ph=0, decoy false-fire) and align regex with positive test values: add plural recommendation\s+letters? (docs use plural exclusively), remove overbroad reference\s+check (88 hits in unrelated vendor decoy) and personal\s+statement'
   - version: 1.1.0
     date: '2026-07-04'
     description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
