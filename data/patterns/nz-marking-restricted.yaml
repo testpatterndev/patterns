@@ -14,11 +14,11 @@ description: >-
   case-sensitively.
 operation: >-
   Tier 85 matches the verified national-security marking format: RESTRICTED followed immediately by
-  the double-forward-slash control/dissemination-marking separator. Tier 85 (separate id) also
-  matches the legacy SEEMail bracket form [RESTRICTED]. Tier 65 matches the bare RESTRICTED banner,
+  the double-forward-slash control/dissemination-marking separator. Tier 75 matches the legacy
+  SEEMail bracket form [RESTRICTED] (attested but business-reused, so it sits below the // tier). Tier 65 matches the bare RESTRICTED banner,
   gated by New Zealand government/PSR corroborative context and a NOT-exclusion for common
   non-government "RESTRICTED" collocations (RESTRICTED AREA, AGE RESTRICTED, etc).
-pattern: '\bRESTRICTED//|\[RESTRICTED\]'
+pattern: '\bRESTRICTED//[A-Z]|\[RESTRICTED\]'
 confidence: high
 confidence_justification: >-
   High confidence on the `//` national-security-marking form and the legacy-bracket form: both are
@@ -66,24 +66,26 @@ test_cases:
       description: bare tier excluded by the template/noise NOT-group (documentation/sample content)
 false_positives:
   - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare RESTRICTED banner tier relies on.
-    mitigation: Treat banner-tier-only (65) hits as lower confidence when the surrounding text is itself all-caps; the `//` and legacy-bracket tiers (85) remain the reliable signal.
+    mitigation: Treat banner-tier-only (65) hits as lower confidence when the surrounding text is itself all-caps; the `//` tier (85) and legacy-bracket tier (75) remain the reliable signal.
   - description: >-
       RESTRICTED is an extremely common English word in everyday non-government usage (RESTRICTED
       AREA, RESTRICTED ACCESS, ACCESS RESTRICTED, AGE RESTRICTED, RESTRICTED STOCK, RESTRICTED USE,
       USE RESTRICTED), all of which are more common in general text than the PSR classification
       marking.
-    mitigation: The bare tier (65) requires New Zealand government/PSR corroborative evidence and excludes this collocation set via a dedicated NOT-group. The `//` and bracket tiers (85) are unaffected — they are structurally distinctive and do not require the gate.
+    mitigation: The bare tier (65) requires New Zealand government/PSR corroborative evidence and excludes this collocation set via a dedicated NOT-group. The `//` (85) and bracket (75) tiers are unaffected — they are structurally distinctive and do not require the gate.
   - description: >-
       The SEEMail square-bracket trigger-word convention ([RESTRICTED]) is being decommissioned
       during 2026 as the Secure Government Email (SGE) Framework replaces SEEMail. RESTRICTED is
       confirmed as one of SEEMail's five bracket trigger words (the complete list is [SEEMAIL],
       [TRUSTED], [RESTRICTED], [SENSITIVE], [IN-CONFIDENCE] — verified directly against the PSR
       marking-guidance page), so this tier reflects a real, current, if soon-to-be-legacy convention.
-    mitigation: Weight the bracket tier (85) as a transitional/legacy indicator; the `//` and gated bare-banner tiers reflect the durable PSR marking convention and are expected to remain valid after SEEMail's decommissioning.
+    mitigation: Weight the bracket tier (75) as a transitional/legacy indicator; the `//` and gated bare-banner tiers reflect the durable PSR marking convention and are expected to remain valid after SEEMail's decommissioning.
   - description: >-
       The `\bRESTRICTED//` trigger requires the double-forward-slash to immediately follow the
       classification word with no space. No verified source shows a spaced variant (e.g.
-      "RESTRICTED //"); if one exists in the wild it would not be matched by this tier.
+      "RESTRICTED //"); if one exists in the wild it would not be matched by this tier. The regex
+      additionally requires an uppercase letter immediately after the separator (//[A-Z]) so that
+      accidental double-slashes in URLs or file paths (e.g. /RESTRICTED//shared/) cannot fire it.
     mitigation: No mitigation implemented; documented as a known coverage gap rather than broadening the regex on unverified syntax.
 exports:
   - purview_xml
@@ -120,7 +122,7 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
+    - confidence_level: 75
       id_match: Regex_nz_restricted_bracket
       matches:
         - type: any
@@ -144,7 +146,7 @@ purview:
             - Keyword_restricted_collocation_exclusion
   regexes:
     - id: Regex_nz_restricted_nsi
-      pattern: '\bRESTRICTED//'
+      pattern: '\bRESTRICTED//[A-Z]'
     - id: Regex_nz_restricted_bracket
       pattern: '\[RESTRICTED\]'
     - id: Regex_nz_restricted_bare
