@@ -44,6 +44,20 @@ const STRUCTURAL_DICT_STRENGTH = new Map([
 //    because these acronyms legitimately appear in mixed/lower case in the config files/paths being
 //    matched (customsettings.ini, sftp-config.json) and the surrounding regex context is already
 //    highly specific, so case-sensitivity would only lose recall without reducing false positives.
+//  - nz-marking-{in-confidence,sensitive}: same protective-marking architecture as the AU marking
+//    SITs above (canonical 65/75/85 levels this time, so no nonCanonical flag), but their 85-tiers
+//    (endorsed form, legacy SEEMail bracket form) are gated only by a template-exclusion NOT-group,
+//    not a positive keyword ref — the case-sensitive ALL-CAPS/structural marking regex itself is the
+//    high-confidence evidence, matching every other protective-marking SIT's design in this repo.
+//  - nz-marking-{restricted,confidential}: same rationale as nz-marking-{in-confidence,sensitive}.
+//    Their 85-tiers (the verified `//` national-security-marking form, and RESTRICTED's legacy
+//    SEEMail bracket form) are gated only by the template-exclusion NOT-group — the structural
+//    regex is the evidence. (confidential's 75 bracket tier is genuinely AND-gated by
+//    nz-government-context and does not need this exclusion; only its ungated 85-tier does.)
+//  - nz-marking-secret-topsecret: same rationale again. Both 85-tiers (the verified `//`
+//    national-security-marking form, and the TOP SECRET banner-words phrase) are gated only by
+//    the template-exclusion NOT-group — the structural regex is the evidence. Its 75 bare-SECRET
+//    tier is genuinely AND-gated by nz-government-context and does not need this exclusion.
 const EXCLUDED_FILES = new Set([
   'au-marking-official.yaml',
   'au-marking-protected.yaml',
@@ -51,7 +65,12 @@ const EXCLUDED_FILES = new Set([
   'au-marking-sensitive.yaml',
   'au-pspf-security-classification.yaml',
   'snaffler-domain-join-creds.yaml',
-  'snaffler-ftp-credentials.yaml'
+  'snaffler-ftp-credentials.yaml',
+  'nz-marking-in-confidence.yaml',
+  'nz-marking-sensitive.yaml',
+  'nz-marking-restricted.yaml',
+  'nz-marking-confidential.yaml',
+  'nz-marking-secret-topsecret.yaml'
 ])
 
 function loadYaml(filePath) {

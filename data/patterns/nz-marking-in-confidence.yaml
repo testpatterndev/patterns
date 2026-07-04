@@ -1,0 +1,131 @@
+schema: testpattern/v1
+name: New Zealand Marking - IN-CONFIDENCE
+slug: nz-marking-in-confidence
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects the New Zealand Government IN-CONFIDENCE protective marking under the Protective
+  Security Requirements (PSR) classification system: endorsed forms (e.g. MEDICAL IN-CONFIDENCE,
+  BUDGET: IN-CONFIDENCE), the legacy SEEMail bracket trigger-word convention ([IN-CONFIDENCE]),
+  and the bare ALL-CAPS document-banner form. Regex logic verified against the official PSR
+  Classification Handbook (protectivesecurity.govt.nz) and Cabinet Office Circular CO(08)1;
+  matched case-sensitively.
+operation: >-
+  Tier 85 matches an endorsed form (an endorsement word directly followed by IN-CONFIDENCE,
+  space- or colon-separated). Tier 85 also matches the legacy SEEMail bracket form
+  [IN-CONFIDENCE]. Tier 75 matches the bare IN-CONFIDENCE document/email banner, gated by a
+  template/noise NOT-exclusion to suppress documentation-sample hits.
+pattern: '\b(?:POLICY|MEDICAL|STAFF|EVALUATIVE|COMMERCIAL|APPOINTMENTS|HONOURS|BUDGET)(?:\s+|:\s*)IN-CONFIDENCE\b|\[IN-CONFIDENCE\]'
+confidence: high
+confidence_justification: >-
+  High confidence on the endorsed and legacy-bracket forms: both are case-sensitive, structured
+  markings with low natural-English collision risk. The bare IN-CONFIDENCE banner (75) is a
+  distinctive hyphenated compound absent from ordinary prose, but is one tier lower and gated by
+  a template/noise NOT-exclusion since it lacks the endorsement/bracket's structural signal.
+jurisdictions:
+  - nz
+regulations:
+  - "Privacy Act 2020 (NZ)"
+frameworks:
+  - PSR
+data_categories:
+  - government
+  - security
+case_sensitive: true
+corroborative_evidence:
+  keywords:
+    - New Zealand
+    - PSR
+    - Protective Security Requirements
+    - Cabinet
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "This memo is marked MEDICAL IN-CONFIDENCE and must not be forwarded outside HR."
+      description: Endorsed form, space-separated — matches the PSR Classification Handbook's own worked example (MEDICAL IN-CONFIDENCE)
+    - value: "Cabinet paper: BUDGET:IN-CONFIDENCE — do not distribute before the Budget announcement."
+      description: 'Endorsed form, colon-separated — matches the Cabinet Office Circular CO(08)1 convention (e.g. "Commercial: In Confidence")'
+    - value: "The attached briefing is classified BUDGET\nIN-CONFIDENCE pending Cabinet sign-off."
+      description: PDF-wrapped endorsed form — line wrap inserts a newline between the endorsement and the classification word
+    - value: "Subject: [IN-CONFIDENCE] Draft policy paper for review"
+      description: Legacy SEEMail bracket trigger-word form
+    - value: "IN-CONFIDENCE\nMinistry of Business, Innovation and Employment — briefing for the Minister"
+      description: Bare document-banner form (PSR Classification Handbook document-marking convention — centred, bold, ALL CAPS)
+  should_not_match:
+    - value: "Please keep this in confidence between us until the announcement."
+      description: lowercase English idiom (case-sensitive exclusion)
+    - value: "IN-CONFIDENCE (template) — replace this sample paragraph with your own content"
+      description: bare banner tier excluded by the template/noise NOT-group (documentation/sample content)
+    - value: "STAFF IN CONFIDENCE handling applies to this personnel file"
+      description: "non-hyphenated \"IN CONFIDENCE\" (two words) is a known coverage gap — canonical PSR guidance renders the classification as the single hyphenated token IN-CONFIDENCE"
+false_positives:
+  - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare IN-CONFIDENCE banner tier relies on.
+    mitigation: Treat banner-tier-only (75) hits as lower confidence when the surrounding text is itself all-caps; the endorsed and legacy-bracket tiers (85) remain the reliable signal.
+  - description: The SEEMail square-bracket trigger-word convention ([IN-CONFIDENCE]) is being decommissioned during 2026 as the Secure Government Email (SGE) Framework replaces SEEMail. It retains legacy detection value for circulated documents and email archives but is not the durable long-term signal.
+    mitigation: Weight the bracket tier (85) as a transitional/legacy indicator; the endorsed and bare-banner tiers reflect the current PSR Classification Handbook convention and are expected to remain valid after SEEMail's decommissioning.
+  - description: The non-hyphenated form "IN CONFIDENCE" (two words, no hyphen) is not matched — canonical PSR guidance renders it as the single hyphenated token "IN-CONFIDENCE", but some agency drafting may omit the hyphen.
+    mitigation: No mitigation implemented; documented as a known coverage gap for a future revision.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+risk_rating: 6
+risk_description: >-
+  IN-CONFIDENCE is the minimum PSR classification tier, indicating information whose compromise
+  would likely prejudice law and order, impede government conduct in New Zealand, or adversely
+  affect personal privacy.
+sensitivity_labels:
+  psr: IN-CONFIDENCE
+  pspf: "OFFICIAL: Sensitive"
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  au_gov: "OFFICIAL: Sensitive"
+  ca_gov: "Protected A"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_nz_in_confidence_endorsed
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_nz_in_confidence_bracket
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_nz_in_confidence_bare
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_nz_in_confidence_endorsed
+      pattern: '\b(?:POLICY|MEDICAL|STAFF|EVALUATIVE|COMMERCIAL|APPOINTMENTS|HONOURS|BUDGET)(?:\s+|:\s*)IN-CONFIDENCE\b'
+    - id: Regex_nz_in_confidence_bracket
+      pattern: '\[IN-CONFIDENCE\]'
+    - id: Regex_nz_in_confidence_bare
+      pattern: '\bIN-CONFIDENCE\b'
+created: '2026-07-04'
+updated: '2026-07-04'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-04'
+    description: Initial release — endorsed, legacy SEEMail-bracket, and bare-banner IN-CONFIDENCE tiers per the PSR Classification Handbook and Cabinet Office Circular CO(08)1.
+author: testpattern-community
+license: MIT
