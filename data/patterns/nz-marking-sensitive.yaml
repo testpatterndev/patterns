@@ -1,0 +1,155 @@
+schema: testpattern/v1
+name: New Zealand Marking - SENSITIVE
+slug: nz-marking-sensitive
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects the New Zealand Government SENSITIVE protective marking under the Protective Security
+  Requirements (PSR) classification system: the legacy SEEMail bracket trigger-word convention
+  ([SENSITIVE]), endorsed forms (e.g. BUDGET SENSITIVE, COMMERCIAL: SENSITIVE, CABINET SENSITIVE),
+  and the bare ALL-CAPS document-banner form gated by New Zealand government context. Regex logic
+  verified against the official PSR Classification Handbook (protectivesecurity.govt.nz) and
+  Cabinet Office Circular CO(08)1; matched case-sensitively.
+operation: >-
+  Tier 85 matches the legacy SEEMail bracket form [SENSITIVE]. Tier 85 also matches an endorsed
+  form (an endorsement word directly followed by SENSITIVE, space- or colon-separated). Tier 65
+  matches the bare SENSITIVE banner, gated by New Zealand government/PSR corroborative context
+  and a NOT-exclusion for generic commercial-sensitivity idioms (e.g. COMMERCIALLY SENSITIVE).
+pattern: '\b(?:BUDGET|COMMERCIAL|CABINET)(?:\s+|:\s*)SENSITIVE\b|\[SENSITIVE\]'
+confidence: high
+confidence_justification: >-
+  High confidence on the legacy-bracket and endorsed forms: both are case-sensitive, structured
+  markings with low natural-English collision risk. The bare SENSITIVE banner (65) is a common
+  English word and is the widest tier, so it requires positive New Zealand government/PSR
+  corroborative evidence plus a NOT-exclusion for generic commercial-sensitivity idioms.
+jurisdictions:
+  - nz
+regulations:
+  - "Privacy Act 2020 (NZ)"
+frameworks:
+  - PSR
+data_categories:
+  - government
+  - security
+case_sensitive: true
+corroborative_evidence:
+  keywords:
+    - New Zealand
+    - PSR
+    - Protective Security Requirements
+    - Cabinet
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Please treat this document as BUDGET SENSITIVE until the Minister's announcement."
+      description: Endorsed form, space-separated (Cabinet Office Circular CO(08)1 endorsement)
+    - value: "COMMERCIAL:SENSITIVE — do not release without General Counsel approval."
+      description: Endorsed form, colon-separated, no space
+    - value: "This Cabinet paper is classified CABINET\nSENSITIVE and restricted to Ministers only."
+      description: PDF-wrapped endorsed form — line wrap inserts a newline between the endorsement and the classification word
+    - value: "Subject: [SENSITIVE] Draft Cabinet paper for review"
+      description: Legacy SEEMail bracket trigger-word form
+    - value: "New Zealand Government agencies must handle this SENSITIVE report under PSR requirements."
+      description: Bare banner form gated by New Zealand government/PSR corroborative evidence within 300 characters
+  should_not_match:
+    - value: "This report contains sensitive information about the ongoing negotiation."
+      description: lowercase English word (case-sensitive exclusion)
+    - value: "THIS DOCUMENT IS COMMERCIALLY SENSITIVE — TREASURY BRIEFING NOTE"
+      description: bare tier excluded by the commercial-sensitivity NOT-group; COMMERCIALLY (not COMMERCIAL) also fails the endorsed-form word boundary
+    - value: "SENSITIVE (sample) — replace with your organisation's Cabinet material"
+      description: bare tier excluded by the template/noise NOT-group (documentation/sample content)
+false_positives:
+  - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare SENSITIVE banner relies on.
+    mitigation: Treat banner-tier-only (65) hits as lower confidence when the surrounding text is itself all-caps; the legacy-bracket and endorsed tiers (85) remain the reliable signal.
+  - description: Uppercase SENSITIVE in generic commercial-sensitivity idioms (e.g. "COMMERCIALLY SENSITIVE", "MARKET SENSITIVE") is common in non-government business writing and is unrelated to PSR classification.
+    mitigation: The bare tier (65) requires New Zealand government/PSR corroborative evidence and excludes the commercial-sensitivity idiom set via a dedicated NOT-group.
+  - description: The Australian PSPF SIT (au-marking-sensitive) also detects a bare ALL-CAPS SENSITIVE banner gated by Australian government context. Text that is ambiguously or jointly Australian/New Zealand government context (e.g. trans-Tasman agency correspondence) can legitimately fire both SITs on the same SENSITIVE occurrence.
+    mitigation: This is expected, acceptable co-firing rather than a defect — downstream consumers should treat concurrent AU/NZ SENSITIVE hits as a signal to check which jurisdiction's corroborative evidence actually matched, not as a false positive to suppress.
+  - description: The SEEMail square-bracket trigger-word convention ([SENSITIVE]) is being decommissioned during 2026 as the Secure Government Email (SGE) Framework replaces SEEMail. It retains legacy detection value for circulated documents and email archives but is not the durable long-term signal.
+    mitigation: Weight the bracket tier (85) as a transitional/legacy indicator; the endorsed and bare-banner tiers reflect the current PSR Classification Handbook convention and are expected to remain valid after SEEMail's decommissioning.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  SENSITIVE is a high-impact PSR classification tier, indicating information whose compromise
+  would likely cause harm to organisations, damage the interests of New Zealand, or endanger the
+  safety or wellbeing of its citizens.
+sensitivity_labels:
+  psr: SENSITIVE
+  pspf: SENSITIVE
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  au_gov: SENSITIVE
+  ca_gov: "Protected B"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 65
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+    - dict: nz-government-context
+      as: Keyword_nz_gov_context
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_nz_sensitive_bracket
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_nz_sensitive_endorsed
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_nz_sensitive_bare
+      matches:
+        - ref: Keyword_nz_gov_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_commercial_sensitive_exclusion
+  regexes:
+    - id: Regex_nz_sensitive_bracket
+      pattern: '\[SENSITIVE\]'
+    - id: Regex_nz_sensitive_endorsed
+      pattern: '\b(?:BUDGET|COMMERCIAL|CABINET)(?:\s+|:\s*)SENSITIVE\b'
+    - id: Regex_nz_sensitive_bare
+      pattern: '\bSENSITIVE\b'
+  keywords:
+    - id: Keyword_commercial_sensitive_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - text: COMMERCIALLY SENSITIVE
+              case_sensitive: true
+            - text: COMMERCIAL-IN-CONFIDENCE
+              case_sensitive: true
+            - text: COMMERCIAL SENSITIVE
+              case_sensitive: true
+            - text: MARKET SENSITIVE
+              case_sensitive: true
+created: '2026-07-04'
+updated: '2026-07-04'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-04'
+    description: Initial release — legacy SEEMail-bracket, endorsed, and government-context-gated bare-banner SENSITIVE tiers per the PSR Classification Handbook and Cabinet Office Circular CO(08)1.
+author: testpattern-community
+license: MIT

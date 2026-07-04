@@ -44,6 +44,11 @@ const STRUCTURAL_DICT_STRENGTH = new Map([
 //    because these acronyms legitimately appear in mixed/lower case in the config files/paths being
 //    matched (customsettings.ini, sftp-config.json) and the surrounding regex context is already
 //    highly specific, so case-sensitivity would only lose recall without reducing false positives.
+//  - nz-marking-{in-confidence,sensitive}: same protective-marking architecture as the AU marking
+//    SITs above (canonical 65/75/85 levels this time, so no nonCanonical flag), but their 85-tiers
+//    (endorsed form, legacy SEEMail bracket form) are gated only by a template-exclusion NOT-group,
+//    not a positive keyword ref — the case-sensitive ALL-CAPS/structural marking regex itself is the
+//    high-confidence evidence, matching every other protective-marking SIT's design in this repo.
 const EXCLUDED_FILES = new Set([
   'au-marking-official.yaml',
   'au-marking-protected.yaml',
@@ -51,7 +56,9 @@ const EXCLUDED_FILES = new Set([
   'au-marking-sensitive.yaml',
   'au-pspf-security-classification.yaml',
   'snaffler-domain-join-creds.yaml',
-  'snaffler-ftp-credentials.yaml'
+  'snaffler-ftp-credentials.yaml',
+  'nz-marking-in-confidence.yaml',
+  'nz-marking-sensitive.yaml'
 ])
 
 function loadYaml(filePath) {
