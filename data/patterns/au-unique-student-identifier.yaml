@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Unique Student Identifier
 slug: au-unique-student-identifier
-version: 1.2.0
+version: 1.4.0
 type: regex
 engine: universal
 description: Detects Unique Student Identifier (USI) patterns. A 10-character alphanumeric code (uppercase letters and digits) mandatory since January 2023 for higher education in Australia.
@@ -9,7 +9,7 @@ operation: >-
   Regex pattern using universal engine. The top-level regex \b[A-Z0-9]{10}\b matches exactly 10 uppercase alphanumeric characters. The Purview engine uses two regexes: Pattern_usi_labeled (labeled
   format with USI/Unique Student Identifier/student identifier prefix + 10 alphanumeric chars) and Pattern_au_usi (bare 10-char format). Three confidence tiers: High (85) requires USI terms +
   education context keywords with template exclusion logic; Medium (75) requires USI terms + education context keywords; Low (65) requires USI terms only. Evidence uses 2 keyword groups (7 USI terms,
-  13 education context terms) within 300-character proximity. Keyword lists: au-identity-usi, industry-education.
+  13 education context terms) within 500-character proximity. Keyword lists: au-identity-usi, industry-education.
 pattern: \b[A-Z0-9]{10}\b
 confidence: low
 confidence_justification: >-
@@ -32,7 +32,7 @@ corroborative_evidence:
     - USI
     - unique student identifier
     - student identifier
-  proximity: 300
+  proximity: 500
   keyword_lists:
     - au-identity-usi
     - industry-education
@@ -89,29 +89,25 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 purview:
-  patterns_proximity: 300
-  recommended_confidence: 75
+  patterns_proximity: 500
+  recommended_confidence: 65
   shared_keywords:
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Pattern_usi_labeled
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Pattern_usi_labeled
+          - Pattern_au_usi
       matches:
         - ref: Evidence_usi_terms
         - ref: Evidence_education_context
       excludes:
         - ref: Evidence_template_exclusion
-    - confidence_level: 75
-      id_match: Pattern_au_usi
-      matches:
-        - ref: Evidence_usi_terms
-        - ref: Evidence_education_context
-    - confidence_level: 65
-      id_match: Pattern_au_usi
-      matches:
-        - ref: Evidence_usi_terms
   regexes:
     - id: Pattern_au_usi
       pattern: \b[A-Z0-9]{10}\b
@@ -122,13 +118,16 @@ purview:
       groups:
         - match_style: word
           terms:
-            - USI
+            - text: USI
+              case_sensitive: true
             - unique student identifier
             - student identifier
-            - VET
+            - text: VET
+              case_sensitive: true
             - vocational education
             - TAFE
             - training
+      strength: noise
     - id: Evidence_education_context
       groups:
         - match_style: word
@@ -143,9 +142,11 @@ purview:
             - training
             - course
             - qualification
-            - RTO
+            - text: RTO
+              case_sensitive: true
             - registered training organisation
             - AVETMISS
+      strength: noise
   filters:
     - id: Guard_usi_same_digits
       type: AllDigitsSameFilter
@@ -158,6 +159,21 @@ purview:
         - "1111111111"
         - "1234567890"
 created: '2026-02-08'
-updated: '2026-06-06'
+updated: '2026-07-04'
+changelog:
+  - version: 1.4.0
+    date: '2026-07-04'
+    description: Widen patterns_proximity 300->500 so keyword evidence still gates at the challenging-layout distance (ph<50 cohort)
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: Downgraded weak high-confidence tier to 65 because independent specific/domain evidence was insufficient.; Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
 author: testpattern-community
 license: MIT
+remediation:
+  catalog_quality_2026_06_02:
+    status: applied
+    changes:
+      - 'Downgraded weak high-confidence tier to 65 because independent specific/domain evidence was insufficient.'
+      - 'Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.'
+      - 'Collapsed 3 duplicate 65-confidence tier(s) into the strictest canonical tier.'
+      - 'Aligned recommended_confidence to 65.'

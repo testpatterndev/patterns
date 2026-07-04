@@ -25,6 +25,26 @@ const errors = [], warns = []
 
 const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(b, fl) }
 
+// Purview (Boost.RegEx) banned constructs — patterns with a purview block fail CI; others warn.
+const stripClasses = (src) => src.replace(/\[(?:[^\]\\]|\\.)*\]/g, '[]')
+function purviewBanned(src) {
+  const s = stripClasses(src)
+  const issues = []
+  if (/[+*]\)[*+]|[+*]\)\{/.test(s)) issues.push('nested quantifier')
+  if (/(?<!\\)\.(?:[*+]|\{\d+,?\d*\})/.test(s)) issues.push('unbounded/braced dot quantifier')
+  // Char classes are already stripped to literal `[]`, so any surviving ^ or $ is outside
+  // a class. Only unescaped anchors count — `\^`/`\$` are literal chars, not anchors.
+  if (/(?<!\\)\^|(?<!\\)\$/.test(s)) issues.push('^/$ anchor')
+  const captures = (s.replace(/\(\?[:=!<]/g, '(?x').match(/\((?!\?)/g) || []).length
+  if (captures > 1) issues.push(`${captures} capturing groups`)
+  // Boost.RegEx allows FIXED-length lookbehinds (e.g. `\s{3}`) — only variable-length
+  // quantifiers (*, +, ?, {n,}, {n,m}) inside the body are banned. Note this also flags a
+  // `?` belonging to a nested (?:...) group inside the lookbehind body; that's acceptable
+  // since a nested group makes the lookbehind's length variable-risk regardless.
+  if (/\(\?<[=!][^)]*(?:[*+?]|\{\d+,)/.test(s)) issues.push('variable-length lookbehind')
+  return issues
+}
+
 for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   let p
   try { p = yaml.load(readFileSync(join(patDir, f), 'utf-8')) }
@@ -39,6 +59,10 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   for (const { id, src } of regexes) {
     if (/\\\\[bdswWDSnrt]/.test(src)) errors.push(`${p.slug}: ${id} double-escaped regex`)
     if (/\|top500\)/.test(src)) errors.push(`${p.slug}: ${id} contains |top500 generator token`)
+    for (const bad of purviewBanned(src)) {
+      const msg = `${p.slug}: ${id} Purview-banned construct — ${bad}`
+      if (p.purview) errors.push(msg); else warns.push(msg)
+    }
   }
   for (const kl of p.corroborative_evidence?.keyword_lists ?? []) if (!kwSlugs.has(kl)) errors.push(`${p.slug}: missing keyword_list '${kl}'`)
   for (const sk of p.purview?.shared_keywords ?? []) if (sk.dict && !kwSlugs.has(sk.dict)) errors.push(`${p.slug}: missing shared dict '${sk.dict}'`)
@@ -57,7 +81,7 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
     const terms = (p.keywords ?? []).map(t => String(t).toLowerCase().trim()).filter(Boolean)
     if (!terms.length) continue
     for (const tc of p.test_cases?.should_match ?? []) { const v = String(tc.value).toLowerCase(); if (!terms.some(t => v.includes(t))) errors.push(`${p.slug}: keyword_list should_match has no listed keyword — ${JSON.stringify(tc.value).slice(0, 50)}`) }
-    for (const tc of p.test_cases?.should_not_match ?? []) { const v = String(tc.value).toLowerCase(); if (terms.some(t => v.includes(t))) warns.push(`${p.slug}: keyword_list should_not_match contains a listed keyword — ${JSON.stringify(tc.value).slice(0, 50)}`) }
+    for (const tc of p.test_cases?.should_not_match ?? []) { const v = String(tc.value).toLowerCase(); if (terms.some(t => v.includes(t))) errors.push(`${p.slug}: keyword_list should_not_match contains a listed keyword — ${JSON.stringify(tc.value).slice(0, 50)}`) }
     continue
   }
   for (const tc of p.test_cases?.should_match ?? []) if (compiled.length && !compiled.some(re => re.test(String(tc.value)))) errors.push(`${p.slug}: should_match not matched — ${JSON.stringify(tc.value).slice(0, 60)}`)

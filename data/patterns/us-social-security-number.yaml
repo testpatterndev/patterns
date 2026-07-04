@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: US Social Security Number
 slug: us-social-security-number
-version: 1.0.0
+version: 1.2.0
 type: regex
 engine: boost_regex
 description: >-
@@ -74,32 +74,35 @@ exports:
 scope: narrow
 purview:
   patterns_proximity: 300
-  recommended_confidence: 95
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 95
-      id_match: Regex_us_ssn_formatted
-      matches:
-        - ref: Keyword_us_ssn_specific
-    - confidence_level: 95
-      id_match: Regex_us_ssn_unformatted
-      matches:
-        - ref: Keyword_us_ssn_specific
     - confidence_level: 85
-      id_match: Regex_us_ssn_formatted
+      id_match:
+        type: any
+        ids:
+          - Regex_us_ssn_formatted
+          - Regex_us_ssn_unformatted
       matches:
         - ref: Keyword_us_ssn_broad
     - confidence_level: 85
-      id_match: Regex_us_ssn_unformatted
+      id_match:
+        type: any
+        ids:
+          - Regex_us_ssn_formatted
+          - Regex_us_ssn_unformatted
       matches:
-        - ref: Keyword_us_ssn_broad
-    - confidence_level: 75
-      id_match: Regex_us_ssn_formatted
-    - confidence_level: 75
-      id_match: Regex_us_ssn_unformatted
+        - ref: Keyword_us_ssn_specific
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_us_ssn_formatted
+          - Regex_us_ssn_unformatted
   regexes:
     - id: Regex_us_ssn_formatted
       pattern: \b(?!000|666|9\d{2})\d{3}[-\s]?(?!00)\d{2}[-\s]?(?!0000)\d{4}\b
@@ -116,15 +119,18 @@ purview:
           terms:
             - Social Security
             - Social Security Number
-            - SSN
+            - text: SSN
+              case_sensitive: true
             - SS#
             - SSID
-            - SS #
+            - text: SS #
+              case_sensitive: true
             - SSN#
             - S.S.N.
             - social security#
             - social security no
             - social security no.
+      strength: domain
     - id: Keyword_us_ssn_broad
       groups:
         - match_style: word
@@ -135,13 +141,18 @@ purview:
             - taxpayer identification
             - tax ID
             - tax identification number
-            - TIN
+            - text: TIN
+              case_sensitive: true
             - individual taxpayer
             - ITIN
-            - W-2
-            - W-9
-            - I-9
+            - text: W-2
+              case_sensitive: true
+            - text: W-9
+              case_sensitive: true
+            - text: I-9
+              case_sensitive: true
             - Form 1099
+      strength: specific
   filters:
     - id: Filter_us_ssn_same_digits
       type: AllDigitsSameFilter
@@ -169,6 +180,22 @@ sensitivity_labels:
   nz_gov: "RESTRICTED"
   ca_gov: "Protected B"
 created: '2026-02-08'
-updated: '2026-02-12'
+updated: '2026-07-04'
+changelog:
+  - version: 1.2.0
+    date: '2026-07-04'
+    description: Restore a pattern_tiers entry the bulk collapse dropped when confidence canonicalization put two distinct-evidence tiers in the same bucket and mergeDuplicateTiers kept only one; the dropped tier carried genuine domain-specific evidence, now reinstated alongside the surviving tier
+  - version: 1.1.0
+    date: '2026-07-04'
+    description: Mapped non-canonical confidence 95 to 85.; Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
 author: testpattern-community
 license: MIT
+remediation:
+  catalog_quality_2026_06_02:
+    status: applied
+    changes:
+      - 'Mapped non-canonical confidence 95 to 85.'
+      - 'Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.'
+      - 'Collapsed 4 duplicate 85-confidence tier(s) into the strictest canonical tier.'
+      - 'Collapsed 2 duplicate 65-confidence tier(s) into the strictest canonical tier.'
+      - 'Aligned recommended_confidence to 85.'

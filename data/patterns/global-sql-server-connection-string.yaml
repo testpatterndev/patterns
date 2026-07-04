@@ -1,14 +1,14 @@
 schema: testpattern/v1
 name: SQL Server
 slug: global-sql-server-connection-string
-version: 1.1.1
+version: 1.4.0
 type: regex
 engine: universal
 description: >-
   Detects SQL Server patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use
   this version as a starting point for customisation.
 operation: 'Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.'
-pattern: Server=[^;]+;Database=[^;]+;(?:User Id|Uid)=[^;]+;(?:Password|Pwd)=[^;]+
+pattern: Server=[^;]+;Database=[^;]+;(?:User\s+Id|Uid)=[^;]+;(?:Password|Pwd)=[^;]+
 confidence: high
 confidence_justification: >-
   High confidence: structurally constrained pattern with corroborative keyword support reduces false positive rates significantly. Added context gating and exclusion rules improve precision and reduce
@@ -92,7 +92,7 @@ purview:
       as: Evidence_generic_data_labels
       match_style: word
   pattern_tiers:
-    - confidence_level: 90
+    - confidence_level: 85
       id_match: Regex_sql_connection_string
       matches:
         - ref: Pattern_global_sql_server_connection_string_label_context
@@ -102,28 +102,22 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
+    - confidence_level: 75
+      id_match:
+        type: any
+        ids:
+          - Regex_connstring_datasource_pw_a
+          - Regex_connstring_datasource_pw_b
+      matches:
+        - ref: Keyword_sql_connection
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
       id_match: Regex_sql_connection_string
       matches:
-        - ref: Keyword_sql_connection
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_connstring_datasource_pw_a
-      matches:
-        - ref: Keyword_sql_connection
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_connstring_datasource_pw_b
-      matches:
-        - ref: Keyword_sql_connection
         - type: any
           min_matches: 0
           max_matches: 0
@@ -131,13 +125,13 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_sql_connection_string
-      pattern: Server=[^;]+;Database=[^;]+;(?:User Id|Uid)=[^;]+;(?:Password|Pwd)=[^;]+
+      pattern: Server=[^;]+;Database=[^;]+;(?:User\s+Id|Uid)=[^;]+;(?:Password|Pwd)=[^;]+
     - id: Pattern_global_sql_server_connection_string_label_context
       pattern: (?i)\b(?:sql\s+server|sql|server|connection|string)\b
     - id: Regex_connstring_datasource_pw_a
-      pattern: Data Source=[^;]{1,128};[\s\S]{0,400}Password=[^;]{1,128}
+      pattern: Data\s+Source=[^;]{1,128};[\s\S]{0,400}Password=[^;]{1,128}
     - id: Regex_connstring_datasource_pw_b
-      pattern: Password=[^;]{1,128};[\s\S]{0,400}Data Source=[^;]{1,128}
+      pattern: Password=[^;]{1,128};[\s\S]{0,400}Data\s+Source=[^;]{1,128}
   keywords:
     - id: Keyword_sql_connection
       groups:
@@ -155,6 +149,7 @@ purview:
             - web.config
             - app.config
             - MSSQL
+      strength: domain
     - id: Keyword_global_sql_server_connection_string_domain_context
       groups:
         - match_style: word
@@ -164,6 +159,7 @@ purview:
             - server
             - connection
             - string
+      strength: domain
 risk_rating: 10
 risk_description: >-
   Exposure of this credential could grant unauthorized access to cloud infrastructure, databases, or services. Compromised credentials are a leading cause of data breaches and can result in full
@@ -180,11 +176,20 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-sql-server-connection-string
     title: SQL Server connection string entity definition - Microsoft Learn
 created: '2026-02-08'
-updated: '2026-06-26'
+updated: '2026-07-04'
 author: testpattern-community
 source: microsoft
 license: MIT
 changelog:
+  - version: 1.4.0
+    date: '2026-07-04'
+    description: Add value-only 65 tier on the strict Server/Database/User Id/Password id_match so detection doesn't depend on keyword proximity — challenging-layout fix (ph<50 cohort)
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: Mapped non-canonical confidence 90 to 85.; Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.
+  - version: 1.2.0
+    date: '2026-07-04'
+    description: 'PDF-safety: literal spaces in "User Id" and "Data Source" connection-string key tokens replaced with \s+ across all three regexes'
   - version: 1.1.1
     date: '2026-06-26'
     note: >-
@@ -200,3 +205,10 @@ changelog:
       KeepCSharpDbConnStringsRed. Restored two should_not_match cases removed during the v1.1.0
       extend (they correctly reject against the primary id_match; the prior removal was driven by a
       harness-scoping bug now fixed).
+remediation:
+  catalog_quality_2026_06_02:
+    status: applied
+    changes:
+      - 'Mapped non-canonical confidence 90 to 85.'
+      - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
+      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
