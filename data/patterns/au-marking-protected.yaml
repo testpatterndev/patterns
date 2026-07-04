@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Marking - PROTECTED
 slug: au-marking-protected
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: boost_regex
 description: >-
@@ -53,9 +53,13 @@ test_cases:
       description: UNPROTECTED must not match PROTECTED
     - value: "Memo [SEC=OFFICIAL]"
       description: OFFICIAL belongs to au-marking-official
+    - value: "ROTATE THE API SECRET KEY QUARTERLY"
+      description: SECRET-collocation excluded from the SECRET roll-up tier by the secret-collocation NOT group
 false_positives:
   - description: Uppercase PROTECTED in non-marking contexts (e.g. "PROTECTED SPECIES").
     mitigation: Structured SEC= tier at 95; corroborative PSPF/government evidence raises banner confidence.
+  - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare PROTECTED/SECRET banners rely on — any all-caps rendering of the word can fire with no protective-marking intent.
+    mitigation: Treat banner/roll-up-tier-only hits as lower confidence when the surrounding text is itself all-caps; the structured SEC=PROTECTED tier (95) remains the reliable signal.
 exports:
   - purview_xml
   - yaml
@@ -102,6 +106,11 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_secret_collocation_exclusion
   regexes:
     - id: Regex_au_protected_struct
       pattern: '\bSEC=PROTECTED\b'
@@ -109,7 +118,28 @@ purview:
       pattern: '\bPROTECTED\b'
     - id: Regex_au_protected_secret
       pattern: '\bSECRET\b'
+  keywords:
+    - id: Keyword_secret_collocation_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - text: TRADE SECRET
+              case_sensitive: true
+            - text: TRADE SECRETS
+              case_sensitive: true
+            - text: CLIENT SECRET
+              case_sensitive: true
+            - text: SECRET KEY
+              case_sensitive: true
+            - text: API SECRET
+              case_sensitive: true
+            - text: SECRET MANAGER
+              case_sensitive: true
 created: '2026-06-29'
-updated: '2026-06-29'
+updated: '2026-07-04'
+changelog:
+  - version: 1.1.0
+    date: '2026-07-04'
+    description: 'Harden SECRET roll-up tier: add TRADE SECRET(S)/CLIENT SECRET/SECRET KEY/API SECRET/SECRET MANAGER NOT-exclusion group, document all-caps-prose false-positive limitation.'
 author: testpattern-community
 license: MIT

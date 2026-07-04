@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Marking - SENSITIVE
 slug: au-marking-sensitive
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: boost_regex
 description: >-
@@ -12,7 +12,7 @@ description: >-
 operation: >-
   Tier 90 matches the OFFICIAL: Sensitive stem (sweeping all IMM/caveat variants). Tier 75 matches
   the Queensland standalone SENSITIVE marking, gated by Australian-government corroborative context.
-pattern: '\bOFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive'
+pattern: '\bOFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive\b'
 confidence: high
 confidence_justification: >-
   High confidence on the OFFICIAL: Sensitive stem (case-sensitive, structured + banner). Standalone
@@ -52,9 +52,15 @@ test_cases:
       description: plain OFFICIAL belongs to au-marking-official
     - value: "Briefing [SEC=PROTECTED]"
       description: PROTECTED belongs to au-marking-protected
+    - value: "THIS DOCUMENT IS COMMERCIALLY SENSITIVE — DEPARTMENT OF TREASURY BRIEFING"
+      description: commercial-sensitivity collocation excluded from the QLD tier by the commercial-sensitive NOT group
+    - value: "OFFICIAL: Sensitively drafted policy note avoids naming individuals"
+      description: "Sensitively (adverb) must not match the OFFICIAL: Sensitive stem after the trailing \\b fix"
 false_positives:
   - description: Uppercase SENSITIVE in non-marking headings (e.g. "COMMERCIALLY SENSITIVE").
-    mitigation: QLD tier requires Australian-government corroborative evidence within 300 characters.
+    mitigation: QLD tier requires Australian-government corroborative evidence within 300 characters, and a dedicated NOT group excludes commercial-sensitivity collocations.
+  - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare SENSITIVE banner relies on — any all-caps rendering of the word can fire with no protective-marking intent.
+    mitigation: "Treat QLD-tier-only hits as lower confidence when the surrounding text is itself all-caps; the OFFICIAL: Sensitive stem tier (90) remains the reliable signal."
 exports:
   - purview_xml
   - yaml
@@ -95,9 +101,14 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_commercial_sensitive_exclusion
   regexes:
     - id: Regex_au_sensitive_official
-      pattern: '\bOFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive'
+      pattern: '\bOFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive\b'
     - id: Regex_au_sensitive_qld
       pattern: '\bSENSITIVE\b'
   keywords:
@@ -112,7 +123,23 @@ purview:
             - PSPF
             - department
             - agency
+    - id: Keyword_commercial_sensitive_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - text: COMMERCIALLY SENSITIVE
+              case_sensitive: true
+            - text: COMMERCIAL-IN-CONFIDENCE
+              case_sensitive: true
+            - text: COMMERCIAL SENSITIVE
+              case_sensitive: true
+            - text: MARKET SENSITIVE
+              case_sensitive: true
 created: '2026-06-29'
-updated: '2026-06-29'
+updated: '2026-07-04'
+changelog:
+  - version: 1.1.0
+    date: '2026-07-04'
+    description: 'Harden QLD SENSITIVE tier: add COMMERCIALLY SENSITIVE/COMMERCIAL-IN-CONFIDENCE/COMMERCIAL SENSITIVE/MARKET SENSITIVE NOT-exclusion group, append trailing \b to the OFFICIAL: Sensitive stem to stop Sensitively matches, document all-caps-prose false-positive limitation.'
 author: testpattern-community
 license: MIT
