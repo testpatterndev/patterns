@@ -6,11 +6,14 @@ type: regex
 engine: universal
 description: >-
   Detects French national telephone numbers per ARCEP's numbering plan: 10-digit numbers in the "0X XX XX
-  XX XX" form covering geographic (01-05) and mobile/personal (06-07) leading digits, plus the +33
-  international form (10-digit domestic number with the leading 0 dropped, per ARCEP convention). Numbers
-  beginning 08 (value-added services) and 09 (polyvalent/technical-platform numbers, e.g. app-to-driver
-  ephemeral numbers) are intentionally out of scope — these are organizational/service numbers rather than
-  personal PII, mirroring how uk-phone-number scopes out non-geographic 03/08/09 service ranges.
+  XX XX" form covering geographic (01-05), mobile/personal (06-07), and polyvalent (09) leading digits,
+  plus the +33 international form (10-digit domestic number with the leading 0 dropped, per ARCEP
+  convention). The 09 polyvalent range is in scope because it is predominantly personal PII in practice: 09
+  is the standard residential VoIP home-line range, auto-issued with consumer internet boxes to millions of
+  French households; only the small 0937-0939 sub-range carries ARCEP's newer "technical platform" category
+  (app-to-driver ephemeral numbers and similar). Numbers beginning 08 (value-added services) remain
+  intentionally out of scope — organizational/service numbers rather than personal PII, mirroring how
+  uk-phone-number scopes out non-geographic service ranges.
 operation: >-
   Validation: none (French numbers have no checksum). Reference: ARCEP, La numérotation,
   https://www.arcep.fr/la-regulation/grands-dossiers-thematiques-transverses/la-numerotation.html; ARCEP
@@ -19,11 +22,12 @@ operation: >-
   within 300 characters. Keyword lists: phone-context. Both the domestic and international (+33) sub-regexes
   are evidence-gated at every tier — no tier fires without positive corroborative evidence, per the
   phone-family convention — see confidence_justification.
-pattern: '(?<!\d)(?:\+33[\s.-]?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+pattern: '(?<!\d)(?:\+33[\s.-]?[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|0[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
 confidence: medium
 confidence_justification: >-
-  Medium confidence: the leading-digit constraint (01-07 domestic, restricting to geographic and
-  mobile/personal ranges) and the fixed 10-digit length narrow the format, but French numbers carry no
+  Medium confidence: the leading-digit constraint (01-07 and 09 domestic, restricting to geographic,
+  mobile/personal, and polyvalent ranges) and the fixed 10-digit length narrow the format, but French
+  numbers carry no
   checksum and a 10-digit sequence with those leading digits is still a high digit-collision format. Per the
   phone-family convention (every tier requires positive corroborative evidence; a +CC prefix alone is
   insufficient gating; there is no 65 rung), both the domestic and +33 international sub-regexes are
@@ -64,19 +68,21 @@ test_cases:
       description: ARCEP-reserved fictional root, geographic 02 range, dot-separated
     - value: 'International: +33 6 39 98 45 67'
       description: International +33 form of the mobile fictional root, leading 0 dropped
+    - value: 'Domicile: 09 70 12 34 56'
+      description: Polyvalent 09 residential VoIP home-line range, illustrative synthetic value (ARCEP's audiovisual-works fictional roots include no 09 root)
   should_not_match:
     - value: '08 92 68 00 00'
       description: Leading digit 8 is a value-added-service number, out of scope for this personal-communications pattern
-    - value: '09 70 12 34 56'
-      description: Leading digit 9 is a polyvalent/technical-platform number, out of scope
+    - value: '00 12 34 56 78'
+      description: Second digit 0 — "00" is the international call prefix, not a valid subscriber-number category (valid categories are 01-07 and 09)
     - value: '01 99 00 12'
       description: Only 8 digits total, two short of the required 10
     - value: '901990012345678'
       description: Valid-shaped digit run embedded inside a longer reference number, rejected by digit boundaries
 false_positives:
   - description: >-
-      A 10-digit sequence with a 01-07 leading digit can still coincidentally match invoice numbers, order
-      numbers, or other structured identifiers of the same length and leading-digit distribution.
+      A 10-digit sequence with a 01-07 or 09 leading digit can still coincidentally match invoice numbers,
+      order numbers, or other structured identifiers of the same length and leading-digit distribution.
     mitigation: >-
       Every tier — for both the domestic and +33 international sub-regexes — requires positive
       phone-context or country-specific evidence within 300 characters; no zero-evidence tier exists, so a
@@ -88,6 +94,15 @@ false_positives:
     mitigation: >-
       Rely on surrounding document context (postal addresses, entity names) rather than the leading digit for
       any geographic-attribution use case.
+  - description: >-
+      Within the 09 range, the 0937-0939 sub-range carries ARCEP's "technical platform" category
+      (organizational platform-to-customer communication numbers, e.g. app-to-driver ephemeral numbers)
+      rather than personal home lines — the regex cannot distinguish this sub-range from the residential
+      VoIP majority of the 09 block.
+    mitigation: >-
+      Accepted trade-off: the 09 block outside 0937-0939 is predominantly personal residential lines, and a
+      platform number matched in error is a low-harm false positive; evidence gating still applies at every
+      tier.
 exports:
   - purview_xml
   - yaml
@@ -132,9 +147,9 @@ purview:
         - ref: Evidence_phone_context
   regexes:
     - id: Regex_fr_phone_domestic
-      pattern: '(?<!\d)0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
+      pattern: '(?<!\d)0[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
     - id: Regex_fr_phone_intl
-      pattern: '(?<!\d)\+33[\s.-]?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
+      pattern: '(?<!\d)\+33[\s.-]?[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
   keywords:
     - id: Keyword_fr_phone_specific
       groups:
@@ -167,7 +182,7 @@ references:
   - url: https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000043910234
     title: "Légifrance: Décision n° 2021-0532 du 8 avril 2021 (plan national de numérotation), incl. §2.5.12 Numéros pour œuvres audiovisuelles"
   - url: https://www.arcep.fr/actualites/actualites-et-communiques/detail/n/plan-de-numerotation-050922.html
-    title: "ARCEP: 06/07 reserved exclusively for interpersonal communications services"
+    title: "ARCEP: 06/07 reserved for interpersonal communications; 09 polyvalent numbers incl. the technical-platform sub-category"
 created: '2026-07-06'
 updated: '2026-07-06'
 changelog:
