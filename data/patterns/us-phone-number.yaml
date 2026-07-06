@@ -1,0 +1,188 @@
+schema: testpattern/v1
+name: US Phone Number
+slug: us-phone-number
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects North American Numbering Plan (NANP) telephone numbers in US contexts: the domestic NPA-NXX-XXXX
+  form (bracketed, hyphenated, dotted, spaced, or bare, with an optional leading trunk "1") and the
+  international +1 NPA-NXX-XXXX form. Area-code (NPA) and exchange-code (NXX) groups are constrained to
+  a leading digit of 2-9 with the N11 service-code shape (211/311/411/511/611/711/811/911) excluded from
+  both groups, per NANPA's published format rules. NANP area codes are drawn from a single pool shared by
+  the US, Canada, and Caribbean member territories — the digit structure itself cannot distinguish a US
+  number from a Canadian one (see ca-phone-number for the sibling pattern). Differentiation between the two
+  patterns is by jurisdiction/regulation metadata and country-specific corroborative evidence keywords only,
+  not by regex — this is the documented convention for the whole NANP pair.
+operation: >-
+  Validation: none (NANP has no checksum; structural leading-digit and N11-exclusion constraints reduce but
+  do not eliminate digit collision with other 10-digit identifiers). Reference: North American Numbering
+  Plan Administration (NANPA), https://www.nanpa.com/. Corroborative evidence: keywords within 300
+  characters. Keyword lists: phone-context. The international (+1) form carries a distinctive literal prefix
+  and is treated as a stronger signal than the bare domestic form: it alone is given an ungated discovery
+  tier, while the domestic form's lowest tier requires generic phone-context evidence — see
+  confidence_justification.
+pattern: '(?<!\d)(?:\+1[\s.-]?\(?[2-9](?!11)\d{2}\)?[\s.-]?[2-9](?!11)\d{2}[\s.-]?\d{4}|(?:1[\s.-]?)?\(?[2-9](?!11)\d{2}\)?[\s.-]?[2-9](?!11)\d{2}[\s.-]?\d{4})(?!\d)'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: NPA/NXX leading-digit constraints (2-9) and N11 exclusion narrow the format
+  meaningfully, but a bare 10-digit US-shaped sequence still collides with invoice numbers, order numbers,
+  and other structured identifiers, so the domestic form is never offered as an ungated discovery tier — its
+  lowest tier requires phone-context evidence. The +1 international form's literal country-code prefix is
+  distinctive enough (rare outside telecom contexts) to justify an ungated 65 discovery tier on that
+  sub-regex alone, mirroring how global-iban and global-email-address use a structurally-distinctive prefix
+  to justify a bare discovery tier despite the absence of a checksum.
+jurisdictions:
+  - us
+regulations:
+  - "CCPA/CPRA"
+  - TCPA
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - pii
+  - contact-information
+corroborative_evidence:
+  keywords:
+    - phone
+    - mobile
+    - cell
+    - call
+    - text
+    - contact number
+    - US phone number
+    - call me at
+  proximity: 300
+  keyword_lists:
+    - phone-context
+test_cases:
+  should_match:
+    - value: 'Call me at (212) 555-0148'
+      description: Domestic bracketed NYC area code with fictional NANPA 555-01XX exchange
+    - value: 'Mobile: 415-555-0172'
+      description: Domestic hyphenated San Francisco area code
+    - value: 'Contact: +1 202 555 0134'
+      description: International +1 form, Washington DC area code, space-separated
+    - value: 'Phone number: 3125550199'
+      description: Domestic bare digits with no separators, Chicago area code
+  should_not_match:
+    - value: '112-555-0148'
+      description: Area code starts with 1 (NPA must start 2-9, not 0 or 1)
+    - value: '212-911-0148'
+      description: Exchange code is 911, an N11 service code, excluded from the NXX position
+    - value: '555-0148'
+      description: Only exchange + subscriber digits, no area code — not a full 10-digit number
+    - value: '42125550147123'
+      description: Valid-shaped digit run embedded inside a longer reference number, rejected by digit boundaries
+false_positives:
+  - description: >-
+      A bare 10-digit sequence with NPA/NXX leading digits in the 2-9 range and no N11 shape can still
+      coincidentally match invoice numbers, tracking numbers, or other structured identifiers of the same
+      length and leading-digit distribution.
+    mitigation: >-
+      The domestic form's lowest tier requires phone-context evidence within 300 characters rather than
+      firing as an ungated discovery match; the +1 international form is the only sub-regex offered at an
+      ungated 65 tier, since the literal country-code prefix is far less ambiguous.
+  - description: >-
+      NANP area codes are shared across the US, Canada, and Caribbean NANP member territories, so this
+      pattern's regex will also structurally match Canadian- or Caribbean-issued numbers with no way to tell
+      from the digits alone.
+    mitigation: >-
+      Deploy alongside ca-phone-number using each pattern's jurisdiction-specific evidence keywords (e.g.
+      "US phone number" vs "Canadian phone number") to bias classification, and rely on surrounding document
+      context (postal addresses, currency, entity names) for jurisdiction attribution rather than the number
+      itself.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: phone-context
+      as: Evidence_phone_context
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_us_phone_domestic
+      matches:
+        - ref: Keyword_us_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_us_phone_domestic
+      matches:
+        - ref: Evidence_phone_context
+    - confidence_level: 85
+      id_match: Regex_us_phone_intl
+      matches:
+        - ref: Keyword_us_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_us_phone_intl
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_us_phone_domestic
+      pattern: '(?<!\d)(?:1[\s.-]?)?\(?[2-9](?!11)\d{2}\)?[\s.-]?[2-9](?!11)\d{2}[\s.-]?\d{4}(?!\d)'
+    - id: Regex_us_phone_intl
+      pattern: '(?<!\d)\+1[\s.-]?\(?[2-9](?!11)\d{2}\)?[\s.-]?[2-9](?!11)\d{2}[\s.-]?\d{4}(?!\d)'
+  keywords:
+    - id: Keyword_us_phone_specific
+      groups:
+        - match_style: word
+          terms:
+            - US phone number
+            - United States phone number
+            - US mobile number
+            - American cell phone
+            - call me at
+            - text me at
+            - cell
+            - mobile
+      strength: specific
+risk_rating: 5
+risk_description: >-
+  Phone number exposure enables targeted vishing (voice phishing), smishing (SMS phishing), and social
+  engineering, and can be combined with other PII for identity correlation. Lower direct financial risk than
+  a payment or government-ID identifier on its own.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - url: https://www.nanpa.com/
+    title: "North American Numbering Plan Administration (NANPA)"
+  - url: https://www.nanpa.com/numbering/555-line-numbers
+    title: "NANPA: 555 Line Numbers (555-0100 through 555-0199 reserved for fictional use)"
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
