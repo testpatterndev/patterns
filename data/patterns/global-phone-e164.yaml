@@ -1,0 +1,173 @@
+schema: testpattern/v1
+name: Global Phone Number (E.164)
+slug: global-phone-e164
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects international telephone numbers in ITU-T E.164 form: a leading "+" (the international prefix
+  symbol defined by ITU-T E.123, the companion notation recommendation) followed by a country code and
+  national significant number totalling no more than 15 digits, per E.164's own numbering-space limit
+  (country code 1-3 digits, subscriber number up to 12 digits, 15 digits maximum overall). This pattern
+  covers only the "+"-prefixed international representation — it is the global counterpart to the
+  country-specific domestic-format patterns (us-phone-number, ca-phone-number, uk-phone-number,
+  in-phone-number, and the EU national patterns), which additionally match each country's bare domestic
+  formatting conventions. Real-world renderings commonly use spaces or hyphens between digit groups even
+  though E.123 formally prescribes spaces only; both are accepted here.
+operation: >-
+  Validation: none (E.164 has no checksum; the regex enforces only the "+" prefix, leading-digit, and
+  15-digit-maximum structural constraints, not a per-country-code length table). Reference: ITU-T
+  Recommendation E.164, "The international public telecommunication numbering plan",
+  https://www.itu.int/rec/t-rec-e.164/en; ITU-T Recommendation E.123, "Notation for national and
+  international telephone numbers, e-mail addresses and web addresses", https://www.itu.int/rec/T-REC-E.123.
+  Corroborative evidence: keywords within 300 characters. Keyword lists: phone-context.
+pattern: '(?<!\d)\+[1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?!\d)'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the mandatory literal "+" prefix is distinctive and rare outside telecom contexts,
+  but the digits that follow it carry no checksum and the regex cannot validate the
+  country-code/national-number split against a real assignment table, so E.164-shaped values remain a
+  high digit-collision format at heart. Per the phone-family convention set by au-fixed-line-telephone
+  (every tier requires positive corroborative evidence; a +CC prefix alone is insufficient gating), no
+  zero-evidence tier is offered: the 75 tier requires generic phone-context evidence and the 85 tier
+  requires specific international-phone keywords with template/noise exclusion.
+jurisdictions:
+  - global
+regulations:
+  - GDPR
+  - "CCPA/CPRA"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - pii
+  - contact-information
+corroborative_evidence:
+  keywords:
+    - phone
+    - mobile
+    - cell
+    - call
+    - text
+    - contact number
+    - international phone number
+    - call me at
+  proximity: 300
+  keyword_lists:
+    - phone-context
+test_cases:
+  should_match:
+    - value: 'Contact: +442079460958'
+      description: >-
+        UK Ofcom-reserved London drama number (020 7946 0958, leading 0 dropped per E.164/+44 convention),
+        contiguous digits, no separators
+    - value: 'Call +1 2125550147 for support'
+      description: >-
+        NANPA-reserved US fictional 555-01XX exchange in +1 international form, one space after the
+        1-digit country code
+    - value: 'Fax: +91 9876543210'
+      description: >-
+        India (+91), illustrative synthetic value — no official DoT/TRAI reserved test-number block exists
+        for India (verified absent during research), so a structurally valid but non-allocated-looking
+        descending-digit sequence is used
+    - value: 'International line: +374 10123456'
+      description: Armenia (+374), 3-digit country code, illustrative synthetic subscriber number
+  should_not_match:
+    - value: '+0123456789'
+      description: Leading digit after the + is 0 — E.164 country codes never start with 0
+    - value: '12125550147'
+      description: Same NANP digit shape as a should_match case but missing the mandatory + prefix — bare domestic-style digit runs are out of scope for this international-only pattern
+    - value: '+123456'
+      description: Only 6 digits after the +, below the practical 8-digit minimum this pattern enforces (ITU specifies only a 15-digit maximum, no minimum)
+    - value: '+123456789012345678'
+      description: 18 digits after the +, three more than E.164's 15-digit maximum — no valid sub-length cut satisfies the trailing digit boundary
+false_positives:
+  - description: >-
+      A syntactically valid "+" followed by 8-15 digits does not confirm the country code is actually
+      assigned or that the subscriber-number length matches that country's real numbering plan — the regex
+      cannot enforce a full per-country-code length table without banned per-alternative length alternation.
+    mitigation: >-
+      Layer with corroborative phone-context evidence at the 75/85 tiers; deployers needing precise
+      per-country validation should prefer the relevant country-specific pattern (us-phone-number,
+      uk-phone-number, etc.) where one exists.
+  - description: >-
+      Co-fires with any country-specific pattern's international (+CC) sub-regex for the same value (e.g.
+      us-phone-number's Regex_us_phone_intl), since both structurally match a "+"-prefixed digit run. This is
+      expected and by design — the two levels of pattern serve different deployment needs (broad global
+      coverage vs. tight per-country evidence).
+    mitigation: >-
+      Deploy either this pattern alone for broad international coverage, or the country-specific patterns
+      alone for tighter per-country evidence, or both if RulePack budget allows and de-duplicate at the
+      reporting layer.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: phone-context
+      as: Evidence_phone_context
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_global_phone_e164
+      matches:
+        - ref: Keyword_global_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_phone_e164
+      matches:
+        - ref: Evidence_phone_context
+  regexes:
+    - id: Regex_global_phone_e164
+      pattern: '(?<!\d)\+[1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?:[\s.-]?\d)?(?!\d)'
+  keywords:
+    - id: Keyword_global_phone_specific
+      groups:
+        - match_style: word
+          terms:
+            - international phone number
+            - call internationally
+            - international mobile number
+            - WhatsApp number
+            - call me at
+            - mobile
+            - cell
+      strength: specific
+risk_rating: 5
+risk_description: >-
+  Phone number exposure enables targeted vishing (voice phishing), smishing (SMS phishing), and social
+  engineering, and can be combined with other PII for identity correlation. Lower direct financial risk than
+  a payment or government-ID identifier on its own.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - url: https://www.itu.int/rec/t-rec-e.164/en
+    title: "ITU-T Recommendation E.164: The international public telecommunication numbering plan"
+  - url: https://www.itu.int/rec/T-REC-E.123
+    title: "ITU-T Recommendation E.123: Notation for national and international telephone numbers"
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT

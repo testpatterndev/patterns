@@ -98,7 +98,10 @@ for (const file of patternFiles) {
           dictSlug: ref.dict,
           groups: [{
             match_style: ref.match_style || 'word',
-            terms: terms.map(t => typeof t === 'string' ? t : String(t))
+            // Terms are either plain strings or {text, case_sensitive} objects
+            // (see data/keywords/*.yaml). Pass them through unchanged — do NOT
+            // coerce with String(t), which stringifies objects to "[object Object]".
+            terms: terms.slice()
           }]
         })
       } else {

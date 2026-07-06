@@ -1,0 +1,179 @@
+schema: testpattern/v1
+name: UK Phone Number
+slug: uk-phone-number
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects UK national telephone numbers per Ofcom's National Telephone Numbering Plan: geographic numbers
+  (01/02 prefix) and mobile numbers (07 prefix, second digit restricted to 1-5 or 7-9 to exclude 070
+  personal-numbering and 076 pager ranges), both as 11-digit domestic strings (leading 0 + 10 significant
+  digits), plus the +44 international form (10 significant digits, leading 0 dropped per ITU/Ofcom
+  convention). Digit groups after the initial prefix use a flexible per-digit optional separator rather than
+  a single fixed grouping, because Ofcom's numbering plan allows multiple valid group-length conventions
+  (4+6, 3+7, 2+8, 5+5) that vary by area. Non-geographic service numbers (03/08/09) are intentionally out of
+  scope — they are typically organizational/service numbers rather than personal PII, mirroring how
+  au-fixed-line-telephone scopes to geographic numbers only.
+operation: >-
+  Validation: none (UK numbers have no checksum). Reference: Ofcom National Telephone Numbering Plan,
+  https://www.ofcom.org.uk/phones-and-broadband/phone-numbers/numbering. Corroborative evidence: keywords
+  within 300 characters. Keyword lists: phone-context. Both the domestic and international (+44)
+  sub-regexes are evidence-gated at every tier — no tier fires without positive corroborative evidence,
+  per the phone-family convention — see confidence_justification.
+pattern: '(?<!\d)(?:\+44[\s.-]?(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)|0(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d))(?!\d)'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the geographic (01/02) and mobile (07 with second-digit restriction) prefix
+  constraints narrow the format, but UK numbers carry no checksum and an 11-digit UK-shaped domestic
+  sequence still collides with other structured identifiers. Per the phone-family convention set by
+  au-fixed-line-telephone (every tier requires positive corroborative evidence; high digit-collision
+  formats never get a zero-evidence tier), both the domestic and +44 international sub-regexes are
+  evidence-gated at every tier: 75 requires generic phone-context evidence and 85 requires
+  country-specific phone keywords with template/noise exclusion. The literal +44 prefix improves precision
+  when present but is not by itself sufficient gating.
+jurisdictions:
+  - uk
+regulations:
+  - UK GDPR
+  - PECR
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - pii
+  - contact-information
+corroborative_evidence:
+  keywords:
+    - phone
+    - mobile
+    - landline
+    - call
+    - text
+    - contact number
+    - UK phone number
+    - call me on
+  proximity: 300
+  keyword_lists:
+    - phone-context
+test_cases:
+  should_match:
+    - value: 'Reception: 020 7946 0958'
+      description: Ofcom-reserved London geographic drama number (020 7946 0XXX range)
+    - value: 'Call the office on 01632 960960'
+      description: Ofcom-reserved 01632 geographic drama number for areas without a specific reserved code
+    - value: 'Mobile: 07700 900123'
+      description: Ofcom-reserved mobile drama number (07700 900XXX range)
+    - value: 'Contact: +44 20 7946 0958'
+      description: International +44 form of the London drama number, leading 0 dropped
+  should_not_match:
+    - value: '0345 600 0000'
+      description: Non-geographic 03 service number — out of scope for this pattern (see description)
+    - value: '07000 123456'
+      description: 070 is personal-numbering, not mobile — second digit 0 is excluded from the mobile set
+    - value: '020 7946 095'
+      description: One digit short of the required 10 significant digits after the leading 0
+    - value: '4420794609589999'
+      description: Valid-shaped digit run embedded inside a longer reference number, rejected by digit boundaries
+false_positives:
+  - description: >-
+      An 11-digit UK-shaped domestic sequence (geographic or mobile prefix, correct leading digits) can
+      still coincidentally match invoice numbers, order numbers, or other structured identifiers of the same
+      length and leading-digit distribution.
+    mitigation: >-
+      Every tier — for both the domestic and +44 international sub-regexes — requires positive
+      phone-context or country-specific evidence within 300 characters; no zero-evidence tier exists, so a
+      bare digit run without corroborating context never fires at any confidence level.
+  - description: >-
+      The flexible per-digit separator allows unusual spacing patterns beyond the conventional group
+      boundaries (e.g. a digit-by-digit hyphenated form), which slightly over-generalises acceptable
+      formatting in exchange for covering Ofcom's multiple valid grouping conventions (4+6, 3+7, 2+8, 5+5).
+    mitigation: >-
+      Corroborative evidence and noise-exclusion gating apply regardless of internal spacing; the structural
+      leading-digit constraints are unaffected by separator placement.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: phone-context
+      as: Evidence_phone_context
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_uk_phone_domestic
+      matches:
+        - ref: Keyword_uk_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_uk_phone_domestic
+      matches:
+        - ref: Evidence_phone_context
+    - confidence_level: 85
+      id_match: Regex_uk_phone_intl
+      matches:
+        - ref: Keyword_uk_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_uk_phone_intl
+      matches:
+        - ref: Evidence_phone_context
+  regexes:
+    - id: Regex_uk_phone_domestic
+      pattern: '(?<!\d)0(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+    - id: Regex_uk_phone_intl
+      pattern: '(?<!\d)\+44[\s.-]?(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+  keywords:
+    - id: Keyword_uk_phone_specific
+      groups:
+        - match_style: word
+          terms:
+            - UK phone number
+            - United Kingdom mobile
+            - British mobile number
+            - call me on
+            - text me on
+            - mobile
+            - landline
+      strength: specific
+risk_rating: 5
+risk_description: >-
+  Phone number exposure enables targeted vishing (voice phishing), smishing (SMS phishing), and social
+  engineering, and can be combined with other PII for identity correlation. Lower direct financial risk than
+  a payment or government-ID identifier on its own.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - url: https://www.ofcom.org.uk/phones-and-broadband/phone-numbers/numbering
+    title: "Ofcom: Telecoms numbering (National Telephone Numbering Plan)"
+  - url: https://www.ofcom.org.uk/phones-and-broadband/phone-numbers/numbers-for-drama
+    title: "Ofcom: Telephone numbers for use in TV and radio drama programmes"
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT

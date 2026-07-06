@@ -1,0 +1,158 @@
+schema: testpattern/v1
+name: Email Address
+slug: global-email-address
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects email addresses in local-part@domain.tld form using a pragmatic RFC 5322 / WHATWG HTML Living
+  Standard subset: bounded local-part and domain-label quantifiers, not the full RFC 5322 address-list
+  grammar (no quoted-string local parts, no comments, no domain literals). This is a genuine value-format
+  identifier, distinct from the existing global-top500-044/045 concept patterns, which only match topic
+  phrases such as "personal email" or "work email" and do not extract an actual address value.
+operation: >-
+  Validation: none (email addresses have no universal checksum; bounded local-part/domain-label quantifiers
+  reject unbounded matches). Reference: RFC 5322 section 3.4.1 (addr-spec), RFC 5321 section 4.5.3.1.1
+  (64-octet local-part limit), WHATWG HTML Living Standard "valid e-mail address" state (the practical regex
+  browsers use for <input type="email">, itself a documented willful simplification of RFC 5322).
+  Corroborative evidence: 9 keywords within 300 characters. Keyword lists: pii-personal.
+pattern: '\b[A-Za-z0-9][A-Za-z0-9.!#$%&''*+/=?^_{|}~-]{0,63}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?){1,8}\b'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the local-part@domain.tld structure is distinctive enough to stand alone at the 65
+  (discovery) tier, but it is not immune to false positives — Retina-resolution image asset filenames
+  (logo@2x.png) and some version/build tokens can coincidentally match the same shape. The 75 tier requires
+  independent "email"/"contact" evidence to raise confidence for labelled occurrences.
+jurisdictions:
+  - global
+regulations:
+  - GDPR
+  - "CCPA/CPRA"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - pii
+  - contact-information
+corroborative_evidence:
+  keywords:
+    - email address
+    - email
+    - e-mail
+    - contact email
+    - personal email
+    - work email
+    - send an email
+    - reply to
+    - mailto
+  proximity: 300
+  keyword_lists:
+    - pii-personal
+test_cases:
+  should_match:
+    - value: jane.doe@example.com
+      description: Simple dot-atom local part with a common two-label domain
+    - value: Please reach j.smith+news99@sub.example.co.uk today.
+      description: Plus-addressing local part with a multi-label subdomain and double TLD
+    - value: user_name-99@my-domain123.org
+      description: Underscore/hyphen local part with a hyphenated, digit-bearing domain label
+    - value: 'Contact email: jane.doe@example.com for details.'
+      description: Address value embedded in a labelled sentence
+  should_not_match:
+    - value: not an email address at all
+      description: No @ sign present anywhere in the string
+    - value: user@localhost
+      description: Domain has no top-level label — no dot follows the host name
+    - value: '@missinglocalpart.com'
+      description: No local-part characters precede the @ sign
+false_positives:
+  - description: >-
+      Retina-resolution image asset filenames such as logo@2x.png or icon@3x.png structurally satisfy
+      local-part@domain.tld and will match the bare 65-tier value regex.
+    mitigation: >-
+      Require corroborative "email"/"contact" evidence keywords within the proximity window; treat the 65
+      discovery tier as triage input rather than a standalone alert.
+  - description: >-
+      Source annotations, changelog entries, or CI badge URLs containing an @ followed by a dotted
+      version-like token (e.g. package@1.2.build) can coincidentally satisfy the structural pattern.
+    mitigation: >-
+      Layer with file-type/content-type context (exclude source-code and image-asset paths) and require
+      email-context evidence at the 75 tier.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_global_email_address
+      matches:
+        - ref: Keyword_global_email_address_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_global_email_address
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_global_email_address
+      pattern: '\b[A-Za-z0-9][A-Za-z0-9.!#$%&''*+/=?^_{|}~-]{0,63}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?){1,8}\b'
+  keywords:
+    - id: Keyword_global_email_address_context
+      groups:
+        - match_style: word
+          terms:
+            - email address
+            - email
+            - e-mail
+            - contact email
+            - personal email
+            - work email
+            - send an email
+            - reply to
+            - mailto
+      strength: specific
+risk_rating: 5
+risk_description: >-
+  Email addresses enable direct contact, phishing targeting, and identity correlation across data breaches,
+  but on their own do not enable financial fraud or account takeover the way a payment or banking identifier
+  does. Risk increases sharply when correlated with other PII.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: "SENSITIVE"
+  qgiscf_dlm: "SENSITIVE Financial"
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - url: https://www.rfc-editor.org/rfc/rfc5322#section-3.4.1
+    title: "RFC 5322 section 3.4.1 (Addr-Spec Specification)"
+  - url: https://www.rfc-editor.org/rfc/rfc5321#section-4.5.3.1.1
+    title: "RFC 5321 section 4.5.3.1.1 (local-part size limit)"
+  - url: https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address
+    title: "WHATWG HTML Living Standard: valid e-mail address"
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT

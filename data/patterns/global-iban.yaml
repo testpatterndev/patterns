@@ -1,0 +1,157 @@
+schema: testpattern/v1
+name: International Bank Account Number (IBAN) - Global
+slug: global-iban
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects International Bank Account Numbers (IBANs) across the full ISO 13616 / SWIFT IBAN Registry country
+  set, extending coverage beyond the EU-focused eu-iban pattern to non-EU IBAN countries verified against the
+  SWIFT IBAN registry — at minimum United Kingdom (GB, 22 chars), Switzerland (CH, 21), Norway (NO, 15),
+  Saudi Arabia (SA, 24), United Arab Emirates (AE, 23), and Turkey (TR, 26). The structural regex widens
+  eu-iban's BBAN length range (12-36 alphanumeric characters) down to 8-32 specifically to also catch
+  shorter formats such as Norway's 15-character IBAN (11-character BBAN), which falls below eu-iban's
+  minimum and would not match it. This pattern intentionally co-fires with eu-iban for EU country codes,
+  since neither pattern restricts the 2-letter prefix to a specific country allow-list — see false_positives.
+operation: >-
+  Validation: Mod 97 (ISO 7064) via Func_iban. Reference: SWIFT IBAN Registry (ISO 13616 Registration
+  Authority, https://www.swift.com/standards/data-standards/iban). Corroborative evidence: keywords within
+  300 characters. Keyword lists: financial-deposit-terms.
+pattern: \b[A-Z]{2}\d{2}[\s-]?[A-Z0-9]{4}(?:[\s-]?[A-Z0-9]{4}){1,6}(?:[\s-]?[A-Z0-9]{1,4})?\b
+confidence: high
+confidence_justification: >-
+  High confidence: the two-letter country code prefix followed by exactly two check digits, combined with
+  the mod-97 checksum validator, produces low false positive rates. The widened length range trades a small
+  amount of extra structural looseness (to reach Norway's shorter format) for broader global coverage; the
+  checksum validator carries the precision that the regex alone cannot express without banned per-country
+  length alternation.
+jurisdictions:
+  - global
+regulations:
+  - GDPR
+  - "CCPA/CPRA"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - PCI-DSS
+  - SOC 2
+data_categories:
+  - financial
+  - pii
+corroborative_evidence:
+  keywords:
+    - IBAN
+    - bank account
+    - international bank
+    - account number
+    - account no
+    - SWIFT
+    - BIC
+    - sort code
+    - routing number
+  proximity: 300
+  keyword_lists:
+    - financial-deposit-terms
+test_cases:
+  should_match:
+    - value: GB33BUKB20201555555555
+      description: United Kingdom (GB) IBAN, 22 characters, no delimiters — the SWIFT/ISO 13616 published example
+    - value: CH56 0483 5012 3456 7800 9
+      description: Switzerland (CH) IBAN, 21 characters, space-separated groups
+    - value: NO8330001234567
+      description: Norway (NO) IBAN, 15 characters — the global minimum length, shorter than eu-iban's regex can match
+    - value: SA4420000001234567891234
+      description: Saudi Arabia (SA) IBAN, 24 characters, no delimiters
+    - value: AE460090000000123456789
+      description: United Arab Emirates (AE) IBAN, 23 characters, no delimiters
+    - value: TR190006200009112345678901
+      description: Turkey (TR) IBAN, 26 characters, no delimiters
+  should_not_match:
+    - value: GB33BUKB
+      description: Only 8 characters — too short, missing the mandatory second BBAN group
+    - value: '1234567890123456'
+      description: Digit-only string missing the two-letter country code prefix
+    - value: INVALID123456789
+      description: Starts with more than two letters before any digit, not a valid IBAN structure
+false_positives:
+  - description: >-
+      Co-fires with eu-iban for EU country codes, since both patterns use the same generic
+      2-letter-country + 2-digit-checksum + alphanumeric BBAN structure and neither restricts the country
+      code to an allow-list. This is expected and by design.
+    mitigation: >-
+      Deploy either pattern alone, or both if RulePack budget allows and de-duplicate at the reporting
+      layer. The mod-97 Func_iban checksum validator rejects the overwhelming majority of structurally-
+      shaped non-IBAN strings regardless of which pattern fires.
+  - description: >-
+      Product codes, serial numbers, or reference numbers beginning with two letters and two digits (e.g.
+      invoice-prefix or license-plate-like strings) can coincidentally satisfy the structural pattern.
+    mitigation: >-
+      Validate the check digits using the MOD-97 algorithm (Func_iban). Require corroborative evidence
+      keywords within the proximity window.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_global_iban
+      matches:
+        - ref: Keyword_global_iban
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_global_iban
+  regexes:
+    - id: Regex_global_iban
+      pattern: \b[A-Z]{2}\d{2}[\s-]?[A-Z0-9]{4}(?:[\s-]?[A-Z0-9]{4}){1,6}(?:[\s-]?[A-Z0-9]{1,4})?\b
+      validators:
+        - ref: Func_iban
+  keywords:
+    - id: Keyword_global_iban
+      groups:
+        - match_style: word
+          terms:
+            - IBAN
+            - bank account
+            - international bank
+            - account number
+            - account no
+            - SWIFT
+            - text: BIC
+              case_sensitive: true
+            - sort code
+            - routing number
+      strength: domain
+risk_rating: 9
+risk_description: >-
+  Financial account identifiers can be exploited for unauthorized transactions, account takeover, and
+  financial fraud. Exposure of banking details poses immediate monetary risk and may violate financial data
+  protection regulations.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: "SENSITIVE"
+  qgiscf_dlm: "SENSITIVE Financial"
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+references:
+  - url: https://www.swift.com/standards/data-standards/iban
+    title: "International Bank Account Number (IBAN) - SWIFT (ISO 13616 Registration Authority)"
+  - url: https://en.wikipedia.org/wiki/International_Bank_Account_Number
+    title: "International Bank Account Number - Wikipedia (per-country structure and length table)"
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release. Superset of eu-iban covering non-EU ISO 13616 countries (GB, CH, NO, SA, AE, TR verified) with a widened BBAN length range to also match Norway's shorter format.
+author: testpattern-community
+license: MIT
