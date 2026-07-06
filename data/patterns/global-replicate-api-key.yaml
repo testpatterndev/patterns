@@ -6,19 +6,23 @@ type: regex
 engine: universal
 description: >-
   Detects Replicate API tokens, which use a distinctive r8_ prefix followed by a fixed-length
-  alphanumeric body. A leaked token grants unauthorized, billed access to Replicate's hosted
-  model inference API and any prompts, images, or data routed through it.
+  body of alphanumerics, underscores, and hyphens. A leaked token grants unauthorized, billed
+  access to Replicate's hosted model inference API and any prompts, images, or data routed
+  through it.
 operation: >-
-  Prefixed token format r8_ followed by an exactly 37-character alphanumeric body (Replicate's
-  own docs state tokens are 40-character strings that always start with r8_; the body is 40
-  minus the 3-character prefix). Corroborative evidence: keywords within 300 characters.
-pattern: (?<![A-Za-z0-9])r8_[A-Za-z0-9]{37}(?![A-Za-z0-9])
+  Prefixed token format r8_ followed by an exactly 37-character body drawn from [0-9A-Za-z_-]
+  (Replicate's own docs state tokens are 40-character strings that always start with r8_ -- the
+  body is 40 minus the 3-character prefix; the body charset including underscore and hyphen is
+  confirmed by TruffleHog's production detector). Corroborative evidence: keywords within 300
+  characters.
+pattern: (?<![0-9A-Za-z_-])r8_[0-9A-Za-z_-]{37}(?![0-9A-Za-z_-])
 confidence: high
 confidence_justification: >-
   High confidence: the r8_ prefix and exact 40-character total token length are explicitly
-  documented on Replicate's own security/API-tokens page, and Replicate is a confirmed GitHub
-  secret-scanning partner (replicate_api_token), so false positives on the prefix+length
-  combination alone are extremely unlikely.
+  documented on Replicate's own security/API-tokens page, the body charset ([0-9A-Za-z_-]) is
+  confirmed by TruffleHog's production Replicate detector, and Replicate is a confirmed GitHub
+  secret-scanning partner (replicate_api_token), so false positives on the
+  prefix+length+charset combination alone are extremely unlikely.
 jurisdictions:
   - global
 regulations:
@@ -51,6 +55,8 @@ test_cases:
       description: Labelled Replicate token in an env assignment
     - value: Using replicate with token r8_0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZa
       description: Replicate brand mention followed by a token value
+    - value: r8_ABCDEFGHIJ_KLMNOPQRST-UVWXYZ0123456_-
+      description: Token body containing underscores and hyphens (full documented charset)
   should_not_match:
     - value: r9_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk
       description: Wrong prefix (r9_ instead of r8_)
@@ -109,7 +115,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_replicate_api_key
-      pattern: (?<![A-Za-z0-9])r8_[A-Za-z0-9]{37}(?![A-Za-z0-9])
+      pattern: (?<![0-9A-Za-z_-])r8_[0-9A-Za-z_-]{37}(?![0-9A-Za-z_-])
   keywords:
     - id: Keyword_replicate_api_key
       groups:
@@ -134,5 +140,7 @@ license: MIT
 references:
   - url: https://replicate.com/docs/topics/security/api-tokens
     title: API tokens - Replicate
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/replicate/replicate.go
+    title: 'TruffleHog production Replicate detector (confirms r8_[0-9A-Za-z-_]{37} body charset)'
   - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
     title: Supported secret scanning patterns - GitHub Docs

@@ -5,24 +5,29 @@ version: 1.0.0
 type: regex
 engine: universal
 description: >-
-  Detects Pinecone API keys, which use a distinctive pckey_ prefix (Pinecone's current key
-  format: pckey_<public-label>_<unique-key>). A leaked key grants unauthorized access to a
-  Pinecone vector database, including any embeddings or vectorised source data it stores.
+  Detects Pinecone API keys in both current live formats: pcsk_ (the dominant format issued by
+  the Pinecone console, CLI, and SDK key-creation flows) and pckey_ (the Enterprise-plan Admin
+  API variant, format pckey_<public-label>_<unique-key>). A leaked key grants unauthorized
+  access to a Pinecone vector database, including any embeddings or vectorised source data it
+  stores.
 operation: >-
-  Prefixed token format pckey_ followed by a bounded alphanumeric/underscore/hyphen body.
-  Pinecone's own Admin API reference states new keys have the format
-  pckey_<public-label>_<unique-key>; the exact label/key segment lengths are not formally
-  published, so a generous bounded body range is used. Corroborative evidence: keywords within
-  300 characters.
-pattern: (?<![A-Za-z0-9_])pckey_[A-Za-z0-9_-]{10,100}(?![A-Za-z0-9_-])
+  Two prefixed token formats. pcsk_ (dominant, console/CLI/SDK-issued): pcsk_<label>_<secret>
+  with a 5-6 character alphanumeric label and a 63-character alphanumeric secret, per
+  TruffleHog's production detector, consistent with Pinecone's own doc placeholders
+  (pcsk_abc123). pckey_ (Enterprise Admin API): pckey_<public-label>_<unique-key> per Pinecone's
+  Admin API reference; segment lengths not formally published, so a generous bounded body range
+  is used for that branch. Corroborative evidence: keywords within 300 characters.
+pattern: (?<![A-Za-z0-9_])(?:pcsk_[A-Za-z0-9]{5,6}_[A-Za-z0-9]{63}|pckey_[A-Za-z0-9_-]{10,100})(?![A-Za-z0-9_-])
 confidence: high
 confidence_justification: >-
-  High confidence: the pckey_ prefix and its <public-label>_<unique-key> structure are explicitly
-  documented on Pinecone's own Admin API reference docs, and Pinecone API keys are a confirmed
-  GitHub secret-scanning partner entry (pinecone_api_key). Older, pre-pckey_ Pinecone keys (bare
-  UUIDs, and a pcsk_-prefixed placeholder still seen in one Pinecone CLI doc example) are not
-  covered by this pattern -- documented as a scope limitation rather than invented as an
-  additional format.
+  High confidence: both prefixes are multiply attested. pcsk_ is the dominant live format --
+  shown in Pinecone's own CLI reference and AGENTS-JAVASCRIPT doc examples, called out in
+  Pinecone's official skills repo contributor guide as the real key shape that security linters
+  flag, and pinned to an exact body structure (5-6 alnum label + 63 alnum secret) by
+  TruffleHog's production detector. pckey_ is explicitly documented on Pinecone's Admin API
+  reference (Enterprise-plan key-creation endpoint). Pinecone is also a confirmed GitHub
+  secret-scanning partner (pinecone_api_key). Older, pre-pcsk_ Pinecone keys (bare UUIDs) are
+  not covered -- documented as a scope limitation rather than invented as an additional format.
 jurisdictions:
   - global
 regulations:
@@ -49,28 +54,30 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
+    - value: pcsk_abc123_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789A
+      description: Pinecone API key, dominant pcsk_ format (6-char label + 63-char secret)
+    - value: 'PINECONE_API_KEY=pcsk_key001_zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIhHgGfFeEdDcCbBaA0123456789z'
+      description: Labelled pcsk_ key in an env assignment
     - value: pckey_devkey_ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
-      description: Pinecone API key, pckey_ prefix + label + unique-key body
-    - value: 'PINECONE_API_KEY=pckey_testlabel_zZyYxXwWvVuUtTsSrRqQpPoOnNmM'
-      description: Labelled Pinecone key in an env assignment
+      description: Pinecone Enterprise Admin API key, pckey_ prefix + label + unique-key body
     - value: Using pinecone with key pckey_ci01234567890123456789012345
-      description: Pinecone brand mention followed by a token value
+      description: Pinecone brand mention followed by a pckey_ token value
   should_not_match:
-    - value: pcsk_devkey_ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
-      description: Different prefix (pcsk_), a legacy/inconsistent placeholder seen in one older Pinecone doc, not the current pckey_ format
+    - value: pcsk_abc123_ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
+      description: pcsk_ key with secret segment far too short (30 chars, not 63)
     - value: pckey_ab
-      description: Body far too short (2 chars, below the 10-char floor)
+      description: pckey_ body far too short (2 chars, below the 10-char floor)
     - value: remember to rotate the pinecone api key before deploying
       description: Prose mention without a token value
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
-  - description: Documentation or examples showing placeholder pckey_ strings.
+  - description: Documentation or examples showing placeholder pcsk_/pckey_ strings.
     mitigation: Require corroborative Pinecone keywords and check for placeholder markers (example, xxxx).
   - description: The common English noun "pinecone" (the plant structure) appearing in unrelated text near an unrelated token or hash.
     mitigation: The brand-name keyword term is case-sensitive (Pinecone, capitalised) and additional unambiguous terms (pinecone.io, PINECONE_API_KEY) disambiguate from the generic noun.
-  - description: Legacy pre-pckey_ Pinecone keys (bare UUIDs, or the older pcsk_-style placeholder) are a different, unverified format not matched by this pattern.
-    mitigation: Documented as a known scope limitation; only the current pckey_ format is matched.
+  - description: Legacy pre-pcsk_ Pinecone keys (bare UUIDs) are a different, unverifiable format not matched by this pattern.
+    mitigation: Documented as a known scope limitation; only the current pcsk_ and pckey_ formats are matched.
 exports:
   - purview_xml
   - yaml
@@ -116,7 +123,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_pinecone_api_key
-      pattern: (?<![A-Za-z0-9_])pckey_[A-Za-z0-9_-]{10,100}(?![A-Za-z0-9_-])
+      pattern: (?<![A-Za-z0-9_])(?:pcsk_[A-Za-z0-9]{5,6}_[A-Za-z0-9]{63}|pckey_[A-Za-z0-9_-]{10,100})(?![A-Za-z0-9_-])
   keywords:
     - id: Keyword_pinecone_api_key
       groups:
@@ -139,7 +146,13 @@ changelog:
 author: testpattern-community
 license: MIT
 references:
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/pinecone/pinecone.go
+    title: 'TruffleHog production Pinecone detector (pins pcsk_ body: 5-6 alnum label + 63 alnum secret)'
+  - url: https://docs.pinecone.io/reference/cli/command-reference
+    title: Pinecone CLI reference (current pcsk_ key example in pc auth configure)
+  - url: https://docs.pinecone.io/AGENTS-JAVASCRIPT
+    title: AGENTS JAVASCRIPT - Pinecone Docs (current pcsk_ key example in SDK usage)
   - url: https://docs.pinecone.io/reference/api/2025-04/admin/create_api_key
-    title: Create an API key - Pinecone Docs (confirms pckey_<public-label>_<unique-key> format)
+    title: Create an API key - Pinecone Docs (confirms Enterprise Admin API pckey_<public-label>_<unique-key> format)
   - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
     title: Supported secret scanning patterns - GitHub Docs
