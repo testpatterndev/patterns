@@ -1,0 +1,189 @@
+schema: testpattern/v1
+name: Italian Phone Number
+slug: it-phone-number
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Italian mobile telephone numbers per AGCOM's national numbering plan (Delibera n. 8/15/CIR,
+  Allegato A): the mobile/personal-communications block, structurally defined as "3XYZ" plus six further
+  digits (a fixed 10-digit total), in both the domestic and +39 international forms. Geographic (landline)
+  numbers are intentionally out of scope: AGCOM's "0" geographic block uses a 2-4 digit area code plus a
+  variable-length subscriber number with no single verified total-length bound, and Italian landline numbers
+  are also the one well-known exception where the leading 0 is retained even in the +39 international form —
+  a second axis of variability this pattern would need to model without a matching structural constraint to
+  bound it, mirroring in-phone-number's decision to scope out India's similarly under-specified STD/landline
+  numbers. Mobile numbers carry no such leading-0 quirk (they never had a leading 0 to begin with).
+operation: >-
+  Validation: none (Italian mobile numbers have no checksum). Reference: AGCOM, Piano di numerazione,
+  https://www.agcom.it/piano-di-numerazione; Delibera n. 8/15/CIR, Allegato A (customer numbering for mobile
+  and personal-communications services: "3XYZ U1U2U3U4U5U6", a fixed 10-digit total),
+  https://www.agcom.it/sites/default/files/migration/attachment/Allegato%2020-2-2015.pdf. Corroborative
+  evidence: keywords within 300 characters. Keyword lists: phone-context. Both the domestic and
+  international (+39) sub-regexes are evidence-gated at every tier — no tier fires without positive
+  corroborative evidence, per the phone-family convention — see confidence_justification.
+pattern: '(?<!\d)(?:\+39[\s.-]?3[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|3[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the leading-digit-3 constraint and the fixed 10-digit total length (drawn directly from
+  AGCOM's Delibera 8/15/CIR customer-numbering structure) narrow the format, but Italian mobile numbers carry
+  no checksum and a 10-digit sequence starting with 3 is still a high digit-collision format. Per the
+  phone-family convention (every tier requires positive corroborative evidence; a +CC prefix alone is
+  insufficient gating; there is no 65 rung), both the domestic and +39 international sub-regexes are
+  evidence-gated at every tier: 75 requires generic phone-context evidence and 85 requires country-specific
+  phone keywords with template/noise exclusion. The literal +39 prefix improves precision when present but
+  is not by itself sufficient gating.
+jurisdictions:
+  - it
+regulations:
+  - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - pii
+  - contact-information
+corroborative_evidence:
+  keywords:
+    - phone
+    - mobile
+    - call
+    - text
+    - contact number
+    - Italian phone number
+    - numero di telefono
+    - call me at
+  proximity: 300
+  keyword_lists:
+    - phone-context
+test_cases:
+  should_match:
+    - value: 'Cellulare: 345 678 9012'
+      description: Domestic mobile, leading 3, illustrative ascending-digit placeholder (no official AGCOM-reserved fictional range exists — verified absent during research), space-separated
+    - value: 'Numero: 3401234567'
+      description: Domestic mobile, bare digits with no separator
+    - value: 'Contatto: 347-890-1234'
+      description: Domestic mobile, hyphenated grouping
+    - value: 'International: +39 345 678 9012'
+      description: International +39 form of the mobile number, leading 3 unchanged (mobile numbers have no leading 0 to drop)
+  should_not_match:
+    - value: '06 1234 5678'
+      description: Leading digit 0 is Italy's geographic (landline) block — out of scope for this mobile-only pattern
+    - value: '9123456789'
+      description: Leading digit 9 is not the mobile/personal-communications leading digit 3
+    - value: '345678901'
+      description: Only 9 digits — one short of the required 10
+    - value: '9345678901234'
+      description: Valid-shaped digit run embedded inside a longer reference number, rejected by digit boundaries
+false_positives:
+  - description: >-
+      A 10-digit sequence starting with 3 can still coincidentally match invoice numbers, order numbers, or
+      other structured identifiers of the same length and leading digit.
+    mitigation: >-
+      Every tier — for both the domestic and +39 international sub-regexes — requires positive
+      phone-context or country-specific evidence within 300 characters; no zero-evidence tier exists, so a
+      bare digit run without corroborating context never fires at any confidence level.
+  - description: >-
+      No official AGCOM-reserved fictional or test number range exists for Italy (confirmed by web research,
+      unlike NANP's 555-01XX or Ofcom's drama numbers), so illustrative synthetic values were used instead of
+      an authoritative reserved range.
+    mitigation: >-
+      Test values use clearly non-representative sequential digit patterns; deployers should substitute their
+      own tenant's synthetic test data for live validation rather than relying on a non-existent official
+      reserved range.
+  - description: >-
+      Landline/geographic numbers are not detected at all (a false negative, not a false positive, but noted
+      for completeness): AGCOM's "0" geographic block has a variable-length area code and subscriber number
+      with no single verified total-length bound, and additionally keeps the leading 0 in the +39
+      international form (unlike almost every other country) — two axes of variability this initial release
+      does not attempt to model.
+    mitigation: >-
+      A future revision could add landline coverage if a genuinely verifiable length constraint is confirmed
+      from a primary AGCOM source, following the same verification bar applied here.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: phone-context
+      as: Evidence_phone_context
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_it_phone_mobile
+      matches:
+        - ref: Keyword_it_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_it_phone_mobile
+      matches:
+        - ref: Evidence_phone_context
+    - confidence_level: 85
+      id_match: Regex_it_phone_intl
+      matches:
+        - ref: Keyword_it_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_it_phone_intl
+      matches:
+        - ref: Evidence_phone_context
+  regexes:
+    - id: Regex_it_phone_mobile
+      pattern: '(?<!\d)3[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
+    - id: Regex_it_phone_intl
+      pattern: '(?<!\d)\+39[\s.-]?3[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
+  keywords:
+    - id: Keyword_it_phone_specific
+      groups:
+        - match_style: word
+          terms:
+            - Italian phone number
+            - Italian mobile number
+            - numero di telefono
+            - numero di cellulare
+            - cellulare
+            - call me at
+            - text me at
+      strength: specific
+risk_rating: 5
+risk_description: >-
+  Phone number exposure enables targeted vishing (voice phishing), smishing (SMS phishing), and social
+  engineering, and can be combined with other PII for identity correlation. Lower direct financial risk than
+  a payment or government-ID identifier on its own.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - url: https://www.agcom.it/piano-di-numerazione
+    title: "AGCOM: Piano di numerazione (national numbering plan — service classification by leading digit)"
+  - url: https://www.agcom.it/sites/default/files/migration/attachment/Allegato%2020-2-2015.pdf
+    title: "AGCOM: Allegato A alla Delibera n. 8/15/CIR (mobile customer numbering structure \"3XYZ U1..U6\", 10-digit total)"
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release. Scoped to mobile numbers only; geographic/landline numbers out of scope pending a verified length constraint.
+author: testpattern-community
+license: MIT

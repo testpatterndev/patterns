@@ -1,0 +1,178 @@
+schema: testpattern/v1
+name: French Phone Number
+slug: fr-phone-number
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects French national telephone numbers per ARCEP's numbering plan: 10-digit numbers in the "0X XX XX
+  XX XX" form covering geographic (01-05) and mobile/personal (06-07) leading digits, plus the +33
+  international form (10-digit domestic number with the leading 0 dropped, per ARCEP convention). Numbers
+  beginning 08 (value-added services) and 09 (polyvalent/technical-platform numbers, e.g. app-to-driver
+  ephemeral numbers) are intentionally out of scope — these are organizational/service numbers rather than
+  personal PII, mirroring how uk-phone-number scopes out non-geographic 03/08/09 service ranges.
+operation: >-
+  Validation: none (French numbers have no checksum). Reference: ARCEP, La numérotation,
+  https://www.arcep.fr/la-regulation/grands-dossiers-thematiques-transverses/la-numerotation.html; ARCEP
+  Décision n° 2021-0532 du 8 avril 2021 (établissant le plan national de numérotation et ses règles de
+  gestion), https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000043910234. Corroborative evidence: keywords
+  within 300 characters. Keyword lists: phone-context. Both the domestic and international (+33) sub-regexes
+  are evidence-gated at every tier — no tier fires without positive corroborative evidence, per the
+  phone-family convention — see confidence_justification.
+pattern: '(?<!\d)(?:\+33[\s.-]?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the leading-digit constraint (01-07 domestic, restricting to geographic and
+  mobile/personal ranges) and the fixed 10-digit length narrow the format, but French numbers carry no
+  checksum and a 10-digit sequence with those leading digits is still a high digit-collision format. Per the
+  phone-family convention (every tier requires positive corroborative evidence; a +CC prefix alone is
+  insufficient gating; there is no 65 rung), both the domestic and +33 international sub-regexes are
+  evidence-gated at every tier: 75 requires generic phone-context evidence and 85 requires country-specific
+  phone keywords with template/noise exclusion. The literal +33 prefix improves precision when present but
+  is not by itself sufficient gating.
+jurisdictions:
+  - fr
+regulations:
+  - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - pii
+  - contact-information
+corroborative_evidence:
+  keywords:
+    - phone
+    - mobile
+    - call
+    - text
+    - contact number
+    - French phone number
+    - numéro de téléphone
+    - call me at
+  proximity: 300
+  keyword_lists:
+    - phone-context
+test_cases:
+  should_match:
+    - value: 'Portable: 06 39 98 45 67'
+      description: ARCEP-reserved fictional root for audiovisual works (Décision n° 2021-0532, §2.5.12), mobile 06 range, space-separated
+    - value: 'Fixe : 01 99 00 12 34'
+      description: ARCEP-reserved fictional root, geographic 01 (Paris-region-style) range
+    - value: 'Bureau: 02.61.91.78.90'
+      description: ARCEP-reserved fictional root, geographic 02 range, dot-separated
+    - value: 'International: +33 6 39 98 45 67'
+      description: International +33 form of the mobile fictional root, leading 0 dropped
+  should_not_match:
+    - value: '08 92 68 00 00'
+      description: Leading digit 8 is a value-added-service number, out of scope for this personal-communications pattern
+    - value: '09 70 12 34 56'
+      description: Leading digit 9 is a polyvalent/technical-platform number, out of scope
+    - value: '01 99 00 12'
+      description: Only 8 digits total, two short of the required 10
+    - value: '901990012345678'
+      description: Valid-shaped digit run embedded inside a longer reference number, rejected by digit boundaries
+false_positives:
+  - description: >-
+      A 10-digit sequence with a 01-07 leading digit can still coincidentally match invoice numbers, order
+      numbers, or other structured identifiers of the same length and leading-digit distribution.
+    mitigation: >-
+      Every tier — for both the domestic and +33 international sub-regexes — requires positive
+      phone-context or country-specific evidence within 300 characters; no zero-evidence tier exists, so a
+      bare digit run without corroborating context never fires at any confidence level.
+  - description: >-
+      Since January 2023, geographic numbers (01-05) are no longer tied to a physical department, so the
+      leading digit alone does not confirm a caller's actual location — this pattern detects the number
+      format only, not geographic attribution.
+    mitigation: >-
+      Rely on surrounding document context (postal addresses, entity names) rather than the leading digit for
+      any geographic-attribution use case.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: phone-context
+      as: Evidence_phone_context
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_fr_phone_domestic
+      matches:
+        - ref: Keyword_fr_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_fr_phone_domestic
+      matches:
+        - ref: Evidence_phone_context
+    - confidence_level: 85
+      id_match: Regex_fr_phone_intl
+      matches:
+        - ref: Keyword_fr_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_fr_phone_intl
+      matches:
+        - ref: Evidence_phone_context
+  regexes:
+    - id: Regex_fr_phone_domestic
+      pattern: '(?<!\d)0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
+    - id: Regex_fr_phone_intl
+      pattern: '(?<!\d)\+33[\s.-]?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
+  keywords:
+    - id: Keyword_fr_phone_specific
+      groups:
+        - match_style: word
+          terms:
+            - French phone number
+            - French mobile number
+            - numéro de téléphone
+            - numéro de portable
+            - portable
+            - call me at
+            - text me at
+      strength: specific
+risk_rating: 5
+risk_description: >-
+  Phone number exposure enables targeted vishing (voice phishing), smishing (SMS phishing), and social
+  engineering, and can be combined with other PII for identity correlation. Lower direct financial risk than
+  a payment or government-ID identifier on its own.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - url: https://www.arcep.fr/la-regulation/grands-dossiers-thematiques-transverses/la-numerotation.html
+    title: "ARCEP: La numérotation (10-digit plan, 01-09 categories)"
+  - url: https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000043910234
+    title: "Légifrance: Décision n° 2021-0532 du 8 avril 2021 (plan national de numérotation), incl. §2.5.12 Numéros pour œuvres audiovisuelles"
+  - url: https://www.arcep.fr/actualites/actualites-et-communiques/detail/n/plan-de-numerotation-050922.html
+    title: "ARCEP: 06/07 reserved exclusively for interpersonal communications services"
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT

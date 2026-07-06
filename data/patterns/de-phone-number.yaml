@@ -1,0 +1,186 @@
+schema: testpattern/v1
+name: German Phone Number
+slug: de-phone-number
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects German mobile telephone numbers per the Bundesnetzagentur's (BNetzA) Nummernplan für Mobile
+  Dienste: the (0)15, (0)16, and (0)17 mobile sub-ranges, in both the domestic (leading trunk "0") and
+  international (+49, leading 0 dropped) forms. BNetzA's own published length table shows the national
+  significant number (the digits after the leading 0, including the "1" of "15/16/17") is 10 digits for
+  most 016x/017x allocations and 11 digits for the 015x range and the 1609/176 exceptions — every quantifier
+  below is bounded to this documented 10-11 digit span rather than left open-ended. Geographic (Ortsnetz)
+  landline numbers are intentionally out of scope: BNetzA states area codes run 2-5 digits and new
+  allocations are capped at 11 significant digits (10 for the Berlin/Hamburg/Frankfurt/Munich two-digit-code
+  exception), but does not publish a verified minimum length for the existing stock of legacy numbers, so a
+  low-end bound would be invented rather than sourced — mirroring in-phone-number's decision to scope out
+  India's similarly under-specified STD/landline numbers.
+operation: >-
+  Validation: none (German mobile numbers carry no checksum). Reference: Bundesnetzagentur, Nummernplan für
+  Mobile Dienste, https://www.bundesnetzagentur.de/DE/Fachthemen/Telekommunikation/Nummerierung/MobileDienste/start.html;
+  digit-length table at https://www.bundesnetzagentur.de/DE/Fachthemen/Telekommunikation/Nummerierung/MobileDienste/LaengeRNB/start.html.
+  Corroborative evidence: keywords within 300 characters. Keyword lists: phone-context. Both the domestic
+  and international (+49) sub-regexes are evidence-gated at every tier — no tier fires without positive
+  corroborative evidence, per the phone-family convention — see confidence_justification.
+pattern: '(?<!\d)(?:\+49[\s.-]?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?|0[\s.-]?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?)(?!\d)'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the 01[5-7] mobile-family leading digits and the 10-11 digit length bound (drawn
+  directly from BNetzA's published Rufnummernblock length table) narrow the format, but German mobile
+  numbers carry no checksum and a 10-11 digit sequence with those leading digits is still a high
+  digit-collision format. Per the phone-family convention (every tier requires positive corroborative
+  evidence; a +CC prefix alone is insufficient gating; there is no 65 rung), both the domestic and +49
+  international sub-regexes are evidence-gated at every tier: 75 requires generic phone-context evidence and
+  85 requires country-specific phone keywords with template/noise exclusion. The literal +49 prefix improves
+  precision when present but is not by itself sufficient gating.
+jurisdictions:
+  - de
+regulations:
+  - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - pii
+  - contact-information
+corroborative_evidence:
+  keywords:
+    - phone
+    - mobile
+    - call
+    - text
+    - contact number
+    - German phone number
+    - Telefonnummer
+    - call me at
+  proximity: 300
+  keyword_lists:
+    - phone-context
+test_cases:
+  should_match:
+    - value: 'Vodafone: 0152 28817386'
+      description: BNetzA-reserved "drama number" (Mitteilung 148/2021), Vodafone 0152 mobile range, space-separated
+    - value: 'Rufnummer: 0172 9925904'
+      description: BNetzA-reserved drama number, 0172 mobile range
+    - value: 'Call the office mobile 0171-3920045'
+      description: BNetzA-reserved Deutsche Telekom drama number block (0171 3920000-3920099), hyphenated
+    - value: 'International contact: +49 152 28817386'
+      description: International +49 form of the Vodafone drama number, leading 0 dropped
+  should_not_match:
+    - value: '030 23125678'
+      description: BNetzA-reserved Berlin landline drama number — geographic (Ortsnetz) numbers are out of scope for this mobile-only pattern
+    - value: '0180 5123456'
+      description: 0180 is a special-rate service prefix, not a 015/016/017 mobile range — third digit 8 is excluded
+    - value: '0152 2881'
+      description: Only 4 digits after the 0152 mobile prefix, far short of the required 8-9
+    - value: '90152288173869999'
+      description: Valid-shaped mobile digit run embedded inside a longer reference number, rejected by digit boundaries
+false_positives:
+  - description: >-
+      A 10-11 digit sequence with the 01[5-7] mobile leading-digit shape can still coincidentally match
+      invoice numbers, order numbers, or other structured identifiers of similar length and leading-digit
+      distribution.
+    mitigation: >-
+      Every tier — for both the domestic and +49 international sub-regexes — requires positive
+      phone-context or country-specific evidence within 300 characters; no zero-evidence tier exists, so a
+      bare digit run without corroborating context never fires at any confidence level.
+  - description: >-
+      Geographic (Ortsnetz) landline numbers are not detected at all (a false negative, not a false positive,
+      but noted for completeness): BNetzA documents a 2-5 digit area code and an 11-digit cap for new
+      allocations (10 for the Berlin/Hamburg/Frankfurt/Munich exception), but publishes no verified minimum
+      length across the existing stock, so bounding a landline regex would mean inventing a lower bound
+      rather than sourcing it.
+    mitigation: >-
+      A future revision could add landline coverage if a genuinely verifiable minimum-length constraint is
+      confirmed from a primary BNetzA source, following the same verification bar applied here.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: phone-context
+      as: Evidence_phone_context
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_de_phone_mobile
+      matches:
+        - ref: Keyword_de_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_de_phone_mobile
+      matches:
+        - ref: Evidence_phone_context
+    - confidence_level: 85
+      id_match: Regex_de_phone_intl
+      matches:
+        - ref: Keyword_de_phone_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_de_phone_intl
+      matches:
+        - ref: Evidence_phone_context
+  regexes:
+    - id: Regex_de_phone_mobile
+      pattern: '(?<!\d)0[\s.-]?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?(?!\d)'
+    - id: Regex_de_phone_intl
+      pattern: '(?<!\d)\+49[\s.-]?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?(?!\d)'
+  keywords:
+    - id: Keyword_de_phone_specific
+      groups:
+        - match_style: word
+          terms:
+            - German phone number
+            - German mobile number
+            - Telefonnummer
+            - Handynummer
+            - Mobilnummer
+            - Rufnummer
+            - call me at
+            - text me at
+      strength: specific
+risk_rating: 5
+risk_description: >-
+  Phone number exposure enables targeted vishing (voice phishing), smishing (SMS phishing), and social
+  engineering, and can be combined with other PII for identity correlation. Lower direct financial risk than
+  a payment or government-ID identifier on its own.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - url: https://www.bundesnetzagentur.de/DE/Fachthemen/Telekommunikation/Nummerierung/MobileDienste/start.html
+    title: "Bundesnetzagentur: Rufnummern für Mobile Dienste ((0)15, (0)16, (0)17)"
+  - url: https://www.bundesnetzagentur.de/DE/Fachthemen/Telekommunikation/Nummerierung/MobileDienste/LaengeRNB/start.html
+    title: "Bundesnetzagentur: Länge der Rufnummernblöcke (Mobile Dienste) — 10/11-digit national-format length table"
+  - url: https://www.bundesnetzagentur.de/DE/Fachthemen/Telekommunikation/Nummerierung/_DL/mittlg148_2021.pdf?__blob=publicationFile&v=1
+    title: "Bundesnetzagentur Mitteilung 148/2021: Rufnummern für Medienproduktionen (\"Drama Numbers\") — reserved fictional test numbers"
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release. Scoped to mobile numbers only; geographic (Ortsnetz) landline numbers out of scope pending a verified minimum-length constraint.
+author: testpattern-community
+license: MIT
