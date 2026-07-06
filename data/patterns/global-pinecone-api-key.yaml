@@ -1,0 +1,145 @@
+schema: testpattern/v1
+name: Pinecone API Key
+slug: global-pinecone-api-key
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Pinecone API keys, which use a distinctive pckey_ prefix (Pinecone's current key
+  format: pckey_<public-label>_<unique-key>). A leaked key grants unauthorized access to a
+  Pinecone vector database, including any embeddings or vectorised source data it stores.
+operation: >-
+  Prefixed token format pckey_ followed by a bounded alphanumeric/underscore/hyphen body.
+  Pinecone's own Admin API reference states new keys have the format
+  pckey_<public-label>_<unique-key>; the exact label/key segment lengths are not formally
+  published, so a generous bounded body range is used. Corroborative evidence: keywords within
+  300 characters.
+pattern: (?<![A-Za-z0-9_])pckey_[A-Za-z0-9_-]{10,100}(?![A-Za-z0-9_-])
+confidence: high
+confidence_justification: >-
+  High confidence: the pckey_ prefix and its <public-label>_<unique-key> structure are explicitly
+  documented on Pinecone's own Admin API reference docs, and Pinecone API keys are a confirmed
+  GitHub secret-scanning partner entry (pinecone_api_key). Older, pre-pckey_ Pinecone keys (bare
+  UUIDs, and a pcsk_-prefixed placeholder still seen in one Pinecone CLI doc example) are not
+  covered by this pattern -- documented as a scope limitation rather than invented as an
+  additional format.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - pinecone
+    - pinecone.io
+    - PINECONE_API_KEY
+    - vector database
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: pckey_devkey_ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
+      description: Pinecone API key, pckey_ prefix + label + unique-key body
+    - value: 'PINECONE_API_KEY=pckey_testlabel_zZyYxXwWvVuUtTsSrRqQpPoOnNmM'
+      description: Labelled Pinecone key in an env assignment
+    - value: Using pinecone with key pckey_ci01234567890123456789012345
+      description: Pinecone brand mention followed by a token value
+  should_not_match:
+    - value: pcsk_devkey_ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
+      description: Different prefix (pcsk_), a legacy/inconsistent placeholder seen in one older Pinecone doc, not the current pckey_ format
+    - value: pckey_ab
+      description: Body far too short (2 chars, below the 10-char floor)
+    - value: remember to rotate the pinecone api key before deploying
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: Documentation or examples showing placeholder pckey_ strings.
+    mitigation: Require corroborative Pinecone keywords and check for placeholder markers (example, xxxx).
+  - description: The common English noun "pinecone" (the plant structure) appearing in unrelated text near an unrelated token or hash.
+    mitigation: The brand-name keyword term is case-sensitive (Pinecone, capitalised) and additional unambiguous terms (pinecone.io, PINECONE_API_KEY) disambiguate from the generic noun.
+  - description: Legacy pre-pckey_ Pinecone keys (bare UUIDs, or the older pcsk_-style placeholder) are a different, unverified format not matched by this pattern.
+    mitigation: Documented as a known scope limitation; only the current pckey_ format is matched.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  A leaked Pinecone API key enables unauthorized access to a Pinecone vector database index,
+  including any embeddings, metadata, or vectorised source data it stores, plus unauthorized,
+  billed API usage.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_pinecone_api_key
+      matches:
+        - ref: Keyword_pinecone_api_key
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_pinecone_api_key
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_pinecone_api_key
+      pattern: (?<![A-Za-z0-9_])pckey_[A-Za-z0-9_-]{10,100}(?![A-Za-z0-9_-])
+  keywords:
+    - id: Keyword_pinecone_api_key
+      groups:
+        - match_style: word
+          terms:
+            - text: Pinecone
+              case_sensitive: true
+            - pinecone.io
+            - PINECONE_API_KEY
+            - pinecone api
+            - vector database
+            - api key
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://docs.pinecone.io/reference/api/2025-04/admin/create_api_key
+    title: Create an API key - Pinecone Docs (confirms pckey_<public-label>_<unique-key> format)
+  - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+    title: Supported secret scanning patterns - GitHub Docs

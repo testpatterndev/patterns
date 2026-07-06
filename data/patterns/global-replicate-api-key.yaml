@@ -1,0 +1,138 @@
+schema: testpattern/v1
+name: Replicate API Key
+slug: global-replicate-api-key
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Replicate API tokens, which use a distinctive r8_ prefix followed by a fixed-length
+  alphanumeric body. A leaked token grants unauthorized, billed access to Replicate's hosted
+  model inference API and any prompts, images, or data routed through it.
+operation: >-
+  Prefixed token format r8_ followed by an exactly 37-character alphanumeric body (Replicate's
+  own docs state tokens are 40-character strings that always start with r8_; the body is 40
+  minus the 3-character prefix). Corroborative evidence: keywords within 300 characters.
+pattern: (?<![A-Za-z0-9])r8_[A-Za-z0-9]{37}(?![A-Za-z0-9])
+confidence: high
+confidence_justification: >-
+  High confidence: the r8_ prefix and exact 40-character total token length are explicitly
+  documented on Replicate's own security/API-tokens page, and Replicate is a confirmed GitHub
+  secret-scanning partner (replicate_api_token), so false positives on the prefix+length
+  combination alone are extremely unlikely.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - replicate
+    - replicate.com
+    - api.replicate.com
+    - REPLICATE_API_TOKEN
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: r8_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk
+      description: Replicate API token, r8_ prefix + 37-char alphanumeric body
+    - value: 'REPLICATE_API_TOKEN=r8_zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIh'
+      description: Labelled Replicate token in an env assignment
+    - value: Using replicate with token r8_0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZa
+      description: Replicate brand mention followed by a token value
+  should_not_match:
+    - value: r9_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk
+      description: Wrong prefix (r9_ instead of r8_)
+    - value: r8_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij
+      description: Body too short (36 chars, below the fixed 37-char length)
+    - value: remember to rotate the replicate api token before deploying
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: Documentation or examples showing placeholder r8_ strings.
+    mitigation: Require corroborative Replicate keywords and check for placeholder markers (example, xxxx).
+  - description: The common English verb "replicate" (e.g. "replicate this dataset") appearing in text near an unrelated token or hash of similar length.
+    mitigation: The brand-name keyword term is case-sensitive (Replicate, capitalised) and additional unambiguous terms (replicate.com, REPLICATE_API_TOKEN) disambiguate from the generic verb.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  A leaked Replicate API token enables unauthorized, billed access to Replicate's hosted model
+  inference API and can expose any prompts, images, or data routed through it.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_replicate_api_key
+      matches:
+        - ref: Keyword_replicate_api_key
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_replicate_api_key
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_replicate_api_key
+      pattern: (?<![A-Za-z0-9])r8_[A-Za-z0-9]{37}(?![A-Za-z0-9])
+  keywords:
+    - id: Keyword_replicate_api_key
+      groups:
+        - match_style: word
+          terms:
+            - text: Replicate
+              case_sensitive: true
+            - replicate.com
+            - api.replicate.com
+            - REPLICATE_API_TOKEN
+            - replicate api
+            - api key
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://replicate.com/docs/topics/security/api-tokens
+    title: API tokens - Replicate
+  - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+    title: Supported secret scanning patterns - GitHub Docs
