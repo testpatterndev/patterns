@@ -1,0 +1,173 @@
+schema: testpattern/v1
+name: UK Sort Code and Account Number
+slug: uk-sort-code-account
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects the paired UK domestic bank sort code (6 digits, written XX-XX-XX, XX XX XX, or XXXXXX) and
+  account number (8 digits) as they normally appear together in UK bank-detail blocks (invoices, remittance
+  advice, payroll/BACS instructions). Both digit groups must be directly attached to their own label
+  ("sort code" / "account number" or "a/c no") in either order — bare unlabelled 6- or 8-digit sequences
+  are never matched, because unlabelled digit sequences of this length collide heavily with dates, phone
+  extensions, invoice numbers, and other structured identifiers.
+operation: >-
+  Validation: none available as a single generic Purview function. UK modulus checking (Mod 10 / Mod 11 /
+  DB1A1) is prescribed per-bank via weighting tables published by Vocalink/Pay.UK, not a universal algorithm,
+  so no Func_ validator exists for this pairing. Reference: Pay.UK Clearing Code Rules; SWIFT/ISO 13616 GB
+  IBAN structure (4a 6n 8n), which independently confirms the 6-digit sort code + 8-digit account number
+  split. Corroborative evidence: keywords within 300 characters. Keyword lists: data-record-context.
+pattern: '(?i)(?:\bsort\s+code[\s:.-]{0,10}\d{2}[-\s]?\d{2}[-\s]?\d{2}\b[\s\S]{0,60}?\b(?:account(?:\s+(?:number|no\.?))?|a\/c(?:\s+(?:no\.?|number))?)[\s:.-]{0,10}\d{8}\b|\b(?:account(?:\s+(?:number|no\.?))?|a\/c(?:\s+(?:no\.?|number))?)[\s:.-]{0,10}\d{8}\b[\s\S]{0,60}?\bsort\s+code[\s:.-]{0,10}\d{2}[-\s]?\d{2}[-\s]?\d{2}\b)'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: both digit groups are structurally anchored to their own label in either order, which
+  materially reduces collision with unrelated digit sequences compared to a bare-digits pattern, but there
+  is no checksum validator to confirm the sort code / account number combination is actually payable (UK
+  modulus checking requires per-bank weight tables that are not expressible as a single Purview function).
+  Evidence tiers exist for reliable production use; there is deliberately no bare/unlabelled 65 tier.
+jurisdictions:
+  - uk
+regulations:
+  - UK GDPR
+  - Payment Services Regulations 2017
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - PCI-DSS
+  - SOC 2
+data_categories:
+  - financial
+  - pii
+corroborative_evidence:
+  keywords:
+    - BACS
+    - CHAPS
+    - Faster Payments
+    - beneficiary
+    - payee
+    - remittance advice
+    - bank transfer
+    - sort code
+    - account number
+  proximity: 300
+  keyword_lists:
+    - data-record-context
+test_cases:
+  should_match:
+    - value: 'Sort Code: 12-34-56  Account Number: 12345678'
+      description: Hyphenated sort code followed by labelled account number
+    - value: sort code 123456 account no 87654321
+      description: Compact unhyphenated digits with abbreviated account label, sort code first
+    - value: 'Account Number: 87654321, Sort Code: 65-43-21'
+      description: Reversed order — account number labelled before sort code
+  should_not_match:
+    - value: 'Sort Code: 12-34-56'
+      description: Sort code alone with no account number anywhere nearby
+    - value: 'Account Number: 12345678'
+      description: Account number alone with no sort code anywhere nearby
+    - value: Invoice number 12345678 dated 12-34-56
+      description: Two digit groups of the right shape but attached to unrelated labels (invoice/date, not sort code/account)
+false_positives:
+  - description: >-
+      A 6-digit date-like or reference-like token near an unrelated 8-digit invoice/case number could in
+      principle appear close together in a document without being real bank details.
+    mitigation: >-
+      The regex requires the literal "sort code" label directly attached to the 6-digit group and the
+      literal "account number"/"a/c no" label directly attached to the 8-digit group — bare digits next to
+      unrelated labels (as in the should_not_match example above) do not match.
+  - description: >-
+      No modulus-check validator is available as a generic Purview function, so a structurally-matching
+      sort code / account number pair is not confirmed to be a real, payable combination.
+    mitigation: >-
+      Rely on the paired label-embedded regex plus evidence/noise-exclusion tiers; consider a downstream
+      per-bank modulus check (Vocalink/Pay.UK weighting tables) for authoritative validation.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+    - dict: data-record-context
+      as: Evidence_data_record_context
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_uk_sort_code_account
+      matches:
+        - ref: Evidence_data_record_context
+        - ref: Keyword_uk_bank_transfer_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_uk_sort_code_account
+      matches:
+        - ref: Evidence_data_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_uk_sort_code_account
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_uk_sort_code_account
+      pattern: '(?i)(?:\bsort\s+code[\s:.-]{0,10}\d{2}[-\s]?\d{2}[-\s]?\d{2}\b[\s\S]{0,60}?\b(?:account(?:\s+(?:number|no\.?))?|a\/c(?:\s+(?:no\.?|number))?)[\s:.-]{0,10}\d{8}\b|\b(?:account(?:\s+(?:number|no\.?))?|a\/c(?:\s+(?:no\.?|number))?)[\s:.-]{0,10}\d{8}\b[\s\S]{0,60}?\bsort\s+code[\s:.-]{0,10}\d{2}[-\s]?\d{2}[-\s]?\d{2}\b)'
+  keywords:
+    - id: Keyword_uk_bank_transfer_specific
+      groups:
+        - match_style: word
+          terms:
+            - text: BACS
+              case_sensitive: true
+            - text: CHAPS
+              case_sensitive: true
+            - Faster Payments
+            - beneficiary
+            - payee
+            - remittance advice
+            - bank transfer
+            - standing order
+            - direct debit
+      strength: domain
+risk_rating: 9
+risk_description: >-
+  Financial account identifiers can be exploited for unauthorized transactions, account takeover, and
+  financial fraud. Exposure of banking details poses immediate monetary risk and may violate financial data
+  protection regulations.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: "SENSITIVE"
+  qgiscf_dlm: "SENSITIVE Financial"
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+references:
+  - url: https://www.legislation.gov.uk/uksi/2017/752/contents
+    title: "The Payment Services Regulations 2017"
+  - url: https://en.wikipedia.org/wiki/Sort_code
+    title: "Sort code - Wikipedia (cites Pay.UK Clearing Code Rules, February 2020)"
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
