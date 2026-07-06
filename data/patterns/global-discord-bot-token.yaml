@@ -1,0 +1,167 @@
+schema: testpattern/v1
+name: Discord Bot Token
+slug: global-discord-bot-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Discord bot tokens: three dot-separated base64url segments where the first segment is
+  the bot's numeric snowflake ID base64-encoded (always starting M, N, or O because it encodes an
+  ASCII digit), the second is a 6-character timestamp, and the third is an HMAC of 27 (pre-2022)
+  to 38 (current) characters. A leaked bot token grants full control of the bot account,
+  including reading every channel the bot can see and sending messages as the bot.
+operation: >-
+  Structured triplet [MNO] + 23-27 base64url chars, dot, 6 chars, dot, 27-38 chars. Discord does
+  not publish the format; the structure is multiply attested across the detector ecosystem --
+  TruffleHog (24.6.27), Kingfisher ([MNO]24.6.27), detect-secrets ([MNO]{23,25}.6.27), and
+  community regex databases ([MNO]{23,25}.6.{27,38}, reflecting the longer HMAC on
+  currently-issued tokens) -- and derives from Discord's own client-side token parsing (the
+  python-discord moderation bot's operationally-validated triplet, taken from discord-developers).
+  The first-segment range is bounded 24-28 total characters (attested 24-26 plus headroom for
+  snowflake ID growth); the discontinued mfa.-prefixed user-token format (dead since May 2022) is
+  out of scope. Corroborative evidence: keywords within 300 characters.
+pattern: (?<![A-Za-z0-9_-])[MNO][A-Za-z0-9_-]{23,27}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,38}(?![A-Za-z0-9_-])
+confidence: high
+confidence_justification: >-
+  High confidence: the triplet structure is rigid (three exact-charset segments with tight length
+  bounds and a structurally-derived [MNO] first character -- base64 of an ASCII digit always
+  starts M, N, or O) and is independently attested by four detector ecosystems plus Discord's
+  GitHub secret-scanning partnership (push protection enabled) and GitGuardian's prefixed
+  high-recall detector. Kingfisher and GitHub's push protection fire on the bare shape in
+  production, supporting a value-only discovery tier; TruffleHog label-gates the same regex as
+  part of its standard PrefixRegex convention (no FP-motivated comment), the same divergence this
+  corpus documents for other structurally-distinctive formats. The third-segment 27-38 range
+  spans the attested pre-2022 length (27, pinned by four detectors) and the longer HMAC on
+  current tokens (38, per community regex databases).
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - discord
+    - discord.com
+    - DISCORD_TOKEN
+    - DISCORD_BOT_TOKEN
+    - bot token
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: MTIzNDU2Nzg5MDEyMzQ1Njc4.AAAAAA.ABCDEFGHIJKLMNOPQRSTUVWXYZa
+      description: Discord bot token (24.6.27, pre-2022 HMAC length; first segment decodes to a sequential fake ID)
+    - value: 'DISCORD_BOT_TOKEN=NzAxMjM0NTY3ODkwMTIzNDU2Nzg5.BBBBBB.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL'
+      description: Labelled bot token with a 28-char first segment and current 38-char HMAC
+    - value: ODk4NzY1NDMyMTA5ODc2NTQzMjE.CCCCCC.0123456789abcdefghijklmnopqrstuvwxyz01
+      description: Bot token with O-leading 27-char first segment and 38-char HMAC
+  should_not_match:
+    - value: XYZ4NTY3ODkwMTIzNDU2Nzg5MDE.AAAAAA.ABCDEFGHIJKLMNOPQRSTUVWXYZa
+      description: First character not M/N/O (a base64-encoded numeric snowflake cannot start with X)
+    - value: MTIzNDU2Nzg5MDEyMzQ1Njc4.AAAAAA.ABCDEFGHIJKLMNOP
+      description: Third segment far too short (16 chars, below the 27-char floor)
+    - value: MTIzNDU2Nzg5MDEyMzQ1Njc4.AAAAAAAAAA.ABCDEFGHIJKLMNOPQRSTUVWXYZa
+      description: Middle timestamp segment wrong length (10 chars, not 6)
+    - value: the discord bot token must be regenerated in the developer portal
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: Three-part dotted base64url runs inside longer chains (for example JWT fragments or minified code) that happen to satisfy the segment lengths.
+    mitigation: The rigid 6-character middle segment and [MNO] first character make coincidental matches rare; corroborative Discord keywords gate the recommended confidence tier, and boundary lookarounds reject runs glued into longer identifiers.
+  - description: Discontinued formats -- mfa.-prefixed user tokens (dead since May 2022) and 64-hex "API keys" (gitleaks' label-gated discord-api-token rule) -- are not matched.
+    mitigation: Documented as a deliberate scope decision; the 64-hex shape near a discord label is generic and the mfa. format no longer exists on live accounts.
+  - description: Documentation or examples showing placeholder token triplets.
+    mitigation: Require corroborative Discord keywords and check for placeholder markers (example, xxxx).
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  A leaked Discord bot token grants full control of the bot account: reading message history in
+  every channel the bot can see, sending messages as the bot, and abusing any moderation or
+  administrative permissions the bot holds across all servers it has joined.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_discord_bot_token
+      matches:
+        - ref: Keyword_discord_bot_token
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_discord_bot_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_discord_bot_token
+      pattern: (?<![A-Za-z0-9_-])[MNO][A-Za-z0-9_-]{23,27}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,38}(?![A-Za-z0-9_-])
+  keywords:
+    - id: Keyword_discord_bot_token
+      groups:
+        - match_style: word
+          terms:
+            - text: Discord
+              case_sensitive: true
+            - discord.com
+            - DISCORD_TOKEN
+            - DISCORD_BOT_TOKEN
+            - discord bot
+            - bot token
+            - api key
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/discordbottoken/discordbottoken.go
+    title: 'TruffleHog production Discord detector (label-gated [A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27})'
+  - url: https://github.com/mongodb/kingfisher/blob/main/crates/kingfisher-rules/data/rules/discord.yml
+    title: 'Kingfisher production Discord Bot Token rule (value-only [MNO][A-Z0-9_-]{23}\.[A-Z0-9_-]{6}\.[A-Z0-9_-]{27} + entropy)'
+  - url: https://github.com/Yelp/detect-secrets/blob/master/detect_secrets/plugins/discord.py
+    title: 'detect-secrets DiscordBotTokenDetector ([MNO][a-zA-Z\d_-]{23,25}\.[a-zA-Z\d_-]{6}\.[a-zA-Z\d_-]{27})'
+  - url: https://github.com/odomojuli/RegExTokens
+    title: 'Community regex-token database (Discord [MNO][0-9A-Za-z_-]{23,25}\.[0-9A-Za-z_-]{6}\.[0-9A-Za-z_-]{27,38}; documents the 38-char HMAC on current tokens)'
+  - url: https://github.com/python-discord/bot/blob/main/bot/exts/filtering/_filters/unique/discord_token.py
+    title: "python-discord moderation bot's operationally-validated token triplet (taken from discord-developers / the client's own parsing)"
+  - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+    title: Supported secret scanning patterns - GitHub Docs (Discord Bot Token, partner + push protection)

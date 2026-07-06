@@ -1,0 +1,186 @@
+schema: testpattern/v1
+name: Supabase Key
+slug: global-supabase-key
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Supabase credentials: personal access tokens (sbp_), the new opaque secret API keys
+  (sb_secret_) introduced in 2025 to replace the legacy service_role JWT, and, when labelled with
+  Supabase context in an assignment, the legacy anon/service_role JWT keys that remain valid until
+  late 2026. A leaked secret key or service_role JWT grants full admin access to the project's
+  production Postgres database, bypassing Row Level Security; a leaked personal access token grants
+  account-wide Management API control.
+operation: >-
+  Two detection branches. Branch 1 (distinctive, value-only capable): sbp_ personal access tokens
+  (40-character body, pinned by both TruffleHog's and Kingfisher's production detectors; charset is
+  their union) and sb_secret_ project secret keys (announced by Supabase's changelog 2025-06-17 as
+  the replacement for service_role JWTs; Kingfisher's production rule and Supabase's own CLI source
+  both pin a 31-character body of the form 22 chars + underscore + 8-char suffix, so a bounded
+  24-60 range is used behind the distinctive 10-character literal prefix, mirroring Kingfisher's
+  own range practice on the sibling sb_publishable_ key). Branch 2 (context-gated only): legacy
+  anon/service_role JWTs -- an eyJ-prefixed three-segment JWT requiring a Supabase-specific label
+  (supabase / service_role / anon key) plus an assignment separator before the value, because bare
+  eyJ JWTs are ubiquitous in logs and configuration. sb_publishable_ keys are deliberately not
+  detected: they are safe-to-expose public keys by design. Corroborative evidence: keywords within
+  300 characters.
+pattern: (?<![A-Za-z0-9_-])(?:sbp_[A-Za-z0-9_-]{40}|sb_secret_[A-Za-z0-9_-]{24,60})(?![A-Za-z0-9_-])
+confidence: high
+confidence_justification: >-
+  High confidence: both distinctive prefixes are multiply attested. sbp_ is pinned at a
+  40-character body by two independent production detectors (TruffleHog sbp_[a-z0-9]{40},
+  Kingfisher sbp_[a-z0-9_-]{40} case-insensitive) and confirmed as the personal-access-token
+  format by Supabase's own Management API and CLI documentation. sb_secret_ is confirmed by
+  Supabase's changelog (new API keys, June 2025), by literal examples hardcoded in Supabase's own
+  open-source CLI (sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz, a 31-character body), and by
+  Kingfisher's production rule (sb_secret_[a-z0-9_-]{31}); a bounded 24-60 body range is used
+  rather than false-precision pinning because the vendor documents the keys only as opaque random
+  strings. The legacy JWT branch is deliberately context-gated: eyJ-prefixed JWTs are one of the
+  most common token shapes in any log or config file, so it requires a labelled assignment and
+  never fires value-only.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - supabase
+    - supabase.co
+    - SUPABASE_ACCESS_TOKEN
+    - SUPABASE_SERVICE_ROLE_KEY
+    - service_role
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: 'SUPABASE_ACCESS_TOKEN=sbp_abcdefghijklmnopqrstuvwxyz01234567890123'
+      description: Supabase personal access token (sbp_ + 40-char body) in the canonical env var
+    - value: sbp_0123456789abcdefghij0123456789abcdefghij
+      description: Bare Supabase personal access token (distinctive prefix, no label needed)
+    - value: sb_secret_ABCDEFGHIJKLMNOPQRSTUV_abcdefgh
+      description: Supabase secret API key (sb_secret_ + 31-char body, the structure in Supabase's own CLI example)
+    - value: 'SUPABASE_SERVICE_ROLE_KEY=eyJABCDEFGHIJKLMNOPQRSTUVWXYZ.eyJabcdefghijklmnopqrstuvwxyz.0123456789ABCDEFGHIJabcdefghij'
+      description: Legacy service_role JWT in a labelled assignment (context-gated branch)
+  should_not_match:
+    - value: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+      description: Supabase publishable key (safe to expose by design, deliberately not detected; value is Supabase's own public CLI default)
+    - value: sbp_abcdefghij
+      description: sbp_ body far too short (10 chars, not 40)
+    - value: eyJABCDEFGHIJKLMNOPQRSTUVWXYZ.eyJabcdefghijklmnopqrstuvwxyz.0123456789ABCDEFGHIJabcdefghij
+      description: Bare JWT with no Supabase label anywhere (eyJ tokens are ubiquitous; never fires value-only)
+    - value: rotate the supabase service_role key in project settings
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: Any JWT (session token, OIDC id_token, other vendors' API keys) appearing near the words supabase/service_role in configuration or documentation -- eyJ-prefixed JWTs are ubiquitous and carry no vendor marker in the visible string.
+    mitigation: The JWT branch requires a Supabase-specific label plus an assignment separator (enforced in the regex), is context-gated only, and never fires value-only; corroborative keywords add further gating.
+  - description: Supabase publishable keys (sb_publishable_) and the project anon JWT are designed to be public; flagging them as leaked credentials would be noise.
+    mitigation: sb_publishable_ is structurally excluded from the regex; the anon JWT is only reported when it appears in a labelled Supabase assignment, where treating it as sensitive is a reasonable default.
+  - description: Documentation or examples showing placeholder sbp_/sb_secret_ strings.
+    mitigation: Require corroborative Supabase keywords and check for placeholder markers (example, xxxx).
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  A leaked Supabase secret key or service_role JWT grants full administrative access to the
+  project's production Postgres database, bypassing Row Level Security; a leaked personal access
+  token grants Management API control over every project in the account (databases, functions,
+  secrets).
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_supabase_key
+      matches:
+        - ref: Keyword_supabase_key
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_supabase_key
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_supabase_legacy_jwt
+      matches:
+        - ref: Keyword_supabase_key
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_supabase_key
+      pattern: (?<![A-Za-z0-9_-])(?:sbp_[A-Za-z0-9_-]{40}|sb_secret_[A-Za-z0-9_-]{24,60})(?![A-Za-z0-9_-])
+    - id: Regex_supabase_legacy_jwt
+      pattern: (?i)(?:supabase|service_role|anon[_ ]key)[\s\S]{0,60}?[=:][\s"']{0,4}eyJ[A-Za-z0-9_-]{10,500}\.eyJ[A-Za-z0-9_-]{10,500}\.[A-Za-z0-9_-]{10,500}(?![A-Za-z0-9_-])
+  keywords:
+    - id: Keyword_supabase_key
+      groups:
+        - match_style: word
+          terms:
+            - supabase
+            - supabase.co
+            - SUPABASE_ACCESS_TOKEN
+            - SUPABASE_SERVICE_ROLE_KEY
+            - service_role
+            - supabase api
+            - access token
+            - api key
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://supabase.com/changelog/29260-upcoming-changes-to-supabase-api-keys
+    title: Supabase changelog introducing sb_publishable_/sb_secret_ opaque API keys (June 2025) and the legacy JWT deprecation timeline (late 2026)
+  - url: https://supabase.com/docs/guides/api/api-keys
+    title: Understanding API keys - Supabase Docs (sb_secret_ replaces service_role JWT; sb_publishable_ is safe to expose)
+  - url: https://github.com/supabase/cli/blob/main/apps/cli-go/pkg/config/apikeys.go
+    title: Supabase's own CLI source (literal sb_secret_/sb_publishable_ default keys, 31-character bodies)
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/supabasetoken/supabasetoken.go
+    title: 'TruffleHog production Supabase detector (sbp_[a-z0-9]{40} personal access token)'
+  - url: https://github.com/mongodb/kingfisher/blob/main/crates/kingfisher-rules/data/rules/supabase.yml
+    title: 'Kingfisher production Supabase rules (sbp_ 40-char, sb_secret_ 31-char, sb_publishable_ 24-40)'
+  - url: https://docs.gitguardian.com/secrets-detection/secrets-detection-engine/detectors/specifics/supabase_service_role_jwt
+    title: Supabase Service Role JWT - GitGuardian detector documentation (unprefixed JWT, admin rights over the whole database)

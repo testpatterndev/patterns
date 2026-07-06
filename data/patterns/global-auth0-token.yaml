@@ -1,0 +1,150 @@
+schema: testpattern/v1
+name: Auth0 Token
+slug: global-auth0-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Auth0 client secrets. Auth0 issues an unprefixed 64-character base64url-style client
+  secret, indistinguishable from other long random strings, so this pattern requires an adjacent
+  Auth0 label plus an assignment separator to structurally qualify a match. A leaked client secret
+  lets an attacker mint tokens as the application and impersonate it against every API it is
+  authorized for.
+operation: >-
+  An Auth0 label (auth0 / AUTH0_CLIENT_SECRET) followed within a short gap by an assignment
+  separator (= or :) and a 64-character (bounded to 100 for longer variants) base64url-charset
+  value. Both production detectors that cover Auth0 client secrets (TruffleHog auth0oauth,
+  Kingfisher auth0.2) use a label-gated 64-plus-character [A-Za-z0-9_-] body; neither fires
+  value-only, and neither does this pattern. Auth0 Management API tokens are JWTs with no
+  Auth0-specific visible marker and are deliberately out of scope (covered generically by the JWT
+  pattern). Auth0 client IDs (32-character identifiers) are public identifiers, not secrets, and
+  are structurally excluded by the 64-character floor. Corroborative evidence: keywords within 300
+  characters.
+pattern: (?i)auth0[\s\S]{0,40}?[=:][\s"']{0,4}(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{64,100}(?![A-Za-z0-9_-])
+confidence: medium
+confidence_justification: >-
+  Medium confidence: Auth0's own documentation does not publish the client secret's visible
+  format. TruffleHog's production detector pins a 64-plus-character [a-zA-Z0-9_-] body paired with
+  Auth0 context, and Kingfisher's production rule independently pins the same label-gated
+  64-plus-character body -- converging secret-scanning-ecosystem evidence, but for an unprefixed
+  opaque string. Without an adjacent Auth0 label the value is indistinguishable from any other
+  64-character token, so this pattern requires the labelled assignment and offers no
+  value-only tier. Auth0 is not a GitHub secret-scanning partner and gitleaks has no Auth0 rule,
+  consistent with the format's inherent ambiguity.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - auth0
+    - auth0.com
+    - AUTH0_CLIENT_SECRET
+    - client secret
+    - client_secret
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: 'AUTH0_CLIENT_SECRET=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AB'
+      description: Auth0 client secret in the canonical env var (label + assignment + 64-char body)
+    - value: 'auth0 client secret: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'
+      description: Auth0 label with colon separator and a 64-char base64url-charset body
+    - value: auth0_secret="zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA9876543210_-"
+      description: Quoted Auth0 secret in a config assignment
+  should_not_match:
+    - value: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AB with no vendor context
+      description: Bare 64-char value with no Auth0 label anywhere (could be any hash or token)
+    - value: 'AUTH0_CLIENT_ID=abcdefghijklmnopqrstuvwxyz012345'
+      description: Auth0 client ID (32-char public identifier, not a secret; below the 64-char floor)
+    - value: 'auth0 secret too short: ABCDEFGHIJKLMNOP0123'
+      description: Auth0 label present but value far too short (20 chars, not 64)
+    - value: rotate the auth0 client secret in the application settings
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: A 64-character hash (for example a SHA-256 hex digest) or unrelated token appearing in a labelled assignment near the word "auth0" in configuration or logs.
+    mitigation: The regex requires label adjacency plus an assignment separator and never fires value-only; corroborative keywords and placeholder checks add further gating.
+  - description: Auth0 Management API access tokens are JWTs (eyJ...) with no Auth0-specific visible marker and are not matched by this pattern.
+    mitigation: Documented as a deliberate scope decision; generic JWT detection covers that shape, and pairing it with Auth0 tenant domains is left to log-analysis tooling.
+  - description: Documentation or examples showing placeholder AUTH0_CLIENT_SECRET values.
+    mitigation: Check for placeholder markers (example, xxxx, 0000) and documentation file types to reduce false positives.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  A leaked Auth0 client secret lets an attacker authenticate as the application, mint access
+  tokens, and impersonate it against every API and user store the tenant protects -- a direct
+  path to account takeover across the applications Auth0 secures.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_auth0_token
+      matches:
+        - ref: Keyword_auth0_token
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_auth0_token
+      pattern: (?i)auth0[\s\S]{0,40}?[=:][\s"']{0,4}(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{64,100}(?![A-Za-z0-9_-])
+  keywords:
+    - id: Keyword_auth0_token
+      groups:
+        - match_style: word
+          terms:
+            - auth0
+            - auth0.com
+            - AUTH0_CLIENT_SECRET
+            - client secret
+            - client_secret
+            - auth0 api
+            - api key
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/auth0oauth/auth0oauth.go
+    title: 'TruffleHog production Auth0 OAuth detector (label-gated client secret [a-zA-Z0-9_-]{64,})'
+  - url: https://github.com/mongodb/kingfisher/blob/main/crates/kingfisher-rules/data/rules/auth0.yml
+    title: 'Kingfisher production Auth0 rules (label-gated client secret [a-z0-9_-]{64,} case-insensitive)'
+  - url: https://www.gitguardian.com/remediation/auth0-key
+    title: Remediating Auth0 Key leaks - GitGuardian (detector exists; format not published)
