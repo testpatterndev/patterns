@@ -10,20 +10,25 @@ description: >-
   allows payment processing and transaction-history access on the connected merchant's behalf.
 operation: >-
   Literal prefix access_token followed by three $-delimited segments: environment (production or
-  sandbox, Braintree's two documented environments), a 16-character lowercase alphanumeric
-  merchant ID, and a 32-character lowercase alphanumeric token. The structure (access_token
-  prefix, $ delimiter, environment segment, merchant-id segment) is confirmed by Braintree's own
-  SDK credential parser; the segment lengths are pinned by the Semgrep secrets registry rule and
-  TruffleHog's Braintree merchant-id shape. Corroborative evidence: keywords within 300
-  characters.
-pattern: (?<![A-Za-z0-9_])access_token\$(?:production|sandbox)\$[0-9a-z]{16}\$[0-9a-z]{32}(?![A-Za-z0-9_])
+  sandbox, Braintree's two documented environments), a lowercase alphanumeric merchant ID
+  (bounded 8-32 chars), and a lowercase alphanumeric token (bounded 16-64 chars). The structure
+  (access_token prefix, $ delimiter, environment segment, merchant-id segment) is confirmed by
+  Braintree's own SDK credential parser. The exact segment lengths are NOT vendor-published: the
+  only concrete observation (16-char merchant id, 32-char token) comes from the Semgrep secrets
+  registry rule -- which self-declares LOW confidence and traces to a legacy third-party regex
+  list -- loosely corroborated by TruffleHog's separate legacy-credential shapes (16-char
+  merchant id, 32-char private key). Bounded ranges around those observations are used so real
+  tokens with different segment lengths are not missed; the literal access_token$env$ lead-in
+  carries the distinctiveness. Corroborative evidence: keywords within 300 characters.
+pattern: (?<![A-Za-z0-9_])access_token\$(?:production|sandbox)\$[0-9a-z]{8,32}\$[0-9a-z]{16,64}(?![A-Za-z0-9_])
 confidence: high
 confidence_justification: >-
   High confidence: the literal "access_token$production$"/"access_token$sandbox$" lead-in is
-  self-describing and essentially cannot occur by accident. The structure is confirmed by
-  Braintree's own SDK source (CredentialsParser splits on $ and requires the access_token
-  prefix), and the 16/32 segment lengths converge from the Semgrep secrets registry rule and
-  TruffleHog's Braintree detector shapes.
+  self-describing and essentially cannot occur by accident, and the $-delimited structure is
+  confirmed by Braintree's own SDK source (CredentialsParser splits on $ and requires the
+  access_token prefix). The segment lengths are deliberately bounded ranges rather than exact
+  pins because the only exact-length evidence (16/32) is a single low-confidence community rule;
+  the confidence rests on the literal prefix and structure, not on segment lengths.
 jurisdictions:
   - global
 regulations:
@@ -60,8 +65,10 @@ test_cases:
   should_not_match:
     - value: access_token$staging$abcdefghij012345$0123456789abcdefghijklmnopqrstuv
       description: Invalid environment segment (staging is not a Braintree environment)
-    - value: access_token$production$abcdefghij012345$0123456789abcdef
-      description: Token segment too short (16 chars, not 32)
+    - value: access_token$production$abcdefghij012345$0123456789abcde
+      description: Token segment too short (15 chars, below the 16-char floor)
+    - value: access_token$production$abcdefg$0123456789abcdefghijklmnopqrstuv
+      description: Merchant-id segment too short (7 chars, below the 8-char floor)
     - value: client_id$production$abcdefghij012345
       description: Braintree client_id credential (different $-structure, segment shapes unverified, deliberately out of scope)
     - value: rotate the braintree access token and private key
@@ -72,7 +79,7 @@ false_positives:
   - description: Documentation or examples showing placeholder access_token$production$ strings.
     mitigation: Require corroborative Braintree keywords and check for placeholder markers (example, xxxx).
   - description: 'Braintree legacy gateway credentials (merchant ID, public key, private key) are unprefixed opaque strings (GitGuardian lists them as non-prefixed) and are not matched by this pattern; nor are the client_id$/client_secret$ OAuth app credentials, whose segment shapes are not published.'
-    mitigation: Documented as a known scope limitation; only the fully-verified access_token$ form is matched.
+    mitigation: Documented as a known scope limitation; only the structure-verified access_token$ form is matched.
 exports:
   - purview_xml
   - yaml
@@ -117,7 +124,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_braintree_access_token
-      pattern: (?<![A-Za-z0-9_])access_token\$(?:production|sandbox)\$[0-9a-z]{16}\$[0-9a-z]{32}(?![A-Za-z0-9_])
+      pattern: (?<![A-Za-z0-9_])access_token\$(?:production|sandbox)\$[0-9a-z]{8,32}\$[0-9a-z]{16,64}(?![A-Za-z0-9_])
   keywords:
     - id: Keyword_braintree_access_token
       groups:
@@ -144,8 +151,8 @@ references:
   - url: https://github.com/braintree/braintree_ruby/blob/master/lib/braintree/credentials_parser.rb
     title: "Braintree's own SDK credential parser (access_token prefix, $-delimited environment and merchant-id segments)"
   - url: https://github.com/semgrep/semgrep-rules/blob/develop/generic/secrets/security/detected-paypal-braintree-access-token.yaml
-    title: 'Semgrep secrets registry rule (access_token\$production\$[0-9a-z]{16}\$[0-9a-z]{32})'
+    title: 'Semgrep secrets registry rule (access_token\$production\$[0-9a-z]{16}\$[0-9a-z]{32}; self-declared LOW confidence, traces to the legacy truffleHogRegexes list)'
   - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/braintreepayments/braintreepayments.go
-    title: 'TruffleHog production Braintree detector (16-char lowercase alnum merchant id; 32-char key shape)'
+    title: 'TruffleHog production Braintree detector (targets the legacy credential pair: 16-char lowercase alnum merchant id; 32-char hex private key)'
   - url: https://docs.gitguardian.com/secrets-detection/secrets-detection-engine/detectors/specifics/paypal_braintree_keys
     title: 'PayPal Braintree Keys - GitGuardian detector documentation (legacy keys Prefixed: False)'

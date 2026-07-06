@@ -5,28 +5,35 @@ version: 1.0.0
 type: regex
 engine: universal
 description: >-
-  Detects Vercel credentials: API access tokens (an unprefixed 24-character alphanumeric string,
-  context-gated on a nearby Vercel label) and Vercel Blob read-write tokens (distinctive
-  vercel_blob_rw_ prefix). A leaked API token grants control of the account's projects,
-  deployments and environment variables; a leaked Blob token grants read/write access to the
-  associated storage.
+  Detects Vercel credentials: the current prefixed token family introduced in February 2026
+  (vcp_ personal access tokens, vci_ integration tokens, vca_ app access tokens, vcr_ app
+  refresh tokens, vck_ API keys), Vercel Blob read-write tokens (vercel_blob_rw_), and, when
+  labelled with Vercel context in an assignment, the legacy unprefixed 24-character token form.
+  A leaked token grants control of the account's projects, deployments and environment
+  variables; a leaked Blob token grants read/write access to the associated storage.
 operation: >-
-  Two detection branches. Branch 1 (context-gated only): Vercel API access tokens have no
-  vendor prefix (GitGuardian "Prefixed: False"), so a Vercel label is required within 40
-  characters before a 24-character alphanumeric value, mirroring TruffleHog's label-gated
-  production detector. Branch 2 (distinctive, value-only capable): Vercel Blob read-write
-  tokens in the vendor-documented vercel_blob_rw_<storeId>_<secret> structure; the segment
-  lengths are not formally published, so generous bounded ranges are used behind the
-  15-character literal prefix. Corroborative evidence: keywords within 300 characters.
-pattern: (?i)vercel[\s\S]{0,40}?(?<![A-Za-z0-9])[A-Za-z0-9]{24}(?![A-Za-z0-9])
-confidence: medium
+  Two detection branches. Branch 1 (distinctive, value-only capable): the vc?-prefix family
+  announced by Vercel's changelog (2026-02-09) explicitly for secret-scanning detectability --
+  Vercel's own Sign in with Vercel docs show literal vca_/vcr_ examples with a 56-character
+  alphanumeric body, so a bounded 40-80 range is used behind the vendor-confirmed prefixes --
+  plus Vercel Blob read-write tokens in the vendor-documented vercel_blob_rw_<storeId>_<secret>
+  structure (segment lengths not formally published; generous bounded ranges behind the
+  15-character literal prefix). Branch 2 (context-gated only): legacy unprefixed 24-character
+  alphanumeric tokens (per TruffleHog's label-gated detector, which predates the prefixed
+  family), requiring a Vercel label plus an assignment separator (= or :) before the value;
+  legacy tokens issued before the format change may still be live. Corroborative evidence:
+  keywords within 300 characters.
+pattern: (?<![A-Za-z0-9_])(?:vc[aikpr]_[A-Za-z0-9]{40,80}|vercel_blob_rw_[A-Za-z0-9]{5,40}_[A-Za-z0-9]{10,60})(?![A-Za-z0-9_])
+confidence: high
 confidence_justification: >-
-  Medium confidence: Vercel API tokens are unprefixed opaque strings (GitGuardian "Prefixed:
-  False"; Vercel's own docs show no format), so the primary branch is only distinguishable via
-  the embedded label requirement and carries inherent collision risk with other 24-character
-  identifiers. The 24-character alphanumeric body is attested by TruffleHog's production
-  detector. The Blob-token branch is high-precision by contrast (15-character literal prefix,
-  vendor-documented structure) but its exact segment lengths are not formally published.
+  High confidence: the vc?-prefix family is documented by Vercel's own changelog (all five
+  prefixes named, introduced specifically so scanners can detect them), corroborated by literal
+  vca_/vcr_ token examples in Vercel's own Sign in with Vercel docs (56-character alphanumeric
+  bodies), and Vercel is a GitHub secret-scanning partner with six token types, five
+  push-protection enabled. Exact per-prefix body lengths are not formally published, so an
+  honest bounded 40-80 range is used. The legacy unprefixed form is deliberately context-gated:
+  it is indistinguishable from other 24-character identifiers (GitGuardian lists it as
+  non-prefixed), so it requires a labelled assignment and never fires value-only.
 jurisdictions:
   - global
 regulations:
@@ -53,30 +60,42 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: 'VERCEL_TOKEN=ABCDEFGHIJKLMNOPQRSTUVWX'
-      description: Vercel API token in the canonical VERCEL_TOKEN env var (label + 24-char body)
-    - value: 'vercel api token: zyxwvutsrqponmlkjihgfedc'
-      description: Vercel label followed by a 24-char alphanumeric token within the proximity gap
+    - value: 'VERCEL_TOKEN=vcp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567'
+      description: Vercel personal access token, current vcp_ format, in the canonical env var
+    - value: vca_zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA9876
+      description: Vercel app access token (vca_ + 56-char body, the length shown in Vercel's own docs example)
+    - value: vck_0123456789ABCDEFGHIJ0123456789abcdefghij
+      description: Vercel API key (vck_ prefix, 40-char body at the bounded floor)
     - value: 'BLOB_READ_WRITE_TOKEN=vercel_blob_rw_abc123_ABCDEFGHIJKLMNOPQRSTUVWXYZ'
       description: Vercel Blob read-write token (vercel_blob_rw_ + store id + secret)
     - value: vercel_blob_rw_store01_zyxwvutsrqponmlkjihgfedcba0123456789
       description: Bare Vercel Blob token (distinctive prefix, no label needed)
+    - value: 'VERCEL_TOKEN=ABCDEFGHIJKLMNOPQRSTUVWX'
+      description: Legacy unprefixed Vercel token (24 chars) in a labelled assignment
+    - value: 'vercel api token: zyxwvutsrqponmlkjihgfedc'
+      description: Legacy Vercel token with a label and colon separator within the proximity gap
   should_not_match:
+    - value: vercel_deploy_id_ABCDEFGHIJKLMNOPQRSTUVWX_env_more
+      description: 24-char run glued inside a longer identifier (boundary regression case from review)
+    - value: vcx_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567
+      description: Invalid prefix letter (vcx_ is not a Vercel token family)
+    - value: vcp_ABCDEFGHIJ0123456789
+      description: vcp_ body too short (20 chars, below the 40-char floor)
     - value: ABCDEFGHIJKLMNOPQRSTUVWX with no vendor context
       description: Bare 24-char alphanumeric value with no Vercel label anywhere (could be any ID or hash)
     - value: vercel_blob_rw_abc_Zz9
       description: Blob token secret segment far too short (3 chars, below the 10-char floor)
-    - value: 'vercel deployment token too short: ABCDEFGHIJ0123456789'
-      description: Vercel label present but value too short (20 chars, not 24)
     - value: rotate the vercel token in account settings
       description: Prose mention without a token value
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
-  - description: A 24-character identifier (for example a MongoDB ObjectId is 24 hex characters) appearing near the word "vercel" in documentation or logs.
-    mitigation: Require the label adjacency (already enforced by the regex) plus corroborative keywords; exclude placeholder markers. This branch is context-gated only and never fires value-only.
-  - description: Documentation or examples showing placeholder VERCEL_TOKEN or vercel_blob_rw_ strings.
+  - description: A 24-character identifier (for example a MongoDB ObjectId is 24 hex characters) appearing in a labelled assignment near the word "vercel" in configuration or logs.
+    mitigation: The legacy branch requires label adjacency plus an assignment separator (already enforced by the regex) and corroborative keywords; it is context-gated only and never fires value-only.
+  - description: Documentation or examples showing placeholder vcp_/VERCEL_TOKEN/vercel_blob_rw_ strings.
     mitigation: Check for placeholder markers (example, xxxx, 0000) and documentation file types to reduce false positives.
+  - description: The per-prefix body lengths of the vc?-family are not individually published; a bounded 40-80 range around the vendor-documented 56-character examples is used, and the possible sixth partner type (support access tokens) has no published prefix and is not matched.
+    mitigation: Documented as an honest bound; the prefixes themselves are vendor-announced and highly distinctive.
 exports:
   - purview_xml
   - yaml
@@ -84,7 +103,7 @@ exports:
 scope: narrow
 risk_rating: 8
 risk_description: >-
-  A leaked Vercel API token grants control of the account's projects, deployments, domains and
+  A leaked Vercel token grants control of the account's projects, deployments, domains and
   environment variables (which typically contain further secrets), enabling site takeover and
   supply-chain compromise; a leaked Blob token exposes stored content.
 sensitivity_labels:
@@ -104,16 +123,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 75
-      id_match: Regex_vercel_api_token
-      matches:
-        - ref: Keyword_vercel_token
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_vercel_blob_token
+      id_match: Regex_vercel_token
       matches:
         - ref: Keyword_vercel_token
         - type: any
@@ -122,18 +132,27 @@ purview:
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
-      id_match: Regex_vercel_blob_token
+      id_match: Regex_vercel_token
       matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_vercel_api_token
+      matches:
+        - ref: Keyword_vercel_token
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
+    - id: Regex_vercel_token
+      pattern: (?<![A-Za-z0-9_])(?:vc[aikpr]_[A-Za-z0-9]{40,80}|vercel_blob_rw_[A-Za-z0-9]{5,40}_[A-Za-z0-9]{10,60})(?![A-Za-z0-9_])
     - id: Regex_vercel_api_token
-      pattern: (?i)vercel[\s\S]{0,40}?(?<![A-Za-z0-9])[A-Za-z0-9]{24}(?![A-Za-z0-9])
-    - id: Regex_vercel_blob_token
-      pattern: (?<![A-Za-z0-9_])vercel_blob_rw_[A-Za-z0-9]{5,40}_[A-Za-z0-9]{10,60}(?![A-Za-z0-9_])
+      pattern: (?i)vercel[\s\S]{0,40}?[=:][\s"']{0,4}(?<![A-Za-z0-9_])[A-Za-z0-9]{24}(?![A-Za-z0-9_])
   keywords:
     - id: Keyword_vercel_token
       groups:
@@ -157,13 +176,17 @@ changelog:
 author: testpattern-community
 license: MIT
 references:
+  - url: https://vercel.com/changelog/new-token-formats-and-secret-scanning
+    title: "Vercel's own changelog introducing the prefixed token family (vcp_/vci_/vca_/vcr_/vck_, 2026-02-09)"
+  - url: https://vercel.com/docs/sign-in-with-vercel/tokens
+    title: Vercel Sign in with Vercel docs (literal vca_/vcr_ token examples with 56-char alphanumeric bodies)
+  - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+    title: Supported secret scanning patterns - GitHub Docs (six Vercel partner token types, five push-protection enabled)
   - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/vercel/vercel.go
-    title: 'TruffleHog production Vercel detector (label-gated 24-char alphanumeric token)'
+    title: 'TruffleHog production Vercel detector (label-gated legacy 24-char alphanumeric token; predates the prefixed family)'
   - url: https://docs.gitguardian.com/secrets-detection/secrets-detection-engine/detectors/specifics/vercel_api_access_token
-    title: 'Vercel API Access Token - GitGuardian detector documentation (Prefixed: False)'
+    title: 'Vercel API Access Token - GitGuardian detector documentation (legacy form, Prefixed: False)'
   - url: https://docs.gitguardian.com/secrets-detection/secrets-detection-engine/detectors/specifics/vercel_blob_token
     title: 'Vercel Blob Token - GitGuardian detector documentation (Prefixed: True)'
   - url: https://vercel.com/docs/vercel-blob/using-blob-sdk
     title: 'Vercel Blob SDK docs (vercel_blob_rw_<storeId>_<secret> token structure)'
-  - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
-    title: Supported secret scanning patterns - GitHub Docs (five Vercel partner token types)
