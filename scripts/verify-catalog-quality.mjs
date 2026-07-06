@@ -58,6 +58,11 @@ const STRUCTURAL_DICT_STRENGTH = new Map([
 //    national-security-marking form, and the TOP SECRET banner-words phrase) are gated only by
 //    the template-exclusion NOT-group — the structural regex is the evidence. Its 75 bare-SECRET
 //    tier is genuinely AND-gated by nz-government-context and does not need this exclusion.
+//  - us-classification-banner / us-cui-banner-marking: same protective-marking architecture as
+//    the AU/NZ marking SITs above. Their tiers (95 structural `//` banner form, 85 portion-mark /
+//    CUI phrase) are gated only by the template-exclusion NOT-group — the structural marking
+//    regex itself is the high-confidence evidence. cui-banner's 95 structural tier also carries
+//    a nonCanonical flag for the same ranking-order reason as the AU markings.
 const EXCLUDED_FILES = new Set([
   'au-marking-official.yaml',
   'au-marking-protected.yaml',
@@ -70,7 +75,9 @@ const EXCLUDED_FILES = new Set([
   'nz-marking-sensitive.yaml',
   'nz-marking-restricted.yaml',
   'nz-marking-confidential.yaml',
-  'nz-marking-secret-topsecret.yaml'
+  'nz-marking-secret-topsecret.yaml',
+  'us-classification-banner.yaml',
+  'us-cui-banner-marking.yaml'
 ])
 
 function loadYaml(filePath) {
