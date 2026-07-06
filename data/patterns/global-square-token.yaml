@@ -1,0 +1,176 @@
+schema: testpattern/v1
+name: Square Access Token
+slug: global-square-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Square credential formats: application secrets (sq0csp-, with sandbox- prefixed
+  sandbox variants), legacy personal access tokens (sq0atp-), and current OAuth/personal access
+  tokens (EAAA + 60-character body, context-gated on a nearby Square label because the EAAA
+  base64 shape also occurs in non-Square tokens and encoded blobs). A leaked token or secret
+  enables payment processing and transaction data access in the associated Square account.
+operation: >-
+  Two detection branches. Branch 1 (distinctive, value-only capable): sq0-family prefixes --
+  (sandbox-)sq0c??- application secrets (40-50 char base64url body, per TruffleHog's production
+  detector) and sq0atp- legacy personal access tokens (22-60 char body, per gitleaks). Branch 2
+  (context-gated only): EAAA-prefixed access tokens with an exactly-60-character body, requiring
+  a Square label within 40 characters before the token, mirroring TruffleHog's production
+  requirement of Square context for the EAAA form. Corroborative evidence: keywords within 300
+  characters.
+pattern: (?<![A-Za-z0-9_])(?:(?:sandbox-)?sq0c[a-z]{2}-[0-9A-Za-z_-]{40,50}|sq0atp-[0-9A-Za-z_-]{22,60})(?![0-9A-Za-z_-])
+confidence: high
+confidence_justification: >-
+  High confidence: the sq0-family prefixes are Square-specific and multiply attested (TruffleHog
+  squareapp production detector, gitleaks square-access-token rule, GitHub secret-scanning
+  partner entries square_production_application_secret / square_sandbox_application_secret).
+  The EAAA access-token form is attested by TruffleHog (exact 60-char body) and gitleaks but is
+  deliberately context-gated: TruffleHog's own production detector requires the word "square" in
+  the scanned data because bare EAAA matches base64-encoded blobs and other vendors' token
+  families, so this pattern embeds the same label requirement at the regex level.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - PCI-DSS
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - square
+    - squareup.com
+    - SQUARE_ACCESS_TOKEN
+    - application secret
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: sq0csp-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcd
+      description: Square production application secret (sq0csp- + 40-char body)
+    - value: sandbox-sq0csb-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghi
+      description: Square sandbox application secret (sandbox- prefix + 45-char body)
+    - value: sq0atp-ABCDEFGHIJKLMNOPQRSTUV
+      description: Square legacy personal access token (sq0atp- + 22-char body)
+    - value: 'SQUARE_ACCESS_TOKEN=EAAAABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567'
+      description: Labelled Square OAuth/personal access token (EAAA + 60-char body)
+    - value: Using square with token EAAAzyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA01234567
+      description: Square brand mention followed by an EAAA access token
+  should_not_match:
+    - value: sq0idp-ABCDEFGHIJKLMNOPQRSTUV
+      description: Square application ID (public identifier, deliberately not matched)
+    - value: sq0csp-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123
+      description: Application secret body too short (30 chars, below the 40-char floor)
+    - value: EAAAABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567
+      description: Bare EAAA value with no Square label anywhere (could be any base64 blob or another vendor's token)
+    - value: rotate the square access token in the developer dashboard
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: A base64-encoded blob or another vendor's EAAA-prefixed token appearing near the word "square" in unrelated text.
+    mitigation: The EAAA branch requires the Square label within 40 characters (already enforced by the regex) plus corroborative keywords; the 60-character exact body length further constrains matches.
+  - description: Documentation or examples showing placeholder sq0csp-/sq0atp-/EAAA strings.
+    mitigation: Require corroborative Square keywords and check for placeholder markers (example, xxxx).
+  - description: Square application IDs (sq0idp-/sq0idb-) are public identifiers, not secrets, and are deliberately out of scope.
+    mitigation: Documented as a scope decision; only secret-bearing formats (application secrets, personal access tokens, OAuth access tokens) are matched.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 10
+risk_description: >-
+  A leaked Square access token or application secret enables unauthorized payment processing,
+  refund issuance, and access to transaction and customer data in the associated Square
+  account -- direct financial loss, not just data exposure.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_square_credential
+      matches:
+        - ref: Keyword_square_token
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_square_credential
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_square_access_token
+      matches:
+        - ref: Keyword_square_token
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_square_credential
+      pattern: (?<![A-Za-z0-9_])(?:(?:sandbox-)?sq0c[a-z]{2}-[0-9A-Za-z_-]{40,50}|sq0atp-[0-9A-Za-z_-]{22,60})(?![0-9A-Za-z_-])
+    - id: Regex_square_access_token
+      pattern: (?i)square[\s\S]{0,40}?(?<![A-Za-z0-9+_-])EAAA[A-Za-z0-9+=_-]{60}(?![A-Za-z0-9+=_-])
+  keywords:
+    - id: Keyword_square_token
+      groups:
+        - match_style: word
+          terms:
+            - text: Square
+              case_sensitive: true
+            - squareup.com
+            - SQUARE_ACCESS_TOKEN
+            - square api
+            - sq0csp
+            - application secret
+            - access token
+            - api key
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/square/square.go
+    title: 'TruffleHog production Square detector (EAAA + exactly 60-char body, requires "square" context)'
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/squareapp/squareapp.go
+    title: 'TruffleHog production Square app detector ((sandbox-)sq0c??- secret 40-50 chars; sq0i??- app id)'
+  - url: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+    title: 'gitleaks rule square-access-token ((?:EAAA|sq0atp-)[\w-]{22,60})'
+  - url: https://docs.gitguardian.com/secrets-detection/secrets-detection-engine/detectors/specifics/square_token
+    title: 'Square Token - GitGuardian detector documentation (Prefixed: True)'
+  - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+    title: Supported secret scanning patterns - GitHub Docs (square_access_token, square_production_application_secret, square_sandbox_application_secret)
