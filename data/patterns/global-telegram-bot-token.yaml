@@ -5,32 +5,36 @@ version: 1.0.0
 type: regex
 engine: universal
 description: >-
-  Detects Telegram Bot API tokens: the numeric bot ID, a colon, and a 35-character secret that
-  starts with A (per Telegram's own documentation example and the gitleaks rule's case-sensitive
-  pin). A leaked bot token grants full control of the bot -- reading its message traffic, sending
-  messages to every chat it belongs to, and hijacking any workflow automation built on it.
+  Detects Telegram Bot API tokens: the numeric bot ID, a colon, and a 35-character
+  [A-Za-z0-9_-] secret. A leaked bot token grants full control of the bot -- reading its message
+  traffic, sending messages to every chat it belongs to, and hijacking any workflow automation
+  built on it.
 operation: >-
-  Structured value: 7-12 digit bot ID, a colon, then A + 34 characters of [A-Za-z0-9_-] (35
-  total). The 35-character secret length is pinned identically by TruffleHog, gitleaks, and
-  Kingfisher; the leading A is pinned case-sensitively by gitleaks and matches the example token
-  in Telegram's own Bot API documentation. The digit range spans the production detectors'
-  attested 7-10 (Kingfisher 7-10, TruffleHog 8-10) with headroom to 12 for bot-ID growth, within
-  gitleaks' looser 5-16 bound (considered too loose to adopt wholesale). Known limitation shared
-  with all three production detectors: a token glued directly to the canonical URL form
-  (api.telegram.org/bot<token>) is not matched, because the digits are letter-adjacent there;
-  the same word-boundary behavior applies to TruffleHog, gitleaks, and Kingfisher. Corroborative
-  evidence: keywords within 300 characters.
-pattern: (?<![A-Za-z0-9_-])[0-9]{7,12}:A[A-Za-z0-9_-]{34}(?![A-Za-z0-9_-])
+  Structured value: 7-12 digit bot ID, a colon, then exactly 35 characters of [A-Za-z0-9_-]. The
+  35-character secret length is pinned identically by TruffleHog, gitleaks, and Kingfisher. No
+  first-letter constraint is imposed: only gitleaks pins a leading A; TruffleHog and Kingfisher
+  impose no letter constraint, and TruffleHog's own test fixture treats a B-starting secret as a
+  valid token, so an A-pinned regex would miss real token shapes. The digit range spans the
+  production detectors' attested 7-10 (Kingfisher 7-10, TruffleHog 8-10) with headroom to 12 for
+  bot-ID growth, within gitleaks' looser 5-16 bound (considered too loose to adopt wholesale).
+  Known limitation shared with all three production detectors: a token glued directly to the
+  canonical URL form (api.telegram.org/bot<token>) is not matched, because the digits are
+  letter-adjacent there; the same word-boundary behavior applies to TruffleHog, gitleaks, and
+  Kingfisher. Corroborative evidence: keywords within 300 characters.
+pattern: (?<![A-Za-z0-9_-])[0-9]{7,12}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])
 confidence: medium
 confidence_justification: >-
   Medium confidence: the shape is structurally pinned by three independent production detectors
-  (35-character secret, leading-A pin, numeric-ID:secret layout confirmed by Telegram's own Bot
-  API docs example) and Telegram Bot Token appears in GitHub's secret-scanning pattern set, which
-  matches on the bare shape. It is nonetheless a digits:string layout rather than a literal
-  vendor prefix -- log lines or ratio-like data (epoch:hash) can approximate it -- and both
-  regex-first scanners (TruffleHog, gitleaks) choose to context-gate it in their rules, so the
-  value-only tier is discovery-grade and the recommended confidence tier requires Telegram
-  keywords in proximity.
+  (35-character secret, numeric-ID:secret layout consistent with Telegram's own Bot API docs
+  example) and Telegram Bot Token appears in GitHub's secret-scanning pattern set, which matches
+  on the bare shape. The evidentiary split on the secret's first letter is disclosed honestly:
+  gitleaks pins a case-sensitive leading A, but TruffleHog and Kingfisher impose no letter
+  constraint and TruffleHog's test fixture contains a valid B-starting secret -- so this pattern
+  follows the 2-of-3 no-pin majority. It is a digits:string layout rather than a literal vendor
+  prefix -- log lines or ratio-like data (epoch:hash) can approximate it -- and both regex-first
+  scanners (TruffleHog, gitleaks) choose to context-gate it in their rules, so the value-only
+  tier is discovery-grade and the recommended confidence tier requires Telegram keywords in
+  proximity.
 jurisdictions:
   - global
 regulations:
@@ -64,20 +68,22 @@ test_cases:
       description: Labelled bot token in the canonical env var (8-digit bot ID)
     - value: 'telegram bot token: 123456789:AAabcdefghijklmnopqrstuvwxyz0123456'
       description: Bot token with a preceding Telegram label (9-digit bot ID)
+    - value: '987654321:BbcABCDEFGHIJK-abcdefghijklmnopq012'
+      description: B-starting secret (mirrors the shape of TruffleHog's own valid test fixture; only gitleaks pins a leading A)
   should_not_match:
     - value: '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11'
-      description: Telegram's own documentation placeholder token (6-digit ID, below the 7-digit floor of real bot IDs)
-    - value: '1234567890:BBCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi'
-      description: Secret does not start with A (all attested real tokens carry the A pin)
+      description: Telegram's own documentation placeholder token (6-digit ID below the 7-digit floor; 34-char secret below the 35-char pin)
     - value: '1234567890:AABCDEFGHIJKLMNOPQRSTUVWXYZabc'
       description: Secret far too short (30 chars, not 35)
+    - value: '1234567890:AABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi'
+      description: Secret too long (36 chars, not 35)
     - value: the telegram bot token is stored with BotFather
       description: Prose mention without a token value
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
-  - description: Log or data lines of the form <epoch>:<token> where a 10-digit timestamp is followed by a 35-character A-leading string.
-    mitigation: The exact 35-character length, leading-A pin, and boundary lookarounds make coincidental matches rare; the recommended confidence tier additionally requires Telegram keywords in proximity, and the value-only tier is discovery-grade.
+  - description: Log or data lines of the form <epoch>:<token> where a 10-digit timestamp is followed by a 35-character [A-Za-z0-9_-] string.
+    mitigation: The exact 35-character length and boundary lookarounds make coincidental matches rare; the recommended confidence tier additionally requires Telegram keywords in proximity, and the value-only tier is discovery-grade.
   - description: A token embedded in the canonical URL form https://api.telegram.org/bot<token>/... is NOT detected because the digits are glued to the word "bot".
     mitigation: Documented as a known limitation shared by all three production detectors (identical word-boundary behavior); the surrounding api.telegram.org text still triggers keyword-level review.
   - description: Documentation or examples showing placeholder <digits>:<secret> tokens.
@@ -127,7 +133,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_telegram_bot_token
-      pattern: (?<![A-Za-z0-9_-])[0-9]{7,12}:A[A-Za-z0-9_-]{34}(?![A-Za-z0-9_-])
+      pattern: (?<![A-Za-z0-9_-])[0-9]{7,12}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])
   keywords:
     - id: Keyword_telegram_bot_token
       groups:
@@ -155,9 +161,9 @@ references:
   - url: https://core.telegram.org/bots/api
     title: 'Telegram Bot API docs (token example 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11 in Authorizing your bot)'
   - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/telegrambottoken/telegrambottoken.go
-    title: 'TruffleHog production Telegram detector (label-gated [0-9]{8,10}:[a-zA-Z0-9_-]{35})'
+    title: 'TruffleHog production Telegram detector (label-gated [0-9]{8,10}:[a-zA-Z0-9_-]{35}, no letter pin; its test fixture includes a valid B-starting secret)'
   - url: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
-    title: 'gitleaks.toml telegram-bot-api-token rule ([0-9]{5,16}:(?-i:A)[a-z0-9_-]{34}, case-sensitive A pin)'
+    title: 'gitleaks.toml telegram-bot-api-token rule ([0-9]{5,16}:(?-i:A)[a-z0-9_-]{34}; the only scanner that pins a leading A)'
   - url: https://github.com/mongodb/kingfisher/blob/main/crates/kingfisher-rules/data/rules/telegram.yml
     title: 'Kingfisher production Telegram rule (label-gated [0-9]{7,10}:[A-Z0-9_-]{35} case-insensitive)'
   - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns

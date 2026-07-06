@@ -7,16 +7,19 @@ engine: universal
 description: >-
   Detects Discord bot tokens: three dot-separated base64url segments where the first segment is
   the bot's numeric snowflake ID base64-encoded (always starting M, N, or O because it encodes an
-  ASCII digit), the second is a 6-character timestamp, and the third is an HMAC of 27 (pre-2022)
-  to 38 (current) characters. A leaked bot token grants full control of the bot account,
-  including reading every channel the bot can see and sending messages as the bot.
+  ASCII digit), the second is a 6-character timestamp, and the third is an HMAC of 27 to 38
+  characters. A leaked bot token grants full control of the bot account, including reading every
+  channel the bot can see and sending messages as the bot.
 operation: >-
   Structured triplet [MNO] + 23-27 base64url chars, dot, 6 chars, dot, 27-38 chars. Discord does
   not publish the format; the structure is multiply attested across the detector ecosystem --
   TruffleHog (24.6.27), Kingfisher ([MNO]24.6.27), detect-secrets ([MNO]{23,25}.6.27), and
-  community regex databases ([MNO]{23,25}.6.{27,38}, reflecting the longer HMAC on
-  currently-issued tokens) -- and derives from Discord's own client-side token parsing (the
-  python-discord moderation bot's operationally-validated triplet, taken from discord-developers).
+  community regex databases ([MNO]{23,25}.6.{27,38}) -- and derives from Discord's own
+  client-side token parsing (the python-discord moderation bot's operationally-validated triplet,
+  taken from discord-developers). Third-segment evidence split, disclosed honestly: the three
+  production scanners all pin exactly 27, while a self-labeled-approximate community database
+  extends to 38; no announcement or changelog documents an HMAC length change, so the 27-38
+  range is a recall-protective envelope over both attestations, not a documented format history.
   The first-segment range is bounded 24-28 total characters (attested 24-26 plus headroom for
   snowflake ID growth); the discontinued mfa.-prefixed user-token format (dead since May 2022) is
   out of scope. Corroborative evidence: keywords within 300 characters.
@@ -30,9 +33,10 @@ confidence_justification: >-
   high-recall detector. Kingfisher and GitHub's push protection fire on the bare shape in
   production, supporting a value-only discovery tier; TruffleHog label-gates the same regex as
   part of its standard PrefixRegex convention (no FP-motivated comment), the same divergence this
-  corpus documents for other structurally-distinctive formats. The third-segment 27-38 range
-  spans the attested pre-2022 length (27, pinned by four detectors) and the longer HMAC on
-  current tokens (38, per community regex databases).
+  corpus documents for other structurally-distinctive formats. The third-segment 27-38 range is
+  a recall-protective envelope: 27 is pinned exactly by the production scanners, 38 comes only
+  from a community regex database, and no vendor announcement documents a length change -- the
+  envelope covers both attestations rather than asserting an unverified format timeline.
 jurisdictions:
   - global
 regulations:
@@ -61,9 +65,9 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: MTIzNDU2Nzg5MDEyMzQ1Njc4.AAAAAA.ABCDEFGHIJKLMNOPQRSTUVWXYZa
-      description: Discord bot token (24.6.27, pre-2022 HMAC length; first segment decodes to a sequential fake ID)
+      description: Discord bot token (24.6.27, the production-scanner-pinned HMAC length; first segment decodes to a sequential fake ID)
     - value: 'DISCORD_BOT_TOKEN=NzAxMjM0NTY3ODkwMTIzNDU2Nzg5.BBBBBB.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL'
-      description: Labelled bot token with a 28-char first segment and current 38-char HMAC
+      description: Labelled bot token with a 28-char first segment and a 38-char HMAC (the community-attested envelope ceiling)
     - value: ODk4NzY1NDMyMTA5ODc2NTQzMjE.CCCCCC.0123456789abcdefghijklmnopqrstuvwxyz01
       description: Bot token with O-leading 27-char first segment and 38-char HMAC
   should_not_match:
@@ -160,7 +164,7 @@ references:
   - url: https://github.com/Yelp/detect-secrets/blob/master/detect_secrets/plugins/discord.py
     title: 'detect-secrets DiscordBotTokenDetector ([MNO][a-zA-Z\d_-]{23,25}\.[a-zA-Z\d_-]{6}\.[a-zA-Z\d_-]{27})'
   - url: https://github.com/odomojuli/RegExTokens
-    title: 'Community regex-token database (Discord [MNO][0-9A-Za-z_-]{23,25}\.[0-9A-Za-z_-]{6}\.[0-9A-Za-z_-]{27,38}; documents the 38-char HMAC on current tokens)'
+    title: 'Community regex-token database (Discord [MNO][0-9A-Za-z_-]{23,25}\.[0-9A-Za-z_-]{6}\.[0-9A-Za-z_-]{27,38}; sole source for the 38-char HMAC ceiling, self-labeled approximate)'
   - url: https://github.com/python-discord/bot/blob/main/bot/exts/filtering/_filters/unique/discord_token.py
     title: "python-discord moderation bot's operationally-validated token triplet (taken from discord-developers / the client's own parsing)"
   - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns

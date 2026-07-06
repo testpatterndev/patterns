@@ -16,15 +16,15 @@ operation: >-
   (40-character body, pinned by both TruffleHog's and Kingfisher's production detectors; charset is
   their union) and sb_secret_ project secret keys (announced by Supabase's changelog 2025-06-17 as
   the replacement for service_role JWTs; Kingfisher's production rule and Supabase's own CLI source
-  both pin a 31-character body of the form 22 chars + underscore + 8-char suffix, so a bounded
-  24-60 range is used behind the distinctive 10-character literal prefix, mirroring Kingfisher's
-  own range practice on the sibling sb_publishable_ key). Branch 2 (context-gated only): legacy
+  both pin a 31-character body of the form 22 chars + underscore + 8-char suffix, so a tight
+  28-36 range is used behind the distinctive 10-character literal prefix -- the attested 31 with
+  a small hedge for minor generation-format drift). Branch 2 (context-gated only): legacy
   anon/service_role JWTs -- an eyJ-prefixed three-segment JWT requiring a Supabase-specific label
   (supabase / service_role / anon key) plus an assignment separator before the value, because bare
   eyJ JWTs are ubiquitous in logs and configuration. sb_publishable_ keys are deliberately not
   detected: they are safe-to-expose public keys by design. Corroborative evidence: keywords within
   300 characters.
-pattern: (?<![A-Za-z0-9_-])(?:sbp_[A-Za-z0-9_-]{40}|sb_secret_[A-Za-z0-9_-]{24,60})(?![A-Za-z0-9_-])
+pattern: (?<![A-Za-z0-9_-])(?:sbp_[A-Za-z0-9_-]{40}|sb_secret_[A-Za-z0-9_-]{28,36})(?![A-Za-z0-9_-])
 confidence: high
 confidence_justification: >-
   High confidence: both distinctive prefixes are multiply attested. sbp_ is pinned at a
@@ -33,9 +33,10 @@ confidence_justification: >-
   format by Supabase's own Management API and CLI documentation. sb_secret_ is confirmed by
   Supabase's changelog (new API keys, June 2025), by literal examples hardcoded in Supabase's own
   open-source CLI (sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz, a 31-character body), and by
-  Kingfisher's production rule (sb_secret_[a-z0-9_-]{31}); a bounded 24-60 body range is used
-  rather than false-precision pinning because the vendor documents the keys only as opaque random
-  strings. The legacy JWT branch is deliberately context-gated: eyJ-prefixed JWTs are one of the
+  Kingfisher's production rule (sb_secret_[a-z0-9_-]{31}) -- two convergent sources pinning 31
+  exactly, so the body is bounded 28-36: the pin plus a small hedge, because the vendor documents
+  the keys only as opaque random strings and a hard 31 would silently miss minor generation-format
+  drift. The legacy JWT branch is deliberately context-gated: eyJ-prefixed JWTs are one of the
   most common token shapes in any log or config file, so it requires a labelled assignment and
   never fires value-only.
 jurisdictions:
@@ -73,6 +74,10 @@ test_cases:
       description: Supabase secret API key (sb_secret_ + 31-char body, the structure in Supabase's own CLI example)
     - value: 'SUPABASE_SERVICE_ROLE_KEY=eyJABCDEFGHIJKLMNOPQRSTUVWXYZ.eyJabcdefghijklmnopqrstuvwxyz.0123456789ABCDEFGHIJabcdefghij'
       description: Legacy service_role JWT in a labelled assignment (context-gated branch)
+    - value: 'supabase anon key: eyJabcdefghijklmnopqrstuvwxyz.eyJABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz012345'
+      description: Legacy anon JWT after a prose-style supabase label with colon separator
+    - value: service_role="eyJ0123456789ABCDEFGHIJ.eyJKLMNOPQRSTUVWXYZabcdefgh.ijklmnopqrstuvwxyz0123456789ABCD"
+      description: Legacy service_role JWT in a quoted config assignment keyed on the service_role label
   should_not_match:
     - value: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
       description: Supabase publishable key (safe to expose by design, deliberately not detected; value is Supabase's own public CLI default)
@@ -146,7 +151,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_supabase_key
-      pattern: (?<![A-Za-z0-9_-])(?:sbp_[A-Za-z0-9_-]{40}|sb_secret_[A-Za-z0-9_-]{24,60})(?![A-Za-z0-9_-])
+      pattern: (?<![A-Za-z0-9_-])(?:sbp_[A-Za-z0-9_-]{40}|sb_secret_[A-Za-z0-9_-]{28,36})(?![A-Za-z0-9_-])
     - id: Regex_supabase_legacy_jwt
       pattern: (?i)(?:supabase|service_role|anon[_ ]key)[\s\S]{0,60}?[=:][\s"']{0,4}eyJ[A-Za-z0-9_-]{10,500}\.eyJ[A-Za-z0-9_-]{10,500}\.[A-Za-z0-9_-]{10,500}(?![A-Za-z0-9_-])
   keywords:

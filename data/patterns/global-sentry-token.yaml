@@ -14,9 +14,11 @@ description: >-
   to keep public.
 operation: >-
   Two detection branches. Branch 1 (distinctive, value-only capable): sntrys_ organization tokens
-  -- a structured token whose payload always begins with base64-encoded '{"iat":' (sntrys_eyJpYXQiO,
-  pinned independently by gitleaks and Kingfisher), followed by a bounded base64 body including a
-  _-separated 43-character secret; sntryu_ user tokens (exactly 64 hex, pinned identically by
+  -- the full structure attested by both gitleaks and Kingfisher: payload beginning with
+  base64-encoded '{"iat":' (sntrys_eyJpYXQiO), a bounded base64 run, an embedded base64-encoded
+  "region_url" JSON marker (one of its three base64 rotations), a second bounded base64 run,
+  optional padding, then an underscore-separated 43-character base64 secret
+  (={0,2}_[A-Za-z0-9+/]{43}); sntryu_ user tokens (exactly 64 hex, pinned identically by
   gitleaks, TruffleHog, and Kingfisher); and sntrya_/sntryi_ (user-app and internal-integration
   prefixes confirmed by Sentry's own source code -- src/sentry/types/token.py -- with unpublished
   bodies, so a generous bounded range is used behind the vendor-confirmed distinctive prefixes,
@@ -24,15 +26,17 @@ operation: >-
   Branch 2 (context-gated only): legacy pre-prefix tokens (bare 64 hex, per gitleaks'
   "old format" rule and TruffleHog's v1 detector), requiring a Sentry label plus an assignment
   separator before the value. Corroborative evidence: keywords within 300 characters.
-pattern: (?<![A-Za-z0-9+/_-])(?:sntrys_eyJpYXQiO[A-Za-z0-9+/=_]{80,400}|sntryu_[a-f0-9]{64}|sntry[ai]_[A-Za-z0-9+/=_-]{20,200})(?![A-Za-z0-9+/=_-])
+pattern: (?<![A-Za-z0-9+/_-])(?:sntrys_eyJpYXQiO[A-Za-z0-9+/]{10,200}(?:LCJyZWdpb25fdXJs|InJlZ2lvbl91cmwi|cmVnaW9uX3VybCI6)[A-Za-z0-9+/]{10,200}={0,2}_[A-Za-z0-9+/]{43}|sntryu_[a-f0-9]{64}|sntry[ai]_[A-Za-z0-9+/=_-]{20,200})(?![A-Za-z0-9+/=_-])
 confidence: high
 confidence_justification: >-
   High confidence: the sntry?_ prefix family is confirmed by Sentry's own source code
   (AuthTokenType enum: sntryu_/sntrys_/sntrya_/sntryi_), and the two dominant formats are pinned
   by multiple independent production detectors -- sntryu_ + 64 hex identically in gitleaks,
-  TruffleHog, and Kingfisher; sntrys_eyJpYXQiO + structured base64 in gitleaks and Kingfisher
-  (TruffleHog pins sntrys_eyJ with a 197-character body, consistent with the bounded range used
-  here). Sentry is a GitHub secret-scanning partner for both (push protection enabled). The
+  TruffleHog, and Kingfisher; the sntrys_ branch adopts the full gitleaks/Kingfisher-attested
+  structure (eyJpYXQiO payload head, embedded base64 region_url marker in any of its three
+  rotations, and the trailing ={0,2}_ + 43-character base64 secret; TruffleHog's flat
+  sntrys_eyJ + 197-character body is consistent with this envelope). Sentry is a GitHub
+  secret-scanning partner for both (push protection enabled). The
   sntrya_/sntryi_ bodies are not published by any source, so they carry an honest bounded range
   behind their distinctive prefixes rather than an invented exact length. The legacy unprefixed
   64-hex form is deliberately context-gated: it is indistinguishable from any SHA-256 hex digest,
@@ -66,12 +70,16 @@ test_cases:
   should_match:
     - value: sntryu_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       description: Sentry user auth token (sntryu_ + 64 hex)
-    - value: 'SENTRY_AUTH_TOKEN=sntrys_eyJpYXQiOABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq'
-      description: Sentry organization token (sntrys_eyJpYXQiO + base64 payload + _ + 43-char secret) in the canonical env var
+    - value: 'SENTRY_AUTH_TOKEN=sntrys_eyJpYXQiOABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789InJlZ2lvbl91cmwiabcdefghijklmnopqrstuvwxyz0123456789==_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq'
+      description: Sentry organization token (sntrys_eyJpYXQiO + base64 + region_url marker + base64 + padding + _ + 43-char secret) in the canonical env var
     - value: sntryi_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
       description: Internal-integration prefix from Sentry's own token-type source (bounded body)
     - value: sentry auth token = 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       description: Legacy pre-prefix token (bare 64 hex) in a labelled Sentry assignment (context-gated branch)
+    - value: 'SENTRY_AUTH_TOKEN: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210'
+      description: Legacy 64-hex token after the canonical env var with colon separator
+    - value: sentry.auth.token="abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+      description: Legacy 64-hex token in a quoted dotted-key config assignment
   should_not_match:
     - value: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef with no vendor context
       description: Bare 64-hex value with no Sentry label anywhere (could be any SHA-256 digest)
@@ -88,8 +96,8 @@ false_positives:
     mitigation: The legacy branch requires a 64-hex body in a labelled assignment, which a DSN's 32-hex public key cannot satisfy; DSN detection is documented as out of scope rather than flagged as a leak.
   - description: A 64-character hex digest (SHA-256) appearing in a labelled assignment near the word "sentry" in configuration or logs.
     mitigation: The legacy branch requires label adjacency plus an assignment separator (enforced by the regex) and corroborative keywords; it never fires value-only.
-  - description: The sntrya_/sntryi_ body lengths are not published by Sentry or any scanner; a generous bounded range is used behind the vendor-confirmed prefixes, and sntrys_ tokens whose payload does not begin with base64-encoded '{"iat":' would not match the organization-token branch.
-    mitigation: Documented as an honest bound; the prefixes themselves come from Sentry's own source and are highly distinctive.
+  - description: The sntrya_/sntryi_ body lengths are not published by Sentry or any scanner; a generous bounded range is used behind the vendor-confirmed prefixes. Hypothetical sntrys_ tokens whose payload lacks the leading '{"iat":' or the embedded region_url field would not match the organization-token branch (both gitleaks and Kingfisher assume the same structure).
+    mitigation: Documented as an honest bound; the prefixes themselves come from Sentry's own source and are highly distinctive, and the structured org-token branch mirrors both production scanners exactly.
 exports:
   - purview_xml
   - yaml
@@ -144,7 +152,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_sentry_token
-      pattern: (?<![A-Za-z0-9+/_-])(?:sntrys_eyJpYXQiO[A-Za-z0-9+/=_]{80,400}|sntryu_[a-f0-9]{64}|sntry[ai]_[A-Za-z0-9+/=_-]{20,200})(?![A-Za-z0-9+/=_-])
+      pattern: (?<![A-Za-z0-9+/_-])(?:sntrys_eyJpYXQiO[A-Za-z0-9+/]{10,200}(?:LCJyZWdpb25fdXJs|InJlZ2lvbl91cmwi|cmVnaW9uX3VybCI6)[A-Za-z0-9+/]{10,200}={0,2}_[A-Za-z0-9+/]{43}|sntryu_[a-f0-9]{64}|sntry[ai]_[A-Za-z0-9+/=_-]{20,200})(?![A-Za-z0-9+/=_-])
     - id: Regex_sentry_legacy_token
       pattern: (?i)sentry[\s\S]{0,40}?[=:][\s"']{0,4}(?<![A-Za-z0-9_])[a-f0-9]{64}(?![A-Za-z0-9_])
   keywords:
