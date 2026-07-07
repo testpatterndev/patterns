@@ -1,0 +1,149 @@
+schema: testpattern/v1
+name: NATO Marking - RESTRICTED / CONFIDENTIAL / SECRET / COSMIC TOP SECRET
+slug: nato-marking
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects NATO security classification markings under the NATO security policy (C-M(2002)49): the
+  spelled-out national-security levels NATO RESTRICTED (NR), NATO CONFIDENTIAL (NC) and NATO SECRET
+  (NS), and the highest level COSMIC TOP SECRET (CTS) — where the codeword COSMIC attaches only to
+  TOP SECRET. ATOMAL caveat markings (NATO CONFIDENTIAL ATOMAL, NATO SECRET ATOMAL, COSMIC TOP SECRET
+  ATOMAL) are covered as suffixes of their parent level marking. Marking syntax verified directly
+  against the International Programs Security Handbook (US-government primary source reproducing NATO
+  security-directive marking rules) and corroborating NATO security briefings; matched
+  case-sensitively so ordinary lowercase prose ("a nato secret") does not trigger it.
+operation: >-
+  Tier 85 matches the distinctive spelled-out form "NATO <LEVEL>" (RESTRICTED, CONFIDENTIAL, SECRET)
+  where the NATO prefix is itself strong context. A second tier 85 matches the distinctive codeword
+  banner COSMIC TOP SECRET, tolerant of a hyphen or PDF-line-wrap-inserted whitespace between the
+  words. ATOMAL caveats ride on these forms (e.g. NATO SECRET ATOMAL matches via NATO SECRET; COSMIC
+  TOP SECRET ATOMAL via COSMIC TOP SECRET). Both tiers carry only a template/noise NOT-exclusion — the
+  case-sensitive ALL-CAPS marking token is the high-confidence evidence.
+pattern: '\bNATO[\s-]+(?:RESTRICTED|CONFIDENTIAL|SECRET)\b|\bCOSMIC[\s-]+TOP[\s-]+SECRET\b'
+confidence: high
+confidence_justification: >-
+  High confidence on both forms. "NATO RESTRICTED / CONFIDENTIAL / SECRET" is a case-sensitive
+  two-word phrase whose NATO prefix is itself a strong, low-collision context marker verified against
+  primary sources; "COSMIC TOP SECRET" is a case-sensitive three-word codeword banner unique to NATO's
+  highest classification. The bare two/three-letter abbreviations (NR, NC, NS, CTS, and the ATOMAL
+  abbreviations CTSA/NSA/NCA) are attested marking forms but are deliberately NOT shipped: even
+  hard-gated on NATO context they collide catastrophically with everyday tokens (NSA = National
+  Security Agency, NC/NR = US state/business shorthand, NS = Nova Scotia, CTS = many uses), with no
+  reliable disambiguation — documented as a skip rather than shipped as noise.
+jurisdictions:
+  - nato
+regulations:
+  - "NATO Security Policy C-M(2002)49"
+frameworks:
+  - NATO Security Policy
+data_categories:
+  - government
+  - security-classification
+case_sensitive: true
+corroborative_evidence:
+  keywords:
+    - NATO
+    - North Atlantic Treaty Organization
+    - COSMIC
+    - ATOMAL
+    - national security
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "This report is marked NATO SECRET and must be handled per NATO security policy."
+      description: Spelled-out NATO SECRET (NS) national-security level — the NATO prefix is strong context
+    - value: "Cover sheet: COSMIC TOP SECRET — access restricted to briefed personnel only."
+      description: COSMIC TOP SECRET (CTS) codeword banner, NATO's highest level
+    - value: "The annex is classified NATO CONFIDENTIAL ATOMAL and covers released atomic information."
+      description: ATOMAL caveat form — matched via its parent level marking NATO CONFIDENTIAL (NC)
+    - value: "Distribution list for the NATO RESTRICTED briefing pack is attached."
+      description: NATO RESTRICTED (NR), the lowest NATO classified level
+    - value: "Header reads COSMIC\nTOP SECRET ATOMAL for the working-group papers."
+      description: PDF line-wrap between COSMIC and TOP SECRET (the [\s-]+ separator tolerates a wrap-inserted newline); ATOMAL suffix rides on the COSMIC TOP SECRET match
+  should_not_match:
+    - value: "the nato secret was leaked to a journalist last spring, allegedly"
+      description: lowercase prose (case-sensitive exclusion — the marking regex only matches ALL-CAPS tokens)
+    - value: "THE NSA REGULARLY MONITORS NATO COMMUNICATIONS ACROSS THE ALLIANCE"
+      description: ALL-CAPS prose naming NSA (the agency) and NATO but with no marking — fails at the regex level (NATO is followed by COMMUNICATIONS, not a level word; the NSA abbreviation is deliberately not a shipped marking form)
+    - value: "THE SUMMIT WILL COVER COSMIC BACKGROUND RADIATION AND OTHER TOP RESEARCH TOPICS"
+      description: ALL-CAPS prose containing COSMIC and TOP but not the contiguous COSMIC TOP SECRET banner — fails at the regex level
+false_positives:
+  - description: ALL-CAPS prose (headings, legal boilerplate, or documents rendered entirely in capitals) defeats the case-sensitivity signal; an all-caps rendering of "NATO SECRET" or "COSMIC TOP SECRET" with no marking intent (e.g. a headline or book title) can fire.
+    mitigation: Treat hits as lower confidence when the surrounding text is itself all-caps. The NATO/COSMIC prefixes keep collision low relative to bare classification words, and the corroborative NATO/COSMIC/ATOMAL keywords within 300 characters reinforce genuine marking context.
+  - description: >-
+      The bare NATO classification abbreviations (NR, NC, NS, CTS) and the ATOMAL abbreviations
+      (CTSA, NSA, NCA) are real, verified marking forms but are not implemented: they are two/three-letter
+      tokens that collide with extremely common non-marking uses (NSA = National Security Agency, NS =
+      Nova Scotia, NC/NR = US-state and business shorthand, CTS = numerous), and no jurisdiction gate can
+      reliably separate a genuine NATO marking abbreviation from these.
+    mitigation: Documented as a deliberate coverage gap rather than shipped as ungovernable noise. The spelled-out NATO <LEVEL> and COSMIC TOP SECRET forms capture the same marking vocabulary at high confidence.
+  - description: >-
+      NATO UNCLASSIFIED (NU) is a verified NATO marking but is deliberately excluded from the level
+      regex: it denotes releasable/unclassified content, so it carries little data-loss value and would
+      only broaden matches.
+    mitigation: Out of scope by design; this SIT targets protectively-marked (RESTRICTED and above) NATO content.
+  - description: >-
+      This SIT's SECRET / TOP SECRET / CONFIDENTIAL vocabulary overlaps with the US/UK/NZ/AU marking
+      families, but the mandatory NATO or COSMIC prefix means a genuine NATO marking will not, on the
+      prefix alone, co-fire those nations' bare-word tiers; conversely a document carrying both a NATO
+      marking and a national marking is expected to fire both SITs as corroborating signals.
+    mitigation: No mitigation needed — the prefix makes the NATO forms structurally distinct from the national bare-word markings.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+risk_rating: 10
+risk_description: >-
+  NATO markings protect Alliance information whose unauthorised disclosure could damage the collective
+  security of NATO and its member nations. NATO SECRET and COSMIC TOP SECRET are the highest tiers and,
+  with the ATOMAL caveat, cover released atomic information subject to special handling controls.
+sensitivity_labels:
+  nato: "NATO RESTRICTED / NATO CONFIDENTIAL / NATO SECRET / COSMIC TOP SECRET"
+  us_gov: "CUI / CONFIDENTIAL / SECRET / TOP SECRET"
+  uk_gov: "OFFICIAL-SENSITIVE / SECRET / TOP SECRET"
+  pspf: "OFFICIAL: Sensitive / PROTECTED / SECRET / TOP SECRET"
+  psr: "RESTRICTED / CONFIDENTIAL / SECRET / TOP SECRET"
+  ca_gov: "Protected B / Confidential / Secret / Top Secret"
+references:
+  - url: https://sgp.fas.org/library/ipshbook/Chap_10.html
+    title: "International Programs Security Handbook, Chapter 10 (NATO) — reproduces NATO security-directive marking rules (NATO classification levels and ATOMAL abbreviations)"
+  - url: https://www.archives.gov/cui/registry/category-detail/nato-restricted.html
+    title: "CUI Category: NATO Restricted — U.S. National Archives CUI Registry"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_nato_level
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_nato_cosmic
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_nato_level
+      pattern: '\bNATO[\s-]+(?:RESTRICTED|CONFIDENTIAL|SECRET)\b'
+    - id: Regex_nato_cosmic
+      pattern: '\bCOSMIC[\s-]+TOP[\s-]+SECRET\b'
+created: '2026-07-07'
+updated: '2026-07-07'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-07'
+    description: Initial release — verified spelled-out NATO RESTRICTED/CONFIDENTIAL/SECRET and COSMIC TOP SECRET marking forms (ATOMAL caveats covered as suffixes) per direct verification against the International Programs Security Handbook (NATO chapter) and NATO security briefings. Bare abbreviations (NR/NC/NS/CTS, CTSA/NSA/NCA) and NATO UNCLASSIFIED deliberately not shipped (documented skips).
+author: testpattern-community
+license: MIT

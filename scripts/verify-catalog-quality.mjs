@@ -72,6 +72,17 @@ const STRUCTURAL_DICT_STRENGTH = new Map([
 //    evidence, matching every other protective-marking SIT's design in this repo. Each SIT's
 //    lowest tier (65/75, bare OFFICIAL / bare SECRET) is genuinely AND-gated by
 //    uk-government-context and does not need this exclusion.
+//  - nato-marking / eu-marking-restreint / ca-marking: same protective-marking architecture as the
+//    AU/NZ/US/UK marking SITs above (canonical 65/75/85 levels, so no nonCanonical flag). Their
+//    85-tiers (nato-marking's spelled-out "NATO <LEVEL>" and COSMIC TOP SECRET forms;
+//    eu-marking-restreint's dual French/English EUCI marking; ca-marking's Canada-distinctive
+//    "Protected A/B/C" designation) are gated only by the template-exclusion NOT-group — the
+//    case-sensitive ALL-CAPS/structural marking regex itself is the high-confidence evidence,
+//    matching every other protective-marking SIT's design in this repo. eu-marking-restreint's 75
+//    single-language French tier is likewise structurally distinctive (trailing UE marker) and
+//    ungated apart from the noise NOT-group; ca-marking's lower classified tiers (75 TOP SECRET,
+//    65 CONFIDENTIAL/SECRET) are genuinely AND-gated by canada-government-context and do not need
+//    this exclusion.
 const EXCLUDED_FILES = new Set([
   'au-marking-official.yaml',
   'au-marking-protected.yaml',
@@ -88,7 +99,10 @@ const EXCLUDED_FILES = new Set([
   'us-classification-banner.yaml',
   'us-cui-banner-marking.yaml',
   'uk-marking-official.yaml',
-  'uk-marking-secret-topsecret.yaml'
+  'uk-marking-secret-topsecret.yaml',
+  'nato-marking.yaml',
+  'eu-marking-restreint.yaml',
+  'ca-marking.yaml'
 ])
 
 function loadYaml(filePath) {
