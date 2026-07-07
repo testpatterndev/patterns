@@ -1,0 +1,120 @@
+schema: testpattern/v1
+name: TRON Address
+slug: global-tron-address
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects TRON (TRX) mainnet addresses: Base58Check encoding of a 21-byte payload (0x41 version byte
+  + 20-byte address hash), always starting with the letter "T" and exactly 34 characters long. The
+  0x41 prefix byte fixes the leading character as "T" and the length at 34 (58^34 > 66*256^24;
+  58^33 insufficient). A single leading letter is weak structure, so detection is context-gated.
+  Prefix/length/charset verified against TRON developer docs and the TRON protocol overview.
+operation: >-
+  Single tier at confidence 75. The leading "T" plus exactly 33 trailing base58 chars is matched, but
+  a single-letter prefix is weak on its own, so the tier requires cryptocurrency/wallet domain context
+  (crypto-wallet-context dict) within proximity AND a template/sample noise NOT-group. Case-sensitive
+  base58 (the Base58Check checksum is not expressible in a Purview-safe regex).
+pattern: '\bT[1-9A-HJ-NP-Za-km-z]{33}\b'
+confidence: medium
+confidence_justification: >-
+  Gated 75, not high: a single leading "T" plus a fixed-length base58 run is weak structure with no
+  regex-expressible checksum, so it collides with other "T..."-leading 34-char base58 tokens.
+  Precision comes from the mandatory cryptocurrency/wallet domain-context gate plus the noise
+  exclusion. The fixed 34-char length is a modest additional constraint but not sufficient alone.
+case_sensitive: true
+jurisdictions:
+  - global
+regulations:
+  - FATF Recommendations
+  - AML/CTF Act (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - financial
+corroborative_evidence:
+  keywords:
+    - identifier
+    - number
+    - ID
+  proximity: 300
+  keyword_lists:
+    - financial-transaction
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: 'TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeL'
+      description: Address from the TRON developer docs Accounts page (34 chars)
+    - value: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+      description: USDT-TRC20 contract address (widely documented, 34 chars)
+    - value: 'TJCnKsPa7y5okkXvQAidZBzqx3QyQ6sxMW'
+      description: Address from the TRON protocol overview section 6.2 worked example (34 chars)
+  should_not_match:
+    - value: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
+      description: Bitcoin legacy address — wrong prefix (starts 1, not T)
+    - value: 'TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqe'
+      description: Too short (T + 32 = 33 chars, below the fixed 34)
+    - value: 'TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeLXY'
+      description: Too long (T + 35 = 36 chars, above the fixed 34)
+    - value: 'TNPeeaaFB7K9cmo4-uQpcU32zGK8G1NYqeL'
+      description: Hyphen breaks the run so no contiguous 34-char body exists — rejected
+    - value: 'tron wallet address example placeholder'
+      description: Template/placeholder context should be excluded even when domain anchor words are present
+false_positives:
+  - description: >-
+      A single leading "T" plus a 34-char base58 run collides with other "T..."-leading base58 tokens;
+      the Base58Check checksum cannot be validated in a Purview-safe regex.
+    mitigation: >-
+      The tier is AND-gated by cryptocurrency/wallet domain context (crypto-wallet-context) within the
+      proximity window plus a template/sample noise NOT-group; held at 75.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+references:
+  - url: https://developers.tron.network/docs/account
+    title: Accounts — TRON Developer Hub (Base58Check "T" prefix, length 34, 0x41 version byte)
+  - url: https://github.com/tronprotocol/documentation/blob/master/TRX/Tron-overview.md
+    title: TRON overview — mainnet addresses begin with 41 (base58 worked example)
+sensitivity_labels:
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: crypto-wallet-context
+      as: Keyword_cryptocurrency
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_tron_address
+      matches:
+        - ref: Keyword_cryptocurrency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_tron_address
+      pattern: '\bT[1-9A-HJ-NP-Za-km-z]{33}\b'
+created: '2026-07-07'
+updated: '2026-07-07'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-07'
+    description: >-
+      Initial release — "T"-prefixed Base58Check address (fixed 34 chars, 0x41 version byte),
+      domain-context-gated at 75 per verification against TRON developer docs and protocol overview.
+author: testpattern-community
+license: MIT

@@ -1,0 +1,125 @@
+schema: testpattern/v1
+name: Monero Address
+slug: global-monero-address
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Monero (XMR) public addresses, encoded in Monero-specific base58 (same 58-character
+  alphabet as standard base58, excluding 0 O I l). Standard addresses (mainnet network byte 18) and
+  subaddresses (network byte 42) are 95 characters and begin with "4" or "8"; integrated addresses
+  (network byte 19, standard address + encrypted 64-bit payment ID) are 106 characters and begin with
+  "4". The fixed 95/106-char length is highly distinctive, gated at 85. Prefixes/lengths verified
+  against the Monero standard-address and integrated-address docs.
+operation: >-
+  Single tier at confidence 85. Matches a leading "4" or "8" plus 94 base58 chars (95-char standard /
+  subaddress), optionally 11 more (106-char integrated), then AND-gated by cryptocurrency/wallet
+  domain context (crypto-wallet-context dict) within proximity plus a template/sample noise NOT-group
+  (never a bare high tier). Case-sensitive base58 (the Monero checksum is not expressible in a
+  Purview-safe regex).
+pattern: '\b[48][1-9A-HJ-NP-Za-km-z]{94}(?:[1-9A-HJ-NP-Za-km-z]{11})?\b'
+confidence: medium
+confidence_justification: >-
+  Gated 85: the fixed 95-char (standard/subaddress) or 106-char (integrated) length with a 4/8 leading
+  character is a very distinctive envelope that essentially never occurs by chance, so it earns the
+  high tier — but only when AND-gated by cryptocurrency/wallet domain context plus the noise
+  exclusion. The Monero checksum cannot be validated in a Purview-safe regex, so context gating is
+  retained rather than exporting a bare tier.
+case_sensitive: true
+jurisdictions:
+  - global
+regulations:
+  - FATF Recommendations
+  - AML/CTF Act (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - financial
+corroborative_evidence:
+  keywords:
+    - identifier
+    - number
+    - ID
+  proximity: 300
+  keyword_lists:
+    - financial-transaction
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: '4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge'
+      description: Standard address (network byte 18, "4" prefix) from the Monero standard-address docs (95 chars)
+    - value: '4LL9oSLmtpccfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2bYXZKKQePHES9khPK'
+      description: Integrated address (network byte 19, "4" prefix, + payment ID) from the Monero integrated-address docs (106 chars)
+    - value: '888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H'
+      description: Address with the 8 prefix (95 chars) from the Monero moneropedia address page (documented example)
+  should_not_match:
+    - value: '5AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge'
+      description: Wrong prefix (starts with 5, not 4 or 8)
+    - value: '4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rg'
+      description: Too short (94 chars — one below the fixed 95)
+    - value: '4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684RgeX'
+      description: Too long (96 chars — neither 95 nor 106)
+    - value: '4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3-skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge'
+      description: Hyphen breaks the run so no contiguous 95/106-char body exists — rejected
+    - value: 'monero wallet address example placeholder'
+      description: Template/placeholder context should be excluded even when domain anchor words are present
+false_positives:
+  - description: >-
+      The fixed 95/106-char base58 envelope with a 4/8 leading character is extremely distinctive, but
+      the Monero checksum cannot be validated in a Purview-safe regex, so a crafted string of the exact
+      length, prefix and charset would still match structurally.
+    mitigation: >-
+      The tier is AND-gated by cryptocurrency/wallet domain context (crypto-wallet-context) within the
+      proximity window plus a template/sample noise NOT-group. The distinctive length keeps the
+      residual collision rate negligible.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+references:
+  - url: https://docs.getmonero.org/public-address/standard-address/
+    title: Standard Address — Monero Docs (95 chars, network byte 18, base58 alphabet)
+  - url: https://docs.getmonero.org/public-address/integrated-address/
+    title: Integrated Address — Monero Docs (106 chars, network byte 19)
+sensitivity_labels:
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: crypto-wallet-context
+      as: Keyword_cryptocurrency
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_monero_address
+      matches:
+        - ref: Keyword_cryptocurrency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_monero_address
+      pattern: '\b[48][1-9A-HJ-NP-Za-km-z]{94}(?:[1-9A-HJ-NP-Za-km-z]{11})?\b'
+created: '2026-07-07'
+updated: '2026-07-07'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-07'
+    description: >-
+      Initial release — 95-char standard/subaddress (4/8 prefix) and 106-char integrated (4 prefix)
+      base58 addresses, domain-context-gated at 85 per verification against the Monero address docs.
+author: testpattern-community
+license: MIT

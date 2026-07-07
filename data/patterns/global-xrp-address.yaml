@@ -1,0 +1,121 @@
+schema: testpattern/v1
+name: XRP Ledger Address
+slug: global-xrp-address
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects XRP Ledger classic addresses: base58-encoded, starting with the character "r", 25-35
+  characters long, encoding a 21-byte buffer (1-byte prefix value 0 + 160-bit account ID) with a
+  4-byte checksum. The XRP base58 dictionary excludes 0, capital O, capital I and lowercase l — the
+  same 58-character set as standard base58, so a standard base58 class matches the charset. A single
+  leading letter is weak structure, so detection is context-gated. Length/charset/prefix verified
+  against xrpl.org address docs.
+operation: >-
+  Single tier at confidence 75. The leading "r" plus 24-34 trailing base58 chars is matched, but a
+  single-letter prefix is weak on its own, so the tier requires cryptocurrency/wallet domain context
+  (crypto-wallet-context dict) within proximity AND a template/sample noise NOT-group. Case-sensitive
+  base58 (the XRP checksum is not expressible in a Purview-safe regex). X-address (X-prefixed) variant
+  not implemented — see false_positives / report.
+pattern: '\br[1-9A-HJ-NP-Za-km-z]{24,34}\b'
+confidence: medium
+confidence_justification: >-
+  Gated 75, not high: a single leading "r" plus a base58 run is weak structure with no
+  regex-expressible checksum, so it collides with other "r..."-leading base58 tokens. Precision comes
+  from the mandatory cryptocurrency/wallet domain-context gate plus the noise exclusion.
+case_sensitive: true
+jurisdictions:
+  - global
+regulations:
+  - FATF Recommendations
+  - AML/CTF Act (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - financial
+corroborative_evidence:
+  keywords:
+    - identifier
+    - number
+    - ID
+  proximity: 300
+  keyword_lists:
+    - financial-transaction
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: 'rDTXLQ7ZKZVKz33zJbHjgVShjsBnqMBhmN'
+      description: Classic address from the xrpl.org base58 encoding example (34 chars)
+    - value: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
+      description: Genesis account address (documented, 34 chars)
+    - value: 'rrrrrrrrrrrrrrrrrrrrrhoLvTp'
+      description: ACCOUNT_ZERO special address (documented, 27 chars — near lower bound)
+  should_not_match:
+    - value: 'zDTXLQ7ZKZVKz33zJbHjgVShjsBnqMBhmN'
+      description: Wrong prefix (does not start with r)
+    - value: 'r123456789'
+      description: Too short (below the 25-char minimum)
+    - value: 'r1111111111111111111111111111111111111'
+      description: Too long (r + 37 = 38, above the 35-char maximum)
+    - value: 'rDTXLQ7ZKZVKz33-zJbHjgVShjsBnqMBhmN'
+      description: Hyphen breaks the run so no contiguous 25-35 char body exists — rejected
+    - value: 'xrp wallet address example placeholder'
+      description: Template/placeholder context should be excluded even when domain anchor words are present
+false_positives:
+  - description: >-
+      A single leading "r" followed by a base58 run collides with other "r..."-prefixed base58 tokens
+      and identifiers; the XRP 4-byte checksum cannot be validated in a Purview-safe regex.
+    mitigation: >-
+      The tier is AND-gated by cryptocurrency/wallet domain context (crypto-wallet-context) within the
+      proximity window plus a template/sample noise NOT-group; held at 75.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+references:
+  - url: https://xrpl.org/docs/concepts/accounts/addresses
+    title: Addresses — XRP Ledger (classic address 25-35 chars, "r" prefix)
+  - url: https://xrpl.org/docs/references/protocol/data-types/base58-encodings
+    title: base58 Encodings — XRP Ledger (custom base58 dictionary, excludes 0 O I l)
+sensitivity_labels:
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: crypto-wallet-context
+      as: Keyword_cryptocurrency
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_xrp_address
+      matches:
+        - ref: Keyword_cryptocurrency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_xrp_address
+      pattern: '\br[1-9A-HJ-NP-Za-km-z]{24,34}\b'
+created: '2026-07-07'
+updated: '2026-07-07'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-07'
+    description: >-
+      Initial release — classic "r"-prefixed base58 address (25-35 chars), domain-context-gated at 75
+      per verification against xrpl.org address docs. X-address variant documented and skipped.
+author: testpattern-community
+license: MIT
