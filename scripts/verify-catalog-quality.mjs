@@ -63,6 +63,15 @@ const STRUCTURAL_DICT_STRENGTH = new Map([
 //    CUI phrase) are gated only by the template-exclusion NOT-group — the structural marking
 //    regex itself is the high-confidence evidence. cui-banner's 95 structural tier also carries
 //    a nonCanonical flag for the same ranking-order reason as the AU markings.
+//  - uk-marking-official / uk-marking-secret-topsecret: same protective-marking architecture as
+//    the AU/NZ/US marking SITs above (canonical 65/75/85 levels, so no nonCanonical flag). Their
+//    85-tiers (uk-marking-official's structured handling-instruction/descriptor form and bare
+//    OFFICIAL-SENSITIVE banner; uk-marking-secret-topsecret's UK Prefix form, National Caveat
+//    form, and TOP SECRET banner-words phrase) are gated only by the template-exclusion NOT-group
+//    — the case-sensitive ALL-CAPS/structural marking regex itself is the high-confidence
+//    evidence, matching every other protective-marking SIT's design in this repo. Each SIT's
+//    lowest tier (65/75, bare OFFICIAL / bare SECRET) is genuinely AND-gated by
+//    uk-government-context and does not need this exclusion.
 const EXCLUDED_FILES = new Set([
   'au-marking-official.yaml',
   'au-marking-protected.yaml',
@@ -77,7 +86,9 @@ const EXCLUDED_FILES = new Set([
   'nz-marking-confidential.yaml',
   'nz-marking-secret-topsecret.yaml',
   'us-classification-banner.yaml',
-  'us-cui-banner-marking.yaml'
+  'us-cui-banner-marking.yaml',
+  'uk-marking-official.yaml',
+  'uk-marking-secret-topsecret.yaml'
 ])
 
 function loadYaml(filePath) {
