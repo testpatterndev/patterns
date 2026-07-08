@@ -9,7 +9,7 @@ Conventions followed: `Z:/patterns/.superpowers/sdd/d4-jurisdiction-conventions.
 | Slug | Decision | Rationale (one line) |
 | --- | --- | --- |
 | tr-tax-number | **SHIPPED** | VKN format fully corroborated (OECD TIN portal + GİB + independent sources) |
-| tr-passport-number | **SHIPPED** | U + 8 digits corroborated by multiple independent sources; caveats documented |
+| tr-passport-number | **SHIPPED** | U + 8 digits corroborated by real-world document instances + ICAO field length; Turkish secondary sources conflict on digit count; scoped to ordinary (bordo) series; caveats documented |
 | qa-passport-number | **SKIPPED** | No credible source documents the Qatari passport number format |
 | sa-passport-number | **SKIPPED** | Sources conflict (letter+6 vs letter+8 vs Z+8); no primary source |
 | sa-drivers-license | **SKIPPED** | Licence records keyed to the 10-digit national ID/iqama number — duplicate surface of `sa-national-id`; no distinct standardized licence-number format publicly documented |
@@ -64,32 +64,52 @@ Saudi 10-digit national IDs, order numbers.
 
 ## 2. tr-passport-number (SHIPPED) — `data/patterns/tr-passport-number.yaml`
 
-**Format (corroborated, with documented caveat):** New-generation Turkish passports (issued by
-NVİ since 2018) carry a nine-character number: series letter "U" + 8 digits (e.g. U14133624),
-top-right of the data page. Case-fixed uppercase → `case_sensitive: true` (convention 6).
+**Format (corroborated, with documented caveats):** New-generation ordinary (umuma mahsus /
+bordo) Turkish passports (issued by NVİ since 2018) carry a nine-character number: series letter
+"U" + 8 digits (e.g. U14133624), top-right of the data page. Case-fixed uppercase →
+`case_sensitive: true` (convention 6).
 
-**Sources (no single-source authorship):**
-- NVİ passport services (issuing authority; confirms NVİ issues passports; does not publish the
-  number format): https://www.nvi.gov.tr/pasaport ; https://www.nvi.gov.tr/sss-pasaport-hizmetleri
-- Turkish-language sources consistently documenting "starts with U + 8 digits, top-right corner":
-  https://www.eksiduyuru.com/duyuru/1205493/pasaport-numarasi-hangisi-anlamadim
-  ("Pasaport numarası u ıle baslar ve 8 hanelıdır sag ust kosede bulunur"; example U14133624);
+**Sourcing (honest characterization — Turkish secondary sources CONFLICT on digit count):**
+- NVİ passport services (issuing authority; confirms NVİ issues passports; publishes NO number
+  format at all): https://www.nvi.gov.tr/pasaport ; https://www.nvi.gov.tr/sss-pasaport-hizmetleri
+- Turkish secondary sources disagree: eksiduyuru documents U + 8 digits
+  (https://www.eksiduyuru.com/duyuru/1205493/pasaport-numarasi-hangisi-anlamadim — "Pasaport
+  numarası u ıle baslar ve 8 hanelıdır sag ust kosede bulunur"; example U14133624), but
+  tercihiniyap.net CONTRADICTS this — it states the new chip passport number "consists of 7
+  characters" with examples "U987654" / "U123987" (U + 6 digits):
   https://www.tercihiniyap.net/pasaport-numarasi-nedir-nerede-yazar-nereden-ogrenilir-h10567.html
+  (an earlier draft of this report mischaracterized this page as supporting U + 8; corrected —
+  see "Review fixes" below). Other secondary claims of U+7 also circulate. Secondary prose alone
+  is therefore NOT sufficient to fix the digit count.
+- Decisive corroboration is real-world document instances of U + 8 digits:
+  - Notarized power-of-attorney / journal entry (Albanian notary, 18.05.2021) recording the
+    Turkish passport "U11069760" of a Turkish national (YDA İnşaat board member):
+    https://opencorporates.al/documents/dokumenta/1643645467DOC270.pdf.pdf1_31_2022.pdf
+  - The eksiduyuru first-person example U14133624 (holder reading their own passport).
+- Consistency check: ICAO Doc 9303 TD3 document-number field is 9 characters — U + 8 digits
+  fills it exactly, while U + 6 would leave two filler characters:
+  https://www.icao.int/sites/default/files/publications/DocSeries/9303_p4_cons_en.pdf
 - Existence of a standardized detectable format confirmed by commercial DLP vendors shipping a
   "Turkey Passport Number" identifier: Broadcom/Symantec DLP
   (https://techdocs.broadcom.com/us/en/symantec-security-software/information-security/data-loss-prevention/16-1/about-data-loss-prevention-policy-authoring/data-identifiers/system-defined-data-identifiers/personal-identity-data-identifiers.html)
   and Forcepoint ONE ("Turkey PII: Passport Number",
   https://help.forcepoint.com/fpone/fdlp/guid-c40bfcbf-0164-46a0-a33c-f294adbffe76.html).
-- ICAO Doc 9303 TD3 constraint (document number ≤ 9 characters) consistent with U+8:
-  https://www.icao.int/sites/default/files/publications/DocSeries/9303_p4_cons_en.pdf
 
-**Caveats (documented in the YAML):** the issuing authority does not publish a number-format
-specification; pre-2018 non-chip passports used different serials and are out of scope; no
-public checksum for the printed number. Mitigation: no bare tier — every tier (85/75/65) is
-evidence-gated; AllDigitsSameFilter; strict `\bU[0-9]{8}\b` boundaries. A dead-blog claim of
-"three letters + 6 digits" (circulating via a US-embassy paraphrase in search summaries) could
-not be traced to any live authoritative page and conflicts with all Turkish-language sources;
-rejected.
+**Series scope (documented in the YAML):** "U" is the series letter of the ordinary
+(umuma mahsus, bordo) passport only. Turkish sources (gruppal.com blog "Hangi Pasaport Türü Kime
+Verilir?", yandex.com.tr answers) report "S" for hususi (green/special) and "Z" for hizmet
+(grey/service) passports. The S/Z + 8-digit shape could not be independently corroborated
+against real documents, so those series are deliberately OUT of scope (known false negative for
+green/grey passport holders); the pattern description, operation and a should_not_match test
+(`S12345678`) document this. Ordinary bordo passports are the dominant variant, so the U-only
+regex covers the bulk of the detection surface.
+
+**Other caveats (documented in the YAML):** the issuing authority does not publish a
+number-format specification; pre-2018 non-chip passports used different serials and are out of
+scope; no public checksum for the printed number. Mitigation: no bare tier — every tier
+(85/75/65) is evidence-gated; AllDigitsSameFilter; strict `\bU[0-9]{8}\b` boundaries. A
+dead-blog claim of "three letters + 6 digits" (circulating via a US-embassy paraphrase in search
+summaries) could not be traced to any live authoritative page; rejected.
 
 **Adjudication note:** this ships at a weaker source tier than tr-tax-number. If the review
 panel judges the sourcing below the bar, converting to a skip is a one-file revert; the
@@ -179,3 +199,56 @@ Both top-level patterns and all purview regexes: no free wildcards, no nested qu
   duplicateLevelsIdentical, weakHigh] outside the exclusion set`
 - `npm run compile` — `Done: 1598 patterns, 18 collections, 128 keyword dictionaries`
 - `git checkout -- patterns.json` before staging
+
+---
+
+## Review fixes (post-review, 2026-07-08)
+
+Independent review verdict: needs_fixes (0 Critical, 2 Important, 2 Minor). Both Important
+findings were verified against the sources and accepted; both are fixed. Nothing was rebutted.
+
+**Important 1 — tercihiniyap.net was mischaracterized as supporting U + 8 digits (FIXED).**
+Re-fetched the page: it actually states the new chip passport number "consists of 7 characters"
+with examples "U987654" / "U123987" (U + 6 digits), i.e. it CONTRADICTS the shipped format.
+Reviewer confirmed. Fixes:
+- Report section 2 rewritten: tercihiniyap is now described as a conflicting source; the
+  sourcing narrative states plainly that Turkish secondary sources disagree (U+6 / U+7 / U+8)
+  and that NVİ publishes no format at all.
+- The decisive corroboration is now correctly attributed to real-world document instances of
+  U + 8 digits — a notarized Albanian journal entry containing Turkish passport "U11069760"
+  (opencorporates.al, independently verified during this fix pass) and the eksiduyuru
+  first-person example U14133624 — plus the exact fit with ICAO Doc 9303's 9-character TD3
+  document-number field.
+- YAML `confidence_justification` softened: the overclaim "corroborated from the issuing
+  authority's public materials and multiple independent Turkish-language sources" replaced with
+  an honest statement that NVİ publishes no spec, secondary sources conflict on digit count,
+  and the format rests on real-world instances plus ICAO field-length consistency.
+- The pattern still ships at `confidence: medium` with every tier evidence-gated; the
+  one-file-skip fallback offer to the panel stands, now on an accurate premise.
+
+**Important 2 — description overclaimed series coverage; S/Z miss undocumented (FIXED).**
+Verified via Turkish sources (gruppal.com, yandex.com.tr answers): "U" is the series letter of
+the ordinary (umuma mahsus, bordo) passport only; hususi (green) passports start with "S" and
+hizmet (grey) with "Z". Fixes:
+- YAML `description` re-scoped to ordinary (umuma mahsus / bordo) passports and now names the
+  reported S/Z series as explicitly not covered.
+- YAML `operation` gained a false-negative scope note: S/Z series are deliberately out of scope
+  because their letter + 8-digit shape is not corroborated against real documents; extend the
+  letter class only if that is confirmed. (Regex intentionally NOT extended to `[SUZ]` — the
+  same weak-secondary-source problem from Important 1 applies doubly to S/Z, for which no
+  real-world instance was found.)
+- Added should_not_match test `S12345678` encoding the documented limitation.
+- Report section 2 gained a "Series scope" subsection documenting the same.
+
+**Minor findings — left for final triage per fixer instructions (no churn):**
+- eksiduyuru forum thread as a permanent YAML reference: kept as-is. Note for triage: the
+  strongest replacement candidate found (the opencorporates.al notarized document) contains a
+  named individual's real passport number, which is arguably worse to enshrine as a published
+  pattern reference; it is cited in this report's research trail instead.
+- Bare `turkey`/`passport` terms in the 65-tier domain-context group: kept as-is, mirroring the
+  ae-passport-number sibling convention, as the reviewer noted.
+
+**Post-fix gates (re-run in this worktree):** see structured summary / commit — `npm run check`
+0 errors (same two expected filter warnings plus pre-existing warnings), `npm run check:quality`
+PASSED, `npm run compile` OK, `git checkout -- patterns.json` before staging. Regex unchanged
+(`\bU[0-9]{8}\b`); node re-verification re-run including the new `S12345678` rejection.

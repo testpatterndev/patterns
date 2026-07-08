@@ -5,10 +5,14 @@ version: 1.0.0
 type: regex
 engine: boost_regex
 description: >-
-  Detects Turkish (Türkiye) passport numbers. New-generation Turkish passports, issued by the General
-  Directorate of Civil Registration and Citizenship (Nüfus ve Vatandaşlık İşleri Genel Müdürlüğü, NVİ)
-  since 2018, carry a nine-character document number consisting of the series letter "U" followed by
-  eight digits (e.g. U12345678), printed in the top-right corner of the data page.
+  Detects Turkish (Türkiye) ordinary ("umuma mahsus", bordo/burgundy) passport numbers. New-generation
+  ordinary passports, issued by the General Directorate of Civil Registration and Citizenship (Nüfus ve
+  Vatandaşlık İşleri Genel Müdürlüğü, NVİ) since 2018, carry a nine-character document number consisting
+  of the series letter "U" followed by eight digits (e.g. U12345678), printed in the top-right corner of
+  the data page. Turkish sources report different series letters for the special/green (hususi, "S") and
+  service/grey (hizmet, "Z") passports; those series are NOT covered by this pattern because their
+  letter-plus-digit shape could not be independently corroborated. Ordinary bordo passports are by far
+  the dominant variant.
 operation: >-
   Regex pattern (boost_regex engine). Regex_tr_passport matches the letter U followed by exactly eight
   digits with word boundaries so the value is not found inside longer alphanumeric runs. The document
@@ -18,16 +22,21 @@ operation: >-
   requires label context plus passport keywords with template exclusion; Medium (75) requires passport
   keywords with template exclusion; Low (65) requires domain-context keywords. AllDigitsSameFilter
   suppresses repeated-digit placeholders such as U00000000. Older (pre-2018) non-chip Turkish passports
-  used different serial formats and are not targeted by this pattern.
+  used different serial formats and are not targeted by this pattern. Known false-negative scope: hususi
+  ("S" series, green) and hizmet ("Z" series, grey) passport numbers are reported by secondary sources
+  but not corroborated, so they are deliberately out of scope; extend the leading letter class only if
+  the S/Z + 8-digit shape is confirmed against real documents.
 pattern: \bU[0-9]{8}\b
 case_sensitive: true
 confidence: medium
 confidence_justification: >-
   Medium confidence: the fixed "U" prefix plus exact eight-digit tail is structurally distinctive, but
-  letter-plus-digits codes occur in invoices, SKUs and other identifiers, and the format is corroborated
-  from the issuing authority's public materials and multiple independent Turkish-language sources rather
-  than a published specification. All tiers therefore require corroborating passport keywords, which is
-  also why the evidence-gated 75 tier is the recommended workhorse.
+  letter-plus-digits codes occur in invoices, SKUs and other identifiers. The issuing authority (NVİ)
+  publishes no number-format specification and Turkish secondary sources conflict on the digit count
+  (U+6, U+7 and U+8 are all claimed), so the U + 8-digit shape rests on real-world document instances
+  and on consistency with the nine-character ICAO Doc 9303 document-number field rather than on a
+  published standard. All tiers therefore require corroborating passport keywords, which is also why
+  the evidence-gated 75 tier is the recommended workhorse.
 jurisdictions:
   - tr
 regulations:
@@ -70,6 +79,10 @@ test_cases:
       description: Lowercase series letter — document number is case-fixed uppercase
     - value: A12345678
       description: Different leading letter (e.g. a foreign passport series), not the Turkish U series
+    - value: S12345678
+      description: >-
+        Reported hususi (green) series letter S — deliberately out of scope; the S-series shape is not
+        corroborated well enough to ship (documented scope limitation)
     - value: REF-U1234567890123
       description: U followed by a longer digit run — boundary guard prevents partial match
     - value: U00000000
