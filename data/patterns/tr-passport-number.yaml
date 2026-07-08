@@ -1,0 +1,194 @@
+schema: testpattern/v1
+name: Turkish Passport Number
+slug: tr-passport-number
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects Turkish (Türkiye) passport numbers. New-generation Turkish passports, issued by the General
+  Directorate of Civil Registration and Citizenship (Nüfus ve Vatandaşlık İşleri Genel Müdürlüğü, NVİ)
+  since 2018, carry a nine-character document number consisting of the series letter "U" followed by
+  eight digits (e.g. U12345678), printed in the top-right corner of the data page.
+operation: >-
+  Regex pattern (boost_regex engine). Regex_tr_passport matches the letter U followed by exactly eight
+  digits with word boundaries so the value is not found inside longer alphanumeric runs. The document
+  number is case-fixed (uppercase U), so the pattern is case-sensitive. No public checksum is documented
+  for the printed passport number, so detection relies on structure plus corroborating evidence: every
+  tier requires Turkish passport keywords or label context — there is no bare value-only tier. High (85)
+  requires label context plus passport keywords with template exclusion; Medium (75) requires passport
+  keywords with template exclusion; Low (65) requires domain-context keywords. AllDigitsSameFilter
+  suppresses repeated-digit placeholders such as U00000000. Older (pre-2018) non-chip Turkish passports
+  used different serial formats and are not targeted by this pattern.
+pattern: \bU[0-9]{8}\b
+case_sensitive: true
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the fixed "U" prefix plus exact eight-digit tail is structurally distinctive, but
+  letter-plus-digits codes occur in invoices, SKUs and other identifiers, and the format is corroborated
+  from the issuing authority's public materials and multiple independent Turkish-language sources rather
+  than a published specification. All tiers therefore require corroborating passport keywords, which is
+  also why the evidence-gated 75 tier is the recommended workhorse.
+jurisdictions:
+  - tr
+regulations:
+  - KVKK (Law No. 6698 on Protection of Personal Data) (Turkey)
+  - Passport Law No. 5682 (Türkiye)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - pasaport
+    - passport
+    - pasaport numarası
+    - passport number
+    - travel document
+  proximity: 300
+  keyword_lists:
+    - pii-civic-credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: U12345678
+      description: Plain new-generation passport number, series letter U plus eight digits
+    - value: 'Pasaport No: U08296543'
+      description: Turkish label followed by passport number
+    - value: passport number U90130578 issued in Ankara
+      description: English label context with passport number
+    - value: U14133624
+      description: Real-format example cited in Turkish-language sources
+  should_not_match:
+    - value: U1234567
+      description: Only seven digits after the series letter — too short
+    - value: U123456789
+      description: Nine digits after the series letter — too long
+    - value: u12345678
+      description: Lowercase series letter — document number is case-fixed uppercase
+    - value: A12345678
+      description: Different leading letter (e.g. a foreign passport series), not the Turkish U series
+    - value: REF-U1234567890123
+      description: U followed by a longer digit run — boundary guard prevents partial match
+    - value: U00000000
+      description: Repeated-digit placeholder — suppressed by AllDigitsSameFilter
+false_positives:
+  - description: >-
+      Letter-plus-eight-digit codes in unrelated contexts (invoice numbers, product serials, container
+      or tracking references beginning with U).
+    mitigation: >-
+      Every tier requires corroborating passport keywords or label context within the proximity window;
+      there is no bare value-only tier.
+  - description: >-
+      No checksum is published for the printed Turkish passport number, so structural validation cannot
+      eliminate random matches.
+    mitigation: >-
+      Rely on structure (fixed U prefix, exact length, word boundaries), AllDigitsSameFilter and label
+      evidence; the high tier additionally requires label context plus keywords.
+  - description: >-
+      Sample or template passport numbers in documentation and application guides.
+    mitigation: The high and medium tiers apply the template-exclusion NOT-group to suppress sample content.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+    - dict: data-record-context
+      as: Evidence_data_record_context
+      match_style: word
+    - dict: generic-data-labels
+      as: Evidence_generic_data_labels
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_tr_passport
+      matches:
+        - ref: Pattern_tr_passport_label_context
+        - ref: Keyword_tr_passport
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_tr_passport
+      matches:
+        - ref: Keyword_tr_passport
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_tr_passport
+      matches:
+        - ref: Keyword_tr_passport_domain_context
+  regexes:
+    - id: Regex_tr_passport
+      pattern: \bU[0-9]{8}\b
+    - id: Pattern_tr_passport_label_context
+      pattern: (?i)\b(?:pasaport|passport|seyahat\s+belgesi|travel\s+document|pasaport\s+numaras[ıi]|passport\s+number)\b
+  keywords:
+    - id: Keyword_tr_passport
+      groups:
+        - match_style: word
+          terms:
+            - pasaport
+            - pasaport no
+            - pasaport numarası
+            - passport number
+            - passport no
+            - Turkish passport
+            - Türkiye Cumhuriyeti pasaportu
+            - umuma mahsus pasaport
+            - seyahat belgesi
+            - travel document
+      strength: specific
+    - id: Keyword_tr_passport_domain_context
+      groups:
+        - match_style: word
+          terms:
+            - turkey
+            - türkiye
+            - passport
+            - pasaport
+      strength: domain
+  filters:
+    - id: Filter_tr_passport_same_digits
+      type: AllDigitsSameFilter
+risk_rating: 8
+risk_description: >-
+  Passport numbers are high-value identity documents used for international travel and identity verification. Compromise enables identity fraud, unauthorized border crossings, and creation of
+  fraudulent documents.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - url: https://www.nvi.gov.tr/pasaport
+    title: Pasaport Hizmetleri - Nüfus ve Vatandaşlık İşleri Genel Müdürlüğü (issuing authority)
+  - url: https://techdocs.broadcom.com/us/en/symantec-security-software/information-security/data-loss-prevention/16-1/about-data-loss-prevention-policy-authoring/data-identifiers/system-defined-data-identifiers/personal-identity-data-identifiers.html
+    title: Personal identity data identifiers (includes Turkey Passport Number) - Broadcom TechDocs
+  - url: https://www.eksiduyuru.com/duyuru/1205493/pasaport-numarasi-hangisi-anlamadim
+    title: Turkish-language discussion documenting the U + 8 digit passport number format
+created: '2026-07-08'
+updated: '2026-07-08'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-08'
+    description: Initial release
+author: testpattern-community
+license: MIT
