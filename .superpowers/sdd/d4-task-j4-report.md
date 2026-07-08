@@ -121,6 +121,24 @@ https://fuehrerausweise.ch/informationen/fak/
 - Every regex empirically verified with node (String.raw + new RegExp) against positive and negative cases
   before the gates (scratchpad j4-verify.mjs — ALL PASS).
 
+## Review fixes (post-review, 2026-07-08)
+
+Independent review verdict: needs_fixes (0 Critical, 1 Important, 3 Minor).
+
+- IMPORTANT — ch-passport-number 2022-series overclaim: FIXED. The description previously asserted that
+  issued 2022-series numbers "remain letter-plus-digits combinations covered by this shape" and the
+  false-positive mitigation claimed "fedpol-issued examples remain letter-plus-seven-digits". Neither claim
+  is supported by any source; the pattern's own reference (travelnews.ch citing fedpol) says the 2022 series
+  has no fixed public structure, and the sibling new-generation Swiss ID-card number (documented by Keesing
+  as K9N99N99, letters in interior positions) would not match this regex, suggesting 2022-series passports
+  deviate too. Prose corrected in three places (description, operation, third false_positives entry) to
+  state that the 2022 series is unpublished and may NOT match this shape, and that only the documented
+  2010-and-earlier format is covered. The regex itself is unchanged — the documented 2003/2006/2010 shape
+  remains the only authorable structure.
+- MINOR findings (za-passport reference host with broken TLS cert; shaky Danske Bank PDF extraction quote;
+  missing repeated-digit filter test cases on ch/no passports): left for final triage per fixer
+  instructions — no churn.
+
 ## Gates
 
 - npm install: OK (fresh worktree)
