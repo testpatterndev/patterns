@@ -144,3 +144,60 @@ text surgery + structural proof). 1159/1159 passed.
    into the marking/classification family.
 4. `verify-pattern-testcases.mjs --all` carries 86 pre-existing failures unrelated to
    this sweep.
+
+## 6. Review fixes (fix: dead-noise-gate-pass review fixes)
+
+The review found a detection regression the wiring pass introduced, plus the same
+collision class in two more files. Root cause: **the collision scan was under-scoped.**
+It checked the dictionary's 13 terms against (a) `should_match` values, (b)
+`strength: specific`/`strength: domain` keyword terms, and (c) tier regex sources —
+but not against keyword groups of *other* strengths that tiers reference as POSITIVE
+evidence. That is exactly where the collisions live: the 20 files in out-of-scope
+finding #1 have `strength: noise` groups miswired as positive AND-evidence, and three
+of them were also in the WIRE-SAFE set. The ticket's wire-safety criterion is about
+*positively-referenced* vocabulary regardless of declared strength.
+
+**Corrected audit** (all keyword groups positively referenced by any tier —
+`id_match` + non-NOT `matches` refs — any strength, word-level against all 13 dict
+terms): **5 collisions in 3 files; the remaining 175 wired files are clean.**
+
+| file | tier(s) affected | colliding positive group | dict terms |
+|---|---|---|---|
+| global-lab-test-terms | 65 (only tier) | Keyword_lab_test_context (required) | sample |
+| crown-solicitor-legal-opinion | 85 | Evidence_crown_solicitor_legal_opinion_exclusion (required) | template, example |
+| major-litigation-strategy-document | 85 | Evidence_major_litigation_strategy_document_exclusion (required) | template, example |
+
+**Impact before the fix.** global-lab-test-terms was a live regression: the only tier
+required Keyword_lab_test_context (contains 'sample') while the new NOT-gate vetoed
+'sample'. Empirical probe (tier semantics, old-vs-new): *"Pathology report: biopsy
+sample collected from patient, results within reference range."* and *"Histology and
+cytology findings: specimen sample processed by the laboratory."* both fired at 65
+before the sweep and were fully suppressed after — restored by the fix (verified:
+HEAD-wired silent, fixed FIRES, both probes). In the two legal files the 85 tier
+simultaneously *required* and *vetoed* 'template'/'example': any document satisfying
+the (miswired) positive leg via those terms was categorically suppressed.
+
+**Fix applied: all three reclassified WIRE-SAFE → UNSAFE-REMOVE.** Added NOT nodes
+dropped, dead `shared_keywords` declaration removed, minor bump reverted to the
+removal convention's patch bump (1.1.0 → 1.1.1), changelog rewritten to record the
+reclassification. Net diff vs the pre-sweep base is exactly the standard
+UNSAFE-REMOVE shape — tier structures are byte-identical to pre-sweep, so pre-sweep
+detection behavior is restored structurally, not just empirically. The miswired-NOT-gate
+follow-up (finding #1) may re-wire the gate in the two legal files once
+Evidence_*_exclusion is moved to a proper NOT-group.
+
+**Corrected census:** WIRE-SAFE 178 → **175** (399 gated tiers), UNSAFE-REMOVE
+58 → **61**, removal-only files 981 → 984; total touched files unchanged at 1159.
+
+**Disclosure:** the changelog line on the 175 wired files ("verified collision-free
+against this pattern's should_match values and specific/domain vocabulary") describes
+the original under-scoped scan; the corrected any-strength positive-reference audit
+above now backs the collision-free claim for all 175. The files are not churned to
+reword 175 changelogs — this section is the authoritative record of the scan scope.
+
+**Gates re-run after the fix:** `verify-pattern-testcases.mjs --all` 86 failures /
+77 warnings — identical to before, zero flips; `npm run check` 0 errors (57
+pre-existing warnings); `npm run check:quality` PASSED; `npm run compile` OK (1655
+patterns) with the three compiled entries at 1.1.1, `shared_keywords` absent and zero
+Keyword_noise_exclusion references in compiled purview; patterns.json reverted before
+staging.
