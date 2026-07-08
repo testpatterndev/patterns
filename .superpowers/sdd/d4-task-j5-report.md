@@ -10,13 +10,13 @@ Implementer report. Worktree: `Z:\patterns\.claude\worktrees\wf_2084d11b-7fa-7`,
 
 - Base TIN: 9 digits, written `XXX-XXX-XXX`; 9th digit is a BIR check digit (algorithm not public).
 - Branch code suffix: historically 3 digits (`000` head office → 12 digits total).
-- **Since eBIRForms v7.9.6.0 (RMC No. 036-2026, released 2026-04-28) the branch code field is 5 digits → 14 digits total.** The regex therefore accepts 9, 9+3 and 9+5 digit forms with optional dash/space separators:
+- **Since eBIRForms v7.9.6.0 (RMC No. 36-2026, released 2026-04-28) the branch code field is 5 digits → 14 digits total.** The regex therefore accepts 9, 9+3 and 9+5 digit forms with optional dash/space separators:
   `\b\d{3}[- ]?\d{3}[- ]?\d{3}(?:[- ]?(?:\d{5}|\d{3}))?\b`
 
 **Sources:**
 - BIR eFPS help (issuing authority): TIN = 9 digits + 3-digit branch code, default 000 — https://efps.bir.gov.ph/efps-war/EFPSWeb_war/help/help_03e.html (surfaced via site:bir.gov.ph search; page body confirmed in search index, direct fetch blocked by certificate error)
 - BIR RMO No. 23-91 (legal basis for the TIN structure) — https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/10/49676
-- RMC No. 036-2026 branch-code expansion 3→5 digits — https://taxify.ph/blog/tin-branch-code-5-digits-large-business-guide/
+- RMC No. 36-2026 branch-code expansion 3→5 digits — https://taxify.ph/blog/tin-branch-code-5-digits-large-business-guide/
 - Structure corroboration (classification prefix, sequential body, check digit, branch code): https://orus.ph/tin-format/ and https://lookuptax.com/docs/tax-identification-number/philippines-tax-id-guide
 
 **Design decisions:**
@@ -78,6 +78,6 @@ Sources:
 
 ## Adjudications / concerns
 
-- **ph-tin 14-digit form**: task spec said "9 or 12 digit — verify"; verification surfaced the 2026 branch-code expansion to 5 digits (RMC No. 036-2026). Shipped with all three lengths — omitting the 14-digit form would miss every post-April-2026 corporate TIN.
+- **ph-tin 14-digit form**: task spec said "9 or 12 digit — verify"; verification surfaced the 2026 branch-code expansion to 5 digits (RMC No. 36-2026). Shipped with all three lengths — omitting the 14-digit form would miss every post-April-2026 corporate TIN.
 - **ph-tin vs ph-national-id overlap**: an unseparated 12-digit TIN and an unseparated PhilSys number are both 12-digit runs; both SITs are keyword-gated on disjoint vocabularies (BIR/TIN vs PhilSys/PSA), so cross-firing requires both vocabularies in proximity. Documented in false_positives.
 - **ua-tax-number leading digit**: secondary sources describe the first 5 digits as days-since-1899-12-31 (implying realistic values start 1-4), but the OECD primary source only says "sequence number of registration of birth date", so the regex was not over-constrained beyond `\d{10}`.
