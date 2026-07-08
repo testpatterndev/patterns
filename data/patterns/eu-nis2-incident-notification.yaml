@@ -1,0 +1,188 @@
+schema: testpattern/v1
+name: EU NIS2 Significant Incident Notification
+slug: eu-nis2-incident-notification
+version: 1.0.0
+type: keyword_proximity
+engine: universal
+description: Detects NIS2 Article 23 significant-incident notifications from essential and important entities — the 24-hour early warning, 72-hour incident notification, intermediate report, final report, and progress report submitted to the CSIRT or competent authority. These filings contain live compromise details, indicators of compromise, and impact assessments; disclosure aids attackers and breaches supervisory confidentiality.
+operation: 'Keyword proximity: primary topic phrase (significant incident — the Article 23 defined trigger) within 300 characters of Article 23 vocabulary (early warning, incident notification, CSIRT, competent authority, Directive (EU) 2022/2555, severe operational disruption, indicators of compromise, final report). Structural corroboration: case-sensitive CSIRT acronym regex. Negative keyword exclusion for news, consultancy, and training material. Concept classifier: matches the topic, not identifier-grade evidence.'
+pattern: (?i)\bsignificant\s+incident\b
+confidence: medium
+confidence_justification: 'Medium confidence: honest topic matcher. ''Significant incident'' is the Article 23 defined trigger term and the only primary; the stage names ''early warning'' and ''incident notification'' are ubiquitous outside NIS2 (meteorology, PagerDuty-style ops tooling) so they corroborate but never fire alone. ''Significant incident'' still occurs in generic incident-management prose at the 75/65 tiers; the 85 tier, which requires NIS2-specific vocabulary (CSIRT, Directive (EU) 2022/2555, severe operational disruption, indicators of compromise), approaches document-class precision.'
+jurisdictions:
+  - eu
+regulations:
+- "Directive (EU) 2022/2555 (NIS2)"
+data_categories:
+  - security
+  - governance
+corroborative_evidence:
+  keywords:
+    - CSIRT
+    - computer security incident response team
+    - competent authority
+    - Directive (EU) 2022/2555
+    - NIS2
+    - NIS 2
+    - severe operational disruption
+    - indicators of compromise
+    - cross-border impact
+    - early warning
+    - incident notification
+    - intermediate report
+    - final report
+    - progress report
+    - essential entity
+    - important entity
+    - without undue delay
+  proximity: 300
+  keyword_lists:
+    - industry-critical-infrastructure
+test_cases:
+  should_match:
+    - value: |-
+        EARLY WARNING — significant incident under Article 23(4)(a) of Directive (EU) 2022/2555 (NIS2).
+        Submitted to the national CSIRT within 24 hours of becoming aware of the significant incident.
+        Entity: GridWorks Energy AS — essential entity, energy sector.
+        Suspected cause: unlawful or malicious acts (ransomware deployment on the SCADA historian).
+        Cross-border impact: possible — interconnector scheduling systems degraded.
+      description: 24-hour early warning to the national CSIRT from an essential entity
+    - value: 'Incident notification — significant incident ref NIS-2026-0118, updating the early warning of 05/07/2026. Initial assessment: severity high; severe operational disruption of DNS resolution services affecting approximately 214,000 recipients of services. Indicators of compromise attached for CSIRT correlation. Submitted within 72 hours of becoming aware.'
+      description: 72-hour incident notification with severity assessment and IoCs
+    - value: 'Final report to the competent authority under Article 23(4)(d) of Directive (EU) 2022/2555: detailed description of the significant incident, including its severity and impact; the type of threat and root cause that triggered the incident (compromised supplier VPN account); applied and ongoing mitigation measures; assessment of cross-border impact with the Baltic CSIRTs network.'
+      description: One-month final report with root cause and mitigation measures
+  should_not_match:
+    - value: 'Law-firm newsletter: NIS2 is here — essential and important entities must file an early warning of a significant incident within 24 hours and an incident notification within 72 hours. Contact our cyber practice for a readiness explainer.'
+      description: Law-firm newsletter summarising Article 23 deadlines
+    - value: 'Vendor webinar: automate your NIS2 incident notification workflow and never miss the 24-hour early warning deadline again. Demo of our compliance dashboard included.'
+      description: Vendor webinar marketing an incident-reporting product
+    - value: The university's incident-response course tutorial has students draft a mock early warning and a sample incident notification for a fictional significant incident at a water utility.
+      description: Academic tutorial with mock notification exercise
+false_positives:
+  - description: Generic incident-management, emergency-management, and meteorological content using 'early warning', 'incident notification', or 'significant incident'
+    mitigation: '''Early warning'' and ''incident notification'' are corroborative-only and never fire alone at any tier. ''Significant incident'' remains a genuine collision at the 75 and 65 tiers (generic incident-management prose without noise terms); the 85 tier requires NIS2-specific vocabulary (CSIRT, Directive (EU) 2022/2555, severe operational disruption) in proximity'
+  - description: News, law-firm alerts, and vendor marketing about NIS2 reporting obligations
+    mitigation: 'Negative keyword exclusion: ''newsletter'', ''webinar'', ''explainer'', ''press release'', ''blog post''. Advisory content reuses the directive''s vocabulary; residual matches are expected for a topic classifier.'
+  - description: Collision with DORA Article 19 incident reports and national CSIRT advisories that share report-stage vocabulary
+    mitigation: DORA documents anchor on 'major ICT-related incident'; NIS2 notifications anchor on 'significant incident' and CSIRT terms — overlap is acknowledged and both classes are typically sensitive
+  - description: Training exercises and tabletop scenarios drafting mock notifications
+    mitigation: Shared template-exclusion dictionary (mock, sample, tutorial, training exercise) as NOT evidence on every tier
+exports:
+  - purview_xml
+  - yaml
+scope: wide
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_eu_nis2_incident_notification_topic_terms
+      matches:
+        - ref: Evidence_eu_nis2_incident_notification_primary
+        - ref: Evidence_eu_nis2_incident_notification_corroborative
+        - ref: Pattern_eu_nis2_incident_notification_csirt
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_eu_nis2_incident_notification_exclusion
+    - confidence_level: 75
+      id_match: Pattern_eu_nis2_incident_notification_topic_terms
+      matches:
+        - ref: Evidence_eu_nis2_incident_notification_primary
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_eu_nis2_incident_notification_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_eu_nis2_incident_notification_topic_terms
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_eu_nis2_incident_notification_exclusion
+  regexes:
+    - id: Pattern_eu_nis2_incident_notification_topic_terms
+      pattern: (?i)\bsignificant\s+incident\b
+    - id: Pattern_eu_nis2_incident_notification_csirt
+      pattern: \bCSIRTs?\b
+  keywords:
+    - id: Evidence_eu_nis2_incident_notification_primary
+      groups:
+        - match_style: word
+          terms:
+            - significant incident
+      strength: specific
+    - id: Evidence_eu_nis2_incident_notification_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - text: CSIRT
+              case_sensitive: true
+            - computer security incident response team
+            - competent authority
+            - Directive (EU) 2022/2555
+            - text: NIS2
+              case_sensitive: true
+            - text: NIS 2
+              case_sensitive: true
+            - severe operational disruption
+            - indicators of compromise
+            - cross-border impact
+            - early warning
+            - incident notification
+            - intermediate report
+            - final report
+            - progress report
+            - essential entity
+            - important entity
+            - without undue delay
+      strength: domain
+    - id: Filter_eu_nis2_incident_notification_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - press release
+            - media statement
+            - consultation paper
+            - explainer
+            - webinar
+            - newsletter
+            - blog post
+            - academic
+            - training course
+      strength: noise
+risk_rating: 8
+risk_description: Article 23 notifications contain live compromise details — suspected malicious cause, indicators of compromise, severity and impact assessments, and mitigation status — often while the incident is ongoing. Leakage aids the attacker, exposes the entity to follow-on targeting, and breaches the confidentiality of the CSIRT/supervisory channel.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: "SENSITIVE Security"
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - url: https://www.nis-2-directive.com/NIS_2_Directive_Article_23.html
+    title: "NIS2 Directive Article 23 — reporting obligations: early warning (24h), incident notification (72h), intermediate, final and progress reports"
+  - url: https://luxgap.com/lois/nis2/art-23/?lang=en
+    title: "NIS2 Article 23(4) exact text — stage contents including indicators of compromise, severity and impact, root cause, mitigation measures"
+created: '2026-07-08'
+updated: '2026-07-08'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-08'
+    description: Initial release
+author: testpattern-community
+source: testpattern-community
+license: MIT
