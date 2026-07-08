@@ -1,0 +1,136 @@
+schema: testpattern/v1
+name: Litecoin Address
+slug: global-litecoin-address
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Litecoin addresses in two forms. Native SegWit bech32 addresses use the human-readable part
+  "ltc1" (distinctive, 85-gated). Legacy base58 addresses are P2PKH with version byte 0x30 (leading
+  "L") and P2SH with version byte 0x32 (leading "M"), 26-35 characters (most 34) — a single-letter
+  prefix that is weaker (75-gated). Prefixes/version bytes/lengths verified against the Litecoin
+  address-prefix docs and documented example addresses.
+operation: >-
+  Two tiers. Tier 85 matches the distinctive "ltc1" bech32 form (HRP + bech32 body). Tier 75 matches
+  the legacy L/M base58 form (weaker single-letter prefix). BOTH tiers are AND-gated by
+  cryptocurrency/wallet domain context (crypto-wallet-context dict) within proximity plus a
+  template/sample noise NOT-group — no bare high tier. Case-sensitive (base58 and bech32 are
+  case-sensitive; the legacy "3" P2SH form is intentionally excluded as it collides with Bitcoin).
+pattern: '\b[LM][1-9A-HJ-NP-Za-km-z]{25,34}\b'
+confidence: medium
+confidence_justification: >-
+  The "ltc1" bech32 form is a distinctive fixed HRP (85 when domain-gated). The legacy L/M base58 form
+  is a single-letter prefix that collides with other base58 addresses and has no regex-expressible
+  checksum (75). Neither tier is exported bare — precision comes from (distinctive prefix/HRP) times
+  the mandatory cryptocurrency/wallet domain-context gate plus the noise exclusion.
+case_sensitive: true
+jurisdictions:
+  - global
+regulations:
+  - FATF Recommendations
+  - AML/CTF Act (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - financial
+corroborative_evidence:
+  keywords:
+    - identifier
+    - number
+    - ID
+  proximity: 300
+  keyword_lists:
+    - financial-transaction
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: 'LZyv3r9Tt6o7yUENc9AZf5FbQVe9GxL7w3'
+      description: Legacy P2PKH address (L prefix, version 0x30), documented example (34 chars)
+    - value: 'MQMcJhpWHYVeQArcZR3sBgyPZxxRtnH441'
+      description: P2SH address (M prefix, version 0x32), documented example (34 chars)
+    - value: 'ltc1qg82u5u4mhn6n9l5xup0yfl52q3c4z9hsgwlj5n'
+      description: Native SegWit bech32 address (ltc1 HRP), documented example (43 chars)
+  should_not_match:
+    - value: '3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy'
+      description: Bitcoin legacy P2SH "3" address — intentionally excluded (wrong prefix, collides with Bitcoin)
+    - value: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4'
+      description: Bitcoin bech32 address — wrong HRP (bc1, not ltc1)
+    - value: 'LZyv3r9Tt6o'
+      description: Too short (below the base58 body minimum)
+    - value: 'LZyv3r9Tt6o7yUENc9AZf5-FbQVe9GxL7w3'
+      description: Hyphen breaks the run so no contiguous body exists — rejected
+    - value: 'litecoin wallet address example placeholder'
+      description: Template/placeholder context should be excluded even when domain anchor words are present
+false_positives:
+  - description: >-
+      The legacy L/M base58 form shares the base58 alphabet and 34-char envelope with Bitcoin/Dogecoin
+      addresses and arbitrary base58 tokens; the Base58Check checksum cannot be validated in a
+      Purview-safe regex. The "ltc1" bech32 form is far more distinctive but still lacks a
+      regex-expressible checksum.
+    mitigation: >-
+      Both tiers are AND-gated by cryptocurrency/wallet domain context (crypto-wallet-context) within
+      the proximity window plus a template/sample noise NOT-group. The distinctive ltc1 form is 85, the
+      weaker legacy form 75.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+references:
+  - url: https://litecoin.info/docs/key-concepts/addresses-prefixes
+    title: Addresses & Prefixes — Litecoin Wiki (L=0x30, M=0x32, ltc1 HRP)
+  - url: https://litecoin.com/learning-center/addresses-prefixes
+    title: Litecoin — Addresses & Prefixes (L / M / ltc1 formats)
+sensitivity_labels:
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: crypto-wallet-context
+      as: Keyword_cryptocurrency
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_litecoin_bech32
+      matches:
+        - ref: Keyword_cryptocurrency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_litecoin_legacy
+      matches:
+        - ref: Keyword_cryptocurrency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_litecoin_legacy
+      pattern: '\b[LM][1-9A-HJ-NP-Za-km-z]{25,34}\b'
+    - id: Regex_litecoin_bech32
+      pattern: '\bltc1[ac-hj-np-z02-9]{39,59}\b'
+created: '2026-07-07'
+updated: '2026-07-07'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-07'
+    description: >-
+      Initial release — distinctive "ltc1" bech32 form (85) and legacy L/M base58 form (75), both
+      domain-context-gated, per verification against Litecoin address-prefix docs. Legacy "3" P2SH
+      form excluded to avoid Bitcoin collision.
+author: testpattern-community
+license: MIT

@@ -1,0 +1,152 @@
+schema: testpattern/v1
+name: Working With Children Check Number (NSW / VIC / WA)
+slug: au-wwcc-number
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects Working With Children Check (WWCC) clearance numbers across Australian states. Covers the NSW
+  structural format (WWC + 7 digits + check letter, e.g. WWC1234567E) and the labelled VIC / WA / generic
+  forms where a WWCC or working-with-children phrase precedes a card or clearance number. The Queensland
+  Blue Card is handled by a separate classifier.
+operation: >-
+  Regex pattern (boost_regex engine). Pattern_au_wwcc_number matches either the NSW structural form
+  (WWC + 7 digits + trailing letter) or a WWCC / working-with-children phrase followed within 50 characters
+  by a 6-9 digit card/clearance number with an optional trailing letter. Three confidence tiers: High (85)
+  requires WWCC evidence (min 2) with template exclusion; Medium (75) requires WWCC evidence with template
+  exclusion; Low (65) requires WWCC evidence. Evidence uses one keyword group (13 child-screening terms)
+  within 300-character proximity.
+pattern: (?i)\bWWC\s?\d{7}\s?[A-Z]\b|\b(?:WWCC|WWC\s+check|working\s+with\s+children(?:\s+check)?)\b[\s\S]{0,20}?\b(?:no|number|card|clearance|reg(?:istration)?)\b\.?\s*[:#-]?\s*\d{6,9}[A-Z]?(?:-\d{2})?\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the NSW WWC#######E form is highly specific, but the labelled VIC / WA / generic
+  forms match a broad 6-9 digit number near a working-with-children phrase, so corroborating child-screening
+  keywords are required. WA assessment-notice numbering is not publicly standardised and is covered only by
+  the labelled proximity branch.
+jurisdictions:
+- au
+regulations:
+- Child Protection (Working with Children) Act 2012 (NSW)
+- HRIPA (Cth)
+- NDB Scheme (Cth)
+- Privacy Act 1988 (Cth)
+- Working with Children Act 2005 (Vic)
+frameworks:
+- ISO 27001
+- ISO 27701
+data_categories:
+- pii
+- government-id
+- children
+corroborative_evidence:
+  keywords:
+  - Working with Children Check
+  - WWCC
+  - WWC
+  - Office of the Children's Guardian
+  - child-related work
+  - clearance number
+  - child protection
+  - screening check
+  - Service NSW
+  - assessment notice
+  - working with children clearance
+  - child safety
+  - positive notice
+  proximity: 300
+test_cases:
+  should_match:
+  - value: NSW Working with Children Check number WWC1234567E is valid until 2029 for the applicant
+  - value: Working with Children Check clearance 1088651V issued to the volunteer this month
+  - value: VIC WWC Check card 0512345A-01 held by the classroom teacher on file
+  - value: WA Working with Children Check registration 20481523 sighted by the coordinator
+  should_not_match:
+  - value: The child protection policy was updated by the school board last week
+  - value: Working with children is rewarding work in early childhood education
+  - value: Card number 4111 1111 1111 1111 was declined at the terminal
+  - value: Working with children policy 20240815 was updated for all 12 campuses
+false_positives:
+- description: A working-with-children phrase near an unrelated 6-9 digit number could match without being a clearance number.
+  mitigation: Require corroborating child-screening keywords within the proximity window.
+- description: Sample clearance numbers in HR templates or training material may match the labelled form.
+  mitigation: The high and medium tiers apply the template-exclusion NOT-group to suppress sample and training content.
+exports:
+- purview_xml
+- yaml
+- regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: WWCC number exposure reveals child-related screening status and can be misused to falsely assert clearance to work with children.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: SECRET
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+  - dict: template-exclusion
+    as: Evidence_template_exclusion
+    match_style: word
+  pattern_tiers:
+  - confidence_level: 85
+    id_match: Pattern_au_wwcc_number
+    matches:
+    - ref: Evidence_au_wwcc_number
+      min_count: 2
+      unique_results: true
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Evidence_template_exclusion
+  - confidence_level: 75
+    id_match: Pattern_au_wwcc_number
+    matches:
+    - ref: Evidence_au_wwcc_number
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Evidence_template_exclusion
+  - confidence_level: 65
+    id_match: Pattern_au_wwcc_number
+    matches:
+    - ref: Evidence_au_wwcc_number
+  regexes:
+  - id: Pattern_au_wwcc_number
+    pattern: (?i)\bWWC\s?\d{7}\s?[A-Z]\b|\b(?:WWCC|WWC\s+check|working\s+with\s+children(?:\s+check)?)\b[\s\S]{0,20}?\b(?:no|number|card|clearance|reg(?:istration)?)\b\.?\s*[:#-]?\s*\d{6,9}[A-Z]?(?:-\d{2})?\b
+  keywords:
+  - id: Evidence_au_wwcc_number
+    groups:
+    - match_style: word
+      terms:
+      - Working with Children Check
+      - text: WWCC
+        case_sensitive: true
+      - text: WWC
+        case_sensitive: true
+      - Office of the Children's Guardian
+      - child-related work
+      - clearance number
+      - child protection
+      - screening check
+      - Service NSW
+      - assessment notice
+      - working with children clearance
+      - child safety
+      - positive notice
+    strength: specific
+created: '2026-07-07'
+updated: '2026-07-07'
+author: testpattern-community
+license: MIT
+references:
+- url: https://www.service.nsw.gov.au/transaction/find-working-children-check-number
+  title: Find your Working with Children Check number | Service NSW
+- url: https://service.vic.gov.au/services/working-with-children-check-find-card-number
+  title: Find your Working with Children Check card number | Service Victoria

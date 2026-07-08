@@ -1,0 +1,198 @@
+schema: testpattern/v1
+name: Canada Marking - Protected A/B/C + Classified
+slug: ca-marking
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects Government of Canada protective markings under the Treasury Board Standard on Security
+  Categorization (Appendix J of the Directive on Security Management): the Canada-distinctive
+  "Protected" designations Protected A / Protected B / Protected C (information whose compromise could
+  injure interests outside the national interest), and the classified levels Confidential / Secret /
+  Top Secret (injury to the national interest). "Protected A/B/C" is unique to Canada and matched at
+  high confidence in both title-case and ALL-CAPS renderings; the classified words are shared
+  vocabulary with other nations and are matched only at lower, Canada-government-context-gated tiers.
+  Rendering verified directly against the Treasury Board Standard on Security Categorization; matched
+  case-sensitively.
+operation: >-
+  Tier 85 matches the Canada-distinctive "Protected <A|B|C>" designation in either its policy title-case
+  (Protected B) or ALL-CAPS banner (PROTECTED B) rendering, tolerant of hyphen or PDF-line-wrap
+  whitespace before the level letter; carries only a template/noise NOT-exclusion. Tier 75 matches the
+  bare TOP SECRET banner-words phrase, AND-gated by Canada-government corroborative context. Tier 65
+  matches the bare CONFIDENTIAL / SECRET words, AND-gated by Canada-government context plus a
+  NOT-exclusion for common non-government SECRET collocations (TRADE SECRET, CLIENT SECRET, API SECRET,
+  SECRET MANAGER, SECRET SANTA).
+pattern: '\b(?:PROTECTED|Protected)[\s-]+[ABC]\b'
+confidence: high
+confidence_justification: >-
+  High confidence on the "Protected A/B/C" designation: the word Protected (leading capital)
+  immediately followed by a single bare A, B or C is a structurally distinctive, Canada-unique marking
+  with negligible natural-language collision, verified against the Treasury Board Standard on Security
+  Categorization; matched case-sensitively so lowercase "protected b" cannot fire, and constrained by a
+  trailing word boundary so "Protected Areas"/"Protected Building" cannot fire. The classified words
+  CONFIDENTIAL, SECRET and TOP SECRET are shared Five-Eyes vocabulary and extremely collision-prone, so
+  — following this SIT's Canada-specific role — they are placed at lower tiers gated by
+  Canada-government corroborative evidence within 300 characters (TOP SECRET at 75 as a distinctive
+  two-word phrase; bare CONFIDENTIAL/SECRET at 65) plus, for the bare words, a dedicated collocation
+  NOT-group.
+jurisdictions:
+  - ca
+regulations:
+  - "Directive on Security Management (Canada)"
+frameworks:
+  - Policy on Government Security
+data_categories:
+  - government
+  - security-classification
+case_sensitive: true
+corroborative_evidence:
+  keywords:
+    - Government of Canada
+    - Treasury Board
+    - Policy on Government Security
+    - RCMP
+    - national security
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "This record is designated Protected B under the Treasury Board Standard on Security Categorization."
+      description: Canada-distinctive Protected B designation in policy title-case
+    - value: "Cover sheet stamped PROTECTED C — extremely sensitive personal information, handle accordingly."
+      description: Protected C in ALL-CAPS banner rendering
+    - value: "The briefing note is classified TOP SECRET and was prepared for the Government of Canada Privy Council Office."
+      description: Gated bare TOP SECRET — Canada-government corroborative context (Government of Canada, Privy Council Office) present within 300 characters
+    - value: "This SECRET memorandum must be handled per the Government of Canada Directive on Security Management."
+      description: Gated bare SECRET — Canada-government corroborative context (Government of Canada, Directive on Security Management) present within 300 characters
+    - value: "Marking: Protected-A applied to the salary schedule in the personnel file."
+      description: Protected-A with a hyphen separator (the [\s-]+ separator tolerates a hyphen before the level letter)
+  should_not_match:
+    - value: "please keep these files protected and do not disclose anything secret without approval"
+      description: lowercase prose (case-sensitive exclusion — neither "protected" nor "secret" is capitalised as a marking)
+    - value: "PROTECTED AREAS OF THE NATIONAL PARK REQUIRE A PERMIT FROM PARKS CANADA"
+      description: ALL-CAPS prose — "PROTECTED A" is followed by the rest of "AREAS" (no word boundary after the A), so it fails at the regex level
+    - value: "THE COMPANY'S TRADE SECRET FORMULA IS CONFIDENTIAL AND STORED UNDER AN NDA"
+      description: ALL-CAPS non-government collocation — excluded from the top-level Protected pattern (no PROTECTED A/B/C) and from the gated bare tier by the TRADE SECRET NOT-group
+false_positives:
+  - description: ALL-CAPS prose (headings, legal boilerplate, or fully-capitalised documents) defeats the case-sensitivity signal the bare TOP SECRET / SECRET / CONFIDENTIAL tiers rely on — any all-caps rendering with no marking intent can fire those gated tiers if Canada-government context also happens to be present.
+    mitigation: Treat gated-tier (65/75) hits as lower confidence when the surrounding text is itself all-caps. The Protected A/B/C tier (85) is structurally distinctive and does not depend on the context gate.
+  - description: >-
+      The classified words CONFIDENTIAL, SECRET and TOP SECRET are shared Five-Eyes vocabulary already
+      covered by the US/UK/NZ/AU marking families; a genuine Canadian classified document is expected to
+      co-fire those SITs. This SIT deliberately gates its classified-word tiers on Canada-government
+      context so its distinctive contribution is the Canada-unique Protected A/B/C designation rather
+      than redundant broad firing on generic classification words.
+    mitigation: Deploy policies should treat cross-jurisdiction co-fire on the shared classified words as corroborating, not conflicting; do not remove the Canada-context gate, which is what keeps this SIT's classified tiers precise.
+  - description: >-
+      The title-case "Protected A/B/C" form has a small residual: rare constructions such as "Protected
+      A-list" or a standalone "Protected A" heading followed by a boundary can match without marking
+      intent. "Protected Area(s)", "Protected Building", and similar are NOT affected — the trailing word
+      boundary requires the A/B/C to stand alone.
+    mitigation: Residual is rare and low-impact; the template/noise NOT-exclusion suppresses sample/training content, and the ALL-CAPS banner rendering (the dominant real-world marking form) is unambiguous.
+  - description: >-
+      Coverage gap (false negative, not false positive): the bare classified tiers (CONFIDENTIAL /
+      SECRET / TOP SECRET) match ALL-CAPS only. Treasury Board policy text and many banners also render
+      these in Title Case (Top Secret, Secret, Confidential); Title-Case classified banners are therefore
+      NOT detected. Deliberate precision tradeoff — a bare title-case "Secret"/"Confidential" is
+      un-gateable everyday English. The Protected A/B/C tier (85) matches both title-case and ALL-CAPS,
+      so only the shared classified words carry this recall gap.
+    mitigation: Accepted recall tradeoff; ALL-CAPS banners are the dominant high-assurance rendering, and Canadian classified content is independently covered by the US/UK/NZ/AU marking SITs.
+  - description: >-
+      French-language Government of Canada markings (Protégé A/B/C, Confidentiel, Secret, Très secret)
+      are applied per-document-language, NOT co-rendered bilingually the way EUCI markings are. They are
+      not implemented here: the Treasury Board Standard's English text defines the English terms, and
+      verifying the exact French banner rendering from a French primary source was out of scope for this
+      release.
+    mitigation: Documented as a known coverage gap for French-language Canadian documents rather than authored from assumption; the English designations and classified words are the verified, shipped forms.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  Canadian protective markings cover both the "Protected" designations (Protected A/B/C — sensitive
+  personal or business information whose compromise could injure interests outside the national
+  interest) and the "Classified" levels (Confidential/Secret/Top Secret — injury to the national
+  interest), per the Treasury Board Standard on Security Categorization.
+sensitivity_labels:
+  ca_gov: "Protected A / Protected B / Protected C / Confidential / Secret / Top Secret"
+  us_gov: "CUI / CONFIDENTIAL / SECRET / TOP SECRET"
+  uk_gov: "OFFICIAL-SENSITIVE / SECRET / TOP SECRET"
+  pspf: "OFFICIAL: Sensitive / PROTECTED / SECRET / TOP SECRET"
+  psr: "IN CONFIDENCE / CONFIDENTIAL / SECRET / TOP SECRET"
+references:
+  - url: https://www.tbs-sct.canada.ca/pol/doc-eng.aspx?id=32614
+    title: "Directive on Security Management, Appendix J: Standard on Security Categorization — Treasury Board of Canada Secretariat"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+    - dict: canada-government-context
+      as: Keyword_ca_gov_context
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_ca_protected
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_ca_topsecret
+      matches:
+        - ref: Keyword_ca_gov_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_ca_classified
+      matches:
+        - ref: Keyword_ca_gov_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_ca_secret_collocation_exclusion
+  regexes:
+    - id: Regex_ca_protected
+      pattern: '\b(?:PROTECTED|Protected)[\s-]+[ABC]\b'
+    - id: Regex_ca_topsecret
+      pattern: '\bTOP[\s-]+SECRET\b'
+    - id: Regex_ca_classified
+      pattern: '\b(?:CONFIDENTIAL|SECRET)\b'
+  keywords:
+    - id: Keyword_ca_secret_collocation_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - text: TRADE SECRET
+              case_sensitive: true
+            - text: TRADE SECRETS
+              case_sensitive: true
+            - text: CLIENT SECRET
+              case_sensitive: true
+            - text: API SECRET
+              case_sensitive: true
+            - text: SECRET MANAGER
+              case_sensitive: true
+            - text: SECRET SANTA
+              case_sensitive: true
+created: '2026-07-07'
+updated: '2026-07-07'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-07'
+    description: Initial release — verified Canada-distinctive Protected A/B/C designation (title-case and ALL-CAPS) at tier 85, and Canada-government-context-gated bare TOP SECRET (75) and CONFIDENTIAL/SECRET (65) classified tiers, per direct verification against the Treasury Board Standard on Security Categorization. French-language markings documented as a coverage gap.
+author: testpattern-community
+license: MIT

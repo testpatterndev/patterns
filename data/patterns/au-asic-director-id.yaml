@@ -1,0 +1,152 @@
+schema: testpattern/v1
+name: Director Identification Number (Director ID)
+slug: au-asic-director-id
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects Australian Director Identification Numbers (director IDs / DIN) issued by the Australian Business
+  Registry Services (ABRS). A director ID is a 15-digit number beginning with Australia's ISO 3166 country
+  code 036, followed by an 11-digit unique identifier and a single check digit, often written with spaces
+  or hyphens between groups.
+operation: >-
+  Regex pattern (boost_regex engine). Pattern_au_asic_director_id matches an optional director ID / DIN
+  label followed by a 15-digit number beginning 036 (allowing single spaces or hyphens between digits). The
+  036 prefix plus exact 15-digit length is structurally distinctive. Three confidence tiers: High (85)
+  requires director-ID evidence (min 2) with template exclusion; Medium (75) requires director-ID evidence
+  with template exclusion; Low (65) requires director-ID evidence. Evidence uses one keyword group (12
+  ABRS/ASIC terms) within 300-character proximity.
+pattern: (?i)(?:\b(?:director\s+id(?:entification)?(?:\s+number)?|DIN)\b\s*[:#-]?\s*)?\b036(?:[\s-]?\d){12}\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: a 15-digit number beginning 036 is a distinctive structural signal, but bare 15-digit
+  numeric strings can occur in other contexts, so corroborating director-ID / ABRS keywords are required for
+  reliable detection. The optional label further raises precision when present.
+jurisdictions:
+  - au
+regulations:
+  - Corporations Act 2001 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - government-id
+  - financial
+corroborative_evidence:
+  keywords:
+    - Director Identification Number
+    - director ID
+    - DIN
+    - ABRS
+    - Australian Business Registry Services
+    - company director
+    - ASIC
+    - director appointment
+    - Corporations Act
+    - myGovID
+    - register of directors
+    - directorship
+  proximity: 300
+test_cases:
+  should_match:
+    - value: Director ID 036 042 007 415 123 was verified via ABRS before the appointment
+      description: Director ID label with space-separated 15-digit DIN
+    - value: The director identification number is 036-1234-5678-9012 as issued by the registry
+      description: Full label with hyphen-separated DIN
+    - value: 'DIN: 036000000000010 recorded on the register of directors this quarter'
+      description: DIN label with unseparated 15-digit number
+    - value: Please confirm your director ID 036999888777666 before lodgement with ASIC
+      description: Director ID label with unseparated DIN
+  should_not_match:
+    - value: The order number 036 refers to the March batch of stationery supplies
+      description: 036 followed by non-numeric text, not a 15-digit DIN
+    - value: Invoice 0361234 dated last week is still outstanding for payment
+      description: Short number beginning 036 but far fewer than 15 digits
+    - value: Director John Smith joined the board in 2021 as a non-executive member
+      description: Director prose with no DIN label or number
+false_positives:
+  - description: An unrelated 15-digit number beginning 036 could match the bare numeric form.
+    mitigation: Require corroborating director-ID / ABRS keywords within the proximity window.
+  - description: Sample director IDs in ABRS guidance or templates may match the labelled form.
+    mitigation: The high and medium tiers apply the template-exclusion NOT-group to suppress sample and documentation content.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 7
+risk_description: Director ID exposure enables director impersonation, fraudulent company appointments, and linkage of an individual across all their directorships.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_au_asic_director_id
+      matches:
+        - ref: Evidence_au_asic_director_id
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_au_asic_director_id
+      matches:
+        - ref: Evidence_au_asic_director_id
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      id_match: Pattern_au_asic_director_id
+      matches:
+        - ref: Evidence_au_asic_director_id
+  regexes:
+    - id: Pattern_au_asic_director_id
+      pattern: (?i)(?:\b(?:director\s+id(?:entification)?(?:\s+number)?|DIN)\b\s*[:#-]?\s*)?\b036(?:[\s-]?\d){12}\b
+  keywords:
+    - id: Evidence_au_asic_director_id
+      groups:
+        - match_style: word
+          terms:
+            - Director Identification Number
+            - director ID
+            - text: DIN
+              case_sensitive: true
+            - text: ABRS
+              case_sensitive: true
+            - Australian Business Registry Services
+            - company director
+            - text: ASIC
+              case_sensitive: true
+            - director appointment
+            - Corporations Act
+            - myGovID
+            - register of directors
+            - directorship
+      strength: specific
+created: '2026-07-07'
+updated: '2026-07-07'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://www.asic.gov.au/for-business-and-companies/companies/company-officeholder-rules-and-changes/director-identification-numbers-director-ids/
+    title: Director identification numbers (director IDs) | ASIC
+  - url: https://www.abrs.gov.au/
+    title: Australian Business Registry Services (ABRS)

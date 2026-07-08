@@ -1,0 +1,198 @@
+schema: testpattern/v1
+name: UK Marking - OFFICIAL / OFFICIAL-SENSITIVE
+slug: uk-marking-official
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects the UK Government Security Classifications Policy (GSCP) OFFICIAL classification and its
+  -SENSITIVE marking, written OFFICIAL-SENSITIVE and applied immediately after the OFFICIAL
+  classification per the current policy. Matches the verified structured
+  "CLASSIFICATION - HANDLING INSTRUCTION[- DESCRIPTOR]" format (e.g. OFFICIAL-SENSITIVE - RECIPIENTS
+  ONLY, OFFICIAL-SENSITIVE - COMMERCIAL) using the centrally-defined GSCP handling-instruction and
+  descriptor vocabulary, the bare OFFICIAL-SENSITIVE banner, and — at a lower, UK-government-context
+  gated tier — bare OFFICIAL alone, which is a common English word. Regex logic verified directly
+  against the current Government Security Classifications Policy (gov.uk, version 2.0, August 2024);
+  matched case-sensitively so ordinary lowercase English use of "official"/"official-sensitive" does
+  not trigger it.
+operation: >-
+  Tier 85 matches the fully structured "OFFICIAL-SENSITIVE - <handling instruction/descriptor>" form
+  using the centrally-defined GSCP vocabulary (RECIPIENTS ONLY, FOR PUBLIC RELEASE, HMG USE ONLY,
+  EMBARGOED, PERSONAL DATA, LEGAL PROFESSIONAL PRIVILEGE/LPP, LEGAL, MARKET SENSITIVE, COMMERCIAL,
+  HR/MANAGEMENT). A second tier 85 matches the bare OFFICIAL-SENSITIVE banner (no descriptor
+  required). Tier 65 matches the bare OFFICIAL classification alone, gated by UK central-government/
+  GSCP corroborative context and a NOT-exclusion for common non-government OFFICIAL collocations
+  (OFFICIAL WEBSITE, OFFICIAL SPONSOR, OFFICIAL SECRETS ACT, etc).
+pattern: '\bOFFICIAL[\s-]+SENSITIVE\b'
+confidence: high
+confidence_justification: >-
+  High confidence on the OFFICIAL-SENSITIVE hyphenated marking, in both its structured
+  handling-instruction/descriptor form and its bare banner form: both are case-sensitive,
+  structurally distinctive tokens verified directly against the current GSCP primary source, with
+  negligible natural-English collision risk. Bare OFFICIAL alone (65) is the widest tier and is
+  highly collision-prone — a common English adjective used constantly outside government contexts
+  (OFFICIAL WEBSITE, OFFICIAL SPONSOR, OFFICIAL RECEIVER, OFFICIAL SECRETS ACT citations, etc) — so
+  it requires UK central-government/GSCP corroborative evidence within 300 characters plus a
+  dedicated NOT-exclusion for the most common non-marking collocations.
+jurisdictions:
+  - uk
+regulations:
+  - "Official Secrets Act 1989"
+frameworks:
+  - GSCP
+data_categories:
+  - government
+  - security-classification
+case_sensitive: true
+corroborative_evidence:
+  keywords:
+    - HM Government
+    - Cabinet Office
+    - GSCP
+    - protective marking
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "This document is marked OFFICIAL-SENSITIVE - RECIPIENTS ONLY and must not be forwarded outside the distribution list."
+      description: Structured handling-instruction form per the verified GSCP "CLASSIFICATION - HANDLING INSTRUCTION" format
+    - value: "Briefing note: OFFICIAL-SENSITIVE - COMMERCIAL — do not release without clearance from the commercial team."
+      description: Structured descriptor form per the verified GSCP "CLASSIFICATION - HANDLING INSTRUCTION - DESCRIPTOR" format
+    - value: "The attached report is classified OFFICIAL-SENSITIVE."
+      description: Bare OFFICIAL-SENSITIVE banner, no descriptor required
+    - value: "Cover sheet reads OFFICIAL-\nSENSITIVE for internal circulation only."
+      description: PDF line-wrap between the OFFICIAL- hyphen and SENSITIVE (the [\s-]+ separator tolerates a wrap-inserted newline)
+    - value: "This memo must be handled under Cabinet Office guidance; it is marked OFFICIAL and should be treated accordingly by HMG staff."
+      description: Gated bare-OFFICIAL form — UK central-government/GSCP corroborative evidence (Cabinet Office, HMG) present within 300 characters
+  should_not_match:
+    - value: "please visit our official website for further official announcements"
+      description: lowercase English word (case-sensitive exclusion)
+    - value: "This memo is UNOFFICIAL and carries no protective marking."
+      description: UNOFFICIAL must not match OFFICIAL (no word boundary before OFFICIAL within UNOFFICIAL)
+    - value: "OFFICIAL SPONSOR OF THE NATIONAL SPORTS CHAMPIONSHIP — MARKETING PARTNERSHIP ANNOUNCEMENT"
+      description: ALL-CAPS non-government collocation — excluded from the top-level pattern (no -SENSITIVE present) and from the gated bare tier by the OFFICIAL-collocation NOT-group
+    - value: "DISCLOSURE OF THIS MATERIAL MAY CONSTITUTE AN OFFENCE UNDER THE OFFICIAL SECRETS ACT 1989."
+      description: ALL-CAPS statutory citation — excluded from the top-level pattern (no -SENSITIVE present) and from the gated bare tier by the OFFICIAL SECRETS ACT NOT-group
+false_positives:
+  - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare OFFICIAL-SENSITIVE banner tier relies on — any all-caps rendering of the phrase can fire with no protective-marking intent.
+    mitigation: Treat banner-tier-only (85) hits as lower confidence when the surrounding text is itself all-caps; the structured descriptor tier (85) with a verified GSCP handling-instruction/descriptor term remains the more reliable signal.
+  - description: >-
+      OFFICIAL is an extremely common English adjective in everyday non-government usage (OFFICIAL
+      WEBSITE, OFFICIAL STATEMENT, OFFICIAL SPONSOR, OFFICIAL PARTNER, OFFICIAL RECEIVER, OFFICIAL
+      LAUNCH/OPENING, and citations of the OFFICIAL SECRETS ACT itself), all more common in general
+      text than the GSCP classification marking.
+    mitigation: The bare tier (65) requires UK central-government/GSCP corroborative evidence and excludes this collocation set via a dedicated NOT-group. The structured and banner OFFICIAL-SENSITIVE tiers (both 85) are unaffected — they are structurally distinctive and do not require the gate.
+  - description: >-
+      This SIT's OFFICIAL/OFFICIAL-SENSITIVE vocabulary overlaps with the Australian PSPF scheme: AU's
+      au-marking-official ships its own bare OFFICIAL banner tier (85) ungated apart from a
+      noise-exclusion NOT-group (no AU-context requirement), and au-marking-sensitive's OFFICIAL:
+      Sensitive stem tier (90) uses a different separator convention (colon/space/`//`, not a fixed
+      hyphen). A genuine UK OFFICIAL or OFFICIAL-SENSITIVE document will typically NOT co-fire the AU
+      SITs (different separator syntax), but the bare word "OFFICIAL" appearing in UK government prose
+      could coincidentally satisfy AU's ungated bare-OFFICIAL tier if it also happens to read as an AU
+      marking banner.
+    mitigation: Deploy policies should expect occasional cross-jurisdiction co-fire on the bare-word vocabulary as a corroborating, not conflicting, signal; do not add a UK-exclusion to the AU SIT, as that would break its own (broader, deliberately ungated) intended coverage.
+  - description: >-
+      The GSCP's "[INSERT ORGANISATION(S) NAME] USE ONLY" handling instruction and centrally-allocated
+      Codewords are not machine-matchable: organisation names and codewords are arbitrary text
+      assigned per-asset, not fixed vocabulary, so no regex can enumerate them. Similarly, the GSCP's
+      REL EU releasability marking (used alongside a UK-prefixed OFFICIAL-SENSITIVE asset shared with
+      an EU institution) is rendered inconsistently in the primary source itself (prose text reads
+      "REL EU", the source's own worked example renders it "REL-EU" on the following line) — the exact
+      character-level syntax cannot be pinned down from the primary source, so it is not implemented.
+    mitigation: No mitigation implemented — documented as a known coverage gap rather than guessing at unverified syntax. The structured handling-instruction/descriptor tier and the bare banner tier remain the reliable, verified signals.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+risk_rating: 6
+risk_description: >-
+  OFFICIAL is the majority tier of the UK's three-tier GSCP classification scheme, covering
+  information whose compromise could cause no more than moderate damage. The -SENSITIVE marking
+  (OFFICIAL-SENSITIVE) is applied to OFFICIAL information that is not intended for public release and
+  requires stricter need-to-know enforcement, per the current GSCP.
+sensitivity_labels:
+  gscp: "OFFICIAL / OFFICIAL-SENSITIVE"
+  pspf: "OFFICIAL / OFFICIAL: Sensitive"
+  psr: "IN CONFIDENCE / SENSITIVE"
+  us_gov: "CUI"
+  ca_gov: "Protected A / Protected B"
+references:
+  - url: https://www.gov.uk/government/publications/government-security-classifications/government-security-classifications-policy-html
+    title: "Government Security Classifications Policy (GSCP), version 2.0 - GOV.UK"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+    - dict: uk-government-context
+      as: Keyword_uk_gov_context
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_uk_official_sensitive_structured
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_uk_official_sensitive_banner
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_uk_official_bare
+      matches:
+        - ref: Keyword_uk_gov_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_official_collocation_exclusion
+  regexes:
+    - id: Regex_uk_official_sensitive_structured
+      pattern: '\bOFFICIAL[\s-]+SENSITIVE[\s-]+-[\s-]+(?:RECIPIENTS ONLY|FOR PUBLIC RELEASE|HMG USE ONLY|EMBARGOED|PERSONAL DATA|LEGAL PROFESSIONAL PRIVILEGE|LPP|MARKET SENSITIVE|COMMERCIAL|HR\s*/\s*MANAGEMENT|LEGAL)\b'
+    - id: Regex_uk_official_sensitive_banner
+      pattern: '\bOFFICIAL[\s-]+SENSITIVE\b'
+    - id: Regex_uk_official_bare
+      pattern: '\bOFFICIAL\b'
+  keywords:
+    - id: Keyword_official_collocation_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - text: OFFICIAL SPONSOR
+              case_sensitive: true
+            - text: OFFICIAL PARTNER
+              case_sensitive: true
+            - text: OFFICIAL WEBSITE
+              case_sensitive: true
+            - text: OFFICIAL STATEMENT
+              case_sensitive: true
+            - text: OFFICIAL LAUNCH
+              case_sensitive: true
+            - text: OFFICIAL OPENING
+              case_sensitive: true
+            - text: OFFICIAL RECEIVER
+              case_sensitive: true
+            - text: OFFICIAL SECRETS ACT
+              case_sensitive: true
+created: '2026-07-07'
+updated: '2026-07-07'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-07'
+    description: Initial release — verified structured handling-instruction/descriptor, bare-banner OFFICIAL-SENSITIVE, and UK-government-context-gated bare-OFFICIAL tiers per direct verification against the current Government Security Classifications Policy (gov.uk).
+author: testpattern-community
+license: MIT
