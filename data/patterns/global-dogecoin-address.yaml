@@ -1,0 +1,122 @@
+schema: testpattern/v1
+name: Dogecoin Address
+slug: global-dogecoin-address
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Dogecoin mainnet addresses: Base58Check encoded, 34 characters long. Pay-to-Public-Key-Hash
+  (P2PKH) addresses use version byte 0x1E and start with "D"; Pay-to-Script-Hash (P2SH) addresses use
+  version byte 0x16 (22) and start with "A" (leading "9" is also possible for that version byte). A
+  single leading letter is weak structure, so detection is context-gated. Prefix/version/length
+  verified against libdogecoin and Dogecoin address-type docs.
+operation: >-
+  Single tier at confidence 75. A leading D/A/9 plus a base58 body (total 26-34, real addresses 34) is
+  matched, but a single-letter prefix is weak on its own, so the tier requires cryptocurrency/wallet
+  domain context (crypto-wallet-context dict) within proximity AND a template/sample noise NOT-group.
+  Case-sensitive base58 (the Base58Check checksum is not expressible in a Purview-safe regex).
+pattern: '\b[DA9][1-9A-HJ-NP-Za-km-z]{25,33}\b'
+confidence: medium
+confidence_justification: >-
+  Gated 75, not high: a single leading D/A/9 plus a base58 run is weak structure with no
+  regex-expressible checksum, so it collides with other similarly-prefixed base58 tokens (notably
+  other coins' base58 addresses). Precision comes from the mandatory cryptocurrency/wallet
+  domain-context gate plus the noise exclusion.
+case_sensitive: true
+jurisdictions:
+  - global
+regulations:
+  - FATF Recommendations
+  - AML/CTF Act (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - financial
+corroborative_evidence:
+  keywords:
+    - identifier
+    - number
+    - ID
+  proximity: 300
+  keyword_lists:
+    - financial-transaction
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: 'DGZpfEKqPEwQqtbfpNLk5pu8E3gq5PwNgK'
+      description: P2PKH address (D prefix) from libdogecoin address docs (34 chars)
+    - value: 'D7Y55hsu3uvxyXoPjHojmV2hj92bxkD6Ue'
+      description: P2PKH address (D prefix), documented example (34 chars)
+    - value: 'A9Lbq5HbUpK8P3hP2ZoWbEv1k2Nh1Q9bD4'
+      description: P2SH address (A prefix, version byte 0x16), documented example (34 chars)
+  should_not_match:
+    - value: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
+      description: Bitcoin legacy address — wrong prefix (starts 1, not D/A/9)
+    - value: 'D7Y55hsu3uv'
+      description: Too short (below the base58 body minimum)
+    - value: 'D7Y55hsu3uvxyXoPjHojmV2hj92bxkD6UeXY'
+      description: Too long (D + 35 = 36, above the 34/35 envelope)
+    - value: 'D7Y55hsu3uvxyXoPjHojmV2-hj92bxkD6Ue'
+      description: Hyphen breaks the run so no contiguous body exists — rejected
+    - value: 'dogecoin wallet address example placeholder'
+      description: Template/placeholder context should be excluded even when domain anchor words are present
+false_positives:
+  - description: >-
+      A single leading D/A/9 plus a base58 run collides with other coins' base58 addresses (Dogecoin
+      and Litecoin/Bitcoin share the same base58 alphabet and 34-char envelope) and with arbitrary
+      base58 tokens; the Base58Check checksum cannot be validated in a Purview-safe regex.
+    mitigation: >-
+      The tier is AND-gated by cryptocurrency/wallet domain context (crypto-wallet-context) within the
+      proximity window plus a template/sample noise NOT-group; held at 75. Co-fire with other coins'
+      SITs on the shared base58 envelope is expected and corroborating, not conflicting.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+references:
+  - url: https://lib.dogecoin.org/docs/address
+    title: Address — libdogecoin (P2PKH "D" mainnet prefix, base58check)
+  - url: https://docs.nintondo.io/docs/knowledge-base/basics/dogecoin/dogecoin-address-types
+    title: Dogecoin Address Types (P2PKH "D" and P2SH "A", 34 chars)
+sensitivity_labels:
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: crypto-wallet-context
+      as: Keyword_cryptocurrency
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_dogecoin_address
+      matches:
+        - ref: Keyword_cryptocurrency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_dogecoin_address
+      pattern: '\b[DA9][1-9A-HJ-NP-Za-km-z]{25,33}\b'
+created: '2026-07-07'
+updated: '2026-07-07'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-07'
+    description: >-
+      Initial release — D-prefixed P2PKH (0x1E) and A/9-prefixed P2SH (0x16) base58 addresses (34
+      chars), domain-context-gated at 75 per verification against libdogecoin and Dogecoin docs.
+author: testpattern-community
+license: MIT

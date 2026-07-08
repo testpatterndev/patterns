@@ -1,0 +1,178 @@
+schema: testpattern/v1
+name: Plaid Access Token
+slug: global-plaid-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Plaid API credentials: Item access tokens (access-sandbox-/access-production- followed
+  by an RFC 4122 UUID) and, when labelled with Plaid context, the 30-character hex API secret.
+  A leaked access token exposes a user's linked bank account data; a leaked secret compromises
+  the whole Plaid integration.
+operation: >-
+  Two detection branches. Branch 1 (distinctive, value-only capable): access tokens in Plaid's
+  documented [type]-[environment]-[uuid] format, matching the access- type with the two current
+  environments (sandbox, production) and an 8-4-4-4-12 hex UUID. Branch 2 (context-gated only):
+  the unprefixed 30-character hex API secret, requiring a Plaid label within 40 characters plus
+  an assignment separator (= or :) directly before the value, mirroring gitleaks'
+  assignment-operator-gated rule (TruffleHog uses a label-only gate, which proved too loose
+  against free-standing hex in prose). Corroborative evidence: keywords within 300 characters.
+pattern: (?<![A-Za-z0-9_])access-(?:sandbox|production)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![A-Za-z0-9_-])
+confidence: high
+confidence_justification: >-
+  High confidence for the access-token branch: the [type]-[environment]-[uuid] structure is
+  documented by Plaid's own docs (quickstart glossary) and independently pinned by TruffleHog's
+  production detector and gitleaks. Disclosure: TruffleHog additionally wraps even this
+  distinctive access-token regex in a blanket "plaid" PrefixRegex gate; this pattern diverges
+  by offering a value-only 65 tier because the literal access-sandbox-/access-production- +
+  RFC 4122 UUID structure is self-distinctive, and TruffleHog's wrapper there is its standard
+  detector convention rather than a response to a documented false-positive problem (unlike
+  Square's EAAA detector, which carries an explicit FP comment). The secret branch is
+  deliberately context-gated: a bare 30-character hex string is indistinguishable from other
+  identifiers, so both production scanners gate it on Plaid context; this pattern embeds the
+  label plus an assignment separator (= or :, mirroring gitleaks' assignment-operator
+  requirement) at the regex level, because a label-only gap gate still matched free-standing
+  hex in prose (review regression case).
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+  - financial
+corroborative_evidence:
+  keywords:
+    - plaid
+    - plaid.com
+    - PLAID_SECRET
+    - PLAID_CLIENT_ID
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: access-production-0123abcd-0123-abcd-0123-0123456789ab
+      description: Plaid production Item access token (access-production- + UUID)
+    - value: 'PLAID_ACCESS_TOKEN=access-sandbox-abcdef01-2345-6789-abcd-ef0123456789'
+      description: Labelled Plaid sandbox access token in an env assignment
+    - value: 'PLAID_SECRET=0123456789abcdef0123456789abcd'
+      description: Plaid API secret in the canonical PLAID_SECRET env var (label + 30-char hex body)
+    - value: 'plaid secret: fedcba9876543210fedcba98765432'
+      description: Plaid label with colon separator followed by a 30-char hex secret
+  should_not_match:
+    - value: plaid_client_secret_field is 0123456789abcdef0123456789abcd
+      description: Free-standing 30-hex in prose after an identifier containing "plaid" but no assignment separator (boundary regression case from review)
+    - value: access-development-0123abcd-0123-abcd-0123-0123456789ab
+      description: Development environment token (Plaid decommissioned the Development environment on 2024-06-20)
+    - value: access-production-0123abcd-0123-abcd-0123
+      description: Truncated UUID (missing the final 12-hex segment)
+    - value: 'PLAID_CLIENT_ID=0123456789abcdef01234567'
+      description: Plaid client_id (24-hex public-style identifier, not a secret, deliberately out of scope)
+    - value: rotate the plaid secret before deployment
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: A 30-character hex hash or identifier that happens to appear in a labelled assignment near the word "plaid" (a common English word for the fabric pattern).
+    mitigation: The secret branch requires label adjacency plus an assignment separator (already enforced by the regex) and corroborative keywords; the brand-name keyword term is case-sensitive (Plaid) to reduce collisions with the common noun.
+  - description: Documentation or examples showing placeholder access-sandbox- strings.
+    mitigation: Require corroborative Plaid keywords and check for placeholder markers (example, xxxx).
+  - description: Plaid public tokens, link tokens, and asset-report tokens (public-/link-/asset-report- prefixes) are short-lived, client-side-by-design tokens and are deliberately out of scope; decommissioned access-development- tokens are dead credentials and also excluded.
+    mitigation: Documented as a scope decision; only durable server-side secrets (access tokens, API secret) are matched.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  A leaked Plaid access token exposes the linked end-user's bank account data (balances,
+  transactions, identity); a leaked API secret compromises every Item in the Plaid integration
+  and enables new unauthorized data pulls.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_plaid_access_token
+      matches:
+        - ref: Keyword_plaid_token
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_plaid_access_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_plaid_secret
+      matches:
+        - ref: Keyword_plaid_token
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_plaid_access_token
+      pattern: (?<![A-Za-z0-9_])access-(?:sandbox|production)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![A-Za-z0-9_-])
+    - id: Regex_plaid_secret
+      pattern: (?i)plaid[\s\S]{0,40}?[=:][\s"']{0,4}(?<![a-z0-9_])[a-f0-9]{30}(?![a-z0-9_])
+  keywords:
+    - id: Keyword_plaid_token
+      groups:
+        - match_style: word
+          terms:
+            - text: Plaid
+              case_sensitive: true
+            - plaid.com
+            - PLAID_SECRET
+            - PLAID_CLIENT_ID
+            - plaid api
+            - access token
+            - api key
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://plaid.com/docs/quickstart/glossary/
+    title: 'Plaid docs glossary (token format [type]-[environment]-[uuid], RFC 4122 UUID)'
+  - url: https://plaid.com/docs/sandbox/
+    title: Plaid Sandbox docs (Development environment decommissioned 2024-06-20)
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/plaidkey/plaidkey.go
+    title: 'TruffleHog production Plaid detector (access-(sandbox|production)-uuid; label-gated 30-hex secret, 24-hex client id)'
+  - url: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+    title: 'gitleaks rules: plaid-api-token, plaid-secret-key, plaid-client-id'

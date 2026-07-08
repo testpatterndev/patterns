@@ -1,0 +1,123 @@
+schema: testpattern/v1
+name: Cardano Address
+slug: global-cardano-address
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Cardano Shelley-era payment addresses: bech32-encoded with the mainnet human-readable
+  prefix "addr1" (CIP-19 / CIP-5). The bech32 body varies with address type — enterprise (payment
+  only) ~53 body chars, base (payment + stake) ~98 body chars, pointer in between — so the total
+  ranges roughly 58-103 characters. The distinctive "addr1" prefix plus a long bech32 body is strong
+  structure, gated at 85. Legacy Byron base58 (Ae2.../DdzFF...) and reward "stake1" addresses are not
+  implemented (see report). Prefix/lengths verified against the CIP-19 test vectors.
+operation: >-
+  Single tier at confidence 85. The distinctive "addr1" bech32 HRP plus a 50-100 char bech32 body is
+  matched, then AND-gated by cryptocurrency/wallet domain context (crypto-wallet-context dict) within
+  proximity plus a template/sample noise NOT-group (never a bare high tier). Case-sensitive bech32
+  body (charset a c-h j-n p-z 0 2-9; the bech32 checksum is not expressible in a Purview-safe regex).
+pattern: '\baddr1[ac-hj-np-z02-9]{50,100}\b'
+confidence: medium
+confidence_justification: >-
+  Gated 85: the fixed "addr1" mainnet HRP combined with a long bech32 body (roughly 58-103 chars) is
+  highly distinctive and unlikely to occur by chance, so it earns the high tier — but only when
+  AND-gated by cryptocurrency/wallet domain context plus the noise exclusion. The bech32 checksum
+  cannot be validated in a Purview-safe regex, so context gating is retained rather than exporting a
+  bare tier.
+case_sensitive: true
+jurisdictions:
+  - global
+regulations:
+  - FATF Recommendations
+  - AML/CTF Act (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - financial
+corroborative_evidence:
+  keywords:
+    - identifier
+    - number
+    - ID
+  proximity: 300
+  keyword_lists:
+    - financial-transaction
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: 'addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgse35a3x'
+      description: CIP-19 type-00 base address (payment + stake key hash), 103 chars — upper bound
+    - value: 'addr1gx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer5pnz75xxcrzqf96k'
+      description: CIP-19 type-04 pointer address, 67 chars
+    - value: 'addr1vx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzers66hrl8'
+      description: CIP-19 type-06 enterprise address (payment only), 58 chars — near lower bound
+  should_not_match:
+    - value: 'stake1uyehkck0lajq8gr28t9uxnuvgcqrc6070x3k9r8048z8y5gh6ffgw'
+      description: Reward/stake address (stake1 HRP) — not a payment address, excluded (wrong prefix)
+    - value: 'addr1qx2fxv2'
+      description: Too short (body below the 50-char minimum)
+    - value: 'addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5-pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgse35a3x'
+      description: Hyphen breaks the run so no contiguous addr1 body exists — rejected
+    - value: 'cardano wallet address example placeholder'
+      description: Template/placeholder context should be excluded even when domain anchor words are present
+false_positives:
+  - description: >-
+      A long bech32 string beginning "addr1" is highly distinctive, but the bech32 checksum cannot be
+      validated in a Purview-safe regex, so a crafted or corrupted "addr1..." string of the right
+      length and charset would still match structurally.
+    mitigation: >-
+      The tier is AND-gated by cryptocurrency/wallet domain context (crypto-wallet-context) within the
+      proximity window plus a template/sample noise NOT-group. The distinctive prefix and length keep
+      the residual collision rate very low.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+references:
+  - url: https://cips.cardano.org/cip/CIP-19
+    title: CIP-19 Cardano Addresses (Shelley bech32, addr1 HRP, address-type test vectors)
+  - url: https://cips.cardano.org/cip/CIP-5
+    title: CIP-5 Common Bech32 Prefixes (addr = mainnet payment address)
+sensitivity_labels:
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: crypto-wallet-context
+      as: Keyword_cryptocurrency
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_cardano_address
+      matches:
+        - ref: Keyword_cryptocurrency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_cardano_address
+      pattern: '\baddr1[ac-hj-np-z02-9]{50,100}\b'
+created: '2026-07-07'
+updated: '2026-07-07'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-07'
+    description: >-
+      Initial release — Shelley "addr1" bech32 payment address (body 50-100 chars), domain-context
+      -gated at 85 per verification against the CIP-19 test vectors. Byron base58 and stake1 reward
+      addresses documented and skipped.
+author: testpattern-community
+license: MIT

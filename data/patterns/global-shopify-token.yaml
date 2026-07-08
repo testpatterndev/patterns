@@ -1,0 +1,154 @@
+schema: testpattern/v1
+name: Shopify Access Token
+slug: global-shopify-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects the Shopify access-token family: Admin API access tokens (shpat_), custom app access
+  tokens (shpca_), legacy private app passwords (shppa_) and app shared secrets (shpss_), each
+  followed by a 32-character hex body. A leaked token grants API access to a Shopify store,
+  including customers, orders and payment-adjacent data.
+operation: >-
+  Single alternation over the four current Shopify prefixes (shpat_/shpca_/shppa_/shpss_)
+  followed by exactly 32 hex characters. Shopify's own changelog fixes the token at 38
+  characters total including the 6-character prefix, matching the 32-hex body used by the
+  TruffleHog and gitleaks production detectors. Corroborative evidence: keywords within 300
+  characters.
+pattern: (?<![A-Za-z0-9_])shp(?:at|ca|pa|ss)_[0-9a-fA-F]{32}(?![A-Za-z0-9_])
+confidence: high
+confidence_justification: >-
+  High confidence: all four prefixes are multiply attested (TruffleHog production detectors for
+  shpat_/shppa_/shpss_, gitleaks rules for all four including shpca_, and Shopify's own changelog
+  confirming the 38-character total length), and Shopify is a GitHub secret-scanning partner with
+  push-protection-enabled token types. The distinctive prefix plus fixed-length hex body makes
+  false positives extremely unlikely.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - PCI-DSS
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - shopify
+    - myshopify.com
+    - SHOPIFY_ACCESS_TOKEN
+    - admin api
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: shpat_0123456789abcdef0123456789abcdef
+      description: Shopify Admin API access token (shpat_ + 32-hex body)
+    - value: 'SHOPIFY_ACCESS_TOKEN=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'
+      description: Labelled Shopify custom app access token in an env assignment
+    - value: shppa_abcdef0123456789abcdef0123456789
+      description: Shopify legacy private app password (shppa_)
+    - value: shpss_0123456789ABCDEF0123456789ABCDEF
+      description: Shopify app shared secret (shpss_, uppercase hex body)
+  should_not_match:
+    - value: shpxx_0123456789abcdef0123456789abcdef
+      description: Invalid prefix variant (shpxx_ is not a Shopify token family)
+    - value: shpat_0123456789abcdef0123456789abcde
+      description: Body too short (31 hex chars, not 32)
+    - value: shpat_0123456789abcdefghijklmnopqrstuv
+      description: Body contains non-hex characters (g-v), not a valid token body
+    - value: rotate the shopify admin api access token
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: Documentation or examples showing placeholder shpat_/shpca_/shppa_/shpss_ strings.
+    mitigation: Require corroborative Shopify keywords and check for placeholder markers (example, xxxx).
+  - description: Pre-2020 Shopify tokens (32 characters total, shorter body) are an older generation not matched by this pattern.
+    mitigation: Documented as a known scope limitation; only the current 38-character (prefix + 32-hex) generation is matched.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  A leaked Shopify access token grants API access to the store it was issued for, exposing
+  customer PII, order history, and commerce operations, and enabling fraudulent catalogue or
+  order manipulation.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_shopify_token
+      matches:
+        - ref: Keyword_shopify_token
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_shopify_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_shopify_token
+      pattern: (?<![A-Za-z0-9_])shp(?:at|ca|pa|ss)_[0-9a-fA-F]{32}(?![A-Za-z0-9_])
+  keywords:
+    - id: Keyword_shopify_token
+      groups:
+        - match_style: word
+          terms:
+            - shopify
+            - myshopify.com
+            - SHOPIFY_ACCESS_TOKEN
+            - shopify api
+            - admin api
+            - access token
+            - api key
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/shopify/shopify.go
+    title: 'TruffleHog production Shopify detector (shppa_/shpat_ + 32-hex body)'
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/shopifyoauth/shopifyoauth.go
+    title: 'TruffleHog production Shopify OAuth detector (shpss_ shared secret + 32-hex body)'
+  - url: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+    title: 'gitleaks rules: shopify-access-token, shopify-custom-access-token, shopify-private-app-access-token, shopify-shared-secret'
+  - url: https://shopify.dev/changelog/length-of-the-shopify-access-token-is-increasing
+    title: Shopify changelog confirming 38-character total token length (prefix included) for shpat_/shpca_/shppa_
+  - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+    title: Supported secret scanning patterns - GitHub Docs (Shopify partner token types)

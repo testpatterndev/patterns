@@ -1,0 +1,171 @@
+schema: testpattern/v1
+name: Netlify Access Token
+slug: global-netlify-token
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Netlify authentication tokens: the current nf-prefixed family announced by Netlify in
+  November 2023 (nfp_ personal access tokens, nfc_ CLI tokens, nfo_ OAuth tokens, nfu_
+  app.netlify.com tokens, nfb_ build tokens) and, when labelled with Netlify context, the legacy
+  unprefixed 43-45 character token form that remains valid. A leaked token grants control of the
+  account's sites, deploys and environment variables.
+operation: >-
+  Two detection branches. Branch 1 (distinctive, value-only capable): the nf-prefixed family --
+  nfp_ personal access tokens are pinned to a 36-character body by TruffleHog's production
+  detector (40 characters total, matching Netlify's announced maximum), and the other four
+  vendor-announced prefixes (nfc_/nfo_/nfu_/nfb_) use a bounded 20-36 character body consistent
+  with the same 40-character cap. Branch 2 (context-gated only): legacy unprefixed tokens
+  (43-45 character base64url body per TruffleHog's v1 detector; Netlify states existing tokens
+  remain valid), requiring a Netlify label within 40 characters. Corroborative evidence:
+  keywords within 300 characters.
+pattern: (?<![A-Za-z0-9_])(?:nfp_[A-Za-z0-9_]{36}|nf[bcou]_[A-Za-z0-9_]{20,36})(?![A-Za-z0-9_])
+confidence: high
+confidence_justification: >-
+  High confidence: the nf-prefix family is documented by Netlify's own format-change
+  announcement (all five prefixes named, 40-character maximum), and the nfp_ body length is
+  pinned by TruffleHog's production v2 detector. Disclosure: TruffleHog's v2 detector wraps
+  even the distinctive nfp_ regex in a blanket "netlify" PrefixRegex gate; this pattern
+  diverges by offering a value-only 65 tier because the nf?-prefix + bounded-body structure is
+  self-distinctive, and TruffleHog's wrapper there is its standard detector convention rather
+  than a response to a documented false-positive problem (unlike Square's EAAA detector, which
+  carries an explicit FP comment). The legacy unprefixed form is deliberately context-gated: it
+  is indistinguishable from other base64url strings, so both TruffleHog v1 and gitleaks gate it
+  on Netlify context and this pattern embeds the same label requirement at the regex level.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - netlify
+    - app.netlify.com
+    - NETLIFY_AUTH_TOKEN
+    - personal access token
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: nfp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+      description: Netlify personal access token (nfp_ + 36-char body)
+    - value: 'NETLIFY_AUTH_TOKEN=nfp_abcdefghijklmnopqrstuvwxyz0123456789'
+      description: Labelled Netlify PAT in the canonical NETLIFY_AUTH_TOKEN env var
+    - value: nfc_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345
+      description: Netlify CLI token (nfc_ prefix, vendor-announced family)
+    - value: 'netlify api token: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq'
+      description: Legacy unprefixed Netlify token (43 chars) with a Netlify label within the proximity gap
+  should_not_match:
+    - value: nfx_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+      description: Invalid prefix character (nfx_ is not a Netlify token family)
+    - value: nfp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345678
+      description: nfp_ body too short (35 chars, not 36)
+    - value: regenerate the netlify access token in user settings
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: Documentation or examples showing placeholder nfp_ strings.
+    mitigation: Require corroborative Netlify keywords and check for placeholder markers (example, xxxx).
+  - description: A 43-45 character base64url string (for example a hash or signed URL fragment) appearing near the word "netlify" in unrelated text.
+    mitigation: The legacy branch requires label adjacency (already enforced by the regex) plus corroborative keywords and never fires value-only.
+  - description: The nfc_/nfo_/nfu_/nfb_ body lengths are not individually pinned by any production detector; a bounded 20-36 range consistent with Netlify's announced 40-character cap is used for those prefixes.
+    mitigation: Documented as an honest bound; the prefixes themselves are vendor-announced and highly distinctive.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  A leaked Netlify token grants control of the account's sites, deploys, DNS and environment
+  variables (which typically contain further secrets), enabling site takeover and supply-chain
+  compromise.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_netlify_token
+      matches:
+        - ref: Keyword_netlify_token
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_netlify_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_netlify_legacy_token
+      matches:
+        - ref: Keyword_netlify_token
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_netlify_token
+      pattern: (?<![A-Za-z0-9_])(?:nfp_[A-Za-z0-9_]{36}|nf[bcou]_[A-Za-z0-9_]{20,36})(?![A-Za-z0-9_])
+    - id: Regex_netlify_legacy_token
+      pattern: (?i)netlify[\s\S]{0,40}?[=:][\s"']{0,4}(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{43,45}(?![A-Za-z0-9_-])
+  keywords:
+    - id: Keyword_netlify_token
+      groups:
+        - match_style: word
+          terms:
+            - netlify
+            - app.netlify.com
+            - NETLIFY_AUTH_TOKEN
+            - netlify api
+            - personal access token
+            - access token
+            - api key
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://answers.netlify.com/t/change-to-the-netlify-authentication-token-format/106146
+    title: "Netlify's own token-format announcement (nfp_/nfc_/nfo_/nfu_/nfb_ prefixes, up to 40 characters, November 2023)"
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/netlify/v2/netlify_v2.go
+    title: 'TruffleHog production Netlify v2 detector (nfp_[a-zA-Z0-9_]{36})'
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/netlify/v1/netlify_v1.go
+    title: 'TruffleHog production Netlify v1 detector (label-gated legacy 43-45 char token)'
+  - url: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+    title: 'gitleaks rule netlify-access-token (label-gated 40-46 char legacy form)'
