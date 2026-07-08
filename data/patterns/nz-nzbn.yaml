@@ -1,0 +1,169 @@
+schema: testpattern/v1
+name: New Zealand Business Number (NZBN)
+slug: nz-nzbn
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects New Zealand Business Numbers (NZBNs) — the 13-digit universal business identifier
+  administered by MBIE. Every NZBN is a GS1 Global Location Number (GLN): the first two digits are
+  94 (the GS1 prefix identifying New Zealand entities), the next ten digits are the business entity
+  identifier, and the final digit is a GS1 mod-10 check digit. A bare 13-digit run has a
+  phone-number-sized collision surface (NZ mobile/landline numbers, card fragments, timestamps), so
+  every tier requires the number to be directly attached to an NZBN label — label-embedded-in-regex
+  counts as label gating per the D1 decision record. There is deliberately no bare unlabelled tier.
+operation: >-
+  Validation: the GS1 mod-10 check digit (alternating 1/3 weights over the first 12 digits) is not
+  expressible as a regex and no Purview validator function exists for GLN/NZBN, so the check digit
+  is enforced only as a structural digit. Reference: NZBN registry (nzbn.govt.nz, "About the NZBN")
+  and GS1 New Zealand GLN documentation. Detection is a label-embedded regex requiring an NZBN /
+  New Zealand Business Number label directly attached to a 94-prefixed 13-digit number, with
+  optional space/hyphen grouping. AllDigitsSameFilter guards repeated-digit sentinels.
+  Corroborative evidence: keywords within 300 characters.
+pattern: '(?i)\b(?:NZBN|New\s+Zealand\s+Business\s+Number|NZ\s+Business\s+Number)\b\s{0,3}(?:number|no\.?|is)?\s{0,3}[:#=-]{0,3}\s{0,3}94\d{2}(?:[\s-]?\d{4}){2}[\s-]?\d(?!\d)'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the 94 GS1 prefix plus fixed 13-digit length is a solid structural signal, but
+  13-digit runs collide with phone numbers and other identifiers, and the GS1 mod-10 check digit
+  cannot be enforced in the exported SIT. The label-embedded regex is the evidence gate for every
+  tier (75 workhorse per the D1 convention); the 85 tier additionally requires NZ business-registry
+  keywords in proximity.
+jurisdictions:
+  - nz
+regulations:
+  - Privacy Act 2020 (NZ)
+  - Companies Act 1993 (NZ)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - business-identifier
+corroborative_evidence:
+  keywords:
+    - NZBN
+    - New Zealand Business Number
+    - Companies Office
+    - business.govt.nz
+    - business register
+  proximity: 300
+  keyword_lists:
+    - data-record-context
+test_cases:
+  should_match:
+    - value: 'NZBN: 9429041234567'
+      description: NZBN label with colon and solid 13-digit 94-prefixed number
+    - value: NZBN 9429 0412 3456 7
+      description: NZBN label with space-grouped number (4-4-4-1)
+    - value: New Zealand Business Number 9429031547891
+      description: Full label form with solid 13-digit number
+    - value: The NZBN is 9429041234567 for invoicing purposes
+      description: Prose form with "is" between label and number
+  should_not_match:
+    - value: '9429041234567'
+      description: Bare 13-digit 94-prefixed number with no NZBN label — bare digit runs are never matched
+    - value: 'NZBN: 4321098765432'
+      description: 13 digits not starting with the GS1 New Zealand prefix 94
+    - value: 'NZBN: 942904123456'
+      description: Only 12 digits, one short of the GLN length
+    - value: NZBN 9429 0412 3456 7890
+      description: 16-digit card-like number — the trailing digit guard rejects NZBN-prefixed longer runs
+    - value: Call us on +64 21 123 4567 about your NZBN application
+      description: NZ phone number near the NZBN keyword but not label-attached and not 94-prefixed
+false_positives:
+  - description: >-
+      13-digit runs are common — NZ phone numbers written with country code, EAN-13 barcodes
+      (which share the GS1 GLN format and 94-prefix space), card-number fragments and timestamps
+      all collide with an unlabelled NZBN.
+    mitigation: >-
+      The regex only matches when the number is directly attached to an NZBN label; there is no
+      bare tier. EAN-13 product barcodes beginning 94 are the closest collision but rarely appear
+      label-attached to "NZBN".
+  - description: >-
+      The GS1 mod-10 check digit is not enforced in the exported SIT, so a label-attached 13-digit
+      94-prefixed number with an invalid check digit still matches, and repeated-digit sentinels
+      pass any weighted-mod checksum.
+    mitigation: >-
+      AllDigitsSameFilter drops repeated-digit values; downstream consumers can verify candidates
+      against the NZBN register API for authoritative validation.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_nz_nzbn_labelled
+      matches:
+        - ref: Keyword_nz_nzbn
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_nz_nzbn_labelled
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_nz_nzbn_labelled
+  regexes:
+    - id: Regex_nz_nzbn_labelled
+      pattern: '(?i)\b(?:NZBN|New\s+Zealand\s+Business\s+Number|NZ\s+Business\s+Number)\b\s{0,3}(?:number|no\.?|is)?\s{0,3}[:#=-]{0,3}\s{0,3}94\d{2}(?:[\s-]?\d{4}){2}[\s-]?\d(?!\d)'
+  keywords:
+    - id: Keyword_nz_nzbn
+      groups:
+        - match_style: word
+          terms:
+            - NZBN
+            - New Zealand Business Number
+            - Companies Office
+            - business.govt.nz
+            - incorporated in New Zealand
+            - business register
+            - primary business data
+            - trading name
+            - text: MBIE
+              case_sensitive: true
+            - GST number
+      strength: specific
+  filters:
+    - id: Filter_nz_nzbn_same_digits
+      type: AllDigitsSameFilter
+risk_rating: 4
+risk_description: >-
+  NZBNs are public business identifiers, but their exposure alongside other records enables business
+  impersonation, fraudulent invoicing and linkage of business documents in a data breach.
+sensitivity_labels:
+  pspf: "OFFICIAL"
+  qgiscf: "OFFICIAL"
+  qgiscf_dlm: "OFFICIAL"
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+references:
+  - url: https://www.nzbn.govt.nz/whats-an-nzbn/about/
+    title: "About the NZBN - New Zealand Business Number (MBIE)"
+  - url: https://www.gs1nz.org/sectors/government/nzbn
+    title: "New Zealand Business Number (NZBN) - GS1 New Zealand (GLN format and check digit)"
+created: '2026-07-08'
+updated: '2026-07-08'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-08'
+    description: Initial release.
+author: testpattern-community
+license: MIT
