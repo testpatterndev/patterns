@@ -12,9 +12,13 @@ description: >-
   reserved and set to "00", characters 7-18 are the entity-specific part, and characters 19-20 are
   numeric check digits (ISO 7064 MOD 97-10). Requiring the literal "00" at positions 5-6 and two
   digits at positions 19-20 makes the format far more distinctive than a generic 20-character
-  alphanumeric run. A small legacy population of pre-2013 interim identifiers (CICIs) grandfathered
-  into the system, e.g. Apple's HWUPKR0MPOU8FGXBT394, lacks the reserved "00" and is deliberately
-  not matched — a precision-over-recall trade-off.
+  alphanumeric run. Known recall cost: pre-2012 CICI-era legacy LEIs — interim identifiers issued
+  before the "00" reservation, grandfathered into the GLEIF system and still live and checksum-valid
+  — do not carry "00" at positions 5-6 and are NOT matched. This class includes major counterparties
+  such as Microsoft (INR2EJN1ERAN0W5ZP974), Deutsche Bank (7LTWFZYICNSX8D621K86) and Apple
+  (HWUPKR0MPOU8FGXBT394), so documents dealing with such entities' LEIs will be missed. This is a
+  deliberate precision-over-recall trade-off: dropping the "00" anchor would widen the pattern to
+  any 20-character uppercase alphanumeric run ending in two digits.
 operation: >-
   Validation: the ISO 7064 MOD 97-10 check over base-36 character expansion is not expressible as a
   regex and no Purview validator function exists for LEI, so the check digits are enforced only as
@@ -28,7 +32,10 @@ confidence_justification: >-
   5-6 and numeric check-digit pair at positions 19-20 make coincidental collisions rare; the
   evidence-gated 85 tier is the recommended workhorse. The 65 tier is discovery-only because the
   MOD 97-10 checksum cannot be enforced in the exported SIT, so a bare structural match is not
-  confirmed to be an issued LEI.
+  confirmed to be an issued LEI. Recall is knowingly reduced by the "00" requirement: live,
+  checksum-valid pre-2012 CICI-era legacy LEIs without "00" at positions 5-6 — including major
+  counterparties such as Microsoft, Deutsche Bank and Apple — are structurally excluded, a
+  deliberate precision choice documented in the description.
 jurisdictions:
   - global
 regulations:
@@ -63,7 +70,11 @@ test_cases:
       description: Structurally valid LEI under the 5299 LOU prefix with computed MOD 97-10 check digits
   should_not_match:
     - value: HWUPKR0MPOU8FGXBT394
-      description: Real legacy pre-2013 CICI (Apple Inc.) without the reserved "00" at positions 5-6 — deliberately excluded
+      description: Live checksum-valid pre-2012 CICI-era legacy LEI (Apple Inc.) without the reserved "00" at positions 5-6 — documented false-negative class, deliberately excluded
+    - value: INR2EJN1ERAN0W5ZP974
+      description: Live checksum-valid pre-2012 CICI-era legacy LEI (Microsoft Corporation), positions 5-6 are "EJ" — documented false-negative class, deliberately excluded
+    - value: 7LTWFZYICNSX8D621K86
+      description: Live checksum-valid pre-2012 CICI-era legacy LEI (Deutsche Bank AG), positions 5-6 are "FZ" — documented false-negative class, deliberately excluded
     - value: 5493001KJTIIGC8Y1R1
       description: Only 19 characters, one short of the fixed LEI length
     - value: 5493001KJTIIGC8Y1RAB
@@ -80,7 +91,10 @@ false_positives:
     mitigation: >-
       Require LEI/GLEIF keywords within the proximity window for the reporting tier; keep the bare
       structural tier discovery-only. Downstream consumers can verify candidates against the GLEIF
-      API for authoritative validation.
+      API for authoritative validation. The "00" positions 5-6 anchor is what keeps this collision
+      surface small; its cost is the known false-negative class of pre-2012 non-"00" legacy LEIs
+      (CICI-era registrations, including major counterparties such as Microsoft, Deutsche Bank and
+      Apple) described in the pattern description.
   - description: >-
       Repeated-digit sentinels such as an all-zeros 20-character string satisfy the structure, and
       all-same-digit values pass any weighted-mod checksum (0 mod N = 0).

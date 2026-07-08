@@ -12,10 +12,14 @@ description: >-
   (pre-partition Northern Ireland companies, registered as the R0 prefix). The prefix allow-list is
   taken from the Companies House Uniform Resource Identifiers (URI) Customer Guide plus the
   post-2011 additions CE/CS (charitable incorporated organisations), SG (Scottish qualifying
-  partnerships) and OE (Register of Overseas Entities, 2022). Bare 8-digit runs collide heavily with
-  invoice, order and account numbers, so the all-numeric form is only ever matched when directly
-  attached to a company-number label; the more distinctive prefixed form additionally gets a
-  keyword-gated tier without a directly-attached label.
+  partnerships), OE (Register of Overseas Entities, 2022), RS (registered societies, e.g. the live
+  entry RS008375) and FE (further education / sixth form college corporations). Bare 8-digit runs
+  collide heavily with invoice, order and account numbers, so the all-numeric form is only ever
+  matched when directly attached to a company-number label; the more distinctive prefixed form
+  additionally gets a keyword-gated tier without a directly-attached label. Two allow-list prefixes
+  are excluded from that bare prefixed form because they collide with common document-number
+  abbreviations — NO ("INVOICE NO123456") and SO (ERP sales-order numbers such as SO123456) — and
+  are matched only via the label-attached regex.
 operation: >-
   Validation: none — Companies House numbers are sequential allocations with no check digit, so no
   checksum validator exists. Reference: Companies House URI Customer Guide (List of Company Numbers
@@ -23,7 +27,7 @@ operation: >-
   forms, plus a prefix-allow-list structural regex (Regex_uk_companies_house_prefixed) that is only
   exported behind Companies House keyword evidence. AllDigitsSameFilter guards the all-numeric form
   against sentinel values such as 11111111. Corroborative evidence: keywords within 300 characters.
-pattern: '(?i)\b(?:company\s+(?:registration\s+|reg(?:istration)?\.?\s+)?(?:number|no\.?)|(?:companies\s+house|registered)\s+(?:company\s+)?(?:number|no\.?)|companies\s+house\s+registration|incorporation\s+number|CRN)\s{0,3}[:#.-]{0,3}\s{0,3}(?:(?:AC|CE|CS|EN|ES|FC|GE|GN|GS|IC|IP|LP|NA|NC|NF|NI|NL|NO|NP|NR|NV|NZ|OC|OE|RC|SA|SC|SE|SF|SG|SI|SL|SO|SP|SR|SZ|ZC)\d{6}|R\d{7}|\d{8})(?![A-Za-z0-9])'
+pattern: '(?i)\b(?:company\s+(?:registration\s+|reg(?:istration)?\.?\s+)?(?:number|no\.?)|(?:companies\s+house|registered)\s+(?:company\s+)?(?:number|no\.?)|companies\s+house\s+registration|incorporation\s+number|CRN)\s{0,3}[:#.-]{0,3}\s{0,3}(?:(?:AC|CE|CS|EN|ES|FC|FE|GE|GN|GS|IC|IP|LP|NA|NC|NF|NI|NL|NO|NP|NR|NV|NZ|OC|OE|RC|RS|SA|SC|SE|SF|SG|SI|SL|SO|SP|SR|SZ|ZC)\d{6}|R\d{7}|\d{8})(?![A-Za-z0-9])'
 confidence: medium
 confidence_justification: >-
   Medium confidence: the 8-character structure is rigid and the prefix allow-list is verified
@@ -31,8 +35,10 @@ confidence_justification: >-
   indistinguishable from any other 8-digit reference without its label. Every exported tier is
   evidence-gated — the all-numeric form requires a directly-attached company-number label
   (label-embedded-in-regex counts as label gating per the D1 decision record), and the bare prefixed
-  form additionally requires Companies House keywords in proximity. There is deliberately no bare
-  unlabelled tier.
+  form additionally requires Companies House keywords in proximity. The bare prefixed form also
+  drops the collision-prone NO and SO prefixes (document-number abbreviations that appear near
+  generic keywords like "registered office" in UK letter footers); those two prefixes are covered
+  only when label-attached. There is deliberately no bare unlabelled tier.
 jurisdictions:
   - uk
 regulations:
@@ -72,6 +78,8 @@ test_cases:
       description: Pre-partition Northern Ireland company number (R0 prefix, R + 7 digits)
     - value: OE000123
       description: Bare Register of Overseas Entities number (prefixed structural regex, keyword-gated tier)
+    - value: RS008375
+      description: Bare registered-society number — live Companies House entry (Nurture Housing Association Limited), RS prefix
   should_not_match:
     - value: 'Invoice number: 12345678'
       description: 8-digit run attached to a non-company label — the all-numeric form is label-gated
@@ -81,6 +89,10 @@ test_cases:
       description: 9 digits — the trailing alphanumeric guard rejects longer digit runs
     - value: 'Company number: AB123456'
       description: AB is not a Companies House prefix — fails the verified prefix allow-list
+    - value: INVOICE NO123456
+      description: NO as the "number" abbreviation in an invoice header — NO is excluded from the bare prefixed regex and only matched label-attached
+    - value: SALES ORDER SO123456
+      description: SO as an ERP sales-order document prefix — SO is excluded from the bare prefixed regex and only matched label-attached
 false_positives:
   - description: >-
       Unlabelled 8-digit sequences (invoices, order numbers, phone fragments) share the all-numeric
@@ -95,6 +107,10 @@ false_positives:
       The prefixed structural regex is restricted to the verified Companies House prefix allow-list
       and is only exported behind Companies House keyword evidence within the proximity window.
       In the exported SIT the prefix match is case-sensitive (prefixes are always upper case).
+      NO and SO are additionally removed from the bare prefixed regex — NO is the ubiquitous
+      "number" abbreviation (INVOICE NO123456, ACCOUNT NO123456) and SO is a common ERP sales-order
+      document prefix, both of which co-occur with footer keywords such as "registered office" —
+      so those two prefixes match only in the label-attached form.
 exports:
   - purview_xml
   - yaml
@@ -136,9 +152,9 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_uk_companies_house_labelled
-      pattern: '(?i)\b(?:company\s+(?:registration\s+|reg(?:istration)?\.?\s+)?(?:number|no\.?)|(?:companies\s+house|registered)\s+(?:company\s+)?(?:number|no\.?)|companies\s+house\s+registration|incorporation\s+number|CRN)\s{0,3}[:#.-]{0,3}\s{0,3}(?:(?:AC|CE|CS|EN|ES|FC|GE|GN|GS|IC|IP|LP|NA|NC|NF|NI|NL|NO|NP|NR|NV|NZ|OC|OE|RC|SA|SC|SE|SF|SG|SI|SL|SO|SP|SR|SZ|ZC)\d{6}|R\d{7}|\d{8})(?![A-Za-z0-9])'
+      pattern: '(?i)\b(?:company\s+(?:registration\s+|reg(?:istration)?\.?\s+)?(?:number|no\.?)|(?:companies\s+house|registered)\s+(?:company\s+)?(?:number|no\.?)|companies\s+house\s+registration|incorporation\s+number|CRN)\s{0,3}[:#.-]{0,3}\s{0,3}(?:(?:AC|CE|CS|EN|ES|FC|FE|GE|GN|GS|IC|IP|LP|NA|NC|NF|NI|NL|NO|NP|NR|NV|NZ|OC|OE|RC|RS|SA|SC|SE|SF|SG|SI|SL|SO|SP|SR|SZ|ZC)\d{6}|R\d{7}|\d{8})(?![A-Za-z0-9])'
     - id: Regex_uk_companies_house_prefixed
-      pattern: '(?<![A-Za-z0-9])(?:AC|CE|CS|EN|ES|FC|GE|GN|GS|IC|IP|LP|NA|NC|NF|NI|NL|NO|NP|NR|NV|NZ|OC|OE|RC|SA|SC|SE|SF|SG|SI|SL|SO|SP|SR|SZ|ZC)\d{6}(?![A-Za-z0-9])'
+      pattern: '(?<![A-Za-z0-9])(?:AC|CE|CS|EN|ES|FC|FE|GE|GN|GS|IC|IP|LP|NA|NC|NF|NI|NL|NP|NR|NV|NZ|OC|OE|RC|RS|SA|SC|SE|SF|SG|SI|SL|SP|SR|SZ|ZC)\d{6}(?![A-Za-z0-9])'
   keywords:
     - id: Keyword_uk_companies_house
       groups:
@@ -181,6 +197,10 @@ references:
     title: "Register an overseas entity and its beneficial owners - GOV.UK (OE ID allocation)"
   - url: https://doorda.com/glossary/company-number-prefixes-defined/
     title: "Company Number Prefixes Defined (corroborates post-2011 CE/CS/SG prefixes)"
+  - url: https://chguide.co.uk/general/company-number.html
+    title: "Company numbers - CH Guide (lists RS registered societies and FE further education / sixth form college corporations as active prefixes)"
+  - url: https://find-and-update.company-information.service.gov.uk/company/RS008375
+    title: "Companies House register entry RS008375 - Nurture Housing Association Limited (live registered-society example)"
 created: '2026-07-08'
 updated: '2026-07-08'
 changelog:
