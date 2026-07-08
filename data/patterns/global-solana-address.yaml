@@ -1,0 +1,120 @@
+schema: testpattern/v1
+name: Solana Address
+slug: global-solana-address
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Solana public wallet/account addresses: the base58 encoding of a 32-byte ed25519 public
+  key, 32-44 characters long, with NO distinctive prefix. Because a prefix-less base58 run of this
+  length collides heavily with random tokens, other base58 identifiers and prose, detection is
+  context-gated: the single tier is AND-gated by cryptocurrency/wallet domain context and a
+  template/sample noise exclusion. Length/charset bounds verified against the Solana account model
+  (32-byte address displayed as a base58 string) and the base58 alphabet (excludes 0 O I l).
+operation: >-
+  Single tier at confidence 75. The base58 32-44 char structure alone is weak evidence (no prefix,
+  no expressible checksum), so the tier requires cryptocurrency/wallet domain context
+  (crypto-wallet-context dict) within proximity AND a template/sample noise NOT-group. Case-sensitive
+  base58 matching (alphabet 1-9 A-H J-N P-Z a-k m-z).
+pattern: '\b[1-9A-HJ-NP-Za-km-z]{32,44}\b'
+confidence: medium
+confidence_justification: >-
+  Gated 75, not high: a prefix-less base58 run of 32-44 chars is the weakest structure in this family
+  (no leading version byte, no HRP, no checksum recoverable in a Purview-safe regex), so structure
+  alone is insufficient. Precision comes from the mandatory cryptocurrency/wallet domain-context gate
+  plus the noise exclusion, never from the bare pattern.
+case_sensitive: true
+jurisdictions:
+  - global
+regulations:
+  - FATF Recommendations
+  - AML/CTF Act (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - financial
+corroborative_evidence:
+  keywords:
+    - identifier
+    - number
+    - ID
+  proximity: 300
+  keyword_lists:
+    - financial-transaction
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: '11111111111111111111111111111111'
+      description: Solana System Program address (documented canonical address, 32 chars — lower bound)
+    - value: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'
+      description: SPL Token-2022 program address (documented canonical program id, 43 chars)
+    - value: 'BPFLoader2111111111111111111111111111111111'
+      description: BPF Loader program address (documented canonical program id, 43 chars)
+  should_not_match:
+    - value: '1111111111111111111111111111111'
+      description: 31 chars — below the 32-char minimum
+    - value: '111111111111111111111111111111111111111111111'
+      description: 45 chars — above the 44-char maximum
+    - value: '1111111111111111-111111111111111'
+      description: Hyphen breaks the run so no contiguous 32-44 char base58 body exists — rejected
+    - value: 'solana wallet address example placeholder'
+      description: Template/placeholder context should be excluded even when domain anchor words are present
+false_positives:
+  - description: >-
+      Prefix-less base58 32-44 char tokens are the highest-collision format in this family: random
+      API keys, base58-encoded blobs, other coins' addresses and even some hex/word runs can match the
+      bare structure. There is no version byte, HRP or recoverable checksum to disambiguate in a
+      Purview-safe regex.
+    mitigation: >-
+      Every tier is AND-gated by cryptocurrency/wallet domain context (crypto-wallet-context) within
+      the proximity window plus a template/sample noise NOT-group; the bare structural pattern is
+      never exported as a high tier. Confidence is held at 75.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+references:
+  - url: https://solana.com/docs/core/accounts/account-structure
+    title: Account Structure — Solana Docs (32-byte address as base58 string)
+sensitivity_labels:
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: crypto-wallet-context
+      as: Keyword_cryptocurrency
+      match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_solana_address
+      matches:
+        - ref: Keyword_cryptocurrency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_solana_address
+      pattern: '\b[1-9A-HJ-NP-Za-km-z]{32,44}\b'
+created: '2026-07-07'
+updated: '2026-07-07'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-07'
+    description: >-
+      Initial release — base58 ed25519 pubkey (32-44 chars, no prefix), domain-context-gated at 75
+      per verification against the Solana account model and base58 alphabet.
+author: testpattern-community
+license: MIT
