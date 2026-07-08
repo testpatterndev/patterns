@@ -5,11 +5,11 @@
 //   - a purview validators[].ref that is not a real MS validator function nor a local definition
 //   - a should_match that no regex in the file matches, or a should_not_match that the
 //     top-level pattern matches (filter-documented negatives are reported as warnings only)
-//   - a collection member (data/collections/*.yaml patterns list) that does not reference
-//     an existing pattern slug (dangling member)
+//   - a collection member (data/collections/**/*.yaml patterns list, recursive like
+//     compile.js walkDir) that does not reference an existing pattern slug (dangling member)
 // Usage: node scripts/ci-check.mjs
 import { readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
 
@@ -95,10 +95,17 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
 }
 
 // ── Collection integrity: every collection member must reference an existing pattern slug ──
+// Recursive walk (mirrors compile.js walkDir) so a collection placed in a subdirectory —
+// which compile.js WOULD ship — cannot be silently skipped by this integrity check.
 const colDir = join(BASE, 'data', 'collections')
-for (const f of readdirSync(colDir).filter(f => f.endsWith('.yaml'))) {
+const walkYaml = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap(e => {
+  const full = join(dir, e.name)
+  return e.isDirectory() ? walkYaml(full) : (/\.ya?ml$/.test(e.name) ? [full] : [])
+})
+for (const file of walkYaml(colDir)) {
+  const f = relative(colDir, file).replace(/\\/g, '/')
   let c
-  try { c = yaml.load(readFileSync(join(colDir, f), 'utf-8')) }
+  try { c = yaml.load(readFileSync(file, 'utf-8')) }
   catch (e) { errors.push(`collections/${f}: YAML parse — ${e.message.split('\n')[0]}`); continue }
   const label = `collections/${typeof c?.slug === 'string' ? c.slug : f}`
   if (!Array.isArray(c?.patterns) || !c.patterns.length) { errors.push(`${label}: missing or empty 'patterns' member list`); continue }

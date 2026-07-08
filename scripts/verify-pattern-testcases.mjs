@@ -300,6 +300,37 @@ function tierWouldFire(tier, text, reg, filters) {
   return true
 }
 
+// ---------- failure diagnostics ----------
+
+// Which members of an any-group matched the value (names the NOT-group culprits).
+function groupMatchedMembers(node, text, reg) {
+  const out = []
+  for (const ref of node.refs ?? []) if (matches(reg.get(ref), text) === true) out.push(ref)
+  for (const child of node.children ?? []) {
+    if (isAnyGroup(child)) { if (nodeSatisfied(child, text, reg)) out.push('(nested group)') }
+    else if (child?.ref && matches(reg.get(child.ref), text) === true) out.push(child.ref)
+  }
+  return out
+}
+
+// Explain WHY no tier can pass for a should_match value: report the actual veto
+// (document-level filter, match-level filter, or a violated NOT-group) instead of
+// blaming id_match when the primary in fact matched.
+function shouldMatchFailReason(v, tiers, reg, filters) {
+  if (filters.docLevel.some((trips) => trips(v))) return 'document-level exclude filter suppresses the value'
+  const reasons = []
+  for (const t of tiers) {
+    if (!idMatchIds(t).some((id) => matches(reg.get(id), v) === true)) continue // primary never hit
+    if (!idMatchSurvives(t, v, reg, filters)) {
+      reasons.push(`tier@${t.confidence_level}: every id_match hit is vetoed by a match-level filter`)
+      continue
+    }
+    const veto = tierNodes(t).find((n) => nodeVetoedByValue(n, v, reg))
+    if (veto) reasons.push(`tier@${t.confidence_level}: NOT-group violated (matched: ${groupMatchedMembers(veto, v, reg).join(', ') || 'nested members'})`)
+  }
+  return reasons.length ? reasons.join('; ') : 'id_match never matches the value (nor top-level pattern/keyword terms)'
+}
+
 // ---------- per-pattern verification ----------
 
 function verifyPattern(slug) {
@@ -360,12 +391,13 @@ function verifyPattern(slug) {
     const ok = !docFiltered(v) && ((top && top.test(v)) || kwHit(v) || tiers.some((t) => tierCanPass(t, v, reg, filters)))
     if (!ok) {
       failures++
-      console.log(`  FAIL ${slug} should_match: ${JSON.stringify(tc.value).slice(0, 80)} — no tier can pass (id_match never matches the value)`)
+      console.log(`  FAIL ${slug} should_match: ${JSON.stringify(tc.value).slice(0, 80)} — no tier can pass: ${shouldMatchFailReason(v, tiers, reg, filters)}`)
     }
   }
 
   // discovery_only tiers are deliberately broad inventory tiers — matching one is not a
-  // should_not_match violation (negatives are authored against the enforcement tiers).
+  // should_not_match violation (negatives are authored against the enforcement tiers),
+  // but it IS worth a warning: the value would still surface in discovery inventory.
   const enforcementTiers = tiers.filter((t) => t.discovery_only !== true)
 
   for (const tc of shouldNot) {
@@ -380,6 +412,12 @@ function verifyPattern(slug) {
     if (kwTerms.length && kwHit(v)) {
       failures++
       console.log(`  FAIL ${slug} should_not_match: ${JSON.stringify(tc.value).slice(0, 80)} — keyword_list term present in value`)
+      continue
+    }
+    const discoveryFiring = tiers.find((t) => t.discovery_only === true && tierWouldFire(t, v, reg, filters))
+    if (discoveryFiring) {
+      warnings++
+      console.log(`  warn  ${slug} should_not_match fires discovery_only tier@${discoveryFiring.confidence_level} (inventory tier — not a failure, but the value would surface in discovery): ${JSON.stringify(tc.value).slice(0, 60)}`)
       continue
     }
     if (tiers.length === 0 && top && top.test(v)) {
@@ -400,6 +438,10 @@ function verifyPattern(slug) {
 
 let slugs = process.argv.slice(2)
 if (slugs.includes('--all')) {
+  if (slugs.length > 1) {
+    console.error('Error: --all cannot be combined with explicit slugs — pass either --all or a slug list, not both.')
+    process.exit(2)
+  }
   slugs = readdirSync(PAT_DIR).filter((f) => f.endsWith('.yaml')).map((f) => f.replace(/\.ya?ml$/, ''))
 }
 if (slugs.length === 0) {
