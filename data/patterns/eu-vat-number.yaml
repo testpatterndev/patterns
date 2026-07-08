@@ -1,0 +1,196 @@
+schema: testpattern/v1
+name: EU VAT Identification Number - All Member States
+slug: eu-vat-number
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects EU VAT identification numbers for all 27 member states in a single consolidated pattern,
+  built branch-by-branch from the per-country structures published in the European Commission VIES
+  FAQ (Q11). Covers the Greek quirk (Greece prefixes with EL, not GR) and Northern Ireland's XI
+  prefix, which remains checkable in VIES for goods traders under the Windsor Framework — XI is
+  included with the UK 9-digit, 12-digit and GD/HA government/health-authority forms; plain GB
+  numbers are NOT included because Great Britain left the VIES scheme after Brexit. This pattern is
+  a superset alongside the existing per-country detectors (at/be/de/fr/hu/it-vat-number), which stay
+  untouched for deployed-GUID stability — the same document may fire both, following the
+  global-iban / eu-iban precedent.
+operation: >-
+  Structural detection via a bounded per-country alternation (no generic alphanumeric collapse).
+  Per-country check digits (e.g. IT Luhn, HR ISO 7064 MOD 11-10, SK divisible-by-11) are not
+  expressible in a single regex and no Purview validator function covers VAT, so checksums are not
+  enforced. Reference: European Commission VIES FAQ Q11 per-country format table, corroborated
+  row-by-row against secondary mirrors. Corroborative evidence: keywords within 300 characters.
+  Keyword lists: vat-numbers.
+pattern: '\b(?:ATU\d{8}|BE[01]\d{9}|BG\d{9,10}|CY\d{8}[A-Z]|CZ\d{8,10}|DE\d{9}|DK\d{8}|EE\d{9}|EL\d{9}|ES(?:[A-Z]\d{8}|\d{8}[A-Z]|[A-Z]\d{7}[A-Z])|FI\d{8}|FR[A-HJ-NP-Z0-9]{2}\d{9}|HR\d{11}|HU\d{8}|IE(?:\d{7}[A-Z]{1,2}|\d[A-Z+*]\d{5}[A-Z])|IT\d{11}|LT\d{9}(?:\d{3})?|LU\d{8}|LV\d{11}|MT\d{8}|NL[A-Z0-9+*]{9}B\d{2}|PL\d{10}|PT\d{9}|RO[1-9]\d{1,9}|SE\d{12}|SI\d{8}|SK\d{10}|XI(?:\d{9}(?:\d{3})?|GD[0-4]\d{2}|HA[5-9]\d{2}))\b'
+confidence: high
+confidence_justification: >-
+  High confidence: every branch requires the exact two-letter member-state prefix followed by that
+  state's verified digit/letter structure, which is distinctive in business documents; this matches
+  the confidence of the existing per-country VAT detectors. The short Romanian branch (RO + 2-10
+  digits, no leading zero) is the loosest row and is the main reason the bare structural tier stays
+  discovery-only.
+jurisdictions:
+  - eu
+regulations:
+  - GDPR
+  - VAT Directive 2006/112/EC
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
+data_categories:
+  - financial
+  - business-identifier
+corroborative_evidence:
+  keywords:
+    - VAT number
+    - VAT identification
+    - VAT registration
+    - value added tax
+    - VIES
+    - intra-community
+  proximity: 300
+  keyword_lists:
+    - vat-numbers
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: ATU12345678
+      description: Austria — U + 8 digits (9-character block per VIES)
+    - value: BE0123456789
+      description: Belgium — 10 digits, first digit 0 or 1
+    - value: DE129273398
+      description: Germany — 9 digits
+    - value: EL123456789
+      description: Greece — EL prefix (not GR) + 9 digits, the VIES Greek-prefix quirk
+    - value: ESB12345678
+      description: Spain — 9 characters, first and/or last alphabetic (never both numeric)
+    - value: FRXX123456789
+      description: France — 2 validation characters (letters excluding O and I, or digits) + 9-digit SIREN
+    - value: IE6388047V
+      description: Ireland — 7 digits + 1 letter (classic 8-character format)
+    - value: IE1234567WI
+      description: Ireland — 7 digits + 2 letters (post-2013 9-character format)
+    - value: LT123456789012
+      description: Lithuania — 12-digit long form (9 or 12 digits)
+    - value: NL123456789B01
+      description: Netherlands — 12 characters with the literal B at position 10
+    - value: XI110305878
+      description: Northern Ireland — XI prefix + UK 9-digit body, checkable in VIES under the Windsor Framework
+    - value: XIGD012
+      description: Northern Ireland — XI government-department form GD000-GD499
+  should_not_match:
+    - value: DE12345678
+      description: Germany body one digit short — fails the exact 9-digit branch
+    - value: GR123456789
+      description: Greece never uses GR in VIES — the EL branch is deliberately the only Greek prefix
+    - value: GB123456789
+      description: Plain GB numbers left VIES after Brexit — only the XI Northern Ireland prefix is covered
+    - value: IT123456789012
+      description: 12 digits after IT — exceeds Italy's exact 11-digit structure
+    - value: RO0123456789
+      description: Romania with a leading zero — the fiscal code is written without zero padding
+false_positives:
+  - description: >-
+      Deliberate overlap with the existing per-country detectors (at/be/de/fr/hu/it-vat-number):
+      the same VAT number can fire both this consolidated pattern and a per-country pattern.
+      This mirrors the accepted global-iban / eu-iban superset precedent.
+    mitigation: >-
+      Deploy either the consolidated pattern or the per-country patterns, or de-duplicate at the
+      reporting layer if both are enabled.
+  - description: >-
+      Two capital letters followed by digits occur in other identifier schemes (order codes,
+      national IDs, IBAN fragments); the short Bulgarian/Czech/Romanian digit bodies are the most
+      collision-prone rows, and no checksum can be enforced in the exported SIT.
+    mitigation: >-
+      Every branch is bounded to the exact per-country structure (no generic 8-12 alphanumeric
+      collapse); the reporting tier requires VAT keywords within the proximity window and the bare
+      structural tier is discovery-only.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_eu_vat_number
+      matches:
+        - ref: Keyword_eu_vat_number
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_eu_vat_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_eu_vat_number
+      pattern: '\b(?:ATU\d{8}|BE[01]\d{9}|BG\d{9,10}|CY\d{8}[A-Z]|CZ\d{8,10}|DE\d{9}|DK\d{8}|EE\d{9}|EL\d{9}|ES(?:[A-Z]\d{8}|\d{8}[A-Z]|[A-Z]\d{7}[A-Z])|FI\d{8}|FR[A-HJ-NP-Z0-9]{2}\d{9}|HR\d{11}|HU\d{8}|IE(?:\d{7}[A-Z]{1,2}|\d[A-Z+*]\d{5}[A-Z])|IT\d{11}|LT\d{9}(?:\d{3})?|LU\d{8}|LV\d{11}|MT\d{8}|NL[A-Z0-9+*]{9}B\d{2}|PL\d{10}|PT\d{9}|RO[1-9]\d{1,9}|SE\d{12}|SI\d{8}|SK\d{10}|XI(?:\d{9}(?:\d{3})?|GD[0-4]\d{2}|HA[5-9]\d{2}))\b'
+  keywords:
+    - id: Keyword_eu_vat_number
+      groups:
+        - match_style: word
+          terms:
+            - VAT number
+            - VAT identification
+            - VAT registration
+            - VAT ID
+            - value added tax
+            - text: VIES
+              case_sensitive: true
+            - intra-community
+            - reverse charge
+            - USt-IdNr
+            - Umsatzsteuer
+            - TVA intracommunautaire
+            - partita IVA
+            - BTW-nummer
+            - NIF-IVA
+            - tax identification
+      strength: specific
+  filters:
+    - id: Filter_eu_vat_number_same_digits
+      type: AllDigitsSameFilter
+risk_rating: 5
+risk_description: >-
+  VAT registration numbers identify businesses for tax purposes and are semi-public in many
+  jurisdictions. While not highly sensitive alone, they can be combined with other data for business
+  impersonation or tax fraud.
+sensitivity_labels:
+  pspf: "OFFICIAL"
+  qgiscf: "OFFICIAL"
+  qgiscf_dlm: "OFFICIAL"
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+references:
+  - url: https://ec.europa.eu/taxation_customs/vies/
+    title: "VIES VAT number validation - European Commission (FAQ Q11 per-country structure table)"
+  - url: https://en.wikipedia.org/wiki/VAT_identification_number
+    title: "VAT identification number - Wikipedia (per-country structure table mirroring VIES)"
+  - url: https://www.avalara.com/us/en/vatlive/eu-vat-rules/eu-vat-number-registration/eu-vat-number-formats.html
+    title: "EU VAT Number Formats - Avalara (secondary corroboration of VIES rows)"
+created: '2026-07-08'
+updated: '2026-07-08'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-08'
+    description: Initial release. Consolidated superset of the per-country VAT detectors covering all 27 member states plus the XI Northern Ireland prefix; existing at/be/de/fr/hu/it patterns unchanged.
+author: testpattern-community
+license: MIT
