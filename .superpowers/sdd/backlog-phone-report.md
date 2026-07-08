@@ -4,7 +4,9 @@ Date: 2026-07-08. Branch: `worktree-wf_1baf1e2c-30e-1` (isolated worktree of `fe
 
 Scope files touched: `global-phone-e164`, `us/ca/uk/in/de/fr/es/it/nl-phone-number`,
 `au-fixed-line-telephone`, `eu-iban`, `global-iban`, `global-email-address`, `scripts/ci-check.mjs`.
-`data/keywords/phone-context.yaml` was reviewed and deliberately left unchanged (see Part B.1 tail note).
+`data/keywords/phone-context.yaml` was widened in review with the native-language generic phone labels
+(see "Review fixes" section at the end) after the review found the original "left unchanged" conclusion
+missed a detection regression in fr/es/it/nl.
 
 Every regex change below was node-verified with before/after probes, including adversarial inputs
 (dates, currency, case/file references, year-like parentheticals, embedded digit runs). The probe
@@ -162,7 +164,13 @@ in all five patterns; the trunk-0 countries need no note since they provably don
 Doctrine: the 85 tier is "country-specific phone evidence"; bare generic phone nouns belong to the
 shared phone-context dict (75 tier). Every dropped generic below remains 75-tier evidence via
 Evidence_phone_context, so no coverage is lost — matches near a generic term simply score 75 instead
-of a spurious 85.
+of a spurious 85. **Review correction:** as originally shipped this claim was true only for the
+English-language drops (us/ca/uk/in/de/global-e164 — cell, mobile, landline, mobile number, SMS,
+"call me at"→call, "text me at"→text are all genuinely covered by phone-context terms); the four
+native bare terms dropped from fr/es/it/nl ("portable", "móvil", "cellulare", "mobiel") existed in NO
+other dictionary, so those four patterns' own canonical positive renderings stopped firing at any tier.
+Fixed in review by adding the native generics to phone-context.yaml — see "Review fixes" below. With
+that widening, the doctrine claim above now holds for all ten patterns.
 
 | Pattern | Kept (rationale) | Dropped (rationale) | Post-purge count |
 |---|---|---|---|
@@ -182,8 +190,11 @@ country/internationality references; quality gate (weakHigh) confirms all 85 tie
 specific-strength. The `corroborative_evidence.keywords` inline lists (non-Purview engines) were left
 untouched — they are broad-evidence lists by design.
 
-`data/keywords/phone-context.yaml` itself: reviewed; all 17 terms are genuinely jurisdiction-neutral
-generic phone vocabulary (that is its job as the 75-tier dict) — no change needed.
+`data/keywords/phone-context.yaml` itself: reviewed at implementation time as "all 17 terms are
+genuinely jurisdiction-neutral generic phone vocabulary — no change needed". **That conclusion was
+wrong by omission**: the dict was jurisdiction-neutral but English-only, while serving five
+non-English-country patterns as their sole 75-rung evidence source. Corrected in review (see "Review
+fixes"): the dict now also carries the core native-language generic labels for fr/es/it/nl.
 
 ### B.2 Noise-exclusion NOT nodes on the phone 75 tiers
 
@@ -264,3 +275,74 @@ before and after, none in touched files).
 Gates at commit: `npm run check` 0 errors / 57 warnings (baseline), `npm run check:quality` PASSED,
 `npm run compile` OK (1655 patterns), `verify-pattern-testcases.mjs` all 14 touched slugs pass.
 `patterns.json` reverted before staging per repo convention.
+
+---
+
+## Review fixes (2026-07-09)
+
+### CRITICAL — fr/es/it/nl detection regression: dropped native generics existed nowhere else
+
+**The defect.** The B.1 purge dropped the bare native generic terms "portable" (fr), "móvil" (es),
+"cellulare" (it), "mobiel" (nl) from the country-specific 85-tier dicts on the doctrine that generics
+"remain 75-tier evidence via Evidence_phone_context". That was verified for the English drops but never
+for the native ones: a grep across `data/keywords/` shows the four terms existed in NO dictionary, and
+phone-context.yaml was English-only (phone/mobile/cell/tel/call/text/SMS/landline...). Because every
+tier in these four patterns is evidence-gated (no tier fires without positive corroborative evidence,
+per their own confidence_justification), each pattern's own shipped canonical positive rendering —
+'Portable: 06 39 98 45 67' (fr), 'Móvil: 612 345 678' (es), 'Cellulare: 345 678 9012' (it),
+'Mobiel: 06 12345678' (nl), all still present as should_match test cases — fired at NO tier
+post-change, versus 85 pre-change. The verify harness cannot catch this because should_match
+deliberately does not require evidence in the value.
+
+**The fix (option 1 of the ticket's three).** Added the native generic phone vocabulary to
+`data/keywords/phone-context.yaml`, whose own description says "jurisdiction-neutral" — which
+correctly means multilingual, not English-only. The description now states this explicitly. Nine terms
+added (the four dropped generics plus the plain-"telephone" native equivalents, which are the single
+most common phone label in each language and were equally uncovered):
+
+| Term | Language | Collision analysis (match_style: word, 300-char proximity, 75-rung only) |
+|---|---|---|
+| portable | fr (mobile) | Also an English adjective ("portable device", "portable hard drive"). Risk is within the dict's existing envelope: phone-context already carries far more collision-prone English words at the same rung — "cell" (biology, spreadsheet), "text" (any document), "call" (function call), "mobile" (mobile app). Worst case is a phone-shaped digit run near "portable" scoring 75 (generic evidence), never 85. Standard French mobile label ("Portable :"). |
+| téléphone | fr (telephone) | Accented, French-only token; no English collision. The most common French phone label. |
+| móvil | es (mobile) | Accented, Spanish-only token; no English collision. Standard Spanish mobile label ("Móvil:"). |
+| teléfono | es (telephone) | Accented, Spanish-only; the most common Spanish phone label. |
+| cellulare | it (mobile/cellular) | Italian-only token. In non-phone Italian text it can mean "cellular" (biology), but only fires as evidence near an already-phone-shaped number at the generic 75 rung — same acceptance profile as English "cell", which the dict already carries. |
+| telefono | it (telephone) | Italian-only (Spanish spells it with the accent); unambiguous phone word. |
+| mobiel | nl (mobile) | Dutch-only token, common adjective ("mobiel netwerk"), no English collision; near a phone-shaped number it is phone evidence. Standard Dutch mobile label ("Mobiel:"). |
+| telefoon | nl (telephone) | Dutch-only; unambiguous. The most common Dutch phone label ("Telefoon:"). |
+| landline → (no change) | — | Row included for clarity: no English terms were touched. |
+
+German needs nothing: de-phone-number's drops were English-only phrases ("call me at", "text me at")
+and its 85 dict retains the native vocabulary (Telefonnummer/Handynummer/Mobilnummer/Rufnummer);
+the review confirmed the B.1 claim holds for us/ca/uk/in/de/global-e164 as shipped.
+
+**Blast radius.** phone-context is imported by exactly the 11 phone-family patterns (grep verified) —
+always as generic 75-rung evidence (65 in au-fixed-line-telephone), never as an 85 gate, so the
+widening can only add 75/65-tier corroboration, never inflate a high tier. Post-fix, the four
+canonical renderings above fire again at 75 via Evidence_phone_context (pre-purge they fired at 85 via
+the bare term in the specific dict; the 85→75 re-tiering for bare-generic-labelled values is the
+intended B.1 outcome, now actually delivered rather than claimed).
+
+**File hygiene.** Keyword dicts carry no version/changelog fields (corpus convention — checked
+template-exclusion.yaml and others); `updated:` bumped to 2026-07-09 and the description extended.
+No pattern files needed changes: their changelogs factually describe the drops and the four
+should_match cases are correct as-is (they now fire at 75).
+
+**Verification.** Compiled `patterns.json` and asserted the injected `Evidence_phone_context` group in
+fr/es/it/nl-phone-number contains the new native terms; re-ran `verify-pattern-testcases.mjs`
+(all touched slugs pass), `npm run check` (0 errors), quality gate (PASSED); `patterns.json` reverted
+before staging.
+
+### Minor review notes (no action, recorded for posterity)
+
+- DE DIN 5008 rendering citation (workingoffice.de) is a commercial secondary source — weaker than the
+  family's Ofcom/BNetzA/ITU/BOE citations (which the reviewer externally verified, including
+  BOE-A-2010-5251 as the SETSI 71-74 mobile attribution and 07624 as the sole IoM mobile block inside
+  076). Paywall rationale for DIN 5008 already documented above; left as-is.
+- au-fixed-line-telephone `children:` → `refs:` conversion: no semantic change for every in-repo
+  evaluator, but scripts/compile.js passes pattern_tiers through verbatim, so an external consumer that
+  only understood `children` sees a shape change. `refs` matches corpus convention (nl-bsn/mx-rfc/
+  uk-sort-code-account); informational only.
+- Ticket Part A.2's literal landline example forms ('030/12345678', '(030) 12345678') were deliberately
+  not shipped — slash/paren renderings cover the in-scope mobile prefixes only, since landlines are out
+  of scope for de-phone-number; a conscious, documented departure from the ticket's literal wording.
