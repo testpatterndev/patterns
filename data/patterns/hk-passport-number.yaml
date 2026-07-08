@@ -1,0 +1,156 @@
+schema: testpattern/v1
+name: HKSAR Passport Number
+slug: hk-passport-number
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Hong Kong Special Administrative Region (HKSAR) passport numbers issued by the Immigration
+  Department under the HKSAR Passports Ordinance (Cap. 539). HKSAR passport numbers are nine characters:
+  the current series is the letter H followed by 8 digits; earlier biometric series used K followed by
+  8 digits, and KJ (48-page jumbo booklets) followed by 7 digits.
+operation: >-
+  Regex pattern. Regex_hk_passport_number matches the three documented nine-character series: H + 8 digits,
+  K + 8 digits, or KJ + 7 digits, at word boundaries. Three confidence tiers: High (85) requires passport
+  evidence (min 2 unique terms) with template exclusion; Medium (75) requires passport evidence with template
+  exclusion; Low (65) requires passport evidence. Evidence uses one keyword group (English and Chinese
+  passport terms) within 300-character proximity. No public checksum is documented for the digit portion,
+  so detection is structural plus keyword evidence.
+pattern: \b(?:H|K)\d{8}\b|\bKJ\d{7}\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the nine-character letter-prefixed structure (H/K + 8 digits, KJ + 7 digits) is
+  distinctive, but a single letter followed by 8 digits also occurs in invoice, serial and booking
+  references, so corroborating passport keywords are required on every tier. No tier fires on the bare
+  value alone (D1 identifier convention).
+jurisdictions:
+  - hk
+regulations:
+  - HKSAR Passports Ordinance (Cap. 539)
+  - PDPO (Hong Kong)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - HKSAR passport
+    - Hong Kong passport
+    - passport number
+    - travel document
+    - Immigration Department
+    - 特區護照
+    - 護照號碼
+  proximity: 300
+test_cases:
+  should_match:
+    - value: HKSAR passport number H01234567 was presented at the check-in counter
+      description: Current H series with 8 digits, labelled
+    - value: 'Passport No.: K12345678 issued by the Immigration Department in 2015'
+      description: Earlier K series with 8 digits
+    - value: The applicant's 特區護照 number KJ0123456 expires next March
+      description: KJ jumbo series with 7 digits
+  should_not_match:
+    - value: Flight reference H1234567 was rebooked for the delegation
+      description: H followed by only 7 digits is too short
+    - value: Serial HK123456789 printed on the device label
+      description: Two-letter HK prefix with 9 digits is not a documented series
+    - value: Container KJ12345678 cleared customs on Tuesday morning
+      description: KJ followed by 8 digits is too long for the KJ series
+false_positives:
+  - description: A letter H or K followed by 8 digits also occurs in booking references, invoice numbers and hardware serials.
+    mitigation: Every tier requires corroborating passport keywords within the proximity window; there is no bare value-only tier.
+  - description: Malaysian passport numbers (A/H/K + 8 digits, covered by my-passport-number) structurally overlap the H/K series.
+    mitigation: Jurisdiction-specific keyword evidence (HKSAR / 特區護照 / Immigration Department terms) separates Hong Kong context from Malaysian context.
+  - description: Sample passport numbers in application guides or templates may match the labelled form.
+    mitigation: The high and medium tiers apply the template-exclusion NOT-group to suppress sample and documentation content.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  Passport numbers are high-value identity documents used for international travel and identity verification. Compromise enables identity fraud, unauthorized border crossings, and creation of
+  fraudulent documents.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_hk_passport_number
+      matches:
+        - ref: Evidence_hk_passport_number
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Regex_hk_passport_number
+      matches:
+        - ref: Evidence_hk_passport_number
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      id_match: Regex_hk_passport_number
+      matches:
+        - ref: Evidence_hk_passport_number
+  regexes:
+    - id: Regex_hk_passport_number
+      pattern: \b(?:H|K)\d{8}\b|\bKJ\d{7}\b
+  keywords:
+    - id: Evidence_hk_passport_number
+      groups:
+        - match_style: word
+          terms:
+            - HKSAR passport
+            - Hong Kong passport
+            - passport number
+            - passport no
+            - travel document
+            - Immigration Department
+            - 特區護照
+            - 香港特別行政區護照
+            - 護照號碼
+            - 入境事務處
+            - electronic passport
+      strength: specific
+created: '2026-07-08'
+updated: '2026-07-08'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-08'
+    description: Initial release
+author: testpattern-community
+license: MIT
+references:
+  - url: https://en.wikipedia.org/wiki/Hong_Kong_Special_Administrative_Region_passport
+    title: Hong Kong Special Administrative Region passport - Wikipedia (nine-character number format)
+  - url: https://zh.wikipedia.org/zh-hk/中華人民共和國香港特別行政區護照
+    title: 中華人民共和國香港特別行政區護照 - 維基百科 (H/K/KJ series)
+  - url: https://www.hk01.com/政情/268775/孟晚舟被捕-護照號碼解密-揭3本特區護照或在9年間簽發
+    title: HK01 - 護照號碼解密 (KJ jumbo 48-page series prefix)
+  - url: https://www.immd.gov.hk/eng/residents/immigration/traveldoc/hksarpassport/characteristics.html
+    title: Physical Features and Design of Electronic Passport - Immigration Department
+  - url: https://www.elegislation.gov.hk/hk/cap539
+    title: Cap. 539 Hong Kong Special Administrative Region Passports Ordinance
