@@ -70,7 +70,7 @@ than missing an id hit — reworded accordingly.
 
 | file | version | change (id_match now hit) |
 |---|---|---|
-| controlled-operation-authorisation | 1.1.0 → 1.1.1 | "COA renewal." → "Controlled operation authorisation renewal." (id `controlled\s+operation\s+authoris`) |
+| controlled-operation-authorisation | 1.1.0 → 1.1.2 | "COA renewal." → "Controlled operation authorisation renewal … Extension of authorised conduct …" (id hit `authorised conduct`; the interim 1.1.1 rewrite was defective — see Review fixes) |
 | corrective-services-intelligence-report | 1.1.0 → 1.1.1 | "Monthly Assessment" → "Monthly Prison Intelligence Assessment" (id `prison\s+intelligence`) |
 | government-procurement-pricing-schedule-sealed | 1.1.0 → 1.1.1 | value 2: "RFP:" → "RFP QLD-2026-04417:"; value 3: added ", RFT QLD-2025-11203" (id `QLD-\d{4}-\d{3,6}`) |
 | grant-assessment-scoring-matrix | 1.1.0 → 1.1.1 | added "Top-ranked application scored 86.5/100." (id score format `\d/\d`) |
@@ -113,9 +113,15 @@ solicitor-general-legal-advice, state-legal-liability-assessment
 and state-legal-liability-assessment have the same bug with currently-passing tests, fixed
 for consistency — the report calls it "an authoring bug repeated across this family".)
 
-Per-slug harness: 22 FAILs across these 14 slugs before and after — identical FAIL set,
-zero new FAILs. The persisting negatives now fire the 75 tier (which has no exclusion
-wiring at all); per the triage report's candidate fix, closing those requires adding
+Per-slug harness: 22 FAILs across these 14 slugs before and after — identical FAIL key
+set, zero new FAILs. All but one of the persisting negatives fire the 75 tier; one
+(solicitor-general-legal-advice, "The role of the Solicitor-General…") fires the 85 tier
+after the fix, because at baseline the miswired 85 tier required exclusion terms to be
+PRESENT (this value has none, so it could only reach 75), whereas the corrected NOT-group
+form lets it through at 85. Net effect on 85-tier negative firings across the 14 files is
+still an improvement: 3 at baseline → 1 after (the other two dropped 85→75 because the
+now-active NOT-groups veto them at 85). Per the triage report's candidate fix, closing
+the residuals requires adding
 publication-context NOT-groups to every enforcement tier and extending the term lists —
 explicitly deferred/out-of-scope for this ticket. No new should_match failures are possible
 from the conversion: the 75/65 tiers of these files carry no NOT-groups, so any positive
@@ -141,3 +147,54 @@ exclusion terms, so the now-active 85-tier NOT-groups veto nothing they shouldn'
 - 28 pattern YAMLs modified (1 A + 4 B + 9 C + 14 D), 19 test values rewritten,
   14 tier wirings converted, 28 version bumps + changelog entries.
 - 0 filters, NOT-group term lists, regexes, or keyword groups weakened or removed.
+
+## Review fixes
+
+Review of this pass surfaced one IMPORTANT defect and one report inaccuracy; both are
+fixed in the `fix: harness-triage-fixes review fixes` commit.
+
+### 1. controlled-operation-authorisation (1.1.1 → 1.1.2) — class-C fix was defective
+
+The 1.1.1 rewrite claimed the third should_match value gained a genuine tier id_match hit
+via "Controlled operation authorisation renewal". It did not: the tier id regex
+`Pattern_controlled_operation_authorisation_controlled_operation_terms` is
+`(?i)\b(controlled\s+operation\s+authoris|assumed\s+identity\s+authorit|authorised\s+conduct|PPRA\s+controlled\s+operation)\b`
+— the trailing `\b` immediately after the `authoris` prefix can never match
+"authorisation"/"authorised" (a word boundary cannot occur between `s` and `a`). Node
+probe on the 1.1.1 value: tier regex → **false**. The value passed the harness only via
+the top-level universal-engine pattern (which has the full `authoris(?:ation|ed)` forms),
+so the original class-C defect — "tests nothing real at tier level" — persisted, masked
+by a green harness.
+
+Fix (test value only, per ticket scope): the value now reads "… Extension of **authorised
+conduct** for 60 days … **PPRA Part 5** compliance audit completed …". Node probe after:
+tier regex → true (hit `authorised conduct`); no exclusion terms present; all three
+should_match values now genuinely anchor the tier id_match (values 1–2 already anchored
+via "Authorised conduct"). Per-slug harness: `all test_cases pass`.
+
+Follow-up flagged (regex changes out of this ticket's scope): two of the four branches of
+that tier id regex are dead for the same trailing-`\b` reason —
+`controlled\s+operation\s+authoris\b` and `assumed\s+identity\s+authorit\b` can never
+match any real token ("authorisation", "authority", …). The tier regex should be
+corrected in a dedicated ticket (e.g. `authoris(?:ation|ed)?`, `authorit(?:y|ies)`).
+
+### 2. Report correction — class-D "persisting negatives" sentence
+
+The earlier wording "the persisting negatives now fire the 75 tier (which has no
+exclusion wiring at all)" was wrong: harness output shows solicitor-general-legal-advice
+"The role of the Solicitor-General…" fires **tier@85** after the D-class conversion (it
+fired tier@75 at baseline, because the miswired 85 tier required exclusion terms to be
+present and that value has none). Verified from the before/after `--all` outputs:
+85-tier negative firings across the 14 D-class files went 3 (baseline: judicial-review
+x1, solicitor-general x2) → 1 (solicitor-general x1); the other two dropped 85→75
+because the now-active NOT-groups veto them. FAIL key set unchanged. The Class D section
+above has been reworded accordingly; the residual negatives remain deferred per ticket.
+
+### Review-fix verification
+
+1. Per-slug: `node scripts/verify-pattern-testcases.mjs controlled-operation-authorisation`
+   → `all test_cases pass`.
+2. Full run: `--all` → **67 failure(s), 77 warning(s)** — unchanged; normalized FAIL-key
+   set-diff vs the pre-review state: 0 resolved, 0 introduced (identical sets).
+3. Gates re-run: `npm run check` → 0 errors; `npm run check:quality` → PASSED;
+   `npm run compile` → OK (patterns.json reverted before staging).
