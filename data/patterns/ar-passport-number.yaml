@@ -1,0 +1,179 @@
+schema: testpattern/v1
+name: Argentina Passport Number
+slug: ar-passport-number
+version: 1.0.0
+type: regex
+engine: boost_regex
+description: >-
+  Detects Argentine passport numbers issued by the Registro Nacional de las Personas (RENAPER). Since the
+  2012 biometric passport series, every booklet carries a unique alphanumeric number of exactly three
+  uppercase letters followed by six digits (e.g. AAC382190). The number is independent of the holder's DNI.
+  Special three-letter series are reserved for travel documents issued to stateless persons (ZZA) and
+  refugees (ZZX) under RENAPER Disposicion 904/2021.
+operation: >-
+  Regex pattern (boost_regex engine, case-sensitive). Pattern_ar_passport_number matches a word-bounded run
+  of exactly three uppercase letters followed by six digits, so the number is not found inside longer
+  letter or digit runs. Because a 3-letter/6-digit code is structurally ambiguous (order codes, serials,
+  booking references), no tier fires on the bare value: High (85) requires two distinct passport-context
+  keywords with template exclusion; Medium (75) requires passport-context evidence with template exclusion;
+  Low (65) requires passport-context evidence. Evidence uses one keyword group (Spanish and English
+  passport terms plus RENAPER) within 300-character proximity. AllDigitsSameFilter suppresses placeholder
+  values whose six digits are all identical (e.g. AAA000000).
+pattern: \b[A-Z]{3}[0-9]{6}\b
+case_sensitive: true
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the three-uppercase-letters plus six-digits shape is fixed and case-strict, but the
+  same shape occurs in order numbers, serial numbers and booking codes, and the printed passport number
+  carries no check digit that could be validated. Every tier therefore requires corroborating passport
+  keywords; the evidence-gated workhorse tier (75) is the recommended confidence.
+jurisdictions:
+  - ar
+regulations:
+  - PDPL (AR)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - pasaporte
+    - pasaporte argentino
+    - número de pasaporte
+    - passport
+    - passport number
+    - travel document
+    - documento de viaje
+    - RENAPER
+  proximity: 300
+test_cases:
+  should_match:
+    - value: Pasaporte argentino AAC382190, emitido por el RENAPER en Buenos Aires
+      description: Spanish passport label with three-letter six-digit number
+    - value: 'passport number: AAB204617 (Argentina), expiry 2031-05-14'
+      description: English label with Argentine passport number
+    - value: El número de pasaporte AAD915370 no coincide con el DNI del titular
+      description: Passport-number prose distinguishing the number from the DNI
+    - value: Documento de viaje ZZX004821 expedido a refugiado según Disposición 904/2021
+      description: Refugee travel document series ZZX with six digits
+  should_not_match:
+    - value: El pasaporte AB123456 no es válido porque le falta una letra
+      description: Only two letters before the digits — wrong structure
+    - value: 'Pasaporte AAC38219: el número tiene solo cinco cifras'
+      description: Five digits is too short
+    - value: pasaporte mexicano G12345678 presentado en la frontera
+      description: Neighbouring format (Mexico, one letter plus eight digits)
+    - value: 'passport specimen AAA000000 shown in the template'
+      description: All six digits identical — suppressed by AllDigitsSameFilter (placeholder/specimen values)
+    - value: 'código de reserva aab123456 confirmado para el vuelo'
+      description: Lowercase letters — passport numbers are printed in uppercase (case-sensitive pattern)
+false_positives:
+  - description: >-
+      Three uppercase letters followed by six digits is a common shape for order numbers, product serials,
+      airline ticket/booking codes and internal reference IDs.
+    mitigation: >-
+      No tier matches the bare value: all tiers require passport-context keywords (Spanish/English) within
+      the 300-character proximity window.
+  - description: >-
+      The printed passport number has no public check-digit algorithm, so structural validation beyond
+      length, case and letter/digit positions is not possible in regex.
+    mitigation: >-
+      Precision relies on the case-strict structure, keyword evidence on every tier, the
+      template-exclusion NOT-group at 85/75, and AllDigitsSameFilter suppressing repeated-digit
+      placeholder values such as AAA000000.
+  - description: Sample numbers in RENAPER guidance, form templates or documentation may appear near passport keywords.
+    mitigation: The high and medium tiers apply the template-exclusion NOT-group to suppress sample, template and test content.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  Passport numbers are high-value identity attributes used for international travel, KYC and identity
+  verification. Exposure enables identity fraud, fraudulent document creation and account-opening abuse.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_ar_passport_number
+      matches:
+        - ref: Evidence_ar_passport
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_ar_passport_number
+      matches:
+        - ref: Evidence_ar_passport
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      id_match: Pattern_ar_passport_number
+      matches:
+        - ref: Evidence_ar_passport
+  regexes:
+    - id: Pattern_ar_passport_number
+      pattern: \b[A-Z]{3}[0-9]{6}\b
+  keywords:
+    - id: Evidence_ar_passport
+      groups:
+        - match_style: word
+          terms:
+            - pasaporte
+            - pasaporte argentino
+            - número de pasaporte
+            - numero de pasaporte
+            - nro de pasaporte
+            - libreta de pasaporte
+            - passport
+            - passport number
+            - passport no
+            - Argentine passport
+            - Argentina passport
+            - travel document
+            - documento de viaje
+            - text: RENAPER
+              case_sensitive: true
+            - Registro Nacional de las Personas
+      strength: specific
+  filters:
+    - id: Filter_ar_passport_same_digits
+      type: AllDigitsSameFilter
+references:
+  - url: https://www.argentina.gob.ar/interior/pasaporte/preguntasfrecuentes
+    title: 'Preguntas frecuentes - Pasaporte | Argentina.gob.ar (número compuesto por tres letras y seis números, distinto del DNI)'
+  - url: https://www.argentina.gob.ar/normativa/nacional/disposici%C3%B3n-904-2021-357260/actualizacion
+    title: 'Disposición 904/2021 RENAPER - numeración alfanumérica de tres letras y seis números (series ZZA/ZZX/ZZZ)'
+  - url: https://en.wikipedia.org/wiki/Argentine_passport
+    title: Argentine passport - Wikipedia (alphanumeric serial replaced the DNI-based number in 2012)
+created: '2026-07-08'
+updated: '2026-07-08'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-08'
+    description: Initial release
+author: testpattern-community
+license: MIT
