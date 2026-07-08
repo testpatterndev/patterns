@@ -98,9 +98,9 @@ top of the ~3-4 range).
 Node harness (js-yaml + the ci-check `toRe`/`purviewBanned` logic) run against all four files:
 - 0 Purview-banned constructs (no `.*`/`.+`, no nested quantifiers, no anchors, 0 capturing groups,
   bounded `{m,n}` only; lookahead gaps use `[\s\S]{0,400}?` per existing repo precedent, e.g. au-payid).
-- 13/13 should_match matched by the top-level pattern; all should_not_match either fail the primary
-  (8 true negatives, including the generic CE machinery declaration) or are documented filter-dependent
-  negatives (5, each carrying noise-filter terms and labelled in the test-case description).
+- 13/13 should_match matched by the top-level pattern; all 17 should_not_match either fail the primary
+  (10 true negatives, including the generic CE machinery declaration) or are documented filter-dependent
+  negatives (7, each carrying noise-filter terms and labelled in the test-case description).
 - Final run: "ALL REGEX CHECKS PASSED".
 
 ## Gate output tails
@@ -123,3 +123,38 @@ Node harness (js-yaml + the ci-check `toRe`/`purviewBanned` logic) run against a
   documentation, empirically characterised in the node harness rather than gate-enforced.
 - Sensitivity_labels cross-map uses us_gov/uk_gov (matching the repo's other non-AU concept patterns);
   no EU-specific label taxonomy exists in the repo.
+
+## Review fixes (2026-07-08, after independent review of base commit 49d11cb3)
+
+Verdict was needs_fixes with two IMPORTANT findings; both fixed, none rebutted.
+
+1. **eu-ai-act-fria.yaml operation prose** — the prose claimed "a case-sensitive FRIA acronym regex"
+   but `Pattern_eu_ai_act_fria_acronym` is `(?i)\bFRIA\b` (case-insensitive; empirically matches
+   "agua fria"). Fixed the prose, not the regex: the exemplar's `Pattern_..._goc` regex is also `(?i)`,
+   and this report already (correctly) described the regex as case-insensitive, so the prose was the
+   outlier. New wording states the regex is case-insensitive and that the FRIA keyword evidence term
+   (not the regex) is the case-sensitive element.
+
+2. **eu-ai-act-conformity-declaration.yaml missing brief-mandated negatives** — the brief requires
+   should_not_match to include an academic paper and the regulation text quoted in a memo; both were
+   absent. Added two negatives: (a) a peer-reviewed abstract analysing the Article 47 declaration
+   (filter-dependent: 'peer-reviewed'/'abstract'), and (b) an internal memo quoting Art 47(1) verbatim,
+   circulated via a compliance newsletter (filter-dependent: 'newsletter'). Because a *plain* internal
+   memo quoting Art 47(1) verbatim satisfies the AI-coupled primary and carries no noise term, it reaches
+   the 75 tier — a real residual FP the original false_positives entry 4 did not cover. Extended that
+   entry's description and mitigation to state this residual collision explicitly as an accepted
+   concept-class limitation. Also updated the operation prose noise-exclusion list to include academic
+   contexts.
+
+Consequential report correction: the empirical-verification section previously said "8 true negatives +
+5 filter-dependent" against 15 should_not_match cases (arithmetically inconsistent; the empirical split
+was 10+5). With the two new negatives the harness now reports 17 should_not_match = 10 true negatives +
+7 filter-dependent; the section above has been corrected to the verified numbers.
+
+MINOR review findings (GPAI negative labels overstating filter reliance, the constructed
+"Annex IV technical documentation" compound, undocumented plural-form FN scope) were deliberately left
+unchanged for final triage per fixer instructions.
+
+Re-run gates after fixes: `npm run check` → 0 error(s), 51 warning(s); `npm run check:quality` →
+Quality gate PASSED; `npm run compile` → Done: 1600 patterns; `git checkout -- patterns.json` before
+staging. Node harness re-run: 13/13 should_match, 0 failures, "ALL REGEX CHECKS PASSED".
