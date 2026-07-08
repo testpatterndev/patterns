@@ -44,6 +44,16 @@ const STRUCTURAL_DICT_STRENGTH = new Map([
 //    because these acronyms legitimately appear in mixed/lower case in the config files/paths being
 //    matched (customsettings.ini, sftp-config.json) and the surrounding regex context is already
 //    highly specific, so case-sensitivity would only lose recall without reducing false positives.
+//  - snaffler-unattend-password: its two 75-tiers (AdministratorPassword / AutoLogon forms) are
+//    gated only by the template-exclusion NOT-group and so read as weakMedium, but the structural
+//    XML nesting in the id_match regex itself (<AdministratorPassword>...<Value>x</Value>, mirroring
+//    Snaffler rule KeepUnattendXmlRegexRed) is the evidence — the same regex-is-the-evidence
+//    architecture as the protective-marking SITs above. The only available keyword gate
+//    (Keyword_unattend_context) already defines the 85-tiers, and unattend.xml fragments are
+//    routinely pasted/exfiltrated without that surrounding context, so keyword-gating the 75-tiers
+//    would only lose recall without reducing false positives (the exact XML nesting is vanishingly
+//    rare outside real unattend answer files). Adjudicated in the quality-tool-residuals backlog
+//    ticket; see .superpowers/sdd/backlog-quality-residuals-report.md.
 //  - nz-marking-{in-confidence,sensitive}: same protective-marking architecture as the AU marking
 //    SITs above (canonical 65/75/85 levels this time, so no nonCanonical flag), but their 85-tiers
 //    (endorsed form, legacy SEEMail bracket form) are gated only by a template-exclusion NOT-group,
@@ -91,6 +101,7 @@ const EXCLUDED_FILES = new Set([
   'au-pspf-security-classification.yaml',
   'snaffler-domain-join-creds.yaml',
   'snaffler-ftp-credentials.yaml',
+  'snaffler-unattend-password.yaml',
   'nz-marking-in-confidence.yaml',
   'nz-marking-sensitive.yaml',
   'nz-marking-restricted.yaml',
@@ -291,6 +302,19 @@ for (const file of fs.readdirSync(PATTERN_DIR).filter(name => name.endsWith('.ya
       keywordById.set(sharedKeyword.as, classifyDictBySlug(sharedKeyword.dict, dictionariesBySlug))
     }
   }
+  // Regex-ref awareness: a tier's positive matches[] refs may point at supporting element regexes
+  // declared in purview.regexes (label-context / structural corroboration patterns), not only at
+  // keywords. Before this fix such refs were silently dropped from the strength list, so a tier
+  // whose only positive evidence was a corroborating regex read as evidence-less (noEvidence) and a
+  // tier combining a regex ref with generic keywords read as generic-only. A deliberately-authored
+  // supporting regex is real, usually structural-or-better evidence, so it is credited as its own
+  // 'regex' strength (treated like specific/domain in the checks below). Known residual, accepted:
+  // the tool cannot tell a substantive supporting regex from a tautological one (e.g. a
+  // Pattern_*_label_context regex that is the same phrase as the tier's own id_match), and it cannot
+  // see label-embedded-in-regex evidence at all (the D1 convention where the id_match regex itself
+  // carries the label gate, e.g. nz-nzbn / uk-companies-house-number) — those tiers still read as
+  // evidence-less even though the label gating lives inside the primary regex.
+  const regexIds = new Set((pattern.purview.regexes || []).map(regex => regex?.id).filter(Boolean))
 
   const tiers = pattern.purview.pattern_tiers || []
   const levels = tiers.map(tier => Number(tier.confidence_level))
@@ -327,8 +351,11 @@ for (const file of fs.readdirSync(PATTERN_DIR).filter(name => name.endsWith('.ya
 
   for (const tier of tiers) {
     const refs = collectPositiveRefs(tier.matches || [])
-    const strengths = refs.map(ref => keywordById.get(ref)).filter(Boolean).filter(strength => strength !== 'noise')
-    const hasSpecificOrDomain = strengths.some(strength => strength === 'specific' || strength === 'domain')
+    const strengths = refs
+      .map(ref => keywordById.get(ref) ?? (regexIds.has(ref) ? 'regex' : undefined))
+      .filter(Boolean)
+      .filter(strength => strength !== 'noise')
+    const hasSpecificOrDomain = strengths.some(strength => strength === 'specific' || strength === 'domain' || strength === 'regex')
     const genericOnly = strengths.length > 0 && strengths.every(strength => strength === 'generic' || strength === 'structural')
     const noEvidence = strengths.length === 0
     const level = Number(tier.confidence_level)
