@@ -1,14 +1,17 @@
 schema: testpattern/v1
 name: French Phone Number
 slug: fr-phone-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
   Detects French national telephone numbers per ARCEP's numbering plan: 10-digit numbers in the "0X XX XX
   XX XX" form covering geographic (01-05), mobile/personal (06-07), and polyvalent (09) leading digits,
   plus the +33 international form (10-digit domestic number with the leading 0 dropped, per ARCEP
-  convention). The 09 polyvalent range is in scope because it is predominantly personal PII in practice: 09
+  convention), including the widespread "+33 (0)6 39 98 45 67" letterhead rendering (a
+  common-but-nonstandard practice — ITU-T E.123 advises against the parenthesised trunk digit in
+  international notation, but it is ubiquitous on French letterheads and email signatures, so it is
+  matched for detection purposes). The 09 polyvalent range is in scope because it is predominantly personal PII in practice: 09
   is the standard residential VoIP home-line range, auto-issued with consumer internet boxes to millions of
   French households; only the small 0937-0939 sub-range carries ARCEP's newer "technical platform" category
   (app-to-driver ephemeral numbers and similar). Numbers beginning 08 (value-added services) remain
@@ -22,7 +25,7 @@ operation: >-
   within 300 characters. Keyword lists: phone-context. Both the domestic and international (+33) sub-regexes
   are evidence-gated at every tier — no tier fires without positive corroborative evidence, per the
   phone-family convention — see confidence_justification.
-pattern: '(?<!\d)(?:\+33[\s.-]?[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|0[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+pattern: '(?<!\d)(?:\+33[\s.-]?(?:\(0\)[\s.-]?)?[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|0[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
 confidence: medium
 confidence_justification: >-
   Medium confidence: the leading-digit constraint (01-07 and 09 domestic, restricting to geographic,
@@ -68,13 +71,15 @@ test_cases:
       description: ARCEP-reserved fictional root, geographic 02 range, dot-separated
     - value: 'International: +33 6 39 98 45 67'
       description: International +33 form of the mobile fictional root, leading 0 dropped
+    - value: 'En-tête : +33 (0)6 39 98 45 67'
+      description: Widespread "+CC (0)" letterhead rendering — nonstandard per E.123 but ubiquitous on French letterheads
     - value: 'Domicile: 09 70 12 34 56'
       description: Polyvalent 09 residential VoIP home-line range, illustrative synthetic value (ARCEP's audiovisual-works fictional roots include no 09 root)
   should_not_match:
     - value: '08 92 68 00 00'
       description: Leading digit 8 is a value-added-service number, out of scope for this personal-communications pattern
     - value: '00 12 34 56 78'
-      description: Second digit 0 — "00" is the international call prefix, not a valid subscriber-number category (valid categories are 01-07 and 09)
+      description: Second digit 0 — "00" is the international call prefix, not a subscriber-number category (the plan's subscriber categories are 01-09; this pattern covers 01-07 and 09, with 08 value-added services deliberately out of scope)
     - value: '01 99 00 12'
       description: Only 8 digits total, two short of the required 10
     - value: '901990012345678'
@@ -132,6 +137,11 @@ purview:
       id_match: Regex_fr_phone_domestic
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 85
       id_match: Regex_fr_phone_intl
       matches:
@@ -145,11 +155,16 @@ purview:
       id_match: Regex_fr_phone_intl
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_fr_phone_domestic
       pattern: '(?<!\d)0[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
     - id: Regex_fr_phone_intl
-      pattern: '(?<!\d)\+33[\s.-]?[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
+      pattern: '(?<!\d)\+33[\s.-]?(?:\(0\)[\s.-]?)?[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
   keywords:
     - id: Keyword_fr_phone_specific
       groups:
@@ -159,9 +174,7 @@ purview:
             - French mobile number
             - numéro de téléphone
             - numéro de portable
-            - portable
-            - call me at
-            - text me at
+            - téléphone portable
       strength: specific
 risk_rating: 5
 risk_description: >-
@@ -183,9 +196,20 @@ references:
     title: "Légifrance: Décision n° 2021-0532 du 8 avril 2021 (plan national de numérotation), incl. §2.5.12 Numéros pour œuvres audiovisuelles"
   - url: https://www.arcep.fr/actualites/actualites-et-communiques/detail/n/plan-de-numerotation-050922.html
     title: "ARCEP: 06/07 reserved for interpersonal communications; 09 polyvalent numbers incl. the technical-platform sub-category"
+  - url: https://www.itu.int/rec/T-REC-E.123
+    title: "ITU-T Recommendation E.123: Notation for national and international telephone numbers — the international \"(0)\" trunk-digit form is documented as common practice that E.123 advises against"
 created: '2026-07-06'
-updated: '2026-07-06'
+updated: '2026-07-08'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-08'
+    description: >-
+      Rendering coverage: the "+33 (0)..." letterhead form (nonstandard per E.123 but ubiquitous on
+      French letterheads). Docs: corrected the 00-prefix negative test-case parenthetical — 08 is a valid
+      plan category that is deliberately out of scope, not an invalid one. Hygiene: dropped the bare
+      generic term "portable" and generic English phrases (call me at, text me at) from the
+      country-specific 85-tier keyword dict, added "téléphone portable"; added the noise-exclusion NOT
+      node to both 75 tiers per the identifier-family convention.
   - version: 1.0.0
     date: '2026-07-06'
     description: Initial release.

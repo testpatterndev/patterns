@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Italian Phone Number
 slug: it-phone-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
@@ -119,6 +119,16 @@ false_positives:
       Deliberate trade-off: evidence that live 9-digit stock persists today is inconclusive, and loosening
       the length bound to 9-10 digits would measurably raise digit collision for every match; revisit if a
       primary source confirms surviving 9-digit assignments.
+  - description: >-
+      The mobile sub-regex also fires inside the +39 international rendering when the number is written
+      with separators (empirically verified: in "+39 345 678 9012" it matches the "345 678 9012" substring —
+      Italian mobiles have no trunk 0, so the digits after "+39 " are exactly the domestic form; the
+      contiguous "+393456789012" rendering is protected by the digit-boundary lookbehind).
+    mitigation: >-
+      Benign co-fire, left in place deliberately: both sub-regexes carry identical evidence gating and
+      confidence levels, so the duplicate match cannot inflate confidence — it can only duplicate a finding
+      at the same level, which reporting layers de-duplicate by offset. A structural fix would need
+      variable-width negative lookbehind, which the universal engine target does not support.
 exports:
   - purview_xml
   - yaml
@@ -148,6 +158,11 @@ purview:
       id_match: Regex_it_phone_mobile
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 85
       id_match: Regex_it_phone_intl
       matches:
@@ -161,6 +176,11 @@ purview:
       id_match: Regex_it_phone_intl
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_it_phone_mobile
       pattern: '(?<!\d)3[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
@@ -175,9 +195,7 @@ purview:
             - Italian mobile number
             - numero di telefono
             - numero di cellulare
-            - cellulare
-            - call me at
-            - text me at
+            - telefono cellulare
       strength: specific
 risk_rating: 5
 risk_description: >-
@@ -196,10 +214,20 @@ references:
   - url: https://www.agcom.it/piano-di-numerazione
     title: "AGCOM: Piano di numerazione (national numbering plan — service classification by leading digit)"
   - url: https://www.agcom.it/sites/default/files/migration/attachment/Allegato%2020-2-2015.pdf
-    title: "AGCOM: Allegato A alla Delibera n. 8/15/CIR (mobile customer numbering structure \"3XYZ U1..U6\", 10-digit total)"
+    title: "AGCOM: Allegato A alla Delibera n. 8/15/CIR (mobile customer numbering structure \"3XYZ U1..U6\", 10-digit total for current-plan assignments; pre-existing legacy 9-digit mobile assignments permitted to persist)"
 created: '2026-07-06'
-updated: '2026-07-06'
+updated: '2026-07-08'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-08'
+    description: >-
+      Docs: reference title for Delibera 8/15/CIR now carries the legacy-9-digit qualifier the description
+      and false_positives already document, so the citation no longer overstates the "10-digit total" as
+      unconditional. Hygiene: dropped the bare generic term "cellulare" and generic English phrases
+      (call me at, text me at) from the country-specific 85-tier keyword dict, added "telefono cellulare";
+      added the noise-exclusion NOT node to both 75 tiers per the identifier-family convention. Documented
+      the verified mobile-regex co-fire inside the spaced +39 rendering as a benign, same-confidence
+      duplicate (no regex change).
   - version: 1.0.0
     date: '2026-07-06'
     description: Initial release. Scoped to mobile numbers only; geographic/landline numbers out of scope (bounded 10-11 digit total but collision-prone unconstrained structure at that length, unverified per-prefix minimums, and the +39 leading-zero retention quirk — see description).

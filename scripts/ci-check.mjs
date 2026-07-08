@@ -1,15 +1,17 @@
 // CI gate for the patterns repo. Fails (exit 1) on any of:
 //   - YAML parse / missing required fields
+//   - a top-level pattern or purview.regexes[].pattern that does not compile as a regex
+//     (checked for EVERY pattern regardless of its type field — keyword_list &c. included)
 //   - double-escaped regex (\\b instead of \b)
 //   - |top500 generator token left in a regex
 //   - a purview validators[].ref that is not a real MS validator function nor a local definition
 //   - a should_match that no regex in the file matches, or a should_not_match that the
 //     top-level pattern matches (filter-documented negatives are reported as warnings only)
-//   - a collection member (data/collections/*.yaml patterns list) that does not reference
-//     an existing pattern slug (dangling member)
+//   - a collection member (data/collections/**/*.yaml patterns list, recursive like
+//     compile.js walkDir) that does not reference an existing pattern slug (dangling member)
 // Usage: node scripts/ci-check.mjs
 import { readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
 
@@ -38,7 +40,10 @@ function purviewBanned(src) {
   // Char classes are already stripped to literal `[]`, so any surviving ^ or $ is outside
   // a class. Only unescaped anchors count — `\^`/`\$` are literal chars, not anchors.
   if (/(?<!\\)\^|(?<!\\)\$/.test(s)) issues.push('^/$ anchor')
-  const captures = (s.replace(/\(\?[:=!<]/g, '(?x').match(/\((?!\?)/g) || []).length
+  // Strip escaped characters first so literal `\(` / `\)` (e.g. parenthesised phone
+  // renderings like `\(020\)`) are not miscounted as capturing groups — Boost/Purview
+  // accepts literal parens fine; only real unnamed capture groups are the concern.
+  const captures = (s.replace(/\\./g, '').replace(/\(\?[:=!<]/g, '(?x').match(/\((?!\?)/g) || []).length
   if (captures > 1) issues.push(`${captures} capturing groups`)
   // Boost.RegEx allows FIXED-length lookbehinds (e.g. `\s{3}`) — only variable-length
   // quantifiers (*, +, ?, {n,}, {n,m}) inside the body are banned. Note this also flags a
@@ -60,7 +65,14 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   if (typeof p.pattern === 'string') regexes.push({ id: 'TOP', src: p.pattern })
   for (const r of p.purview?.regexes ?? []) if (typeof r.pattern === 'string') regexes.push({ id: r.id, src: r.pattern })
 
+  // Per-regex validation runs for EVERY collected regex (top-level + all purview.regexes),
+  // regardless of p.type — keyword_list/keyword_dictionary purview phrase regexes ship to the
+  // tenant exactly like regex-typed ones do, so they get the same gate. Compilation results
+  // are kept for the test-case execution below (compiled once, not twice).
+  const compiled = []
   for (const { id, src } of regexes) {
+    try { compiled.push(toRe(src, p.case_sensitive)) }
+    catch (e) { errors.push(`${p.slug}: ${id} regex does not compile — ${e.message.split('\n')[0]}`) }
     if (/\\\\[bdswWDSnrt]/.test(src)) errors.push(`${p.slug}: ${id} double-escaped regex`)
     if (/\|top500\)/.test(src)) errors.push(`${p.slug}: ${id} contains |top500 generator token`)
     for (const bad of purviewBanned(src)) {
@@ -74,8 +86,7 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   for (const r of p.purview?.regexes ?? []) for (const v of r.validators ?? [])
     if (v.ref && !MS_VALIDATORS.has(v.ref) && !localVal.has(v.ref)) errors.push(`${p.slug}: validator ref '${v.ref}' is not a real MS validator nor local`)
 
-  // test-case execution
-  const compiled = regexes.map(r => { try { return toRe(r.src, p.case_sensitive) } catch { return null } }).filter(Boolean)
+  // test-case execution (uses the `compiled` array built during per-regex validation above)
   const top = (typeof p.pattern === 'string') ? (() => { try { return toRe(p.pattern, p.case_sensitive) } catch { return null } })() : null
   // keyword_proximity uses keyword+proximity detection (not a single regex), so don't
   // regex-test its cases here. keyword_list/dictionary with no compiled regex: skip too.
@@ -95,10 +106,17 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
 }
 
 // ── Collection integrity: every collection member must reference an existing pattern slug ──
+// Recursive walk (mirrors compile.js walkDir) so a collection placed in a subdirectory —
+// which compile.js WOULD ship — cannot be silently skipped by this integrity check.
 const colDir = join(BASE, 'data', 'collections')
-for (const f of readdirSync(colDir).filter(f => f.endsWith('.yaml'))) {
+const walkYaml = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap(e => {
+  const full = join(dir, e.name)
+  return e.isDirectory() ? walkYaml(full) : (/\.ya?ml$/.test(e.name) ? [full] : [])
+})
+for (const file of walkYaml(colDir)) {
+  const f = relative(colDir, file).replace(/\\/g, '/')
   let c
-  try { c = yaml.load(readFileSync(join(colDir, f), 'utf-8')) }
+  try { c = yaml.load(readFileSync(file, 'utf-8')) }
   catch (e) { errors.push(`collections/${f}: YAML parse — ${e.message.split('\n')[0]}`); continue }
   const label = `collections/${typeof c?.slug === 'string' ? c.slug : f}`
   if (!Array.isArray(c?.patterns) || !c.patterns.length) { errors.push(`${label}: missing or empty 'patterns' member list`); continue }

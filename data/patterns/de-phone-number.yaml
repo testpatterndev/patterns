@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: German Phone Number
 slug: de-phone-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
@@ -10,8 +10,16 @@ description: >-
   international (+49, leading 0 dropped) forms. BNetzA's own published length table shows the national
   significant number (the digits after the leading 0, including the "1" of "15/16/17") is 10 digits for
   most 016x/017x allocations and 11 digits for the 015x range and the 1609/176 exceptions — every quantifier
-  below is bounded to this documented 10-11 digit span rather than left open-ended. Geographic (Ortsnetz)
-  landline numbers are intentionally out of scope: BNetzA states area codes run 2-5 digits and new
+  below is bounded to this documented 10-11 digit span rather than left open-ended. The 10-11 bound is
+  applied as a single envelope across all three ranges (the regex cannot pin 015x to exactly 11 and
+  non-exception 016x/017x to exactly 10 without per-sub-range length alternation), so a 10-digit 015x or an
+  11-digit non-exception 016x/017x rendering is accepted — a deliberate, documented over-acceptance kept
+  small by the envelope itself. Beyond the DIN 5008:2020 space-grouped form, two widespread legacy DIN 5008
+  renderings of the mobile prefix are covered: the slash form "0171/3920045" and the parenthesised form
+  "(0171) 3920045" — both deprecated by the current DIN 5008 (which prescribes plain space grouping) but
+  still common in signatures and letterheads — plus the "+49 (0)171 ..." letterhead form (nonstandard per
+  ITU-T E.123, but ubiquitous). Geographic (Ortsnetz) landline numbers are intentionally out of scope
+  (so the landline renderings "030/12345678" and "(030) 12345678" are likewise not matched): BNetzA states area codes run 2-5 digits and new
   allocations are capped at 11 significant digits (10 for the Berlin/Hamburg/Frankfurt/Munich two-digit-code
   exception), but does not publish a verified minimum length for the existing stock of legacy numbers, so a
   low-end bound would be invented rather than sourced — mirroring in-phone-number's decision to scope out
@@ -23,7 +31,7 @@ operation: >-
   Corroborative evidence: keywords within 300 characters. Keyword lists: phone-context. Both the domestic
   and international (+49) sub-regexes are evidence-gated at every tier — no tier fires without positive
   corroborative evidence, per the phone-family convention — see confidence_justification.
-pattern: '(?<!\d)(?:\+49[\s.-]?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?|0[\s.-]?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?)(?!\d)'
+pattern: '(?<!\d)(?:\+49[\s.-]?(?:\(0\)[\s.-]?)?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?|0[\s.-]?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?|01[5-7]\d\s?/\s?\d(?:[\s.-]?\d){6,7}|\(01[5-7]\d\)[\s.-]?\d(?:[\s.-]?\d){6,7})(?!\d)'
 confidence: medium
 confidence_justification: >-
   Medium confidence: the 01[5-7] mobile-family leading digits and the 10-11 digit length bound (drawn
@@ -68,6 +76,12 @@ test_cases:
       description: BNetzA-reserved Deutsche Telekom drama number block (0171 3920000-3920099), hyphenated
     - value: 'International contact: +49 152 28817386'
       description: International +49 form of the Vodafone drama number, leading 0 dropped
+    - value: 'Durchwahl: 0152/28817386'
+      description: Legacy DIN 5008 slash rendering of the Vodafone drama number (deprecated by DIN 5008:2020 but still widespread)
+    - value: 'Handy: (0171) 3920045'
+      description: Legacy parenthesised-prefix rendering of the Deutsche Telekom drama number
+    - value: 'Briefkopf: +49 (0)152 28817386'
+      description: Widespread "+CC (0)" letterhead rendering — nonstandard per E.123 but common on German letterheads
   should_not_match:
     - value: '030 23125678'
       description: BNetzA-reserved Berlin landline drama number — geographic (Ortsnetz) numbers are out of scope for this mobile-only pattern
@@ -77,6 +91,14 @@ test_cases:
       description: Only 4 digits after the 0152 mobile prefix, far short of the required 8-9
     - value: '90152288173869999'
       description: Valid-shaped mobile digit run embedded inside a longer reference number, rejected by digit boundaries
+    - value: '030/12345678'
+      description: DIN legacy slash rendering of a Berlin landline — geographic numbers stay out of scope, slash or not
+    - value: '(030) 12345678'
+      description: Parenthesised rendering of a Berlin landline — geographic numbers stay out of scope
+    - value: 'Termin am 01/07/2026 um 15:30'
+      description: Date written with slashes — the slash branch requires a 4-digit 015/016/017 mobile prefix and 7-8 subscriber digits
+    - value: 'Az. 0152/2020'
+      description: File/case-reference notation — only four digits after the slash, far short of the required 7-8
 false_positives:
   - description: >-
       A 10-11 digit sequence with the 01[5-7] mobile leading-digit shape can still coincidentally match
@@ -124,6 +146,11 @@ purview:
       id_match: Regex_de_phone_mobile
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 85
       id_match: Regex_de_phone_intl
       matches:
@@ -137,11 +164,16 @@ purview:
       id_match: Regex_de_phone_intl
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_de_phone_mobile
-      pattern: '(?<!\d)0[\s.-]?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?(?!\d)'
+      pattern: '(?<!\d)(?:0[\s.-]?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?|01[5-7]\d\s?/\s?\d(?:[\s.-]?\d){6,7}|\(01[5-7]\d\)[\s.-]?\d(?:[\s.-]?\d){6,7})(?!\d)'
     - id: Regex_de_phone_intl
-      pattern: '(?<!\d)\+49[\s.-]?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?(?!\d)'
+      pattern: '(?<!\d)\+49[\s.-]?(?:\(0\)[\s.-]?)?1[5-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?:[\s.-]?\d)?(?!\d)'
   keywords:
     - id: Keyword_de_phone_specific
       groups:
@@ -153,8 +185,6 @@ purview:
             - Handynummer
             - Mobilnummer
             - Rufnummer
-            - call me at
-            - text me at
       strength: specific
 risk_rating: 5
 risk_description: >-
@@ -176,9 +206,23 @@ references:
     title: "Bundesnetzagentur: Länge der Rufnummernblöcke (Mobile Dienste) — 10/11-digit national-format length table"
   - url: https://www.bundesnetzagentur.de/DE/Fachthemen/Telekommunikation/Nummerierung/_DL/mittlg148_2021.pdf?__blob=publicationFile&v=1
     title: "Bundesnetzagentur Mitteilung 148/2021: Rufnummern für Medienproduktionen (\"Drama Numbers\") — reserved fictional test numbers"
+  - url: https://www.workingoffice.de/korrespondenz/din-5008/telefonnummer-richtig-schreiben/
+    title: "working@office: Telefonnummern nach DIN 5008 — current space-grouped form; slash/hyphen/parenthesis renderings documented as the deprecated legacy convention"
+  - url: https://www.itu.int/rec/T-REC-E.123
+    title: "ITU-T Recommendation E.123: Notation for national and international telephone numbers — the international \"(0)\" trunk-digit form is documented as common practice that E.123 advises against"
 created: '2026-07-06'
-updated: '2026-07-06'
+updated: '2026-07-08'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-08'
+    description: >-
+      Rendering coverage: legacy DIN 5008 slash ("0171/3920045") and parenthesised ("(0171) 3920045")
+      renderings of the mobile prefix, and the "+49 (0)..." letterhead form. Geographic (Ortsnetz)
+      landlines stay out of scope, so the equivalent landline renderings (030/... and (030) ...) are
+      still not matched. Docs: clarified that the 10-11 digit BNetzA length bound is applied as a single
+      envelope across the 015/016/017 ranges rather than per-sub-range exact lengths. Hygiene: dropped
+      generic English phrases (call me at, text me at) from the country-specific 85-tier keyword dict;
+      added the noise-exclusion NOT node to both 75 tiers per the identifier-family convention.
   - version: 1.0.0
     date: '2026-07-06'
     description: Initial release. Scoped to mobile numbers only; geographic (Ortsnetz) landline numbers out of scope pending a verified minimum-length constraint.
