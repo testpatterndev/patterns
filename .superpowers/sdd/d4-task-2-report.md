@@ -86,13 +86,12 @@ version 1.0.0, created/updated 2026-07-08. `pattern_class` does NOT exist in thi
     cross-border impact), progress report for ongoing incidents —
     https://www.nis-2-directive.com/NIS_2_Directive_Article_23.html and exact 23(4) subpoint text at
     https://luxgap.com/lois/nis2/art-23/?lang=en
-- Vocabulary provenance: primary = the Art 23(4) stage names "significant incident", "early warning",
-  "incident notification". These are the honest topic anchors but individually collide with generic
-  incident-management/meteorological text — recorded explicitly in confidence_justification and
-  false_positives (discovery tier is knowingly broad; the exemplar's own primary "due diligence" sets
-  this bar). Corroborative = CSIRT (+ case-sensitive `\bCSIRTs?\b` structural regex required at 85),
-  "severe operational disruption", "indicators of compromise", "Directive (EU) 2022/2555",
-  essential/important entity, report-stage names.
+- Vocabulary provenance: primary = the Art 23 defined trigger "significant incident" ONLY (revised —
+  see Review fixes). The stage names "early warning" and "incident notification" are ubiquitous
+  outside NIS2 (meteorology, ops tooling) and are corroborative-only. Corroborative = CSIRT
+  (+ case-sensitive `\bCSIRTs?\b` structural regex required at 85), "severe operational disruption",
+  "indicators of compromise", "Directive (EU) 2022/2555", essential/important entity,
+  report-stage names ("early warning", "incident notification", intermediate/final/progress report).
 - Tier rationale: 85 = primary + NIS2 corroborative + CSIRT regex + NOT; 75 = primary + NOT; 65 discovery.
 
 ### 5. eu-nis2-cybersecurity-risk-measures (optional — SHIPPED)
@@ -104,12 +103,13 @@ version 1.0.0, created/updated 2026-07-08. `pattern_class` does NOT exist in thi
   effectiveness-assessment policies; cyber hygiene and cybersecurity training; cryptography/encryption;
   HR security, access control, asset management; multi-factor authentication —
   https://www.nis-2-directive.com/NIS_2_Directive_Article_21.html
-- Distinctiveness adjudication: shipped. "Cybersecurity risk-management measures" (hyphenated NIS2
-  term of art) and "all-hazards approach" are distinctive as primaries; the (a)–(j) measure names are
-  generic security vocabulary so they are used ONLY as corroboration, never as primary — this is the
-  design line that made the pattern shippable rather than mushy.
-- Tier rationale: standard ladder; civil-protection "all-hazards" collision documented with 85-tier
-  mitigation.
+- Distinctiveness adjudication: shipped. "Cybersecurity risk-management measures" (the NIS2 Article
+  21 term of art, matched hyphenated or unhyphenated) is the SOLE primary (revised — see Review
+  fixes). "All-hazards approach" is a ubiquitous FEMA/civil-protection term of art, so it and the
+  (a)–(j) measure names are used ONLY as corroboration, never as primary — this is the design line
+  that made the pattern shippable rather than mushy.
+- Tier rationale: standard ladder; civil-protection "all-hazards" collision eliminated at every tier
+  by making the term corroborative-only.
 
 ## Skips
 
@@ -153,12 +153,57 @@ NOT-gated at tier level, per keyword_proximity architecture). Output: ALL OK.
 
 Commit: (hash recorded in structured output; style `feat(patterns): ...`, not pushed)
 
+## Review fixes (fixer pass, 2026-07-08)
+
+Independent review verdict: needs_fixes (0 Critical, 2 Important, 4 Minor). Both Important
+findings fixed; commit `fix(patterns): t2-dora-nis2 review fixes`.
+
+1. `eu-nis2-incident-notification.yaml` — FIXED. "Early warning" and "incident notification"
+   violated brief convention 1 (primary = regulation-specific terms of art only): the reviewer
+   verified that "tsunami early warning system for the Pacific" and "Set up incident notification
+   emails in PagerDuty" fired at the NON-discovery 75 tier. Both phrases demoted from the primary
+   regex/keyword group to the corroborative keyword group (they were already in the top-level
+   corroborative_evidence list); "significant incident" — the Art 23 defined trigger — is now the
+   sole primary. Top-level `pattern`, Purview `Pattern_..._topic_terms`, `Evidence_..._primary`,
+   `Evidence_..._corroborative`, `operation`, `confidence_justification`, and the first
+   false_positives mitigation all updated consistently. should_not_match[0] (law-firm newsletter)
+   was reworded to include "significant incident" so it still exercises the noise-suppression path
+   under the narrowed primary.
+2. `eu-nis2-cybersecurity-risk-measures.yaml` — FIXED (took the stronger of the reviewer's two
+   options). "All-hazards approach" (ubiquitous FEMA/civil-protection term; "FEMA all-hazards
+   approach" fired at 75) removed from the primary regex/keyword group and added to the
+   corroborative group (both hyphenated and unhyphenated forms); "cybersecurity risk-management
+   measures" is now the sole primary, with the unhyphenated keyword variant added to the primary
+   keyword group to keep it aligned with the `risk[\s-]management` regex. The misleading
+   "discovery-tier collision is acknowledged" mitigation prose replaced: all-hazards is now
+   corroborative-only and never fires alone at ANY tier. should_not_match[2] (academic survey)
+   reworded to include the primary phrase so it still exercises the noise gate.
+
+Nothing rebutted — both Important findings were factually correct and were fixed as named.
+
+Empirical re-verification (node, js-yaml): all four reviewer probes ("tsunami early warning system
+for the Pacific", "Set up incident notification emails in PagerDuty", "FEMA all-hazards approach",
+and an unhyphenated "all hazards approach" civil-protection sentence) no longer match the primary
+(top-level AND Purview regex, asserted identical); all 6 should_match cases still match their
+primary; every should_not_match that contains a primary phrase also contains a noise term; no
+should_match contains a noise term. Output: ALL OK.
+
+Gates re-run after fixes: `npm run check` → 0 error(s), 51 warning(s); `npm run check:quality` →
+PASSED (0 issues outside exclusion set); `npm run compile` → Done: 1601 patterns (independently
+confirms the 1596→1601 count the review flagged as unverified); `git checkout -- patterns.json`
+before staging.
+
+Minor findings deliberately left for final triage per fixer instructions: singular-only primaries
+(plural `s?` broadening), DORA webinar should_not_match lacking a primary phrase, and the B-code
+regex over-matching nonexistent template codes (harmless 85-tier corroboration).
+
 ## Self-review
 
 - Strongest pattern: register-of-information (B_xx.yy structural evidence is near-unique to ITS
-  2024/2956 content). Weakest tier: NIS2 incident notification 75/65 — primary stage names are
-  generic; documented honestly rather than over-promising. If reviewers want tighter 75 precision,
-  moving "early warning" from primary to corroborative is the one-line adjustment.
+  2024/2956 content). Weakest tier: NIS2 incident notification 75/65 — "significant incident" alone
+  still collides with generic incident-management prose; documented honestly rather than
+  over-promising. (The originally offered adjustment — demoting "early warning" to corroborative —
+  was applied in the review-fixes pass, along with "incident notification".)
 - EUR-Lex could not be fetched directly (empty body on TXT and HTML endpoints); article text was
   verified via springlex.eu / nis-2-directive.com / luxgap.com mirrors of the OJ text plus the
   Central Bank of Ireland supervisory page, and instrument numbers cross-checked against EUR-Lex ELI
