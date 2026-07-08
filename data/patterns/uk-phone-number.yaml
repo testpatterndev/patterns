@@ -1,26 +1,33 @@
 schema: testpattern/v1
 name: UK Phone Number
 slug: uk-phone-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
   Detects UK national telephone numbers per Ofcom's National Telephone Numbering Plan: geographic numbers
-  (01/02 prefix) and mobile numbers (07 prefix, second digit restricted to 1-5 or 7-9 to exclude 070
-  personal-numbering and 076 pager ranges), both as 11-digit domestic strings (leading 0 + 10 significant
-  digits), plus the +44 international form (10 significant digits, leading 0 dropped per ITU/Ofcom
-  convention). Digit groups after the initial prefix use a flexible per-digit optional separator rather than
-  a single fixed grouping, because Ofcom's numbering plan allows multiple valid group-length conventions
-  (4+6, 3+7, 2+8, 5+5) that vary by area. Non-geographic service numbers (03/08/09) are intentionally out of
-  scope — they are typically organizational/service numbers rather than personal PII, mirroring how
-  au-fixed-line-telephone scopes to geographic numbers only.
+  (01/02 prefix) and mobile numbers (07 prefix, second digit restricted to 1-5 or 7-9, plus the 07624
+  Isle of Man mobile range — the one mobile block inside the otherwise-excluded 076 radiopaging range,
+  allocated to Isle of Man operators under the UK plan; 070 personal-numbering and the rest of 076 remain
+  excluded), both as 11-digit domestic strings (leading 0 + 10 significant digits), plus the +44
+  international form (10 significant digits, leading 0 dropped per ITU/Ofcom convention). Digit groups
+  after the initial prefix use a flexible per-digit optional separator rather than a single fixed grouping,
+  because Ofcom's numbering plan allows multiple valid group-length conventions (4+6, 3+7, 2+8, 5+5) that
+  vary by area. Two additional conventional renderings are covered: the parenthesised-area-code national
+  notation for geographic numbers, e.g. "(020) 7946 0958" / "(01632) 960960" (ITU-T E.123 national
+  notation, parentheses marking the optionally-dialled area code, for 2-5 digit area codes), and the
+  widespread "+44 (0)20 7946 0958" letterhead form (a common-but-nonstandard practice — E.123 advises
+  against the parenthesised trunk digit in international notation, but it is ubiquitous in UK signatures
+  and letterheads, so it is matched for detection purposes). Non-geographic service numbers (03/08/09)
+  are intentionally out of scope — they are typically organizational/service numbers rather than personal
+  PII, mirroring how au-fixed-line-telephone scopes to geographic numbers only.
 operation: >-
   Validation: none (UK numbers have no checksum). Reference: Ofcom National Telephone Numbering Plan,
   https://www.ofcom.org.uk/phones-and-broadband/phone-numbers/numbering. Corroborative evidence: keywords
   within 300 characters. Keyword lists: phone-context. Both the domestic and international (+44)
   sub-regexes are evidence-gated at every tier — no tier fires without positive corroborative evidence,
   per the phone-family convention — see confidence_justification.
-pattern: '(?<!\d)(?:\+44[\s.-]?(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)|0(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d))(?!\d)'
+pattern: '(?<!\d)(?:\+44[\s.-]?(?:\(0\)[\s.-]?)?(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?6[\s.-]?2[\s.-]?4[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)|0(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?6[\s.-]?2[\s.-]?4[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)|\(02\d\)[\s.-]?\d(?:[\s.-]?\d){7}|\(01\d{2}\)[\s.-]?\d(?:[\s.-]?\d){6}|\(01\d{3}\)[\s.-]?\d(?:[\s.-]?\d){5}|\(01\d{4}\)[\s.-]?\d(?:[\s.-]?\d){4})(?!\d)'
 confidence: medium
 confidence_justification: >-
   Medium confidence: the geographic (01/02) and mobile (07 with second-digit restriction) prefix
@@ -66,6 +73,14 @@ test_cases:
       description: Ofcom-reserved mobile drama number (07700 900XXX range)
     - value: 'Contact: +44 20 7946 0958'
       description: International +44 form of the London drama number, leading 0 dropped
+    - value: 'Switchboard: (020) 7946 0958'
+      description: Parenthesised-area-code national notation (E.123), London drama number
+    - value: 'Office: (01632) 960960'
+      description: Parenthesised 5-digit area code (leading 0 + 4 significant digits), Ofcom-reserved drama code
+    - value: 'Letterhead: +44 (0)20 7946 0958'
+      description: Widespread "+CC (0)" letterhead rendering — nonstandard per E.123 but ubiquitous in UK signatures
+    - value: 'IoM mobile: 07624 496123'
+      description: 07624 Isle of Man mobile range (UK-plan mobile block inside 076), illustrative synthetic value — no Ofcom drama range exists for 07624
   should_not_match:
     - value: '0345 600 0000'
       description: Non-geographic 03 service number — out of scope for this pattern (see description)
@@ -75,6 +90,12 @@ test_cases:
       description: One digit short of the required 10 significant digits after the leading 0
     - value: '4420794609589999'
       description: Valid-shaped digit run embedded inside a longer reference number, rejected by digit boundaries
+    - value: '(0345) 600 0000'
+      description: Parenthesised area-code notation does not open the door to 03 non-geographic service numbers
+    - value: '(2026) 1234 5678'
+      description: Year-like parenthetical followed by digits — parenthesised branch requires a leading-0 geographic code
+    - value: '07634 496123'
+      description: 0763x is radiopaging — only the 07624 Isle of Man block inside 076 is a mobile range
 false_positives:
   - description: >-
       An 11-digit UK-shaped domestic sequence (geographic or mobile prefix, correct leading digits) can
@@ -120,6 +141,11 @@ purview:
       id_match: Regex_uk_phone_domestic
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 85
       id_match: Regex_uk_phone_intl
       matches:
@@ -133,11 +159,16 @@ purview:
       id_match: Regex_uk_phone_intl
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_uk_phone_domestic
-      pattern: '(?<!\d)0(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+      pattern: '(?<!\d)(?:0(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?6[\s.-]?2[\s.-]?4[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)|\(02\d\)[\s.-]?\d(?:[\s.-]?\d){7}|\(01\d{2}\)[\s.-]?\d(?:[\s.-]?\d){6}|\(01\d{3}\)[\s.-]?\d(?:[\s.-]?\d){5}|\(01\d{4}\)[\s.-]?\d(?:[\s.-]?\d){4})(?!\d)'
     - id: Regex_uk_phone_intl
-      pattern: '(?<!\d)\+44[\s.-]?(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+      pattern: '(?<!\d)\+44[\s.-]?(?:\(0\)[\s.-]?)?(?:[12][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?[1-57-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[\s.-]?6[\s.-]?2[\s.-]?4[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
   keywords:
     - id: Keyword_uk_phone_specific
       groups:
@@ -148,8 +179,6 @@ purview:
             - British mobile number
             - call me on
             - text me on
-            - mobile
-            - landline
       strength: specific
 risk_rating: 5
 risk_description: >-
@@ -167,11 +196,24 @@ sensitivity_labels:
 references:
   - url: https://www.ofcom.org.uk/phones-and-broadband/phone-numbers/numbering
     title: "Ofcom: Telecoms numbering (National Telephone Numbering Plan)"
+  - url: https://www.ofcom.org.uk/siteassets/resources/documents/phones-telecoms-and-internet/information-for-industry/numbering/other/national-numbering-plan.pdf
+    title: "Ofcom: The National Telephone Numbering Plan (PDF) — incl. the 07624 Isle of Man mobile allocation within 076"
   - url: https://www.ofcom.org.uk/phones-and-broadband/phone-numbers/numbers-for-drama
     title: "Ofcom: Telephone numbers for use in TV and radio drama programmes"
+  - url: https://www.itu.int/rec/T-REC-E.123
+    title: "ITU-T Recommendation E.123: Notation for national and international telephone numbers — national notation with parenthesised area code; the international \"(0)\" trunk-digit form is documented as common practice that E.123 advises against"
 created: '2026-07-06'
-updated: '2026-07-06'
+updated: '2026-07-08'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-08'
+    description: >-
+      Rendering coverage: parenthesised-area-code national notation for geographic numbers (E.123 style,
+      2-5 digit area codes), the "+44 (0)..." letterhead form, and the 07624 Isle of Man mobile range
+      (UK-plan mobile block inside the otherwise-excluded 076 radiopaging range, per Ofcom's numbering
+      plan). Hygiene: dropped generic terms (mobile, landline) from the country-specific 85-tier keyword
+      dict — they remain 75-tier evidence via the shared phone-context dict; added the noise-exclusion
+      NOT node to both 75 tiers per the identifier-family convention.
   - version: 1.0.0
     date: '2026-07-06'
     description: Initial release.

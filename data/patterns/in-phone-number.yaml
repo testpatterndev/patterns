@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: India Phone Number
 slug: in-phone-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
@@ -103,6 +103,17 @@ false_positives:
     mitigation: >-
       A future revision could add STD/landline coverage if a genuinely verifiable structural constraint
       (beyond "10 digits after a leading 0") is confirmed from a primary DoT/TRAI source.
+  - description: >-
+      The domestic sub-regex also fires inside the +91 international rendering when a separator follows the
+      country code (empirically verified: in "+91 9876543210" it matches the "9876543210" substring —
+      Indian mobiles drop the trunk 0 in international form, so the digits after "+91 " are exactly the
+      domestic form; the contiguous "+919876543210" rendering is protected by the digit-boundary
+      lookbehind).
+    mitigation: >-
+      Benign co-fire, left in place deliberately: both sub-regexes carry identical evidence gating and
+      confidence levels, so the duplicate match cannot inflate confidence — it can only duplicate a finding
+      at the same level, which reporting layers de-duplicate by offset. A structural fix would need
+      variable-width negative lookbehind, which the universal engine target does not support.
 exports:
   - purview_xml
   - yaml
@@ -132,6 +143,11 @@ purview:
       id_match: Regex_in_phone_mobile
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 85
       id_match: Regex_in_phone_intl
       matches:
@@ -145,6 +161,11 @@ purview:
       id_match: Regex_in_phone_intl
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_in_phone_mobile
       pattern: '(?<!\d)[6-9]\d{4}[\s.-]?\d{5}(?!\d)'
@@ -159,9 +180,6 @@ purview:
             - India phone number
             - call me at
             - WhatsApp number
-            - mobile number
-            - text: SMS
-              case_sensitive: true
       strength: specific
 risk_rating: 5
 risk_description: >-
@@ -182,8 +200,18 @@ references:
   - url: https://trai.gov.in/tcccpr
     title: "TRAI: Telecom Commercial Communications Customer Preference Regulations (TCCCPR), 2018"
 created: '2026-07-06'
-updated: '2026-07-06'
+updated: '2026-07-08'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-08'
+    description: >-
+      Hygiene: dropped generic terms ("mobile number", "SMS") from the country-specific 85-tier keyword
+      dict — both remain 75-tier evidence via the shared phone-context dict; added the noise-exclusion NOT
+      node to both 75 tiers per the identifier-family convention. Docs: documented the verified
+      domestic-regex co-fire inside the spaced +91 rendering as a benign, same-confidence duplicate (no
+      regex change). The "+91 (0)..." letterhead form was considered and deliberately not added: unlike
+      +44/+49/+33/+31 no authoritative style-guide or regulator documentation of the rendering was found
+      for India, and the family only ships renderings with a citable source.
   - version: 1.0.0
     date: '2026-07-06'
     description: Initial release. Scoped to mobile numbers only; landline/STD out of scope pending verified STD leading-digit structure.

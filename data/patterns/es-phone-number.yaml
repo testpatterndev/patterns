@@ -1,22 +1,26 @@
 schema: testpattern/v1
 name: Spanish Phone Number
 slug: es-phone-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
   Detects Spanish national telephone numbers per Spain's closed 9-digit numbering plan (Plan Nacional de
   Numeración Telefónica, administered under CNMC oversight): mobile numbers (segment N=6 in full, plus
-  N=7 partially opened for mobile use in the 71/72/73/74 sub-ranges per the 2010 CNMC/CMT mobile-expansion
-  resolution) and geographic numbers (leading 8 or 9, with the second digit constrained to never be 0 — a
+  N=7 partially opened for mobile use in the 71/72/73/74 sub-ranges by the SETSI Resolución de 12 de marzo
+  de 2010, BOE-A-2010-5251; the first 7-prefixed mobile numbers entered service from late 2010/2011 once
+  the then-regulator CMT assigned the new ranges to operators) and geographic numbers (leading 8 or 9, with the second digit constrained to never be 0 — a
   constraint that incidentally excludes the 900/901/902/905 toll-free and premium-rate service ranges, whose
   second digit is 0). Spain has no domestic trunk prefix, so the +34 international form carries the same
   9 significant digits as the domestic form, just with the +34 prefix in place of nothing.
 operation: >-
   Validation: none (Spanish numbers have no checksum). Reference: CNMC, Registro de Numeración de
   Telecomunicaciones, https://www.cnmc.es/en/sectores-que-regulamos/telecomunicaciones/registros-de-numeracion
-  (9-digit closed plan); Resolución de 12 de marzo de 2010 (CMT) opening the 71/72/73/74 mobile sub-ranges,
-  as reported in CNMC's 2012 sectoral report, https://www.cnmc.es/sites/default/files/1539217_7.pdf;
+  (9-digit closed plan); Resolución de 12 de marzo de 2010, de la Secretaría de Estado de Telecomunicaciones
+  y para la Sociedad de la Información (SETSI, not CMT — the ministry attributes numbering resources; the
+  regulator then assigns them), BOE-A-2010-5251, https://www.boe.es/diario_boe/txt.php?id=BOE-A-2010-5251,
+  opening the 71/72/73/74 mobile sub-ranges, as reported in CNMC's 2012 sectoral report,
+  https://www.cnmc.es/sites/default/files/1539217_7.pdf;
   leading-digit breakdown corroborated by the Spanish government's consumer information service,
   https://www.consumoresponde.es/. Corroborative evidence: keywords within 300 characters. Keyword lists:
   phone-context. Both the domestic and international (+34) sub-regexes are evidence-gated at every tier —
@@ -62,7 +66,7 @@ test_cases:
     - value: 'Móvil: 612 345 678'
       description: Domestic mobile, N=6 segment, illustrative synthetic value (no official CNMC-reserved fictional range exists — verified absent during research)
     - value: 'Contacto: 711 234 567'
-      description: Domestic mobile, N=7 segment opened for mobile use in 2011 (71-74 sub-range), illustrative synthetic value
+      description: Domestic mobile, N=7 segment (71-74 sub-range opened by the March 2010 SETSI resolution, in service since 2010/2011), illustrative synthetic value
     - value: 'Fijo: 912 345 678'
       description: Domestic geographic, leading 9 with non-zero second digit, illustrative synthetic value
     - value: 'International: +34 612 345 678'
@@ -93,6 +97,16 @@ false_positives:
       Test values use clearly non-representative sequential digit patterns; deployers should substitute their
       own tenant's synthetic test data for live validation rather than relying on a non-existent official
       reserved range.
+  - description: >-
+      The domestic sub-regex also fires inside the +34 international rendering when the number is written
+      with separators (empirically verified: in "+34 612 345 678" it matches the "612 345 678" substring —
+      Spain has no trunk prefix, so the digits after "+34 " are exactly the domestic form; the contiguous
+      "+34612345678" rendering is protected by the digit-boundary lookbehind).
+    mitigation: >-
+      Benign co-fire, left in place deliberately: both sub-regexes carry identical evidence gating and
+      confidence levels, so the duplicate match cannot inflate confidence — it can only duplicate a finding
+      at the same level, which reporting layers de-duplicate by offset. A structural fix would need
+      variable-width negative lookbehind, which the universal engine target does not support.
 exports:
   - purview_xml
   - yaml
@@ -122,6 +136,11 @@ purview:
       id_match: Regex_es_phone_domestic
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 85
       id_match: Regex_es_phone_intl
       matches:
@@ -135,6 +154,11 @@ purview:
       id_match: Regex_es_phone_intl
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_es_phone_domestic
       pattern: '(?<!\d)(?:6[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[1-4][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|[89][1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
@@ -149,9 +173,7 @@ purview:
             - Spanish mobile number
             - número de teléfono
             - número de móvil
-            - móvil
-            - call me at
-            - text me at
+            - teléfono móvil
       strength: specific
 risk_rating: 5
 risk_description: >-
@@ -169,13 +191,25 @@ sensitivity_labels:
 references:
   - url: https://www.cnmc.es/en/sectores-que-regulamos/telecomunicaciones/registros-de-numeracion
     title: "CNMC: Registro de Numeración de Telecomunicaciones (9-digit closed numbering plan)"
+  - url: https://www.boe.es/diario_boe/txt.php?id=BOE-A-2010-5251
+    title: "BOE-A-2010-5251: Resolución de 12 de marzo de 2010, de la SETSI — attribution of the 71/72/73/74 sub-ranges to mobile services (primary source)"
   - url: https://www.cnmc.es/sites/default/files/1539217_7.pdf
-    title: "CNMC: Informe Económico Sectorial 2012 — Numeración (Resolución 12 de marzo de 2010 opening the 71-74 mobile sub-ranges)"
+    title: "CNMC: Informe Económico Sectorial 2012 — Numeración (reporting the March 2010 SETSI resolution and the subsequent CMT range assignments)"
   - url: https://www.consumoresponde.es/art%C3%ADculos/tipologia_de_los_numeros_de_telefono_existentes_en_espana
     title: "Consumo Responde (Spanish government consumer service): Tipología de los números de teléfono existentes en España"
 created: '2026-07-06'
-updated: '2026-07-06'
+updated: '2026-07-08'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-08'
+    description: >-
+      Docs: corrected the 71-74 mobile-opening citation — the Resolución de 12 de marzo de 2010 was issued
+      by SETSI (BOE-A-2010-5251), not CMT, and the BOE primary source is now referenced directly; test-case
+      wording aligned (resolution 2010, service entry 2010/2011). Hygiene: dropped the bare generic term
+      "móvil" and generic English phrases (call me at, text me at) from the country-specific 85-tier
+      keyword dict, added "teléfono móvil"; added the noise-exclusion NOT node to both 75 tiers per the
+      identifier-family convention. Documented the verified domestic-regex co-fire inside the spaced +34
+      rendering as a benign, same-confidence duplicate (no regex change).
   - version: 1.0.0
     date: '2026-07-06'
     description: Initial release.

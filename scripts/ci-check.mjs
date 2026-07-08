@@ -40,7 +40,10 @@ function purviewBanned(src) {
   // Char classes are already stripped to literal `[]`, so any surviving ^ or $ is outside
   // a class. Only unescaped anchors count — `\^`/`\$` are literal chars, not anchors.
   if (/(?<!\\)\^|(?<!\\)\$/.test(s)) issues.push('^/$ anchor')
-  const captures = (s.replace(/\(\?[:=!<]/g, '(?x').match(/\((?!\?)/g) || []).length
+  // Strip escaped characters first so literal `\(` / `\)` (e.g. parenthesised phone
+  // renderings like `\(020\)`) are not miscounted as capturing groups — Boost/Purview
+  // accepts literal parens fine; only real unnamed capture groups are the concern.
+  const captures = (s.replace(/\\./g, '').replace(/\(\?[:=!<]/g, '(?x').match(/\((?!\?)/g) || []).length
   if (captures > 1) issues.push(`${captures} capturing groups`)
   // Boost.RegEx allows FIXED-length lookbehinds (e.g. `\s{3}`) — only variable-length
   // quantifiers (*, +, ?, {n,}, {n,m}) inside the body are banned. Note this also flags a
