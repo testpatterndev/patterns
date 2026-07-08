@@ -1,5 +1,7 @@
 // CI gate for the patterns repo. Fails (exit 1) on any of:
 //   - YAML parse / missing required fields
+//   - a top-level pattern or purview.regexes[].pattern that does not compile as a regex
+//     (checked for EVERY pattern regardless of its type field — keyword_list &c. included)
 //   - double-escaped regex (\\b instead of \b)
 //   - |top500 generator token left in a regex
 //   - a purview validators[].ref that is not a real MS validator function nor a local definition
@@ -60,7 +62,14 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   if (typeof p.pattern === 'string') regexes.push({ id: 'TOP', src: p.pattern })
   for (const r of p.purview?.regexes ?? []) if (typeof r.pattern === 'string') regexes.push({ id: r.id, src: r.pattern })
 
+  // Per-regex validation runs for EVERY collected regex (top-level + all purview.regexes),
+  // regardless of p.type — keyword_list/keyword_dictionary purview phrase regexes ship to the
+  // tenant exactly like regex-typed ones do, so they get the same gate. Compilation results
+  // are kept for the test-case execution below (compiled once, not twice).
+  const compiled = []
   for (const { id, src } of regexes) {
+    try { compiled.push(toRe(src, p.case_sensitive)) }
+    catch (e) { errors.push(`${p.slug}: ${id} regex does not compile — ${e.message.split('\n')[0]}`) }
     if (/\\\\[bdswWDSnrt]/.test(src)) errors.push(`${p.slug}: ${id} double-escaped regex`)
     if (/\|top500\)/.test(src)) errors.push(`${p.slug}: ${id} contains |top500 generator token`)
     for (const bad of purviewBanned(src)) {
@@ -74,8 +83,7 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   for (const r of p.purview?.regexes ?? []) for (const v of r.validators ?? [])
     if (v.ref && !MS_VALIDATORS.has(v.ref) && !localVal.has(v.ref)) errors.push(`${p.slug}: validator ref '${v.ref}' is not a real MS validator nor local`)
 
-  // test-case execution
-  const compiled = regexes.map(r => { try { return toRe(r.src, p.case_sensitive) } catch { return null } }).filter(Boolean)
+  // test-case execution (uses the `compiled` array built during per-regex validation above)
   const top = (typeof p.pattern === 'string') ? (() => { try { return toRe(p.pattern, p.case_sensitive) } catch { return null } })() : null
   // keyword_proximity uses keyword+proximity detection (not a single regex), so don't
   // regex-test its cases here. keyword_list/dictionary with no compiled regex: skip too.
