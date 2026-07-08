@@ -1,0 +1,139 @@
+schema: testpattern/v1
+name: Groq API Key
+slug: global-groq-api-key
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Groq (GroqCloud) API keys, which use a distinctive gsk_ prefix followed by a long
+  alphanumeric body. A leaked key grants unauthorized, billed access to Groq's hosted inference
+  API and any prompts or data routed through it.
+operation: >-
+  Prefixed token format gsk_ followed by a long alphanumeric body (exact length/charset not
+  formally published by Groq; a generous 20-100 character bound is used). Corroborative evidence:
+  keywords within 300 characters.
+pattern: (?<![A-Za-z0-9_-])gsk_[A-Za-z0-9]{20,100}(?![A-Za-z0-9_-])
+confidence: high
+confidence_justification: >-
+  High confidence: the gsk_ prefix is distinctive and independently confirmed by GitGuardian's
+  detector spec (Prefixed: True), Groq's own GitHub secret-scanning partner entry, and
+  third-party secret-scanning prefix research, so false positives on the prefix alone are
+  extremely unlikely even though the exact body length is not formally documented.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - groq
+    - groqcloud
+    - console.groq.com
+    - GROQ_API_KEY
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: gsk_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCD
+      description: Groq API key, gsk_ prefix + long alphanumeric body
+    - value: 'GROQ_API_KEY=gsk_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCD'
+      description: Labelled Groq key in an env assignment
+    - value: gsk_zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIhHgGfFeEdDcCbBaA0123456789
+      description: Mixed-case Groq key body
+  should_not_match:
+    - value: grk_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCD
+      description: Wrong prefix (grk_ instead of gsk_)
+    - value: gsk_ABCDEFGHIJKLMNO
+      description: Body far too short (15 chars, below the 20-char floor)
+    - value: rotate the groq api key before deployment
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: Documentation or examples showing placeholder gsk_ strings.
+    mitigation: Require corroborative Groq keywords and check for placeholder markers (example, xxxx).
+  - description: Co-fires with any generic sk_-family secret detector on the shared body shape, since gsk_ is itself a superset prefix of sk_-style tokens used by other providers.
+    mitigation: Corroborative Groq-specific keywords (groq, groqcloud, GROQ_API_KEY) disambiguate from other sk_-prefixed providers.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  A leaked Groq API key enables unauthorized, billed access to Groq's hosted inference API and
+  can expose any prompts, documents, or data routed through it.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_groq_api_key
+      matches:
+        - ref: Keyword_groq_api_key
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_groq_api_key
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_groq_api_key
+      pattern: (?<![A-Za-z0-9_-])gsk_[A-Za-z0-9]{20,100}(?![A-Za-z0-9_-])
+  keywords:
+    - id: Keyword_groq_api_key
+      groups:
+        - match_style: word
+          terms:
+            - groq
+            - groqcloud
+            - console.groq.com
+            - GROQ_API_KEY
+            - api key
+            - groq api
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://docs.gitguardian.com/secrets-detection/secrets-detection-engine/detectors/specifics/groq_api_key
+    title: Groq API Key - GitGuardian detector documentation
+  - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+    title: Supported secret scanning patterns - GitHub Docs
+  - url: https://semgrep.dev/blog/2025/secrets-story-and-prefixed-secrets/
+    title: 'Secrets Story: The Prefixed Secrets That Tried to Get Away - Semgrep'

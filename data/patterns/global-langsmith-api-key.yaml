@@ -1,0 +1,145 @@
+schema: testpattern/v1
+name: LangSmith API Key
+slug: global-langsmith-api-key
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects LangSmith API keys (personal access tokens and service keys), which use a distinctive
+  lsv2_pt_ or lsv2_sk_ prefix followed by a hyphenated hex body. A leaked key grants unauthorized
+  access to LangSmith trace data -- which can include full LLM prompts and completions -- and
+  billed access to the LangSmith/LangChain platform.
+operation: >-
+  Prefixed token format lsv2_pt_ (personal access token) or lsv2_sk_ (service key) followed by a
+  32-character hex segment, an underscore, and a 10-character hex segment. LangChain's own
+  administration docs confirm both prefixes; the hex segment lengths are corroborated by a real
+  leaked-credential redaction disclosed in a public GitHub issue. Corroborative evidence:
+  keywords within 300 characters.
+pattern: (?<![A-Za-z0-9_])lsv2_(?:pt|sk)_[0-9a-fA-F]{32}_[0-9a-fA-F]{10}(?![A-Za-z0-9_-])
+confidence: high
+confidence_justification: >-
+  High confidence: the lsv2_pt_/lsv2_sk_ prefixes are explicitly documented on LangChain's own
+  administration docs (docs.langchain.com), LangSmith keys are GitHub secret-scanning partner
+  entries (langchain_api_personal_key, langchain_api_server_key), and the specific
+  32-hex-underscore-10-hex body structure is corroborated by a real, independently-observed
+  leaked-credential redaction, so false positives on the prefix+structure combination alone are
+  extremely unlikely.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - langsmith
+    - langchain
+    - smith.langchain.com
+    - LANGSMITH_API_KEY
+    - api key
+  proximity: 300
+  keyword_lists:
+    - credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: lsv2_pt_0123456789abcdef0123456789abcdef_0123456789
+      description: LangSmith personal access token (lsv2_pt_ + 32-hex_10-hex body)
+    - value: 'LANGSMITH_API_KEY=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'
+      description: Labelled LangSmith service key in an env assignment
+    - value: Using langsmith with key lsv2_pt_ABCDEF0123456789ABCDEF0123456789_ABCDEF0123
+      description: LangSmith brand mention followed by a mixed-case hex token value
+  should_not_match:
+    - value: ls__0123456789abcdef0123456789abcdef_0123456789
+      description: Legacy ls__ prefix, rejected by v2 tracing and not a current lsv2_ key
+    - value: lsv2_pt_0123456789abcdef012345678abcd_0123456789
+      description: First hex segment too short (29 chars, not 32)
+    - value: dont forget to rotate the langsmith api key
+      description: Prose mention without a token value
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+  - description: Documentation or examples showing placeholder lsv2_pt_/lsv2_sk_ strings.
+    mitigation: Require corroborative LangSmith/LangChain keywords and check for placeholder markers (example, xxxx).
+  - description: Legacy ls__-prefixed LangChain API keys (pre-v2, superseded October 2024) are a different, older format not matched by this pattern.
+    mitigation: Documented as a known scope limitation; legacy ls__ keys are out of scope for this pattern.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 9
+risk_description: >-
+  A leaked LangSmith API key enables unauthorized access to LangSmith trace data -- which can
+  include full LLM prompts, completions, and any customer data routed through traced
+  applications -- plus unauthorized, billed access to the LangSmith platform.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_langsmith_api_key
+      matches:
+        - ref: Keyword_langsmith_api_key
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_langsmith_api_key
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_langsmith_api_key
+      pattern: (?<![A-Za-z0-9_])lsv2_(?:pt|sk)_[0-9a-fA-F]{32}_[0-9a-fA-F]{10}(?![A-Za-z0-9_-])
+  keywords:
+    - id: Keyword_langsmith_api_key
+      groups:
+        - match_style: word
+          terms:
+            - langsmith
+            - langchain
+            - smith.langchain.com
+            - LANGSMITH_API_KEY
+            - langsmith api
+            - api key
+      strength: specific
+created: '2026-07-06'
+updated: '2026-07-06'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-06'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://docs.langchain.com/langsmith/administration-overview
+    title: Administration overview - Docs by LangChain (confirms lsv2_pt_/lsv2_sk_ prefixes)
+  - url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+    title: Supported secret scanning patterns - GitHub Docs
+  - url: https://github.com/anthropics/claude-code/issues/57131
+    title: 'GitHub issue disclosing real leaked LangSmith key structure: lsv2_pt_<32-hex>_<10-hex>'
