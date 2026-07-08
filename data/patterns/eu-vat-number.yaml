@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: EU VAT Identification Number - All Member States
 slug: eu-vat-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
@@ -19,9 +19,12 @@ operation: >-
   Per-country check digits (e.g. IT Luhn, HR ISO 7064 MOD 11-10, SK divisible-by-11) are not
   expressible in a single regex and no Purview validator function covers VAT, so checksums are not
   enforced. Reference: European Commission VIES FAQ Q11 per-country format table, corroborated
-  row-by-row against secondary mirrors. Corroborative evidence: keywords within 300 characters.
+  row-by-row against secondary mirrors. Spaced presentations are accepted only where the VIES
+  format table itself renders them: DK (4 blocks of 2 digits), FR (2-character key, space, 9-digit
+  SIREN) and XI (UK 3-4-2 blocks, optional 3-digit branch-trader block) — bounded literal-space
+  classes only, never free whitespace. Corroborative evidence: keywords within 300 characters.
   Keyword lists: vat-numbers.
-pattern: '\b(?:ATU\d{8}|BE[01]\d{9}|BG\d{9,10}|CY\d{8}[A-Z]|CZ\d{8,10}|DE\d{9}|DK\d{8}|EE\d{9}|EL\d{9}|ES(?:[A-Z]\d{8}|\d{8}[A-Z]|[A-Z]\d{7}[A-Z])|FI\d{8}|FR[A-HJ-NP-Z0-9]{2}\d{9}|HR\d{11}|HU\d{8}|IE(?:\d{7}[A-Z]{1,2}|\d[A-Z+*]\d{5}[A-Z])|IT\d{11}|LT\d{9}(?:\d{3})?|LU\d{8}|LV\d{11}|MT\d{8}|NL[A-Z0-9+*]{9}B\d{2}|PL\d{10}|PT\d{9}|RO[1-9]\d{1,9}|SE\d{12}|SI\d{8}|SK\d{10}|XI(?:\d{9}(?:\d{3})?|GD[0-4]\d{2}|HA[5-9]\d{2}))\b'
+pattern: '\b(?:ATU\d{8}|BE[01]\d{9}|BG\d{9,10}|CY\d{8}[A-Z]|CZ\d{8,10}|DE\d{9}|DK(?:\d{8}|\d{2}(?:[ ]\d{2}){3})|EE\d{9}|EL\d{9}|ES(?:[A-Z]\d{8}|\d{8}[A-Z]|[A-Z]\d{7}[A-Z])|FI\d{8}|FR[A-HJ-NP-Z0-9]{2}[ ]?\d{9}|HR\d{11}|HU\d{8}|IE(?:\d{7}[A-Z]{1,2}|\d[A-Z+*]\d{5}[A-Z])|IT\d{11}|LT\d{9}(?:\d{3})?|LU\d{8}|LV\d{11}|MT\d{8}|NL[A-Z0-9+*]{9}B\d{2}|PL\d{10}|PT\d{9}|RO[1-9]\d{1,9}|SE\d{12}|SI\d{8}|SK\d{10}|XI(?:\d{9}(?:\d{3})?|\d{3}[ ]\d{4}[ ]\d{2}(?:[ ]\d{3})?|GD[0-4]\d{2}|HA[5-9]\d{2}))\b'
 confidence: high
 confidence_justification: >-
   High confidence: every branch requires the exact two-letter member-state prefix followed by that
@@ -80,6 +83,14 @@ test_cases:
       description: Northern Ireland — XI prefix + UK 9-digit body, checkable in VIES under the Windsor Framework
     - value: XIGD012
       description: Northern Ireland — XI government-department form GD000-GD499
+    - value: DK12 34 56 78
+      description: Denmark — the VIES format table's own rendering, 4 blocks of 2 digits (DK99 99 99 99)
+    - value: FR40 303265045
+      description: France — VIES rendering with a space between the 2-character validation key and the 9-digit SIREN block (FRXX 999999999)
+    - value: XI123 4567 89
+      description: Northern Ireland — UK-style 3-4-2 digit blocks as printed in the VIES XI row (XI999 9999 99)
+    - value: XI123 4567 89 012
+      description: Northern Ireland — branch-trader form with the trailing 3-digit block (XI999 9999 99 999)
   should_not_match:
     - value: DE12345678
       description: Germany body one digit short — fails the exact 9-digit branch
@@ -91,6 +102,16 @@ test_cases:
       description: 12 digits after IT — exceeds Italy's exact 11-digit structure
     - value: RO0123456789
       description: Romania with a leading zero — the fiscal code is written without zero padding
+    - value: DK12 3456 78
+      description: Denmark mixed grouping — VIES renders either solid DK99999999 or fully blocked DK99 99 99 99, never partial spacing
+    - value: DK12 34 56
+      description: Denmark with only 3 of the 4 two-digit blocks — too short
+    - value: FRXX 123 456 789
+      description: France with the SIREN split into triplets — VIES prints the SIREN as a single 9-digit block after the key
+    - value: XI123 45 6789
+      description: Northern Ireland wrong grouping — VIES prints 3-4-2 digit blocks, not 3-2-4
+    - value: DE12 345 678 9
+      description: Germany spaced — the VIES DE row is a single 9-digit block; no spacing is documented
 false_positives:
   - description: >-
       Deliberate overlap with the existing per-country detectors (at/be/de/fr/hu/it-vat-number):
@@ -140,7 +161,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_eu_vat_number
-      pattern: '\b(?:ATU\d{8}|BE[01]\d{9}|BG\d{9,10}|CY\d{8}[A-Z]|CZ\d{8,10}|DE\d{9}|DK\d{8}|EE\d{9}|EL\d{9}|ES(?:[A-Z]\d{8}|\d{8}[A-Z]|[A-Z]\d{7}[A-Z])|FI\d{8}|FR[A-HJ-NP-Z0-9]{2}\d{9}|HR\d{11}|HU\d{8}|IE(?:\d{7}[A-Z]{1,2}|\d[A-Z+*]\d{5}[A-Z])|IT\d{11}|LT\d{9}(?:\d{3})?|LU\d{8}|LV\d{11}|MT\d{8}|NL[A-Z0-9+*]{9}B\d{2}|PL\d{10}|PT\d{9}|RO[1-9]\d{1,9}|SE\d{12}|SI\d{8}|SK\d{10}|XI(?:\d{9}(?:\d{3})?|GD[0-4]\d{2}|HA[5-9]\d{2}))\b'
+      pattern: '\b(?:ATU\d{8}|BE[01]\d{9}|BG\d{9,10}|CY\d{8}[A-Z]|CZ\d{8,10}|DE\d{9}|DK(?:\d{8}|\d{2}(?:[ ]\d{2}){3})|EE\d{9}|EL\d{9}|ES(?:[A-Z]\d{8}|\d{8}[A-Z]|[A-Z]\d{7}[A-Z])|FI\d{8}|FR[A-HJ-NP-Z0-9]{2}[ ]?\d{9}|HR\d{11}|HU\d{8}|IE(?:\d{7}[A-Z]{1,2}|\d[A-Z+*]\d{5}[A-Z])|IT\d{11}|LT\d{9}(?:\d{3})?|LU\d{8}|LV\d{11}|MT\d{8}|NL[A-Z0-9+*]{9}B\d{2}|PL\d{10}|PT\d{9}|RO[1-9]\d{1,9}|SE\d{12}|SI\d{8}|SK\d{10}|XI(?:\d{9}(?:\d{3})?|\d{3}[ ]\d{4}[ ]\d{2}(?:[ ]\d{3})?|GD[0-4]\d{2}|HA[5-9]\d{2}))\b'
   keywords:
     - id: Keyword_eu_vat_number
       groups:
@@ -189,6 +210,13 @@ references:
 created: '2026-07-08'
 updated: '2026-07-08'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-08'
+    description: >-
+      Accept the officially spaced VIES renderings for the three rows the VIES FAQ Q11 format
+      table itself prints with spaces — DK 'DK99 99 99 99', FR 'FRXX 999999999', XI 'XI999 9999
+      99[ 999]' — via bounded literal-space groups; all solid forms unchanged, no other member
+      state gains spacing.
   - version: 1.0.0
     date: '2026-07-08'
     description: Initial release. Consolidated superset of the per-country VAT detectors covering all 27 member states plus the XI Northern Ireland prefix; existing at/be/de/fr/hu/it patterns unchanged.

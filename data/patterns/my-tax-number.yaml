@@ -1,9 +1,10 @@
 schema: testpattern/v1
 name: Malaysia Tax Identification Number (TIN)
 slug: my-tax-number
-version: 1.0.0
+version: 1.1.0
 type: regex
-engine: universal
+engine: boost_regex
+case_sensitive: true
 description: >-
   Detects Malaysian individual Tax Identification Numbers (TIN / Nombor Pengenalan Cukai) issued by the
   Inland Revenue Board of Malaysia (LHDN / HASiL). Since 2 January 2023 individual TINs use the prefix IG
@@ -12,8 +13,9 @@ description: >-
   (C, D, F, PT, TA and similar prefixes) are deliberately out of scope: single-letter prefixes over a
   digit run are too collision-prone and entity TINs are not personal data.
 operation: >-
-  Regex pattern. Regex_my_tax_number matches the IG / OG / SG prefix (optionally separated by a single
-  space) followed by 9-11 digits at word boundaries. Three confidence tiers: High (85) requires tax
+  Regex pattern (boost_regex engine). Regex_my_tax_number matches the IG / OG / SG prefix (optionally
+  separated by a single space) followed by 9-11 digits at word boundaries. The prefix is case-fixed
+  (uppercase IG / OG / SG as issued by LHDN), so the pattern is case-sensitive. Three confidence tiers: High (85) requires tax
   evidence (min 2 unique terms) with template exclusion; Medium (75) requires tax evidence with template
   exclusion; Low (65) requires tax evidence. Evidence uses one keyword group (English and Malay tax terms)
   within 300-character proximity. LHDN publishes no checksum for the digit portion, so detection is
@@ -59,6 +61,10 @@ test_cases:
       description: Entity C prefix is deliberately out of scope
     - value: Code SG123456789012 exceeds the individual tax number length
       description: Twelve digits after the prefix is too long
+    - value: ig115002000
+      description: Lowercase prefix — LHDN issues TINs with uppercase prefixes (pattern is case-sensitive)
+    - value: sg10234567090
+      description: Lowercase legacy prefix — TIN prefixes are uppercase (pattern is case-sensitive)
 false_positives:
   - description: SG- and OG-prefixed codes appear in non-tax contexts (Singapore-related references, order codes, part numbers).
     mitigation: Every tier requires corroborating LHDN / tax keywords within the proximity window; there is no bare value-only tier.
@@ -140,6 +146,13 @@ purview:
 created: '2026-07-08'
 updated: '2026-07-08'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-08'
+    description: >-
+      Harmonized with letter-prefixed identifier convention (j1/j3/j4 waves): engine universal → boost_regex,
+      added case_sensitive: true (IG / OG / SG prefixes are issued uppercase by LHDN). Detection change:
+      lowercase forms such as ig115002000 previously matched under the repo-default case-insensitive testing
+      and are now rejected; lowercase should_not_match cases added to document this.
   - version: 1.0.0
     date: '2026-07-08'
     description: Initial release
