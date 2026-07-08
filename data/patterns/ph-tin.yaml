@@ -1,0 +1,199 @@
+schema: testpattern/v1
+name: Philippine Taxpayer Identification Number (TIN)
+slug: ph-tin
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Philippine Taxpayer Identification Numbers (TIN) issued by the Bureau of Internal Revenue (BIR)
+  under Section 236(j) of the National Internal Revenue Code. The base TIN is a 9-digit number (the 9th
+  digit is a check digit), usually written XXX-XXX-XXX. Registered businesses append a branch code —
+  historically 3 digits (000 for the head office, 12 digits total) and, since eBIRForms v7.9.6.0
+  (RMC No. 036-2026, April 2026), up to 5 digits (14 digits total).
+operation: >-
+  Regex pattern. Matches a 9-digit TIN with optional dash or space group separators (XXX-XXX-XXX) and an
+  optional 3-digit or 5-digit branch-code suffix (XXX-XXX-XXX-XXX or XXX-XXX-XXX-XXXXX). The 9th-digit
+  checksum algorithm is not publicly documented and is NOT enforced in this regex-only pattern; detection
+  is structural. Because bare 9-14 digit runs are ambiguous, every confidence tier requires positive
+  TIN/BIR evidence: High (85) requires a TIN/BIR label-context match plus specific keywords with template
+  exclusion; Medium (75) requires specific TIN/BIR keywords with template exclusion; Low (65) requires
+  domain-context tax keywords with template exclusion. AllDigitsSameFilter suppresses all-zeros and other
+  repeated-digit values.
+pattern: \b\d{3}[- ]?\d{3}[- ]?\d{3}(?:[- ]?(?:\d{5}|\d{3}))?\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the 9/12/14-digit structure with optional dash grouping is common enough in unrelated
+  numeric data (order numbers, phone fragments, other countries' IDs) that corroborating TIN/BIR keywords
+  are required on every tier. The dash-separated XXX-XXX-XXX form plus label evidence raises precision
+  substantially; no bare value-only tier is exposed.
+jurisdictions:
+  - ph
+regulations:
+  - National Internal Revenue Code of 1997 (Philippines)
+  - Data Privacy Act of 2012 (Philippines)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+  - financial
+corroborative_evidence:
+  keywords:
+    - TIN
+    - Taxpayer Identification Number
+    - BIR
+    - Bureau of Internal Revenue
+    - tax identification
+    - branch code
+  proximity: 300
+  keyword_lists:
+    - pii-civic-credentials
+    - data-record-context
+    - generic-data-labels
+test_cases:
+  should_match:
+    - value: 'TIN: 123-456-789 as shown on the BIR certificate of registration'
+      description: 9-digit individual TIN with dash grouping and TIN label
+    - value: Taxpayer Identification Number 004-345-678-000 for the head office
+      description: 12-digit TIN with 3-digit head-office branch code 000
+    - value: The corporation updated TIN 123-456-789-00001 in eBIRForms after the branch-code expansion
+      description: 14-digit TIN with 5-digit branch code (RMC No. 036-2026)
+    - value: BIR records list the taxpayer identification number 123456789012 without separators
+      description: Unseparated 12-digit TIN (9-digit base plus 3-digit branch code)
+  should_not_match:
+    - value: TIN 12-345-678 was rejected as invalid by the registration officer
+      description: Only 8 digits — too short for a 9-digit base TIN
+    - value: Card number 4111111111111111 was charged for the annual registration fee
+      description: 16-digit payment-card run — no 9/12/14-digit boundary match inside a longer digit run
+    - value: РНОКПП 3184710691 belongs to the Ukrainian counterparty
+      description: Neighbouring format — Ukrainian 10-digit RNOKPP does not fit the 9+3/9+5 structure
+    - value: Call the Manila office at 0917-123-4567 tomorrow morning
+      description: Philippine mobile number near-miss — grouping does not fit XXX-XXX-XXX
+    - value: '000-000-000-000'
+      description: All-zeros TIN — matches structurally but is suppressed by AllDigitsSameFilter
+false_positives:
+  - description: >-
+      Bare 9-digit or 12-digit runs (US SSNs written without dashes, order numbers, PhilSys numbers in
+      4-4-4 grouping collapse to the same 12-digit run when unseparated) can match the structural regex.
+    mitigation: >-
+      Every tier requires TIN/BIR keyword or label evidence within the 300-character proximity window; no
+      value-only tier is exposed.
+  - description: >-
+      The 9th digit is a BIR check digit whose algorithm is not publicly documented and cannot be
+      expressed in regex, so structurally valid but non-issued numbers will match.
+    mitigation: >-
+      Rely on structure, AllDigitsSameFilter (suppresses all-zeros/repeated-digit values, which defeat
+      checksum-free matching) and mandatory keyword evidence.
+  - description: A longer dashed number such as 123-456-789-0001 partially matches on its 9-digit core.
+    mitigation: Keyword gating limits this to documents already discussing Philippine tax identifiers.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 7
+risk_description: >-
+  Philippine TINs link directly to an individual's or business's tax records with the BIR. Exposure
+  enables tax-refund fraud, identity theft, and unauthorized transactions with government agencies, as
+  the TIN is widely used as a general identity credential in the Philippines.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Financial
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_ph_tin
+      matches:
+        - ref: Pattern_ph_tin_label_context
+        - ref: Keyword_ph_tin
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_ph_tin
+      matches:
+        - ref: Keyword_ph_tin
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_ph_tin
+      matches:
+        - ref: Keyword_ph_tin_domain_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_ph_tin
+      pattern: \b\d{3}[- ]?\d{3}[- ]?\d{3}(?:[- ]?(?:\d{5}|\d{3}))?\b
+    - id: Pattern_ph_tin_label_context
+      pattern: (?i)\b(?:tin|taxpayer\s+identification|tax\s+identification|bir|bureau\s+of\s+internal\s+revenue|branch\s+code)\b
+  keywords:
+    - id: Keyword_ph_tin
+      groups:
+        - match_style: word
+          terms:
+            - Taxpayer Identification Number
+            - text: TIN
+              case_sensitive: true
+            - tax identification number
+            - text: BIR
+              case_sensitive: true
+            - Bureau of Internal Revenue
+            - TIN ID
+            - taxpayer number
+            - BIR registration
+            - eBIRForms
+            - Revenue District Office
+            - text: RDO
+              case_sensitive: true
+            - certificate of registration
+      strength: specific
+    - id: Keyword_ph_tin_domain_context
+      groups:
+        - match_style: word
+          terms:
+            - taxpayer
+            - tax identification
+            - tax return
+            - branch code
+            - revenue district
+      strength: domain
+  filters:
+    - id: Filter_ph_tin_same_digits
+      type: AllDigitsSameFilter
+references:
+  - url: https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/10/49676
+    title: BIR Revenue Memorandum Order No. 23-91 — New Taxpayer Identification Number (Supreme Court E-Library)
+  - url: https://efps.bir.gov.ph/efps-war/EFPSWeb_war/help/help_03e.html
+    title: BIR eFPS help — TIN is 9 digits plus 3-digit branch code (default 000)
+  - url: https://taxify.ph/blog/tin-branch-code-5-digits-large-business-guide/
+    title: TIN branch code expansion from 3 to 5 digits (RMC No. 036-2026, eBIRForms v7.9.6.0)
+  - url: https://lookuptax.com/docs/tax-identification-number/philippines-tax-id-guide
+    title: Philippines TIN number guide — 9-12 digit structure with check digit and branch code
+created: '2026-07-08'
+updated: '2026-07-08'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-08'
+    description: Initial release
+author: testpattern-community
+license: MIT
