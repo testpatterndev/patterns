@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Canadian Phone Number
 slug: ca-phone-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
@@ -96,6 +96,17 @@ false_positives:
       "Canadian phone number" vs "US phone number") to bias classification, and rely on surrounding document
       context (postal addresses, currency, entity names) for jurisdiction attribution rather than the number
       itself.
+  - description: >-
+      The domestic sub-regex also fires inside the +1 international rendering (empirically verified: in
+      "+1 514 555 0134" it matches the "1 514 555 0134" substring, because the optional trunk-1 branch
+      starts right after the "+", which is not a digit), so an international value produces a domestic-tier
+      match as well as an international-tier match.
+    mitigation: >-
+      Benign co-fire, left in place deliberately: both sub-regexes carry identical evidence gating and
+      confidence levels, so the duplicate match cannot inflate confidence — it can only duplicate a finding
+      at the same level, which reporting layers de-duplicate by offset. A structural fix would need
+      variable-width negative lookbehind (to reject "+1 " at any separator width), which the universal
+      engine target does not support.
 exports:
   - purview_xml
   - yaml
@@ -125,6 +136,11 @@ purview:
       id_match: Regex_ca_phone_domestic
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 85
       id_match: Regex_ca_phone_intl
       matches:
@@ -138,6 +154,11 @@ purview:
       id_match: Regex_ca_phone_intl
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_ca_phone_domestic
       pattern: '(?<!\d)(?:1[\s.-]?)?\(?[2-9](?!11)\d{2}\)?[\s.-]?[2-9](?!11)\d{2}[\s.-]?\d{4}(?!\d)'
@@ -154,8 +175,6 @@ purview:
             - call me at
             - text me at
             - Canada contact number
-            - cell
-            - mobile
       strength: specific
 risk_rating: 5
 risk_description: >-
@@ -176,8 +195,16 @@ references:
   - url: https://cnac.ca/npa_codes/na_numbering_plan.htm
     title: "CNAC: The North American Numbering Plan (shared area-code pool across NANP member countries)"
 created: '2026-07-06'
-updated: '2026-07-06'
+updated: '2026-07-08'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-08'
+    description: >-
+      Hygiene: dropped generic terms (cell, mobile) from the country-specific 85-tier keyword dict — they
+      remain 75-tier evidence via the shared phone-context dict; added the noise-exclusion NOT node to
+      both 75 tiers per the identifier-family convention. Docs: documented the verified domestic-regex
+      co-fire inside the +1 international rendering as a benign, same-confidence duplicate (no regex
+      change — a structural fix would need unsupported variable-width lookbehind).
   - version: 1.0.0
     date: '2026-07-06'
     description: Initial release.

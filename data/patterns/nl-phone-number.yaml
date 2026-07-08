@@ -1,17 +1,23 @@
 schema: testpattern/v1
 name: Netherlands Phone Number
 slug: nl-phone-number
-version: 1.0.0
+version: 1.1.0
 type: regex
 engine: universal
 description: >-
   Detects Dutch national telephone numbers per the ACM-administered numbering plan: 10-digit numbers
   (leading trunk 0 included) covering geographic numbers (area code first significant digit 1-5 or 7, e.g.
   020 Amsterdam, 010 Rotterdam, 070 Den Haag) and mobile numbers (06 prefix), plus the +31 international
-  form (leading 0 dropped). Service numbers beginning 08 (e.g. 088 non-geographic business lines) and 09
-  (e.g. 0800 free-of-charge and 0900 premium-rate information numbers) are intentionally out of scope — these
+  form (leading 0 dropped), including the widespread "+31 (0)6 12345678" letterhead rendering (a
+  common-but-nonstandard practice — ITU-T E.123 advises against the parenthesised trunk digit in
+  international notation, but it is ubiquitous on Dutch letterheads, so it is matched for detection
+  purposes). Numbers beginning 08 (0800 free-of-charge service numbers, 088 non-geographic business
+  lines) and 09 (0900/0906/0909 premium-rate information numbers) are intentionally out of scope — these
   are organizational/service numbers rather than personal PII, mirroring how uk-phone-number and
-  fr-phone-number scope out their own non-geographic service ranges.
+  fr-phone-number scope out their own non-geographic service ranges. Note this also excludes the 085 and
+  091 location-independent subscriber ranges (VoIP numbers ACM makes available to individuals as well as
+  businesses): a personal 085/091 VoIP line is therefore a known false negative, accepted because the
+  085/088/091 block is predominantly organizational in practice and cannot be split from it structurally.
 operation: >-
   Validation: none (Dutch numbers have no checksum). Reference: ACM (Autoriteit Consument & Markt),
   Telefoonnummers, https://www.acm.nl/nl/telefoonnummers; ACM ConsuWijzer, De verdeling van telefoonnummers
@@ -22,7 +28,7 @@ operation: >-
   Corroborative evidence: keywords within 300 characters. Keyword lists: phone-context. Both the domestic
   and international (+31) sub-regexes are evidence-gated at every tier — no tier fires without positive
   corroborative evidence, per the phone-family convention — see confidence_justification.
-pattern: '(?<!\d)(?:\+31[\s.-]?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+pattern: '(?<!\d)(?:\+31[\s.-]?(?:\(0\)[\s.-]?)?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
 confidence: medium
 confidence_justification: >-
   Medium confidence: the leading-digit constraint (01-07 domestic, restricting to geographic area codes and
@@ -67,9 +73,13 @@ test_cases:
       description: Domestic geographic, Den Haag area code (070), hyphenated
     - value: 'International: +31 6 12345678'
       description: International +31 form of the mobile number, leading 0 dropped
+    - value: 'Briefhoofd: +31 (0)6 12345678'
+      description: Widespread "+CC (0)" letterhead rendering — nonstandard per E.123 but ubiquitous on Dutch letterheads
   should_not_match:
     - value: '0800 123456'
       description: Leading digit 8 is a free-of-charge service number (0800), out of scope for this personal-communications pattern
+    - value: '085 1234567'
+      description: 085 location-independent VoIP range — out of scope with the rest of the 08 block (documented known false negative for personal 085 lines)
     - value: '0900-1234567'
       description: Leading digit 9 is a premium-rate information number (0900), out of scope
     - value: '06 1234567'
@@ -121,6 +131,11 @@ purview:
       id_match: Regex_nl_phone_domestic
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 85
       id_match: Regex_nl_phone_intl
       matches:
@@ -134,11 +149,16 @@ purview:
       id_match: Regex_nl_phone_intl
       matches:
         - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_nl_phone_domestic
       pattern: '(?<!\d)0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
     - id: Regex_nl_phone_intl
-      pattern: '(?<!\d)\+31[\s.-]?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
+      pattern: '(?<!\d)\+31[\s.-]?(?:\(0\)[\s.-]?)?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
   keywords:
     - id: Keyword_nl_phone_specific
       groups:
@@ -148,9 +168,7 @@ purview:
             - Dutch mobile number
             - telefoonnummer
             - mobiel nummer
-            - mobiel
-            - call me at
-            - text me at
+            - mobiele nummer
       strength: specific
 risk_rating: 5
 risk_description: >-
@@ -172,9 +190,22 @@ references:
     title: "ACM ConsuWijzer: De verdeling van telefoonnummers in Nederland (area-code and service-number breakdown)"
   - url: https://www.acm.nl/sites/default/files/old_publication/publicaties/16001_097-en-06-nummers-informatie-voor-telecomaanbieders-20160701.pdf
     title: "ACM: Informatie over 097- en 06-nummers — factsheet voor telecomaanbieders (10-digit mobile numbers)"
+  - url: https://www.rijksoverheid.nl/onderwerpen/telecommunicatie/vraag-en-antwoord/soorten-telefoonnummers
+    title: "Rijksoverheid: Welke soorten telefoonnummers zijn er? — 085 (VoIP) and 091 (new services) location-independent ranges, available to individuals and businesses"
+  - url: https://www.itu.int/rec/T-REC-E.123
+    title: "ITU-T Recommendation E.123: Notation for national and international telephone numbers — the international \"(0)\" trunk-digit form is documented as common practice that E.123 advises against"
 created: '2026-07-06'
-updated: '2026-07-06'
+updated: '2026-07-08'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-08'
+    description: >-
+      Rendering coverage: the "+31 (0)..." letterhead form (nonstandard per E.123 but ubiquitous on Dutch
+      letterheads). Docs: corrected the 08/09 out-of-scope examples (0800 belongs to the 08 block, not
+      09) and documented the excluded 085/091 location-independent VoIP ranges as a known false negative
+      for personal lines. Hygiene: dropped the bare generic term "mobiel" and generic English phrases
+      (call me at, text me at) from the country-specific 85-tier keyword dict, added "mobiele nummer";
+      added the noise-exclusion NOT node to both 75 tiers per the identifier-family convention.
   - version: 1.0.0
     date: '2026-07-06'
     description: Initial release.
