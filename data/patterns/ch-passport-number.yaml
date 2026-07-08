@@ -1,0 +1,160 @@
+schema: testpattern/v1
+name: Switzerland Passport Number
+slug: ch-passport-number
+version: 1.0.0
+type: regex
+engine: boost_regex
+case_sensitive: true
+description: >-
+  Detects Swiss passport numbers issued by fedpol (Federal Office of Police). Passports of the 2003, 2006 and
+  2010 series carry an eight-character number consisting of one uppercase letter followed by seven digits
+  (e.g. E1234567); the 2010 series always begins with the letter X. The letters O and I are never used, to
+  avoid confusion with the digits 0 and 1. The 2022 series no longer has a published fixed structure, but
+  issued numbers remain letter-plus-digits combinations covered by this shape.
+operation: >-
+  Regex pattern (boost_regex engine, case-sensitive). Pattern_ch_passport matches one uppercase letter
+  (excluding O and I) followed by exactly seven digits. Three confidence tiers: High (85) requires passport
+  evidence (min 2 unique terms) with template exclusion; Medium (75) requires passport evidence with template
+  exclusion; Low (65) requires passport evidence. Evidence uses one keyword group (passport terms in the four
+  Swiss national-language contexts plus English) within 300-character proximity. fedpol states the 2022-series
+  numbering rules are deliberately not public, so structure beyond letter-plus-seven-digits cannot be enforced.
+pattern: \b[A-HJ-NP-Z]\d{7}\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: one letter plus seven digits is a distinctive but not unique shape (order numbers, invoice
+  references and Swiss identity-card numbers share it), so corroborating passport keywords are required on
+  every tier. Case-sensitivity and the O/I exclusion further narrow the match surface.
+jurisdictions:
+  - ch
+regulations:
+  - FADP (Switzerland)
+  - Identity Documents Act (Switzerland, SR 143.1)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - passport
+    - passport number
+    - Reisepass
+  proximity: 300
+  keyword_lists:
+    - pii-civic-credentials
+test_cases:
+  should_match:
+    - value: 'Passport no: X4720145 issued by fedpol, valid until 2032'
+      description: 2010-series number (X prefix) with passport label context
+    - value: 'E1234567'
+      description: Format example published by the Canton of Bern identification-document guidance
+    - value: 'Passnummer A7654321 (Schweizer Pass)'
+      description: German-language passport label with letter-prefixed number
+  should_not_match:
+    - value: 'O1234567'
+      description: Letter O is never used in Swiss passport numbers
+    - value: 'I1234567'
+      description: Letter I is never used in Swiss passport numbers
+    - value: 'X123456'
+      description: Only six digits after the letter — too short
+    - value: 'X123456789'
+      description: Nine digits after the letter — too long
+    - value: 'x1234567'
+      description: Lowercase letter — passport numbers are printed uppercase (pattern is case-sensitive)
+false_positives:
+  - description: Swiss identity-card numbers share the letter-plus-digits shape (eight or nine characters).
+    mitigation: Keyword evidence is passport-specific (Reisepass, passeport, passaporto); residual overlap is an acceptable same-sensitivity collision (both are Swiss identity documents).
+  - description: Product codes, order references and ticket numbers of the form letter-plus-seven-digits.
+    mitigation: Every tier requires passport keywords within the 300-character proximity window; high and medium tiers additionally apply the template-exclusion NOT-group.
+  - description: The 2022-series numbering rules are not published, so a small share of 2022-series numbers could theoretically fall outside this shape.
+    mitigation: Documented in operation; fedpol-issued examples remain letter-plus-seven-digits. No checksum is published, so structure plus keyword evidence is the strongest available gate.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  Passport numbers are high-value identity documents used for international travel and identity verification.
+  Compromise enables identity fraud, unauthorized border crossings, and creation of fraudulent documents.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_ch_passport
+      matches:
+        - ref: Evidence_ch_passport
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_ch_passport
+      matches:
+        - ref: Evidence_ch_passport
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      id_match: Pattern_ch_passport
+      matches:
+        - ref: Evidence_ch_passport
+  regexes:
+    - id: Pattern_ch_passport
+      pattern: \b[A-HJ-NP-Z]\d{7}\b
+  keywords:
+    - id: Evidence_ch_passport
+      groups:
+        - match_style: word
+          terms:
+            - passport
+            - passport number
+            - passport no
+            - Swiss passport
+            - Schweizer Pass
+            - Reisepass
+            - Passnummer
+            - passeport suisse
+            - numéro de passeport
+            - passaporto svizzero
+            - numero di passaporto
+            - travel document
+            - fedpol
+      strength: specific
+  filters:
+    - id: Filter_ch_passport_same_digits
+      type: AllDigitsSameFilter
+references:
+  - url: https://www.belogin.directories.be.ch/emaillogin/gui/identificationdocumentexplanationpopup
+    title: Canton of Bern (BE-Login) — identification document explanation (passport number format, e.g. E1234567)
+  - url: https://www.travelnews.ch/english-corner/26038-how-can-you-distinguish-between-a-zero-and-an-o-in-a-passport.html
+    title: travelnews.ch citing fedpol — 2010-series numbers begin with X plus 7 digits; letters O and I never used; 2022-series structure not public
+  - url: https://www.fedpol.admin.ch/de/pass-und-identitaetskarte
+    title: fedpol — Pass und Identitätskarte (issuing authority)
+created: '2026-07-08'
+updated: '2026-07-08'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-08'
+    description: Initial release
+author: testpattern-community
+license: MIT
