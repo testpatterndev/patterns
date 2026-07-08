@@ -1,0 +1,96 @@
+schema: testpattern/v1
+name: Kraken API Key
+slug: global-kraken-api-key
+version: 1.0.0
+type: regex
+engine: universal
+description: >-
+  Detects Kraken REST API credentials: the public API key (56 base64 characters) and the
+  private key / API secret (86-88 base64 characters, base64 of 64 bytes). Because base64
+  strings have no distinctive prefix, this pattern is context-gated: it requires a nearby
+  Kraken label and an assignment (= or :) before the value. A leaked private key allows
+  signing authenticated requests to the account.
+operation: >-
+  A Kraken label followed within a short gap by an assignment (= or :) and a base64 value of
+  either 56 characters (public key) or 86-88 characters (private key / secret, base64 of 64
+  bytes with optional = padding). base64 class is [A-Za-z0-9/+] with = padding; / and + are
+  literal. Corroborative evidence: keywords within 300 characters. Keyword lists: credentials.
+pattern: (?i)kraken[\s\S]{0,24}?[=:][\s"]*(?:[A-Za-z0-9/+]{86}={0,2}|[A-Za-z0-9/+]{56})(?![A-Za-z0-9/+=])
+confidence: medium
+confidence_justification: >-
+  Medium confidence: Kraken keys are base64 strings with no self-identifying prefix, so a bare
+  value is indistinguishable from any other base64 blob; detection relies on an adjacent Kraken
+  label plus an assignment. The two fixed lengths (56 and 86-88) narrow the value shape but are
+  not distinctive enough on their own to alert without context.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - kraken
+    - kraken api
+    - api key
+    - api_key
+    - api secret
+    - private key
+    - API-Sign
+    - API-Key
+  proximity: 300
+  keyword_lists:
+    - credentials
+test_cases:
+  should_match:
+    - value: 'KRAKEN_API_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      description: Kraken public key (56 base64 chars), zero-entropy filler in an assignment
+    - value: 'kraken private key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=='
+      description: Kraken private key (86 base64 chars + == padding = 88), zero-entropy filler
+    - value: 'kraken api secret = ABABABABABABABABABABABABABABABABABABABABABABABABABABABAB'
+      description: Kraken public key with repeated-block 56-char base64 filler
+  should_not_match:
+    - value: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      description: Bare 56-char base64 value with no Kraken context (could be any base64 blob)
+    - value: 'KRAKEN_API_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      description: Wrong length (40 base64 chars, neither 56 nor 86-88)
+    - value: store your kraken api key and private key securely offline
+      description: Prose mention with no assignment and no base64 value
+false_positives:
+  - description: A 56 or 86-88 character base64 blob (hash, signature, other vendor secret) appearing near the word kraken in prose.
+    mitigation: The pattern already requires an assignment (=/:) between the Kraken label and the value; require corroborative Kraken keywords and treat obvious placeholders (alphabet runs, all zeros) as non-sensitive.
+  - description: Documentation or examples showing placeholder base64 strings near Kraken text.
+    mitigation: Check for placeholder markers (example, AAAA, xxxx) and require Kraken context.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: wide
+risk_rating: 8
+risk_description: >-
+  A leaked Kraken private key (API secret) allows signing authenticated REST requests to the
+  account, enabling balance access and trading, and where permitted, withdrawals.
+sensitivity_labels:
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+created: '2026-07-08'
+updated: '2026-07-08'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-08'
+    description: Initial release
+author: testpattern-community
+license: MIT
+references:
+  - url: https://docs.kraken.com/api/docs/guides/spot-rest-auth/
+    title: Spot REST Authentication - Kraken API Center
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/kraken/kraken.go
+    title: TruffleHog Kraken detector
