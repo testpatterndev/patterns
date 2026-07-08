@@ -134,19 +134,22 @@ convention.)
 Method: node script over `data/patterns/*.yaml` selecting patterns with
 `engine: universal` (or absent), no top-level `case_sensitive`, a digit component, and a
 top-level regex beginning (after `\b`/group openers) with uppercase literal letters or an
-`[A-Z]`-bearing class. **72 candidates.** No changes made to any of them in this task.
+`[A-Z]`-bearing class. **74 candidates** (72 from the original scan + 2 added in review
+fixes — the original scan required a literal `\d`/`[0-9]` for its "digit component" test and
+missed patterns whose only digits live in `[A-Z0-9]`-style classes; see section 5). No
+changes made to any of them in this task.
 
 Because the repo's verification default is case-INSENSITIVE, every one of these currently
 accepts lowercase forms (e.g. `atu12345678`, `ab123456`) in the CI harness.
 
-### Group A — national ID / passport / licence identifiers, case-fixed uppercase formats (strong harmonization candidates)
+### Group A — national ID / passport / licence / institution identifiers, case-fixed uppercase formats (strong harmonization candidates)
 
 at-passport-number, at-vat-number, au-ahpra-registration, au-citizenship-certificate,
 au-superannuation-fund-number, au-travel-document-id, be-passport-number, be-vat-number,
 ca-drivers-license, ca-passport-number, cy-passport-number, cz-drivers-license,
 de-drivers-license, de-vat-number, ee-drivers-license, ee-passport-number,
 es-passport-number, eu-passport-number, eu-vat-number, fi-passport-number, fr-vat-number,
-gr-drivers-license, gr-national-id, gr-passport-number, hk-identity-card,
+global-swift-bic, gr-drivers-license, gr-national-id, gr-passport-number, hk-identity-card,
 hu-drivers-license, hu-passport-number, hu-vat-number, id-passport-number,
 ie-passport-number, in-drivers-license, in-pan, in-voter-id, it-codice-fiscale,
 it-drivers-license, it-passport-number, it-vat-number, jp-passport-number,
@@ -159,20 +162,32 @@ tw-resident-certificate, ua-passport-number-international, uk-driving-licence,
 uk-electoral-roll, us-alien-registration-number, us-drivers-license,
 us-drivers-license-multistate
 
-(67 files.) Recommendation: harmonize in a dedicated follow-up wave, per-jurisdiction
+(68 files.) Recommendation: harmonize in a dedicated follow-up wave, per-jurisdiction
 verification that the format is genuinely case-fixed (most are — MRZ/document-printed
 uppercase), adding lowercase should_not_match cases and changelog entries as done here.
 Watch for: (a) handwritten/free-text sources where users type identifiers lowercase — the
 tradeoff is precision vs recall; (b) patterns whose purview regexes carry inline `(?i)`
 groups, because `toRe` drops the `i` when `case_sensitive: true` is set (audit those
 label-context regexes before converting); (c) `au-number-plates` (also in this group's shape)
-— plates are printed uppercase but commonly written lowercase informally.
+— plates are printed uppercase but commonly written lowercase informally; (d)
+`global-swift-bic` (`\b[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?\b`) — ISO 9362 defines BICs as
+uppercase and the pattern is entirely letter-prefixed/case-fixed, so it is a strong candidate,
+but BICs are frequently typed lowercase in email prose ("swift: deutdeff"), so weigh the
+recall cost before converting.
 
-### Group B — mixed-case-significant (harmonization candidate for a different reason)
+### Group B — case-sensitive secrets (harmonization candidates for a different reason)
 
 - global-gcp-api-key (`\bAIza[0-9A-Za-z_-]{35}\b`) — the `AIza` prefix and the body are
   genuinely case-significant (API keys are case-sensitive secrets); testing it
-  case-insensitively is arguably wrong today. Strongest single candidate.
+  case-insensitively is arguably wrong today.
+- global-aws-access-key (`\b(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b`)
+  — literal uppercase prefixes and an uppercase-alphanumeric body; AWS access key IDs are
+  genuinely case-sensitive credentials, the exact analogue of global-gcp-api-key. Missed by
+  the original scan (no literal `\d`; see section 5).
+
+These two are the strongest individual candidates in the census: the values are secrets whose
+case is definitionally significant, so case-insensitive matching admits strings that cannot be
+real keys.
 
 ### Group C — document/context patterns, likely deliberate case-insensitive (leave as-is)
 
@@ -190,5 +205,29 @@ leaving case-insensitive unless a review says otherwise.
   forced `i` flag in both gates).
 - The 3 D4 files were safely harmonized to the j1/j3/j4 convention; the behavior change
   (lowercase now rejected) is verified empirically and documented in test cases + changelogs.
-- 72 further candidates catalogued (67 strong, 1 API-key special case, 3 leave-as-is);
-  recommended as a separate follow-up wave. No changes made to them here.
+- 74 further candidates catalogued (68 strong, 2 case-sensitive-secret special cases,
+  3 leave-as-is); recommended as a separate follow-up wave. No changes made to them here.
+
+## 5. Review fixes (2026-07-08)
+
+Review flagged the census as incomplete: two clear in-scope candidates were missing.
+
+- Root cause: the census script's "digit component" test required a literal `\d`/`[0-9]` in
+  the pattern, so patterns whose only digit-bearing component is a combined class like
+  `[A-Z0-9]` were silently excluded.
+- Re-scan of that gap (engine universal / no `case_sensitive` / uppercase-prefixed /
+  `[A-Z0-9]`-class digits / no literal `\d`) returned 7 files. Five are defensible
+  exclusions under the census intent: au-unique-student-identifier and eu-drivers-license
+  (pure `[A-Z0-9]{n}` classes, no fixed letter prefix, all-digit values valid),
+  global-electronic-mail-id (mixed-case by definition), us-cui-banner-marking (prose banner
+  marking, deliberately case-insensitive), and global-gcp-api-key (already in Group B).
+- Two were genuine misses, now added:
+  - **global-aws-access-key** → Group B (case-sensitive secret; literal uppercase prefixes
+    `AKIA`/`ASIA`/... — same class of candidate as global-gcp-api-key).
+  - **global-swift-bic** → Group A (ISO 9362 BICs are case-fixed uppercase; caution note on
+    lowercase prose usage added to the Group A recommendation).
+- Totals updated: 72 → 74 candidates; Group A 67 → 68 files; Group B 1 → 2.
+- No pattern YAML files were changed in this fix (census is documentation-only per the
+  ticket); gates re-run to confirm the tree is clean: check 0 errors, quality PASSED,
+  compile OK (patterns.json reverted before staging), and the three j2 files still pass
+  `verify-pattern-testcases`.
