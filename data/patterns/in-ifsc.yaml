@@ -1,0 +1,146 @@
+schema: testpattern/v1
+name: India IFSC Code
+slug: in-ifsc
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects Indian Financial System Codes (IFSC) used to identify bank branches on the NEFT/RTGS/IMPS
+  networks. Format is four letters (bank code), a mandatory zero, then six alphanumeric characters (branch code),
+  total length 11, typically uppercase.
+operation: >-
+  Structural IFSC format [A-Z]{4}0[A-Z0-9]{6}. No checksum. Corroborative evidence: IFSC/NEFT/branch
+  keywords within 300 characters. Keyword lists: banking, financial-transaction.
+pattern: '\b[A-Z]{4}0[A-Z0-9]{6}\b'
+confidence: high
+confidence_justification: >-
+  High confidence with banking context keywords. The mandatory zero in position 5 is a
+  strong structural constraint rarely seen in random 11-character tokens.
+jurisdictions:
+  - in
+regulations:
+  - DPDPA
+  - "IT Act 2000 (India)"
+  - "Payment and Settlement Systems Act 2007"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - financial
+  - business-identifier
+corroborative_evidence:
+  keywords:
+    - IFSC
+    - IFSC code
+    - NEFT
+    - RTGS
+    - branch code
+  proximity: 300
+  keyword_lists:
+    - banking
+    - financial-transaction
+test_cases:
+  should_match:
+    - value: SBIN0001234
+      description: SBI-style IFSC
+    - value: HDFC0000123
+      description: HDFC-style IFSC
+    - value: UTIB0ABC123
+      description: Alphanumeric branch segment
+  should_not_match:
+    - value: SBIN1001234
+      description: Position 5 is 1, not mandatory 0
+    - value: SBI0001234
+      description: Only 3 letter bank code
+    - value: SBIN000123
+      description: Branch segment too short
+false_positives:
+  - description: >-
+      Other 11-character uppercase codes with a zero mid-string in logistics systems.
+    mitigation: >-
+      Require IFSC/NEFT/RTGS/IMPS keywords in proximity.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_in_ifsc
+      matches:
+        - ref: Keyword_in_ifsc_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_in_ifsc
+      matches:
+        - ref: Keyword_in_ifsc_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_in_ifsc
+  regexes:
+    - id: Regex_in_ifsc
+      pattern: '\b[A-Z]{4}0[A-Z0-9]{6}\b'
+  keywords:
+    - id: Keyword_in_ifsc_specific
+      groups:
+        - match_style: word
+          terms:
+            - IFSC
+            - IFSC code
+            - Indian Financial System Code
+            - NEFT IFSC
+            - RTGS IFSC
+            - IMPS IFSC
+            - bank IFSC
+      strength: specific
+    - id: Keyword_in_ifsc_broad
+      groups:
+        - match_style: word
+          terms:
+            - NEFT
+            - RTGS
+            - IMPS
+            - branch code
+            - beneficiary bank
+            - fund transfer
+            - bank transfer
+      strength: specific
+risk_rating: 5
+risk_description: >-
+  IFSC identifies bank branches used in payments; alone it is low sensitivity but paired with account numbers enables fraudulent transfers.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: "IN CONFIDENCE"
+  ca_gov: "Protected A"
+references:
+  - url: https://www.rbi.org.in/Scripts/FAQView.aspx?Id=65
+    title: RBI IFSC FAQ
+created: '2026-07-09'
+updated: '2026-07-09'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-09'
+    description: 'Initial mature identifier SIT — Phase-1 coverage backlog (Purview-safe regex, full label/risk metadata for pack workbooks)'
+author: testpattern-community
+license: MIT

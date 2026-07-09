@@ -1,0 +1,141 @@
+schema: testpattern/v1
+name: Brazil CNH Number
+slug: br-cnh
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects Brazilian driver licence numbers (CNH - Carteira Nacional de Habilitação). The CNH register
+  number is 11 digits. Structural detection alone is ambiguous with CPF length, so corroborative CNH keywords are
+  required for reliable use.
+operation: >-
+  Structural 11-digit detection. CNH check digits are not enforced here (CPF uses a different Mod-11
+  scheme). Corroborative evidence: CNH/habilitação keywords within 300 characters. Keyword lists: pii-civic-credentials.
+pattern: '\b\d{11}\b'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: same length as CPF; keyword gating is mandatory to avoid systematic
+  collision with br-cpf.
+jurisdictions:
+  - br
+regulations:
+  - LGPD
+  - "CTB (Brazil)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - CNH
+    - carteira de motorista
+    - habilitação
+    - registro CNH
+  proximity: 300
+  keyword_lists:
+    - pii-civic-credentials
+test_cases:
+  should_match:
+    - value: '12345678901'
+      description: 11-digit CNH register number
+    - value: '09876543211'
+      description: Alternate 11-digit value
+    - value: '11144477735'
+      description: Third illustrative value
+  should_not_match:
+    - value: '1234567890'
+      description: Only 10 digits
+    - value: '123456789012'
+      description: 12 digits
+    - value: '1234567890A'
+      description: Contains a letter
+false_positives:
+  - description: >-
+      CPF is also 11 digits and will match the same digit pattern.
+    mitigation: >-
+      Require CNH/habilitação keywords; deploy alongside br-cpf with distinct evidence.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_br_cnh
+      matches:
+        - ref: Keyword_br_cnh_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_br_cnh
+      matches:
+        - ref: Keyword_br_cnh_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_br_cnh
+  regexes:
+    - id: Regex_br_cnh
+      pattern: '\b\d{11}\b'
+  keywords:
+    - id: Keyword_br_cnh_specific
+      groups:
+        - match_style: word
+          terms:
+            - CNH
+            - carteira nacional de habilitação
+            - número da CNH
+            - registro CNH
+            - CNH number
+            - carteira de motorista
+      strength: specific
+    - id: Keyword_br_cnh_broad
+      groups:
+        - match_style: word
+          terms:
+            - habilitação
+            - DET RAN
+            - DETRAN
+            - condutor
+            - categoria CNH
+            - permissão para dirigir
+      strength: specific
+risk_rating: 7
+risk_description: >-
+  CNH numbers identify licensed drivers and appear with PII on licence images and HR driving records.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: "SENSITIVE Personal-Privacy"
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: "Protected B"
+references:
+  - url: https://www.gov.br/infraestrutura/pt-br/assuntos/transito
+    title: Brazilian traffic authority portal
+created: '2026-07-09'
+updated: '2026-07-09'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-09'
+    description: 'Initial mature identifier SIT — Phase-1 coverage backlog (Purview-safe regex, full label/risk metadata for pack workbooks)'
+author: testpattern-community
+license: MIT
