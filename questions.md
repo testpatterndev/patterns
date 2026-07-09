@@ -55,4 +55,21 @@ dict; the 74-file case_sensitive harmonization wave from the j2 census.
 
 ## Answered / resolved during the run
 
-(nothing yet)
+- **2026-07-09 (contstart, this machine): redundant-session output adjudicated.** The two
+  spun-off task-chip sessions left three worktree branches; all pattern changes are
+  superseded by main and none needs merging:
+  - `claude/friendly-keller-630c9d` (task_3bfa12e2 sweep, 242 files): duplicate of merged
+    PR #19 — same files reach the same wired state on main with different changelog text.
+    No PR was opened. Safe to close the session and delete the branch/worktree.
+  - `claude/pensive-albattani-26afe0` (task_bb58ffc0 COA fix): duplicate of merged PR #21.
+    Only delta: its regex also covers plural "authorities" (`authorit(?:y|ies)`) where
+    main covers only "authority" — cosmetic nit, not worth a PR. Safe to close/delete.
+  - `claude/funny-wright-3a7464` = **PR #20** (open, NOT in the handoff): 14-file legal
+    NOT-group fix. Superseded — all 14 slugs on main already carry the identical T2 fix
+    (v1.2.0, batch-3) plus the noise-gate wiring (v1.2.1). **PR #20 closed unmerged**;
+    its follow-up analysis preserved as `.superpowers/sdd/legal-tier-residuals-backlog.md`.
+- **Item 3 of that ticket resolved by audit:** all 1,058 `Evidence_*_exclusion` refs
+  catalog-wide sit under correct negative semantics (1,010 NOT-group refs lists, 39
+  NOT-group children, 9 excludes keys, 0 positive). The legal 14 were the only instances
+  of the lost-wrapper class; no further fixes needed. Items 1–2 (weak legal 75 tiers,
+  ~22 verifier FAILs) remain open — they subsume the deferred item 4b design pass above.
