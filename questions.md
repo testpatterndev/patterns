@@ -2,7 +2,15 @@
 
 Parked here per your instruction; none of these block the loop. Newest at top of each section.
 
-## Needs your decision
+**2026-07-09: all four decided by Nathan (in-session):**
+1. Classification run → regenerate batches incl. D3/D4 first, then he runs at the keyboard.
+2. Secret Scanning + push protection → stay ON.
+3. Concept-strategy C1–C4 → **GO**; start C1 (the ~36 deferred top500 self-corroborating tiers
+   fold into it rather than piecemeal fixes).
+4. Follow-ups → legal 75-tier ticket (legal-tier-residuals-backlog.md Items 1–2) starts now;
+   case_sensitive harmonization / ci-check recursive read / en-gov dict fate stay parked.
+
+## Needs your decision (RESOLVED — see above)
 
 1. **Targeted classification run** — ~100 new patterns since the March baseline are staged for
    validation but the harness needs you at the keyboard for the `Connect-IPPSSession` popup.
