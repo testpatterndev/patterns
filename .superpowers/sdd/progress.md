@@ -337,3 +337,13 @@ C1-T2/T3 COMPLETE + MERGED (site PR #8, ~13:25): codex HIGH returned 1 P2 — RE
 C1-T4 COMPLETE + MERGED (site PR #9 + patterns PR #24, ~13:40): verdictFromRates extracted (verdict = pure fn of ps/ph/nc/nd + class; equivalence property-tested); reverdict-compact-results.mjs re-baselined the published 1,287-record compact with raw cross-check (880 records, 0 disagreements) — new distribution: 274 PASS / 19 PARTIAL / 33 MIXED (identifier) + 88 TOPIC_PASS / 16 TOPIC_PARTIAL / 789 TOPIC_FP (concept) + 64 ND / 4 ERROR. sit-design-paper §7 rewritten (two scales + re-baseline + Run 3 as history). Codex on PR #9: 2 P2s BOTH pre-existing deploy-path code (~0775852), misattributed — rebutted for the PR, logged as chip task_3aa24b35 (DeployReviewStep no-classifier warning vs Deploy-DLPRules abort; deploy-export hard-coded 9-package error vs maxPackages override). Tests 180/180.
 === C1 COMPLETE (all four tasks merged, 2026-07-09 ~13:40) ===
 C1 exit state: pattern_class catalog-wide (PR #22) -> concept verdict model + site vocab (site PR #8, CF-deployed) -> re-baselined published results + design-paper §7 (site PR #9 + patterns PR #24). The ~36 deferred top500 self-corroborating tiers are now correctly scored as topic classifiers (no piecemeal rewiring needed). NEXT concept-strategy blocks: C4 xlsx clean-negative audit (789 TOPIC_FP concentrate there — biggest lever, no tenant needed); C2 discriminator pilot (20 patterns, needs tenant window); C3 deprecate/redesign ~50 un-expressible. A fresh tenant run (Nathan's 37-batch targeted run is staged) validates the re-scored baseline.
+
+=== PLAN: Concept-Strategy C4 — XLSX clean-negative investigation (2026-07-09, Nathan GO in-session) ===
+Plan §C4: clean negatives FP at 71% on xlsx vs 38-45% other formats. Tasks:
+- C4-T1: evidence — per-format clean-neg FP breakdown from raw per-variant data; identify failing slug/doc cohort.
+- C4-T2: audit XLSX doc-gen negative-polarity masking (metadata self-match class — verify the old fix held for
+  sharedStrings; find what leaks pattern vocabulary into clean negatives).
+- C4-T3: fix doc-gen where artefactual; evidence-based generic-business-vocab NOT exclusions in patterns repo
+  where over-match is genuine.
+- C4-T4: keyword-placer keywordHeading robustness — plan prescribes skipping suffixes present in ANY exclusion
+  dictionary (current fix only swapped 'Documentation'->'Summary' in place).
