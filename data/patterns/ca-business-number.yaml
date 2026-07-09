@@ -1,0 +1,150 @@
+schema: testpattern/v1
+name: Canada Business Number
+slug: ca-business-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects Canada Revenue Agency (CRA) Business Numbers (BN). The core BN is nine digits assigned to
+  a business. Program accounts append a two-letter program identifier (RC, RM, RP, or RT) and a four-digit reference,
+  for example 123456789RC0001 for a corporate income-tax account.
+operation: >-
+  Structural detection of 9-digit BN with optional CRA program account suffix (RC|RM|RP|RT + 4 digits).
+  No public checksum is enforced. Corroborative evidence: BN/CRA keywords within 300 characters. Keyword lists:
+  business-identifier, ca-financial, tax-id.
+pattern: '\b\d{9}(?:\s?(?:RC|RM|RP|RT)\s?\d{4})?\b'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: nine-digit sequences are common; program-account suffixes improve
+  precision but bare BN still requires CRA/business-number keywords to limit false positives.
+jurisdictions:
+  - ca
+regulations:
+  - PIPEDA
+  - "Law 25 (QC)"
+  - "Excise Tax Act (CA)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - business-identifier
+  - financial
+  - government-id
+corroborative_evidence:
+  keywords:
+    - business number
+    - BN
+    - CRA business number
+    - program account
+  proximity: 300
+  keyword_lists:
+    - business-identifier
+    - ca-financial
+    - tax-id
+test_cases:
+  should_match:
+    - value: '123456789'
+      description: Bare nine-digit BN
+    - value: '123456789RC0001'
+      description: BN with RC corporate tax account
+    - value: '987654321 RT 0002'
+      description: BN with spaced RT GST/HST account
+  should_not_match:
+    - value: '12345678'
+      description: Only 8 digits
+    - value: '123456789RX0001'
+      description: Invalid program code RX
+    - value: '123456789RC000'
+      description: Only 3 digits in account reference
+false_positives:
+  - description: >-
+      Canadian SINs, phone fragments, or order IDs that are nine digits.
+    mitigation: >-
+      Require business number / CRA / program account keywords; deprioritise when SIN keywords dominate.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_ca_business_number
+      matches:
+        - ref: Keyword_ca_business_number_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_ca_business_number
+      matches:
+        - ref: Keyword_ca_business_number_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_ca_business_number
+  regexes:
+    - id: Regex_ca_business_number
+      pattern: '\b\d{9}(?:\s?(?:RC|RM|RP|RT)\s?\d{4})?\b'
+  keywords:
+    - id: Keyword_ca_business_number_specific
+      groups:
+        - match_style: word
+          terms:
+            - business number
+            - CRA business number
+            - BN number
+            - program account
+            - GST/HST account
+            - corporation account
+            - payroll account
+            - import-export account
+      strength: specific
+    - id: Keyword_ca_business_number_broad
+      groups:
+        - match_style: word
+          terms:
+            - text: BN
+              case_sensitive: true
+            - CRA
+            - Canada Revenue Agency
+            - business registration
+            - tax account
+            - RC0001
+            - RT0001
+      strength: specific
+risk_rating: 6
+risk_description: >-
+  Business Numbers link to tax and payroll program accounts; exposure can enable targeted tax fraud and social engineering against finance teams.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: "SENSITIVE Financial"
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: "Protected B"
+references:
+  - url: https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/registering-your-business/business-number.html
+    title: Business Number - Canada.ca
+created: '2026-07-09'
+updated: '2026-07-09'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-09'
+    description: 'Initial mature identifier SIT — Phase-1 coverage backlog (Purview-safe regex, full label/risk metadata for pack workbooks)'
+author: testpattern-community
+license: MIT

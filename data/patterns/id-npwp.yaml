@@ -1,0 +1,140 @@
+schema: testpattern/v1
+name: Indonesia NPWP
+slug: id-npwp
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects Indonesian taxpayer identification numbers (NPWP). Classic NPWP is 15 digits commonly
+  formatted 01.234.567.8-012.000; newer 16-digit forms align with NIK for individuals under tax reform.
+operation: >-
+  Structural detection of 15-digit formatted/unformatted NPWP and 16-digit continuous form. Checksum
+  not enforced. Corroborative evidence: NPWP/pajak keywords within 300 characters. Keyword lists: tax-id.
+pattern: '\b(?:\d{2}\.\d{3}\.\d{3}\.\d{1}-\d{3}\.\d{3}|\d{15}|\d{16})\b'
+confidence: medium
+confidence_justification: >-
+  Medium confidence due to overlap with other digit IDs (especially 16-digit NIK);
+  NPWP/tax keywords are essential.
+jurisdictions:
+  - id
+regulations:
+  - "UU PDP (Indonesia)"
+  - "KUP Law (Indonesia)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - financial
+  - government-id
+  - pii
+corroborative_evidence:
+  keywords:
+    - NPWP
+    - nomor pokok wajib pajak
+    - pajak
+  proximity: 300
+  keyword_lists:
+    - tax-id
+    - pii-civic-credentials
+test_cases:
+  should_match:
+    - value: '01.234.567.8-012.000'
+      description: Classic dotted NPWP
+    - value: '012345678901000'
+      description: 15-digit continuous
+    - value: '0123456789012345'
+      description: 16-digit reform format
+  should_not_match:
+    - value: '01.234.567.8-012.00'
+      description: Truncated final group
+    - value: '01234567890100'
+      description: Only 14 digits
+    - value: '01234567890123456'
+      description: 17 digits
+false_positives:
+  - description: >-
+      NIK (KTP) is 16 digits and can collide with the reform NPWP form.
+    mitigation: >-
+      Require NPWP/pajak/wajib pajak keywords; use id-identity-card-ktp for NIK context.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_id_npwp
+      matches:
+        - ref: Keyword_id_npwp_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_id_npwp
+      matches:
+        - ref: Keyword_id_npwp_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_id_npwp
+  regexes:
+    - id: Regex_id_npwp
+      pattern: '\b(?:\d{2}\.\d{3}\.\d{3}\.\d{1}-\d{3}\.\d{3}|\d{15}|\d{16})\b'
+  keywords:
+    - id: Keyword_id_npwp_specific
+      groups:
+        - match_style: word
+          terms:
+            - NPWP
+            - nomor pokok wajib pajak
+            - NPWP number
+            - Nomor NPWP
+            - NPWP 16 digit
+      strength: specific
+    - id: Keyword_id_npwp_broad
+      groups:
+        - match_style: word
+          terms:
+            - pajak
+            - wajib pajak
+            - DJP
+            - SPT
+            - tax ID Indonesia
+            - Direktorat Jenderal Pajak
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  NPWP links individuals and entities to tax filings; exposure enables tax fraud and identity misuse.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: "SENSITIVE Financial"
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: "Protected B"
+references:
+  - url: https://www.pajak.go.id/
+    title: Direktorat Jenderal Pajak
+created: '2026-07-09'
+updated: '2026-07-09'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-09'
+    description: 'Initial mature identifier SIT — Phase-1 coverage backlog (Purview-safe regex, full label/risk metadata for pack workbooks)'
+author: testpattern-community
+license: MIT
