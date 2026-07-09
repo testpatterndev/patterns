@@ -58,6 +58,7 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   try { p = yaml.load(readFileSync(join(patDir, f), 'utf-8')) }
   catch (e) { errors.push(`${f}: YAML parse — ${e.message.split('\n')[0]}`); continue }
   for (const k of REQUIRED) if (!(k in p)) errors.push(`${f}: missing field '${k}'`)
+  if ('pattern_class' in p && !['identifier', 'concept', 'marking'].includes(p.pattern_class)) errors.push(`${f}: pattern_class must be identifier|concept|marking, got '${p.pattern_class}'`)
   if (typeof p.slug === 'string') patternSlugs.add(p.slug)
 
   const idMatchIds = new Set((p.purview?.pattern_tiers ?? []).map(t => t.id_match).filter(Boolean))

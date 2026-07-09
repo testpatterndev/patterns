@@ -7,7 +7,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
-const TODAY = '2026-07-04'
+const TODAY = process.env.PATTERN_BUMP_DATE || '2026-07-04'
 const DIR = 'data/patterns'
 
 // Matches the catalog's actual quoting conventions: plain scalars by default,
@@ -47,7 +47,10 @@ export function bumpPatternVersion(slug, note) {
   if (!/^updated:\s*.*$/m.test(text)) throw new Error(`${slug}: no updated field`)
   text = text.replace(/^updated:\s*.*$/m, `updated: '${TODAY}'`)
 
-  const entry = `  - version: ${version}${nl}    date: '${TODAY}'${nl}    description: ${yamlScalar(note)}${nl}`
+  // Match the file's existing changelog item indent (most files use 2 spaces, a
+  // minority use zero-indent list items — mixing the two breaks the YAML parse).
+  const itemIndent = text.match(/^changelog:\s*\r?\n([ \t]*)- version:/m)?.[1] ?? '  '
+  const entry = `${itemIndent}- version: ${version}${nl}${itemIndent}  date: '${TODAY}'${nl}${itemIndent}  description: ${yamlScalar(note)}${nl}`
   if (/^changelog:\s*$/m.test(text)) {
     text = text.replace(/^changelog:\s*\r?\n/m, `changelog:${nl}${entry}`)
   } else {
