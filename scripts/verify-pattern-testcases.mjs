@@ -63,17 +63,20 @@ let warnings = 0
 // ---------- regex / keyword compilation ----------
 
 // Strip a leading inline-flag group like (?i)/(?is)/(?s) (invalid in JS) and map to JS
-// flags. Case-insensitive is forced by repo convention unless p.case_sensitive.
+// flags. Case-insensitive is forced by repo convention unless p.case_sensitive — but a
+// regex that INTENTIONALLY carries (?i) keeps case-insensitivity even on a
+// case_sensitive pattern (the inline flag is authored per-regex and wins).
 const toRe = (src, caseSensitive, extraFlags = '') => {
   let body = String(src)
   let flags = (caseSensitive ? '' : 'i') + extraFlags
   const m = body.match(/^\(\?([ims]+)\)/)
   if (m) {
     body = body.slice(m[0].length)
+    if (m[1].includes('i')) flags += 'i'
     if (m[1].includes('s')) flags += 's'
     if (m[1].includes('m')) flags += 'm'
   }
-  return new RegExp(body, flags)
+  return new RegExp(body, [...new Set(flags)].join(''))
 }
 
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -86,12 +89,20 @@ function compileTerm(term, matchStyle) {
   const cs = typeof term === 'object' && term?.case_sensitive === true
   if (matchStyle === 'string') {
     const needle = cs ? text : text.toLowerCase()
-    return { text, test: (v) => (cs ? v : v.toLowerCase()).includes(needle) }
+    const norm = (v) => (cs ? v : v.toLowerCase())
+    const count = (v) => {
+      const hay = norm(v)
+      let n = 0
+      for (let i = hay.indexOf(needle); i !== -1; i = hay.indexOf(needle, i + needle.length)) n++
+      return n
+    }
+    return { text, test: (v) => norm(v).includes(needle), count }
   }
   const lead = /^[A-Za-z0-9_]/.test(text) ? '(?<![A-Za-z0-9_])' : ''
   const trail = /[A-Za-z0-9_]$/.test(text) ? '(?![A-Za-z0-9_])' : ''
   const re = new RegExp(lead + escRe(text) + trail, cs ? '' : 'i')
-  return { text, test: (v) => re.test(v) }
+  const reG = new RegExp(re.source, re.flags + 'g')
+  return { text, test: (v) => re.test(v), count: (v) => [...v.matchAll(reG)].length }
 }
 
 const dictCache = new Map()
@@ -153,14 +164,16 @@ function buildRegistry(p, slug) {
 }
 
 // Count how many times a matcher hits in `text` (unique -> distinct match strings /
-// distinct keyword terms). Returns null when the matcher cannot be evaluated.
+// distinct keyword terms; non-unique -> total occurrences, so two occurrences of the
+// same term count as 2). Returns null when the matcher cannot be evaluated.
 function matchCount(matcher, text, unique) {
   if (!matcher || matcher.kind === 'divergent') return null
   if (matcher.kind === 'regex') {
     const hits = [...text.matchAll(matcher.reG)].map((m) => m[0])
     return unique ? new Set(hits).size : hits.length
   }
-  return matcher.terms.filter((t) => t.test(text)).length // keyword: distinct terms
+  if (unique) return matcher.terms.filter((t) => t.test(text)).length // distinct terms
+  return matcher.terms.reduce((n, t) => n + t.count(text), 0) // total occurrences
 }
 const matches = (matcher, text) => {
   if (!matcher || matcher.kind === 'divergent') return null
@@ -365,10 +378,16 @@ function verifyPattern(slug) {
   }
 
   // keyword_list/keyword_dictionary: the primary detector is the keywords array.
+  // Terms go through compileTerm so per-term { text, case_sensitive: true } objects
+  // keep their case-sensitivity (substring semantics, matching the previous behavior).
+  const normKwTerm = (t) => {
+    if (typeof t === 'object' && t !== null) return { ...t, text: String(t.text ?? '').trim() }
+    return String(t).trim()
+  }
   const kwTerms = KW_TYPES.has(p.type)
-    ? (p.keywords ?? []).map((t) => String(typeof t === 'object' ? t?.text ?? '' : t).toLowerCase().trim()).filter(Boolean)
+    ? (p.keywords ?? []).map((t) => compileTerm(normKwTerm(t), 'string')).filter(Boolean)
     : []
-  const kwHit = (v) => { const lv = v.toLowerCase(); return kwTerms.some((t) => lv.includes(t)) }
+  const kwHit = (v) => kwTerms.some((t) => t.test(v))
 
   const shouldMatch = p.test_cases?.should_match ?? []
   const shouldNot = p.test_cases?.should_not_match ?? []
