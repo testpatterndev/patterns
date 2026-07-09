@@ -88,7 +88,32 @@ a generated heading, regardless of future dictionary content.
   arguably correct topical behaviour (the training-catalog "neutral" archetype is not
   neutral for that pattern). Single-pattern edge; revisit with post-regeneration data.
 
+## Cause D (found by post-regeneration verification) — filler-corpus topic collisions
+
+Sample verification of the first full regeneration caught a fourth cause:
+au-top500-260-pii-data-flow-maps' clean negatives still matched via the *neutral filler
+sentence* "Privacy impact assessment {ref} was completed by {name}…". A corpus sweep
+found **298 concept patterns matching at least one filler template, heading, or doc
+title** (DOC_TITLES literally contains "Privacy Impact Assessment") — the catalog covers
+the business-document universe so thoroughly that no fixed business-realistic filler can
+be neutral for all of it.
+
+**Fix: per-pattern topic filtering.** `filler-text.js` gains
+`setFillerTopicFilter(regexes)` + `pickTopicSafe(list, idx)` (deterministic skip-forward
+past colliding candidates, bland fallback if all collide), applied to every selection
+surface: generic TEMPLATES, themed archetype templates, NEUTRAL_TEMPLATES, HEADINGS,
+DOC_TITLES, APPENDIX_HEADINGS. `generate-test-docs.js` sets the filter from the
+pattern-under-test's compiled topic regexes for **clean-negative variants only**
+(positives and decoys are unfiltered) and clears it afterwards. A clean negative is thus
+guaranteed topically clean *relative to the pattern it tests* while staying realistic —
+exactly the C1 TOPIC_FP semantic.
+
+Probes (260 + 341 + class-action-defence-strategy): all clean negatives clean across
+docx/xlsx/pptx; positives intact. Final full regeneration launched ~17:20 (~2.7h).
+
 ## Expected effect
 
 TOPIC_FP (789 of 1,287 in the re-baselined dataset) should drop substantially at the next
 tenant run; the concept clean-neg FP floor becomes an honest measure of over-match.
+Batches 1–6 of Nathan's targeted run predate the corpus fixes — discard and restart from
+batch 1 once the final regeneration completes.
