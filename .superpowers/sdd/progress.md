@@ -358,3 +358,6 @@ deprecated + deprecation_reason: needs-EDM/ML (NEW schema fields — au-pspf pre
 the structured field too) OR convert to documented low-precision concept with honest false_positives. Site displays
 status. No silent deletions. Tasks: T1 census+adjudication, T2 schema+ci-check, T3 YAML wave, T4 site display.
 ALSO this block: site PR #11 (deploy-path gaps from Nathan's spun-off session) reviewed + MERGED.
+C3 COMPLETE + MERGED (~19:20): patterns PR #26 (17 structured deprecations + status/deprecation_reason schema + ci-check validation; codex: 1 P2 recompile-convention only) + site PR #12 (DeprecatedBadge/notice/renderer rows, tests 206/206) + recompile 046287a9ce (17 deprecated in build). Report: c3-deprecation-report.md (adjudications, census FPs excluded, Art-9 coverage gap = D-wave candidate).
+CRITICAL CATCH during C3: PR #25 (other agent, Phase-1 SITs) merged with RED CI — 11 shortAcronyms violations, and check:quality GATES the KV publish workflow → **KV publishing broken 08:49-~19:10** (run 29006047037 failed silently). HOTFIX PR #27 (9 files, per-term case_sensitive conversion, j2 convention) merged first; publish restored. LESSON for parallel agents: check "gh run list" after every merge to main — the publish workflow failing is silent; PR CI red = DO NOT MERGE.
+=== CONCEPT-STRATEGY C1+C3+C4 COMPLETE (C2 awaits tenant window) ===
