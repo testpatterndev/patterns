@@ -59,6 +59,9 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   catch (e) { errors.push(`${f}: YAML parse — ${e.message.split('\n')[0]}`); continue }
   for (const k of REQUIRED) if (!(k in p)) errors.push(`${f}: missing field '${k}'`)
   if ('pattern_class' in p && !['identifier', 'concept', 'marking'].includes(p.pattern_class)) errors.push(`${f}: pattern_class must be identifier|concept|marking, got '${p.pattern_class}'`)
+  if ('status' in p && !['active', 'deprecated'].includes(p.status)) errors.push(`${f}: status must be active|deprecated, got '${p.status}'`)
+  if (p.status === 'deprecated' && !(typeof p.deprecation_reason === 'string' && p.deprecation_reason.trim())) errors.push(`${f}: deprecated pattern requires a non-empty deprecation_reason`)
+  if ('deprecation_reason' in p && p.status !== 'deprecated') errors.push(`${f}: deprecation_reason present but status is not 'deprecated'`)
   if (typeof p.slug === 'string') patternSlugs.add(p.slug)
 
   const idMatchIds = new Set((p.purview?.pattern_tiers ?? []).map(t => t.id_match).filter(Boolean))
