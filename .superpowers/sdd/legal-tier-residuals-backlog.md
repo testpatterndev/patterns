@@ -7,7 +7,19 @@ required refs" fix at v1.2.0 plus the v1.2.1 noise-gate wiring on all 14 legal s
 This ticket preserves the follow-up analysis from that PR's report
 (`legal-exclusion-not-group-report.md` on the closed branch), adjudicated 2026-07-09.
 
-## Item 1 — weak 75 tiers on the 14 legal-document patterns (OPEN, design pass)
+> **STATUS 2026-07-09: Items 1–2 RESOLVED** on branch `fix/legal-75-tier-corroboration`.
+> All 22 verifier FAILs cleared (67 → 45 corpus-wide, 0 introduced), zero should_match
+> regressions, gates green. Per-file design decisions recorded in each file's 1.4.0
+> changelog entry. The 3 slugs with narrow 75 id_matches (cabinet-legal-briefing,
+> crown-solicitor-legal-opinion, state-legal-liability-assessment) were left untouched
+> (0 failures; their id_match is already the discriminator — minimal-change principle).
+> Extra design calls: native-title exclusion list gained academic-publication terms
+> (journal article, academic analysis); regulatory-prosecution corroborative dropped
+> bare 'regulatory' + 'Work Health and Safety' (legislative-prose vocabulary);
+> solicitor-general corroborative tightened per Item 2 (drops opinion/advice/
+> constitutional/High Court, adds state sovereignty).
+
+## Item 1 — weak 75 tiers on the 14 legal-document patterns (RESOLVED, was: design pass)
 
 **Problem.** All 22 residual `verify-pattern-testcases.mjs` failures on these slugs share
 one cause: each 75 tier requires only `id_match` + the primary keyword group, and those
@@ -45,7 +57,7 @@ version bumps (behavioral tightening, not a bugfix) + changelog; patterns.json u
 per-slug version of the "~20 legal-concept new noise-gates design pass" that was parked
 overnight. Fold that class into this ticket when picked up.
 
-## Item 2 — solicitor-general-legal-advice 85 tier under-specified (OPEN)
+## Item 2 — solicitor-general-legal-advice 85 tier under-specified (RESOLVED, see status above)
 
 After the wrapper fix the 85 tier is: title regex (`Solicitor[- ]General`) + primary
 (same phrase) + corroborative + NOT-group. The corroborative group contains the generic
