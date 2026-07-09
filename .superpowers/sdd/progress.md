@@ -312,3 +312,19 @@ INTEGRATION per batch: merge worktree branches into a batch branch off main → 
 
 OUTSTANDING TICKETS (consolidated, for next planning session): coverage-waves batch — (c) eu-vat spaced presentations; (d) concept plural-forms pass; (e) concept test hygiene; j2 engine/case_sensitive harmonization pass; D2 ticket batch (b)-(l) + collections curation pass (cloud-credentials-detection frozen since 2026-02); D1 TICKET A/B (phone rendering + dict hygiene); marking-collections curation; tier-aware verify-pattern-testcases; il-passport revisit if PRADO access; Pinecone/Google-AQ watches. QUEUED PLANS: concept-strategy C1-C4 (separate). VALIDATION: targeted classification run on ~100 new patterns (2026-07-04 staged run + D1/D2/D3/D4 additions — needs Nathan for Connect-IPPSSession popup).
 D4 team workflow wf_2084d11b-7fa RUNNING (7 worktree tasks). NOTE: initial launch failed on args-as-string (fixed: parse in script); worktree git ops contend for locks on the \\S1max\claudecode network share — transient index.lock/repack errors are expected noise, retry.
+
+=== PLAN: Concept-Strategy C1 — verdict-model redesign (2026-07-09, Nathan GO in-session) ===
+Plan: testpattern repo docs/superpowers/plans/2026-07-04-concept-strategy.md (§C1)
+Evidence base fixed (do not relitigate): 830/895 MIXED are concept-by-construction; tier-85 worse than 65 on decoys; top500 decoy-FP 93.4%.
+The ~36 deferred top500 self-corroborating tiers fold into this (reclassified under concept verdicts, not rewired piecemeal).
+
+## Tasks
+- C1-T1 (patterns repo): pattern_class field — schema + ci-check validation; scripts/derive-pattern-class.mjs heuristic
+  (document_marker/marking family → marking; top500 family + topic-phrase-alternation purview regex → concept; else identifier);
+  census report → spot review → persist explicit values to all 1,655 YAMLs via the line-based ops engine (Task 5a lesson:
+  NEVER yaml.dump whole files). Metadata-only: patch bumps + changelog per versioning policy.
+- C1-T2 (testpattern repo): compile-patterns.js passthrough; harness + generate-compact-results.mjs concept verdicts
+  (TOPIC_PASS / TOPIC_FP / NOT_DETECTED; identifier scoring unchanged).
+- C1-T3 (site repo): verdict-labels.js, useClassification, PatternDetail/Browse/Card class-appropriate vocabulary;
+  detection-quality docs; bot-renderer + llms-full.txt.
+- C1-T4: re-score RAW 2026-03 per-variant results under new model (no tenant run); update sit-design-paper §7; re-baseline.
