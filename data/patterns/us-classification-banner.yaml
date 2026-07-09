@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: U.S. National Security Classification Banner
 slug: us-classification-banner
-version: 1.3.0
+version: 1.3.1
 type: regex
 pattern_class: marking
 engine: universal
@@ -12,10 +12,11 @@ description: >-
   parenthetical portion mark such as (S//NF) or (TS//SI). The bare words "secret" and "confidential" are far too common
   to match alone, so a match requires the "//" control structure or a parenthetical portion mark.
 operation: >-
-  Two regexes. The first matches a full banner: a classification level token immediately followed by "//" and a control
-  marking. The second matches a parenthetical portion mark like (S//NF) or (TS//SI//NF). Corroborative classification
-  keywords within 300 characters reinforce the context.
-pattern: \b(?:TOP\s+SECRET|SECRET|CONFIDENTIAL|TS|S|C)//(?:SI|TK|HCS|SCI|SAP|NOFORN|NF|ORCON|OC|REL\s+TO[\sA-Z,]+|FGI|RD|FRD)(?:/{1,2}(?:SI|TK|HCS|SCI|SAP|NOFORN|NF|ORCON|OC|REL\s+TO[\sA-Z,]+|FGI|RD|FRD))*\b
+  Two Purview-safe regexes (no groups containing multi-match .*/.+/.{n} or REL TO[class]+). Banner: level//control
+  with up to four additional //control segments as fixed-token alts, plus a separate REL TO [A-Z]{2,5} branch.
+  Portion mark: (level//control…) with the same bounded //control repeats. Keywords within 300 characters.
+# Purview rejects groups of multi-match (e.g. REL\s+TO[\sA-Z,]+ and quantified (?:/{1,2}(...))* forms).
+pattern: \b(?:TOP SECRET|SECRET|CONFIDENTIAL|TS|S|C)//(?:SI|TK|HCS|SCI|SAP|NOFORN|NF|ORCON|OC|FGI|RD|FRD)(?://(?:SI|TK|HCS|SCI|SAP|NOFORN|NF|ORCON|OC|FGI|RD|FRD)){0,4}\b|\b(?:TOP SECRET|SECRET|CONFIDENTIAL|TS|S|C)//REL TO [A-Z]{2,5}(?:,[ ]?[A-Z]{2,5}){0,5}\b
 confidence: high
 confidence_justification: >-
   High confidence: the "//" control structure and the parenthetical portion-mark syntax are unique to U.S. classification
@@ -95,6 +96,12 @@ references:
 created: '2026-06-13'
 updated: '2026-07-09'
 changelog:
+- version: 1.3.1
+  date: '2026-07-09'
+  description: >-
+    Purview upload fix: rewrite banner/portion regexes to remove groups with multi-match
+    (REL\s+TO[\sA-Z,]+, quantified (?:/{1,2}(...))* / (?://?(...))*). Use fixed control
+    tokens, bounded REL TO [A-Z]{2,5} country lists, and {0,4} //control repeats only.
 - version: 1.3.0
   date: '2026-07-09'
   description: 'C1 verdict-model: add pattern_class: marking — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
@@ -132,6 +139,6 @@ purview:
       - Keyword_noise_exclusion
   regexes:
   - id: Regex_classification_banner
-    pattern: \b(?:TOP\s+SECRET|SECRET|CONFIDENTIAL|TS|S|C)//(?:SI|TK|HCS|SCI|SAP|NOFORN|NF|ORCON|OC|REL\s+TO[\sA-Z,]+|FGI|RD|FRD)(?:/{1,2}(?:SI|TK|HCS|SCI|SAP|NOFORN|NF|ORCON|OC|REL\s+TO[\sA-Z,]+|FGI|RD|FRD))*\b
+    pattern: \b(?:TOP SECRET|SECRET|CONFIDENTIAL|TS|S|C)//(?:SI|TK|HCS|SCI|SAP|NOFORN|NF|ORCON|OC|FGI|RD|FRD)(?://(?:SI|TK|HCS|SCI|SAP|NOFORN|NF|ORCON|OC|FGI|RD|FRD)){0,4}\b|\b(?:TOP SECRET|SECRET|CONFIDENTIAL|TS|S|C)//REL TO [A-Z]{2,5}(?:,[ ]?[A-Z]{2,5}){0,5}\b
   - id: Regex_classification_portion_mark
-    pattern: \((?:TS|S|C|U)//(?:SI|TK|HCS|SCI|SAP|NF|NOFORN|OC|ORCON|FGI|RD|FRD)(?://?(?:SI|TK|HCS|SCI|SAP|NF|NOFORN|OC|ORCON|FGI|RD|FRD))*\)
+    pattern: \((?:TS|S|C|U)//(?:SI|TK|HCS|SCI|SAP|NF|NOFORN|OC|ORCON|FGI|RD|FRD)(?://(?:SI|TK|HCS|SCI|SAP|NF|NOFORN|OC|ORCON|FGI|RD|FRD)){0,4}\)
