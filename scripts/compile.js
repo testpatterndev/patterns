@@ -85,6 +85,18 @@ for (const file of patternFiles) {
         }
       }
     }
+    // confidence_justification/operation prose describes the pre-floor tier
+    // levels verbatim (e.g. "medium confidence (75)") and would otherwise
+    // read as contradictory next to the floored confidence above. Append a
+    // note rather than rewriting the prose, so the original justification/
+    // mechanism description is preserved for audit purposes.
+    const DEPRECATED_NOTE = `Compiled confidence is floored to '${DEPRECATED_CONFIDENCE_FLOOR}' because this pattern is deprecated (see deprecation_reason) — any confidence levels described above reflect the pre-deprecation source values, not the compiled output.`
+    if (typeof data.confidence_justification === 'string') {
+      data.confidence_justification = `${data.confidence_justification} ${DEPRECATED_NOTE}`
+    }
+    if (typeof data.operation === 'string') {
+      data.operation = `${data.operation} ${DEPRECATED_NOTE}`
+    }
   }
 
   // Resolve keyword_lists references in corroborative_evidence
