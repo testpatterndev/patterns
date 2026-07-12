@@ -27,8 +27,12 @@ catalog's lowest canonical tier). This is a compiled-output-only change —
 the source YAML's original `confidence: medium` and tier values are left
 untouched as the historical record of what the pattern originally
 claimed before C3 identified its phrase evidence as too generic to trust.
-The floor is general: it applies automatically to these 16 patterns and to
-any pattern deprecated in the future, with no per-file hand-editing.
+The floor is general: it applies automatically to every currently-deprecated
+pattern (17 at time of writing — the 16 Art-9/biometric pairs named above
+plus one pre-existing unrelated deprecated pattern,
+`au-pspf-security-classification`, correctly swept up by the same
+status-gated logic) and to any pattern deprecated in the future, with no
+per-file hand-editing.
 
 ## Issue 2: active-active vocabulary overlap — ACCEPTED, NOT FIXED
 
