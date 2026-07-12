@@ -9,6 +9,9 @@
 //     top-level pattern matches (filter-documented negatives are reported as warnings only)
 //   - a collection member (data/collections/**/*.yaml patterns list, recursive like
 //     compile.js walkDir) that does not reference an existing pattern slug (dangling member)
+//   - a collection member that references a status: deprecated pattern (warning only —
+//     deprecated patterns stay in the catalog for discovery, but a new pack shouldn't
+//     silently ship one without the pack author noticing)
 // Usage: node scripts/ci-check.mjs
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -26,6 +29,7 @@ const MS_VALIDATORS = new Set(['Func_aba_routing','Func_australian_tax_file_numb
 
 const kwSlugs = new Set(readdirSync(kwDir).filter(f => f.endsWith('.yaml')).map(f => f.replace('.yaml', '')))
 const patternSlugs = new Set()
+const deprecatedSlugs = new Set()
 const errors = [], warns = []
 
 const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(b, fl) }
@@ -63,6 +67,7 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   if (p.status === 'deprecated' && !(typeof p.deprecation_reason === 'string' && p.deprecation_reason.trim())) errors.push(`${f}: deprecated pattern requires a non-empty deprecation_reason`)
   if ('deprecation_reason' in p && p.status !== 'deprecated') errors.push(`${f}: deprecation_reason present but status is not 'deprecated'`)
   if (typeof p.slug === 'string') patternSlugs.add(p.slug)
+  if (typeof p.slug === 'string' && p.status === 'deprecated') deprecatedSlugs.add(p.slug)
 
   const idMatchIds = new Set((p.purview?.pattern_tiers ?? []).map(t => t.id_match).filter(Boolean))
   const regexes = []
@@ -128,6 +133,7 @@ for (const file of walkYaml(colDir)) {
   for (const m of c.patterns) {
     if (typeof m !== 'string' || !patternSlugs.has(m)) errors.push(`${label}: dangling member '${m}' — no pattern with that slug exists`)
     if (seen.has(m)) warns.push(`${label}: duplicate member '${m}'`)
+    if (deprecatedSlugs.has(m)) warns.push(`${label}: member '${m}' is a deprecated pattern — check its deprecation_reason before shipping this pack`)
     seen.add(m)
   }
 }
