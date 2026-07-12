@@ -28,6 +28,11 @@ documented low-precision keyword concepts). **Coverage gap logged**: no dedicate
 religion / ethnicity / sexual-orientation / nationality reference patterns exist —
 D-wave candidate.
 
+> **2026-07-12 follow-up:** the Art-9 wave that filled this gap surfaced a
+> confidence-inversion defect (fixed) and an active-active vocabulary
+> overlap (adjudicated as accepted) — see
+> `backlog-art9-overlap-confidence-report.md`.
+
 **au-pspf-security-classification (1):** the deprecation precedent was changelog-note
 only (1.1.0, 2026-06-29); now carries the structured field. Reason: superseded by the
 au-marking-* per-category classifiers; retained for broad discovery.
