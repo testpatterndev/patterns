@@ -66,6 +66,27 @@ for (const file of patternFiles) {
 
   if (!validate(data, reqFields, file)) continue
 
+  // Deprecated patterns must never outrank an active replacement on shared
+  // evidence: floor their compiled confidence to this catalog's lowest
+  // canonical tier. Source YAML confidence/purview values are left
+  // untouched (historical record of what the pattern originally claimed);
+  // only the compiled patterns.json output is demoted.
+  const DEPRECATED_CONFIDENCE_FLOOR = 'low'
+  const DEPRECATED_TIER_FLOOR = 65
+  if (data.status === 'deprecated') {
+    data.confidence = DEPRECATED_CONFIDENCE_FLOOR
+    if (typeof data.purview?.recommended_confidence === 'number') {
+      data.purview.recommended_confidence = Math.min(data.purview.recommended_confidence, DEPRECATED_TIER_FLOOR)
+    }
+    if (Array.isArray(data.purview?.pattern_tiers)) {
+      for (const tier of data.purview.pattern_tiers) {
+        if (typeof tier.confidence_level === 'number') {
+          tier.confidence_level = Math.min(tier.confidence_level, DEPRECATED_TIER_FLOOR)
+        }
+      }
+    }
+  }
+
   // Resolve keyword_lists references in corroborative_evidence
   if (data.corroborative_evidence?.keyword_lists) {
     const resolved = []
