@@ -13,7 +13,7 @@
 //     deprecated patterns stay in the catalog for discovery, but a new pack shouldn't
 //     silently ship one without the pack author noticing)
 // Usage: node scripts/ci-check.mjs
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
@@ -23,6 +23,12 @@ const patDir = join(BASE, 'data', 'patterns')
 const kwDir = join(BASE, 'data', 'keywords')
 const REQUIRED = ['schema', 'name', 'slug', 'type', 'confidence', 'jurisdictions', 'regulations', 'data_categories', 'test_cases']
 const KW_TYPES = new Set(['keyword_list', 'keyword_dictionary'])
+const PACKAGE_TAG_SCHEMA = 'testpattern.package-tags.v1'
+const PACKAGE_COMPONENT_TIERS = new Set(['small', 'medium', 'large'])
+const PACKAGE_SECTORS = new Set(['generic-enterprise', 'public-sector', 'legal-investigations', 'healthcare', 'financial-services', 'education', 'critical-infrastructure'])
+const PACKAGE_ADDONS = new Set(['ai-readiness', 'payment-card-pci', 'credentials-secrets', 'health-phi', 'legal-privilege', 'critical-infrastructure', 'student-child-data'])
+const PACKAGE_LABEL_DOMAINS = new Set(['privacy', 'financial', 'health', 'legal', 'security', 'government', 'education', 'children', 'infrastructure', 'ai', 'business', 'investigations', 'privilege', 'payment', 'fraud', 'credentials', 'clinical', 'operational-technology'])
+const PACKAGE_DEPLOYMENT_PRIORITIES = new Set(['starter', 'standard', 'expanded', 'discovery'])
 
 // MS functions documented as "Is a validator: yes" (sit-functions, 2025-11-18)
 const MS_VALIDATORS = new Set(['Func_aba_routing','Func_australian_tax_file_number','Func_brazil_cnpj','Func_brazil_cpf','Func_canadian_sin','Func_credit_card','Func_dea_number','Func_formatted_itin','Func_iban','Func_india_aadhaar','Func_japanese_my_number_corporate','Func_japanese_my_number_personal','Func_randomized_formatted_ssn','Func_randomized_unformatted_ssn','Func_south_africa_identification_number','Func_ssn','Func_swedish_national_identifier','Func_Turkish_National_Id','Func_uk_nhs_number','Func_unformatted_itin','Func_unformatted_ssn','Func_usa_uk_passport'])
@@ -112,6 +118,55 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   // should_not_match matching the top-level is covered tier-aware by
   // scripts/verify-pattern-testcases.mjs (hard failure for untiered patterns, discovery-aware
   // warning for gated ones), which runs as its own CI gate — no need to duplicate it here.
+}
+
+// ── Package tag coverage: every pattern must have first-class package metadata ──
+const asArray = value => Array.isArray(value) ? value : (value === undefined || value === null ? [] : [value])
+const invalidListValues = (values, allowed) => asArray(values).filter(value => !allowed.has(value))
+const packageTagsPath = join(BASE, 'data', 'package-tags.json')
+if (!existsSync(packageTagsPath)) {
+  errors.push('data/package-tags.json missing — every pattern must have package_tags metadata')
+} else {
+  let packageTags
+  try { packageTags = JSON.parse(readFileSync(packageTagsPath, 'utf-8')) }
+  catch (e) { errors.push(`data/package-tags.json parse error — ${e.message.split('\n')[0]}`) }
+
+  if (packageTags) {
+    if (packageTags.schema !== PACKAGE_TAG_SCHEMA) errors.push(`data/package-tags.json schema must be ${PACKAGE_TAG_SCHEMA}`)
+    const componentIds = new Set(asArray(packageTags.components).map(component => component?.id).filter(Boolean))
+    const rows = packageTags.patterns || {}
+    if (!rows || typeof rows !== 'object' || Array.isArray(rows)) {
+      errors.push('data/package-tags.json must contain a patterns object')
+    } else {
+      for (const slug of patternSlugs) {
+        const tags = rows[slug]
+        if (!tags) {
+          errors.push(`${slug}: missing package_tags row`)
+          continue
+        }
+        const primary = tags.primary_component
+        const components = asArray(tags.components)
+        if (!primary || !componentIds.has(primary)) errors.push(`${slug}: invalid primary_component '${primary}'`)
+        if (!components.length) errors.push(`${slug}: package_tags.components must be non-empty`)
+        if (primary && !components.includes(primary)) errors.push(`${slug}: package_tags.components must include primary_component '${primary}'`)
+        for (const component of components) if (!componentIds.has(component)) errors.push(`${slug}: invalid package component '${component}'`)
+        if (!PACKAGE_COMPONENT_TIERS.has(tags.component_tier)) errors.push(`${slug}: invalid component_tier '${tags.component_tier}'`)
+        const invalidSectors = invalidListValues(tags.sectors, PACKAGE_SECTORS)
+        const invalidAddons = invalidListValues(tags.addons, PACKAGE_ADDONS)
+        const invalidDomains = invalidListValues(tags.label_domains, PACKAGE_LABEL_DOMAINS)
+        const invalidPriorities = invalidListValues(tags.deployment_priority, PACKAGE_DEPLOYMENT_PRIORITIES)
+        if (invalidSectors.length) errors.push(`${slug}: invalid package_tags.sectors ${invalidSectors.join(',')}`)
+        if (invalidAddons.length) errors.push(`${slug}: invalid package_tags.addons ${invalidAddons.join(',')}`)
+        if (invalidDomains.length) errors.push(`${slug}: invalid package_tags.label_domains ${invalidDomains.join(',')}`)
+        if (invalidPriorities.length) errors.push(`${slug}: invalid package_tags.deployment_priority ${invalidPriorities.join(',')}`)
+        if (!asArray(tags.deployment_priority).length) errors.push(`${slug}: package_tags.deployment_priority must be non-empty`)
+        if (!asArray(tags.label_domains).length) errors.push(`${slug}: package_tags.label_domains must be non-empty`)
+      }
+      for (const slug of Object.keys(rows)) {
+        if (!patternSlugs.has(slug)) errors.push(`data/package-tags.json references unknown pattern '${slug}'`)
+      }
+    }
+  }
 }
 
 // ── Collection integrity: every collection member must reference an existing pattern slug ──

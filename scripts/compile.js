@@ -9,6 +9,7 @@ const OUT_FILE = fileURLToPath(new URL('../patterns.json', import.meta.url))
 const REQUIRED_PATTERN_FIELDS = ['schema', 'name', 'slug', 'type', 'confidence', 'jurisdictions', 'regulations', 'data_categories', 'test_cases']
 const REQUIRED_COLLECTION_FIELDS = ['schema', 'name', 'slug', 'description', 'patterns']
 const REQUIRED_KEYWORD_FIELDS = ['schema', 'name', 'slug', 'type', 'keywords']
+const PACKAGE_TAGS_FILE = join(DATA_DIR, 'package-tags.json')
 
 function walkDir(dir) {
   const files = []
@@ -33,7 +34,24 @@ function validate(obj, requiredFields, file) {
   return true
 }
 
+function loadPackageTags() {
+  if (!existsSync(PACKAGE_TAGS_FILE)) return null
+  const data = JSON.parse(readFileSync(PACKAGE_TAGS_FILE, 'utf-8'))
+  if (data.schema !== 'testpattern.package-tags.v1') {
+    throw new Error(`Unsupported package tags schema '${data.schema}' in ${relative(DATA_DIR, PACKAGE_TAGS_FILE)}`)
+  }
+  if (!data.patterns || typeof data.patterns !== 'object' || Array.isArray(data.patterns)) {
+    throw new Error(`${relative(DATA_DIR, PACKAGE_TAGS_FILE)} must contain a patterns object`)
+  }
+  const { patterns: packagePatterns, ...metadata } = data
+  return {
+    metadata,
+    patterns: packagePatterns
+  }
+}
+
 console.log('Compiling patterns...')
+const packageTags = loadPackageTags()
 
 // ── Load keyword dictionaries first (for reference resolution) ──
 const keywordFiles = walkDir(join(DATA_DIR, 'keywords'))
@@ -65,6 +83,10 @@ for (const file of patternFiles) {
     : REQUIRED_PATTERN_FIELDS
 
   if (!validate(data, reqFields, file)) continue
+  if (packageTags) {
+    const tags = packageTags.patterns[data.slug]
+    if (tags) data.package_tags = tags
+  }
 
   // Deprecated patterns must never outrank an active replacement on shared
   // evidence: floor their compiled confidence to this catalog's lowest
@@ -147,6 +169,19 @@ for (const file of patternFiles) {
   patterns.push(data)
 }
 
+if (packageTags) {
+  const patternSlugs = new Set(patterns.map(pattern => pattern.slug))
+  const missingTags = patterns.filter(pattern => !packageTags.patterns[pattern.slug]).map(pattern => pattern.slug)
+  const extraTags = Object.keys(packageTags.patterns).filter(slug => !patternSlugs.has(slug))
+  if (missingTags.length || extraTags.length) {
+    for (const slug of missingTags.slice(0, 20)) console.error(`  ERROR missing package_tags for pattern: ${slug}`)
+    if (missingTags.length > 20) console.error(`  ERROR ${missingTags.length - 20} additional pattern(s) missing package_tags`)
+    for (const slug of extraTags.slice(0, 20)) console.error(`  ERROR package_tags references unknown pattern: ${slug}`)
+    if (extraTags.length > 20) console.error(`  ERROR ${extraTags.length - 20} additional package_tags row(s) reference unknown patterns`)
+    process.exit(1)
+  }
+}
+
 // ── Load collections ──
 const collectionFiles = walkDir(join(DATA_DIR, 'collections'))
 const collections = []
@@ -179,6 +214,7 @@ const output = {
   patterns,
   collections,
   keywords: keywordDicts,
+  packageTags: packageTags?.metadata ?? null,
   dictionaryManifest,
   classificationResults
 }
