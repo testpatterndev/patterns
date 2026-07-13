@@ -109,9 +109,9 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
     continue
   }
   for (const tc of p.test_cases?.should_match ?? []) if (compiled.length && !compiled.some(re => re.test(String(tc.value)))) errors.push(`${p.slug}: should_match not matched — ${JSON.stringify(tc.value).slice(0, 60)}`)
-  // should_not_match matching the top-level is reported as a WARNING: many are filter/tier
-  // -dependent negatives the SIT excludes downstream. Errors stay focused on hard regressions.
-  for (const tc of p.test_cases?.should_not_match ?? []) if (top && top.test(String(tc.value))) warns.push(`${p.slug}: should_not_match matched top-level — ${JSON.stringify(tc.value).slice(0, 50)}`)
+  // should_not_match matching the top-level is covered tier-aware by
+  // scripts/verify-pattern-testcases.mjs (hard failure for untiered patterns, discovery-aware
+  // warning for gated ones), which runs as its own CI gate — no need to duplicate it here.
 }
 
 // ── Collection integrity: every collection member must reference an existing pattern slug ──

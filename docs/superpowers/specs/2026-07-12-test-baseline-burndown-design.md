@@ -49,3 +49,13 @@ E.g. `za-tax-number` warns on `"0000000000"`: the Purview export carries `AllDig
 - The harness's 99 warnings as a target in themselves.
 - `check:quality` informationals on patterns not in the failure/warning inventory.
 - Any change to `scripts/verify-pattern-testcases.mjs`, `scripts/ci-check.mjs`, or `scripts/compile.js` semantics — this wave fixes data, not the referee. (If a harness bug is discovered, stop and report it rather than papering over it in data.)
+
+## Addendum (2026-07-13, user-approved referee change)
+
+Burn-down Tasks 1–4 took the corpus from 45 harness failures to 0 and `ci-check.mjs` from 57 warnings to 36, but the final 36 could not be cleared without weakening the tier-gating regression guards Tasks 1–4 had just put in place: they are all instances of the tier-blind `should_not_match matched top-level` check at `scripts/ci-check.mjs:114`, which duplicates — with cruder, non-tier-aware semantics — a class `scripts/verify-pattern-testcases.mjs` already covers correctly (hard failure for untiered patterns, discovery-aware warning for gated ones). The 36 were structurally unreachable as a `ci-check.mjs` target without either reintroducing narrowed tiers or hand-waiving away exclusions the harness was specifically added to enforce.
+
+Referee fix, approved by Nathan on 2026-07-13, superseding this design's "no referee changes" out-of-scope rule for exactly this change:
+- Removed the tier-blind duplicate warning from `scripts/ci-check.mjs` (was line ~114), replaced with a comment pointing at the harness as the tier-aware source of truth for this check class.
+- Added `node scripts/verify-pattern-testcases.mjs --all` as a CI gate step ("Verify pattern test cases") in both `.github/workflows/ci.yml` and `.github/workflows/compile-and-publish.yml`, immediately after the existing `npm run check` step — safe now that the harness baseline is 0 failures, so it becomes a real regression gate rather than a source of pre-existing noise.
+
+Net effect: `ci-check.mjs` now reports 0 errors / 0 warnings at the current baseline, and the tier-aware class it used to warn on crudely is enforced correctly (and as a hard CI gate) by the harness instead.
