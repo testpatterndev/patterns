@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Nonpublic investor presentations
 slug: au-top500-195-nonpublic-investor-presentations
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -10,7 +10,7 @@ description: >-
   data protection regulations.
 operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
 pattern: >-
-  (?is)\b(?:nonpublic\s+investor\s+presentation|investor\s+presentation|investor\s+deck|pitch\s+deck|investor\s+roadshow|institutional\s+investor|private\s+placement|material\s+non[\s-]+public\s+information|inside\s+information)\b
+  (?is)\b(?:nonpublic\s+investor\s+presentation|investor\s+presentation|investor\s+deck|pitch\s+deck|investor\s+roadshow)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
 jurisdictions:
@@ -48,6 +48,8 @@ test_cases:
       description: Alternative topic phrase match
     - value: pitch deck
       description: Additional topic phrase match
+    - value: DRAFT investor deck - pre-release FY26 forecast; institutional holders only; embargoed until 20 Aug; do not distribute
+      description: Document anchor plus nonpublic-state markers (reaches the enforcing tiers)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -55,6 +57,12 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: merger fundraising
       description: Generic word pair from old broad template should not match
+    - value: Investor presentation published on ASX.
+      description: Publicly released presentation carries no nonpublic-state marker, so enforcement must not fire
+    - value: Inside information handling policy
+      description: MNPI topic without an investor-presentation document anchor must not start this SIT
+    - value: Roadshow training deck with fictional numbers
+      description: Training material without an investor document anchor phrase
 false_positives:
   - description: Common words and phrases related to nonpublic investor presentations appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -78,7 +86,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_nonpublic_investor
       matches:
-        - ref: Evidence_nonpublic_investor
+        - ref: Evidence_nonpublic_state
           min_count: 2
           unique_results: true
         - type: any
@@ -89,7 +97,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_nonpublic_investor
       matches:
-        - ref: Evidence_nonpublic_investor
+        - ref: Evidence_nonpublic_state
         - type: any
           min_matches: 0
           max_matches: 0
@@ -97,30 +105,24 @@ purview:
             - Evidence_template_exclusion
     - confidence_level: 65
       id_match: Pattern_nonpublic_investor
-      matches:
-        - ref: Evidence_nonpublic_investor
+      discovery_only: true
+      description: Investor-presentation document anchor without a nonpublic-state marker — discovery inventory only
   regexes:
     - id: Pattern_nonpublic_investor
       pattern: >-
-        (?is)\b(?:nonpublic\s+investor\s+presentation|investor\s+presentation|investor\s+deck|pitch\s+deck|investor\s+roadshow|institutional\s+investor|private\s+placement|material\s+non[\s-]+public\s+information|inside\s+information)\b
+        (?is)\b(?:nonpublic\s+investor\s+presentation|investor\s+presentation|investor\s+deck|pitch\s+deck|investor\s+roadshow)\b
   keywords:
-    - id: Evidence_nonpublic_investor
+    - id: Evidence_nonpublic_state
       groups:
         - match_style: word
           terms:
-            - nonpublic investor presentation
-            - investor presentation
-            - investor deck
-            - pitch deck
-            - investor roadshow
-            - institutional investor
-            - private placement
             - non-public
             - material non-public information
             - MNPI
             - inside information
             - pre-release
             - confidential
+            - private placement
 risk_description: >-
   This concept detector finds investor decks or presentations explicitly associated with nonpublic distribution. A genuine deck may contain unreleased performance, forecasts, strategy, fundraising terms, or transaction plans that enable insider trading or unfair negotiation. Disclosure can seriously harm the issuer and market participants, but the normal presentation is a bounded corporate record rather than a privileged trading system or economy-wide plan. Risk 8 and SENSITIVE are justified; market-wide consequences, protected government policy, or systemic compromise would be needed for PROTECTED.
 sensitivity_labels:
@@ -132,8 +134,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-17'
+    description: 'TP-00321 approved reduced scope: split the flat Evidence_nonpublic_investor pooling into the two concepts the SIT title requires — the primary (top-level and Pattern_nonpublic_investor) now anchors on investor document phrases only (presentation/deck/pitch deck/roadshow), and a new Evidence_nonpublic_state group (non-public, MNPI, material non-public information, inside information, pre-release, confidential, private placement — all pre-existing terms) is required on the 75/85 enforcing tiers, so MNPI-alone text no longer starts this SIT and a document anchor alone is discovery-only (65). institutional investor removed pending the deferred restricted-audience tier. Deferred per QA/independent review: the 85 audience/version/deal-content tier (undefined references) and public/restricted precedence rules. Added embargoed-draft positive plus ASX-published, MNPI-policy, and training-deck negatives.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 796 without changing detector or package metadata.'

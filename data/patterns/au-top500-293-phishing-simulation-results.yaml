@@ -1,13 +1,23 @@
 schema: testpattern/v1
 name: Phishing simulation results
 slug: au-top500-293-phishing-simulation-results
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies phishing simulation results patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 8 keywords within 300 characters.'
-pattern: (?i)\b(?:phishing\s+simulation|campaign\s+results|click\s+rate|report\s+phish)\b
+description: >-
+  Identifies measured phishing-exercise outcomes in security and access control contexts:
+  enforcement requires phishing-simulation or phish-test context followed by a quantified
+  delivery/open/click/submission/report metric, while simulation-topic language alone remains
+  discovery-only. Marketing campaign metrics are out of scope.
+operation: >-
+  Pattern type: regex (boost_regex engine). Topic phrases (phishing simulation, phish test,
+  report phish) feed a 65 discovery-only tier; enforcement requires
+  Evidence_phishing_result_metric — a phishing-simulation/phish-test anchor within 240
+  characters of a numeric delivered/opened/clicked/submitted/reported or click/report-rate
+  field — at 75, with additional phishing-awareness evidence raising it to 85. The shared
+  template exclusion vetoes sample/training text at enforcement tiers.
+pattern: (?i)\b(?:phishing\s+simulation|phish\s+test|report\s+phish)\b
 confidence: medium
 confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
 jurisdictions:
@@ -45,9 +55,15 @@ test_cases:
       description: Topic phrase, lowercase
     - value: 'this record references the phishing simulation held on file'
       description: Topic phrase within surrounding text
+    - value: 'Phishing simulation delivered=500 opened=210 clicked=37 submitted=8 reported=92'
+      description: A named simulation with quantified outcome fields reaches the enforcing tiers
+    - value: 'Security awareness team scheduled a phishing simulation'
+      description: Scheduling prose matches the topic branch only (discovery, no result metrics)
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
+    - value: 'Campaign results show a click rate of 4 percent'
+      description: Marketing metrics no longer satisfy the primary (campaign results / click rate removed from the ID)
     - value: placeholder value 12345
       description: Random text should not match phrase marker
     - value: generic policy prose without anchors
@@ -81,7 +97,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_phishing_simulation
+      id_match: Evidence_phishing_result_metric
       matches:
         - ref: Evidence_phishing_simulation
           min_count: 2
@@ -92,9 +108,8 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_phishing_simulation
+      id_match: Evidence_phishing_result_metric
       matches:
-        - ref: Evidence_phishing_simulation
         - type: any
           min_matches: 0
           max_matches: 0
@@ -105,7 +120,10 @@ purview:
       id_match: Pattern_phishing_simulation
   regexes:
     - id: Pattern_phishing_simulation
-      pattern: (?i)\b(?:phishing\s+simulation|campaign\s+results|click\s+rate|report\s+phish)\b
+      pattern: (?i)\b(?:phishing\s+simulation|phish\s+test|report\s+phish)\b
+    - id: Evidence_phishing_result_metric
+      pattern: >-
+        (?is)\b(?:phishing\s+simulation|phish\s+test)[\s\S]{0,240}\b(?:delivered|opened|clicked|submitted|reported|click\s+rate|report\s+rate)\s*[:=]?\s*\d+(?:\.\d+)?%?
   keywords:
     - id: Evidence_phishing_simulation
       groups:
@@ -125,8 +143,19 @@ purview:
             - credential harvest
       strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope harden (TP-00410): remove the generic "campaign results" and "click rate"
+      alternatives from the primary (a marketing metrics sentence previously reached 85 via
+      same-span evidence) and make the retained phishing-simulation/phish-test primary
+      explicit. Enforcement now anchors on Evidence_phishing_result_metric (simulation anchor
+      within 240 characters of a quantified outcome field): 75 with template exclusion, 85
+      with two additional unique phishing-awareness evidence terms. Topic branch stays 65
+      discovery_only. Added metric-bearing positive, scheduling discovery case, and marketing
+      negative.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 885 without changing detector or package metadata.'

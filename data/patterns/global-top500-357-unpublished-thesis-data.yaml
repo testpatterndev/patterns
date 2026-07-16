@@ -1,16 +1,24 @@
 schema: testpattern/v1
 name: Unpublished thesis data
 slug: global-top500-357-unpublished-thesis-data
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to unpublished thesis data in international contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Identifies pre-publication thesis manuscripts or thesis datasets, not preliminary results
+  from unrelated operational work: direct thesis/draft/embargo anchors enforce with one thesis
+  field, broad findings/results language needs two independent thesis fields, and topic
+  vocabulary alone remains discovery-only.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Pattern type: regex (boost_regex engine). The full thesis-topic vocabulary feeds a 65
+  discovery-only tier (Regex_unpublished_thesis_Topic). Enforcement: the strong branch
+  (Regex_unpublished_thesis — unpublished thesis, thesis data, dissertation draft, thesis
+  manuscript, masters thesis, embargoed research, unpublished manuscript) plus one
+  Keyword_unpublished_thesis_IndependentContext field reaches 75; the tested contextual branch
+  (Regex_unpublished_thesis_ContextualBranch — preliminary results) needs two unique thesis
+  fields for 65. The "unpublished thesis data" label branch is retained at 75. The shared
+  noise exclusion vetoes template/sample text at enforcement tiers.
 pattern: >-
   (?is)\b(?:unpublished\s+thesis|thesis\s+data|dissertation\s+draft|research\s+findings|preliminary\s+results|thesis\s+manuscript|doctoral\s+research|masters\s+thesis|thesis\s+committee|thesis\s+supervisor|embargoed\s+research|unpublished\s+manuscript)\b
 confidence: medium
@@ -40,7 +48,11 @@ test_cases:
     - value: dissertation draft
       description: Alternative topic phrase match
     - value: research findings
-      description: Additional topic phrase match
+      description: Additional topic phrase match (same-span — discovery inventory only; enforcement now needs separate thesis-field evidence)
+    - value: 'Doctoral candidate DC-118, dissertation draft chapter 4; thesis dataset v7 remains embargoed until 2027-02-01 under supervisor L. Wong.'
+      description: Dissertation-draft anchor with candidate, chapter, dataset, and supervisor fields reaches the enforcing tiers
+    - value: A university press release summarizes preliminary results from a completed public opinion poll.
+      description: University-adjacent results match the topic vocabulary only (discovery — no thesis fields)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -48,6 +60,8 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: student grant
       description: Generic word pair from old broad template should not match
+    - value: The finance dashboard reports preliminary quarterly revenue for three regions.
+      description: Operational financial results contain no thesis-topic phrase
 false_positives:
   - description: Common words and phrases related to unpublished thesis data appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -71,7 +85,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 75
-      id_match: Regex_unpublished_thesis
+      id_match: Regex_unpublished_thesis_Topic
       matches:
         - ref: Pattern_global_top500_357_unpublished_thesis_data_label_context
         - ref: Keyword_global_top500_357_unpublished_thesis_data_domain_context
@@ -80,38 +94,58 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 65
+    - confidence_level: 75
       id_match: Regex_unpublished_thesis
       matches:
-        - ref: Keyword_unpublished_thesis
+        - ref: Keyword_unpublished_thesis_IndependentContext
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_unpublished_thesis_ContextualBranch
+      matches:
+        - ref: Keyword_unpublished_thesis_IndependentContext
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_unpublished_thesis_Topic
   regexes:
     - id: Regex_unpublished_thesis
+      pattern: >-
+        (?is)\b(?:unpublished\s+thesis|thesis\s+data|dissertation\s+draft|thesis\s+manuscript|masters\s+thesis|embargoed\s+research|unpublished\s+manuscript)\b
+    - id: Regex_unpublished_thesis_ContextualBranch
+      pattern: >-
+        (?is)\b(?:preliminary\s+results)\b
+    - id: Regex_unpublished_thesis_Topic
       pattern: >-
         (?is)\b(?:unpublished\s+thesis|thesis\s+data|dissertation\s+draft|research\s+findings|preliminary\s+results|thesis\s+manuscript|doctoral\s+research|masters\s+thesis|thesis\s+committee|thesis\s+supervisor|embargoed\s+research|unpublished\s+manuscript)\b
     - id: Pattern_global_top500_357_unpublished_thesis_data_label_context
       pattern: (?i)\b(?:unpublished\s+thesis\s+data)\b
   keywords:
-    - id: Keyword_unpublished_thesis
+    - id: Keyword_unpublished_thesis_IndependentContext
       groups:
         - match_style: word
           terms:
-            - unpublished thesis
-            - thesis data
-            - dissertation draft
-            - research findings
-            - preliminary results
-            - thesis manuscript
-            - doctoral research
-            - masters thesis
-            - thesis committee
-            - thesis supervisor
-            - embargoed research
-            - unpublished manuscript
+            - candidate ID
+            - student ID
+            - thesis title
+            - supervisor
+            - degree
+            - chapter
+            - dataset
+            - embargo date
+            - draft version
+            - viva
+            - repository hold
+            - submission status
       strength: specific
     - id: Keyword_global_top500_357_unpublished_thesis_data_domain_context
       groups:
@@ -132,8 +166,24 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope harden (TP-01265): the old 65 tier corroborated the full topic primary with
+      the same-span Keyword_unpublished_thesis list, so "preliminary results" from a website
+      survey enforced at 65. Keyword_unpublished_thesis is replaced by
+      Keyword_unpublished_thesis_IndependentContext (candidate/student ID, thesis title,
+      supervisor, degree, chapter, dataset, embargo date, draft version, viva, repository
+      hold, submission status). Regex_unpublished_thesis is modified to the retained strong
+      branch (unpublished thesis, thesis data, dissertation draft, thesis manuscript, masters
+      thesis, embargoed research, unpublished manuscript) enforcing at 75 with one thesis
+      field; Regex_unpublished_thesis_ContextualBranch (preliminary results) enforces at 65
+      only with two unique thesis fields; the full topic vocabulary (including research
+      findings and doctoral research) moves to Regex_unpublished_thesis_Topic as a 65
+      discovery_only inventory tier. Added embargoed-draft positive, press-release discovery
+      case, and finance-dashboard negative.
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1903 without changing detector or package metadata.'

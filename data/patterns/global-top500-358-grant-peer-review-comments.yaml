@@ -1,18 +1,19 @@
 schema: testpattern/v1
 name: Grant peer review comments
 slug: global-top500-358-grant-peer-review-comments
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
   Identifies documents containing references to grant peer review comments in international contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  protection regulations. Enforcement targets confidential assessment output (reviewer feedback, scores, panel decisions, funding recommendations); grant-application language is discovery-only unless
+  independent review-output evidence is present.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
 pattern: >-
-  (?is)\b(?:grant\s+peer\s+review|peer\s+review\s+comments|reviewer\s+feedback|grant\s+application|funding\s+decision|review\s+panel|grant\s+proposal|reviewer\s+score|assessment\s+criteria|funding\s+recommendation|grant\s+committee|research\s+funding)\b
+  (?is)\b(?:grant\s+peer\s+review|peer\s+review\s+comments|reviewer\s+feedback|funding\s+decision|review\s+panel|reviewer\s+score|funding\s+recommendation|grant\s+committee|grant\s+application)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
@@ -41,7 +42,9 @@ test_cases:
     - value: reviewer feedback
       description: Alternative topic phrase match
     - value: grant application
-      description: Additional topic phrase match
+      description: Contextual-branch phrase — discovers only unless independent review-output evidence is present
+    - value: 'Proposal GR-884 reviewer R2: criterion 1 score 3/5; weakness: feasibility; panel rank 14; funding recommendation: do not fund.'
+      description: Reviewer output anchors (funding recommendation) with review-field evidence — enforceable assessment content
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -49,6 +52,14 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: student grant
       description: Generic word pair from old broad template should not match
+    - value: Grant application GR-884 lists the project title, applicant, budget, and closing date but contains no reviewer material.
+      description: Application without review output — discovery only, must not enforce
+    - value: The community foundation announced a new research funding round for local history projects.
+      description: Research-funding topic language was removed from the anchor — must not match
+    - value: 'Reviewer training exercise: classify the example phrases "reviewer feedback" and "funding recommendation".'
+      description: Training/example exclusion suppresses quoted detector vocabulary
+    - value: grant application
+      description: Bare contextual phrase — discovery only, must not enforce
 false_positives:
   - description: Common words and phrases related to grant peer review comments appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -90,10 +101,30 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_grant_peer_review_ContextualBranch
+      matches:
+        - ref: Keyword_grant_peer_review_IndependentContext
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_grant_peer_review_ContextualBranch
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_grant_peer_review
       pattern: >-
-        (?is)\b(?:grant\s+peer\s+review|peer\s+review\s+comments|reviewer\s+feedback|grant\s+application|funding\s+decision|review\s+panel|grant\s+proposal|reviewer\s+score|assessment\s+criteria|funding\s+recommendation|grant\s+committee|research\s+funding)\b
+        (?is)\b(?:grant\s+peer\s+review|peer\s+review\s+comments|reviewer\s+feedback|funding\s+decision|review\s+panel|reviewer\s+score|funding\s+recommendation|grant\s+committee)\b
+    - id: Regex_grant_peer_review_ContextualBranch
+      pattern: (?is)\b(?:grant\s+application)\b
     - id: Pattern_global_top500_358_grant_peer_review_comments_label_context
       pattern: (?i)\b(?:grant\s+peer\s+review\s+comments)\b
   keywords:
@@ -113,6 +144,21 @@ purview:
             - funding recommendation
             - grant committee
             - research funding
+      strength: specific
+    - id: Keyword_grant_peer_review_IndependentContext
+      groups:
+        - match_style: word
+          terms:
+            - reviewer ID
+            - reviewer role
+            - criterion score
+            - panel rank
+            - strengths
+            - weaknesses
+            - recommendation
+            - conflict declaration
+            - moderation note
+            - decision status
       strength: specific
     - id: Keyword_global_top500_358_grant_peer_review_comments_domain_context
       groups:
@@ -135,8 +181,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-17'
+    description: 'SIT alignment wave1 (TP-01266, reduced scope): Regex_grant_peer_review narrowed to review-output anchors (grant application, grant proposal, assessment criteria, research funding removed — they self-corroborated at 65); "grant application" re-wired as the approved contextual branch (Regex_grant_peer_review_ContextualBranch) enforcing at 65 only with Keyword_grant_peer_review_IndependentContext review-field evidence (10 terms materialized from the approved definition) and otherwise 65 discovery_only, both with the template-exclusion NOT gate; adversarial tests added. Deliberately less than the first-pass candidate: grant proposal / assessment criteria / research funding are deleted from the primary (their contextual gating had no written-out branch definition) and remain evidence-only; no 75/85 re-tiering.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1904 without changing detector or package metadata.'

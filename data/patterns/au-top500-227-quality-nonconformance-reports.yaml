@@ -1,13 +1,13 @@
 schema: testpattern/v1
 name: Quality nonconformance reports
 slug: au-top500-227-quality-nonconformance-reports
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to quality nonconformance reports in Australian contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Identifies documents containing references to quality nonconformance reports in Australian contexts. Higher confidence identifies nonconformance records (NCR/NC/DEV identifiers with affected-item,
+  observed-condition, disposition, owner, or closure detail) or the explicit nonconformance-report label; standalone corrective/preventive-action and quality-audit vocabulary remains discovery-only.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
@@ -48,6 +48,10 @@ test_cases:
       description: Alternative topic phrase match
     - value: corrective action
       description: Additional topic phrase match
+    - value: 'NCR-2048; affected item LOT-17; observed seal width 1.4 mm vs 2.0 mm; disposition: rework; owner: QA.'
+      description: NCR identifier with populated finding/disposition fields (enforces at 75 via Pattern_ncr_record)
+    - value: nonconformance report
+      description: Explicit report label is a strong concept anchor and remains enforceable at 75 by design
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -55,6 +59,12 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: product failure
       description: Generic word pair from old broad template should not match
+    - value: Corrective action awareness is on the quality audit agenda.
+      description: CAPA vocabulary without a nonconformance record — discovery only, must not enforce
+    - value: The student corrected an action in the play after review.
+      description: Ordinary prose with no quality-domain phrase must not match
+    - value: 'Sample NCR-000 template; affected item: placeholder.'
+      description: Sample/template/placeholder identifies an empty form — suppressed from enforcement
 false_positives:
   - description: Common words and phrases related to quality nonconformance reports appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -76,7 +86,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_quality_nonconformance_reports
+      id_match: Pattern_ncr_record
       matches:
         - ref: Evidence_quality_nonconformance_reports
           min_count: 2
@@ -87,15 +97,23 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_quality_nonconformance_reports
+      id_match: Pattern_ncr_record
       matches:
-        - ref: Evidence_quality_nonconformance_reports
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_nonconformance_report_label
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_quality_nonconformance_reports
       matches:
         - ref: Evidence_quality_nonconformance_reports
@@ -104,6 +122,11 @@ purview:
       pattern: (?is)\b(?:quality\s+nonconformance\s+reports|nonconformance\s+report|quality\s+deviation|corrective\s+action|preventive\s+action|quality\s+audit|quality\s+deficiency)\b
     - id: Pattern_au_top500_227_quality_nonconformance_reports_label_context
       pattern: (?i)\b(?:quality\s+nonconformance\s+reports)\b
+    - id: Pattern_nonconformance_report_label
+      pattern: (?i)\bnon[\s-]?conformance\s+reports?\b
+    - id: Pattern_ncr_record
+      pattern: >-
+        (?is)\b(?:NCR|NC|DEV)[-_ ]?\d{3,10}\b[\s\S]{0,220}\b(?:affected\s+item|deviation|observed|requirement|disposition|owner|closure\s+status|corrective\s+action)\b
   keywords:
     - id: Evidence_quality_nonconformance_reports
       groups:
@@ -141,8 +164,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-16'
+    description: 'SIT alignment wave1 (TP-00353, reduced scope): enforcement now anchors on Pattern_ncr_record (NCR/NC/DEV id plus populated affected-item/observed/disposition/owner/closure field; banned .{0,N} idiom replaced with [\s\S]{0,N}) at 75/85, plus the explicit nonconformance-report label (Pattern_nonconformance_report_label) at 75 — a deliberate reduced-scope decision; standalone corrective/preventive-action and audit topic tier demoted to 65 discovery_only; adversarial tests added.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 828 without changing detector or package metadata.'

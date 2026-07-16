@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: MAC addresses linked to users
 slug: au-top500-053-mac-addresses-linked-to-users
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -54,6 +54,8 @@ test_cases:
       description: Alternative topic phrase match
     - value: physical address
       description: Additional topic phrase match
+    - value: 'Access log: MAC address assigned to employee Priya Rao.'
+      description: Device-address concept with explicit user-linkage relation (reaches the enforcing tiers)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -61,6 +63,10 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: address mac
       description: Generic word pair from old broad template should not match
+    - value: Router physical address configuration guide.
+      description: Hardware documentation without any user-linkage relation must not reach the enforcing tiers
+    - value: Security training shows how a MAC address can be linked to users.
+      description: Explanatory prose — linked to users is not an authored relational linkage phrase, so enforcement must not fire
 false_positives:
   - description: Common words and phrases related to mac addresses linked to users appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -87,6 +93,7 @@ purview:
         - ref: Evidence_mac_address
           min_count: 2
           unique_results: true
+        - ref: Evidence_mac_user_linkage
         - type: any
           min_matches: 0
           max_matches: 0
@@ -96,6 +103,7 @@ purview:
       id_match: Pattern_mac_address
       matches:
         - ref: Evidence_mac_address
+        - ref: Evidence_mac_user_linkage
         - type: any
           min_matches: 0
           max_matches: 0
@@ -105,6 +113,7 @@ purview:
       id_match: Pattern_mac_address
       matches:
         - ref: Evidence_mac_address
+      discovery_only: true
   regexes:
     - id: Pattern_mac_address
       pattern: >-
@@ -130,6 +139,16 @@ purview:
             - ethernet address
             - wireless adapter
       strength: specific
+    - id: Evidence_mac_user_linkage
+      groups:
+        - match_style: word
+          terms:
+            - assigned to
+            - device owner
+            - associated user
+            - authenticated user
+            - access log
+      strength: domain
     - id: Keyword_au_top500_053_mac_addresses_linked_to_users_domain_context
       groups:
         - match_style: word
@@ -151,8 +170,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: 'TP-00181 approved reduced scope: add Evidence_mac_user_linkage restricted to relational phrases only (assigned to, device owner, associated user, authenticated user, access log — QA refinement: bare person nouns user/employee/account/login deliberately excluded) and require it on the 75/85 enforcing tiers, which retain the existing template-exclusion NOT-gate; demote the address-topic-only 65 tier to discovery_only. Not implemented (undefined references): 48-bit hexadecimal MAC structure (out of scope for this concept class) and a manuals/configuration-guide exclusion dictionary. Added an access-log linkage positive plus router-guide and security-training negatives.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 656 without changing detector or package metadata.'

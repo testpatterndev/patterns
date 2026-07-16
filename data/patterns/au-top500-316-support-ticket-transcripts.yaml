@@ -1,11 +1,13 @@
 schema: testpattern/v1
 name: Support ticket transcripts
 slug: au-top500-316-support-ticket-transcripts
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies support ticket transcripts patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
+description: >-
+  Identifies support ticket conversation transcripts in security and access control contexts. Enforcement requires timestamped requester/agent message turns; ticket, help-desk, and service-desk
+  references without conversational structure remain discovery inventory.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Keyword
   lists: industry-education.
@@ -49,6 +51,8 @@ test_cases:
       description: Alternative topic phrase match
     - value: service desk
       description: Additional topic phrase match
+    - value: "Ticket ID=HD-771\n09:14 Customer: VPN fails after MFA\n09:16 Agent: Reset the device registration\n09:22 Customer: Access restored"
+      description: Ticket ID with three timestamped alternating requester/agent messages - the transcript shape that satisfies Evidence_ticket_transcript_turn for enforcement
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -80,6 +84,9 @@ purview:
         - ref: Evidence_support_ticket
           min_count: 2
           unique_results: true
+        - ref: Evidence_ticket_transcript_turn
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -89,12 +96,16 @@ purview:
       id_match: Pattern_support_ticket
       matches:
         - ref: Evidence_support_ticket
+        - ref: Evidence_ticket_transcript_turn
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_support_ticket
       matches:
         - ref: Evidence_support_ticket
@@ -102,6 +113,9 @@ purview:
     - id: Pattern_support_ticket
       pattern: >-
         (?is)\b(?:support\s+ticket|ticket\s+transcript|help\s+desk|service\s+desk|case\s+number|ticket\s+ID|customer\s+complaint|resolution\s+notes|incident\s+ticket|support\s+request|ticket\s+history)\b
+    - id: Evidence_ticket_transcript_turn
+      pattern: >-
+        (?i)(?:\[?\d{1,2}:\d{2}(?::\d{2})?\]?[ \t]{0,4})?\b(?:requester|customer|user|agent|support)\b[ \t]{0,4}[-:>][ \t]{0,4}\S[^\r\n]{0,160}
   keywords:
     - id: Evidence_support_ticket
       groups:
@@ -130,8 +144,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-17'
+    description: 'Reduced-scope alignment fix (TP-00432): add Evidence_ticket_transcript_turn (timestamped requester/customer/user/agent/support speaker-turn regex) and require at least two unique turns in the 75/85 enforcement tiers, so help-desk policy prose with ticket vocabulary can no longer enforce; the topic branch is retained as a discovery-only 65 tier. Turn regex written with [^\r\n]/bounded-gap idioms instead of the first-pass (?im)^...$ line anchors, which repo CI bans for purview patterns.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 907 without changing detector or package metadata.'

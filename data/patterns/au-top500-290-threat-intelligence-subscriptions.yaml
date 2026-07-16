@@ -1,12 +1,22 @@
 schema: testpattern/v1
 name: Threat intelligence subscriptions
 slug: au-top500-290-threat-intelligence-subscriptions
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies threat intelligence subscriptions patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 7 keywords within 300 characters.'
+description: >-
+  Identifies threat-intelligence, STIX, TAXII, MISP, and intel-feed topic language in security
+  contexts. Discovery-only in Purview: provider relationships and common feed use are low-harm
+  OFFICIAL per the risk assessment, so topic and subscription-metadata language does not
+  enforce; feed tokens, covert-source identities, or private collection priorities would
+  warrant a separately designed enforcing detector.
+operation: >-
+  Pattern type: regex (boost_regex engine). Topic phrase regex with corroborative keywords
+  within 300 characters. All Purview tiers are discovery_only: the 75/85 branches corroborated
+  the primary with the same-span phrase list, letting a standards sentence (STIX/TAXII
+  exchange guidance) enforce at 85; enforcement is withheld because the risk assessment rates
+  provider relationships and common feed use low-harm OFFICIAL.
 pattern: (?i)\b(?:threat\s+intelligence|stix|taxii|misp|intel\s+feed)\b
 confidence: medium
 confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
@@ -44,9 +54,13 @@ test_cases:
       description: Topic phrase, lowercase
     - value: 'this record references the threat intelligence held on file'
       description: Topic phrase within surrounding text
+    - value: 'MISP supports threat intelligence sharing'
+      description: Platform-capability statement matches the topic vocabulary (discovery inventory only — no tier enforces)
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
+    - value: 'The market intelligence subscription covers commodity prices'
+      description: Subscription wording without cyber-threat vocabulary must not match
     - value: placeholder value 12345
       description: Random text should not match phrase marker
     - value: generic policy prose without anchors
@@ -80,6 +94,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
+      discovery_only: true
       id_match: Pattern_threat_intelligence
       matches:
         - ref: Evidence_threat_intelligence
@@ -91,6 +106,7 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
+      discovery_only: true
       id_match: Pattern_threat_intelligence
       matches:
         - ref: Evidence_threat_intelligence
@@ -123,8 +139,18 @@ purview:
             - intelligence platform
       strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope fix (TP-00407): demote the 75/85 tiers to discovery_only — same-span
+      evidence let "Use STIX over TAXII to exchange threat intelligence with partners" enforce
+      at 85. The first-pass subscription-metadata anchor (provider/tenant/endpoint/renewal
+      fields) was deliberately NOT adopted: the risk assessment rates provider relationships
+      and common feed use low-harm OFFICIAL, so enforcement is reserved for a future detector
+      keyed on feed tokens, covert sources, or private collection priorities (QA correction).
+      Added platform-capability discovery case and market-intelligence negative.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 882 without changing detector or package metadata.'

@@ -1,12 +1,22 @@
 schema: testpattern/v1
 name: Remote administration tool settings
 slug: au-top500-311-remote-administration-tool-settings
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies remote administration tool settings patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
+description: >-
+  Identifies remote-administration configuration records rather than remote administration
+  discussion: enforcement requires a remote-administration anchor plus populated configuration
+  settings (host, port, protocol, allowed group, authentication, timeout, session recording),
+  while general remote-access and architecture prose remains discovery-only.
+operation: >-
+  Pattern type: regex (boost_regex engine). Topic phrases (remote administration, remote
+  access, jump server, bastion host) feed a 65 discovery-only tier and remain the primary
+  anchor for enforcement, which additionally requires Evidence_remote_admin_setting — a
+  host/port/protocol/allowed-group/authentication/MFA/timeout/session-recording/policy
+  key-value assignment — once at 75 and at least twice (unique keys) at 85. The shared
+  template exclusion vetoes tutorial/demo settings at enforcement tiers.
 pattern: (?is)\b(?:remote\s+administration|remote\s+access|remote\s+desktop|jump\s+server|bastion\s+host|remote\s+management|session\s+recording|privileged\s+session)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
@@ -46,6 +56,12 @@ test_cases:
       description: Alternative topic phrase match
     - value: jump server
       description: Additional topic phrase match
+    - value: 'Bastion host=jump01 port=22 protocol=SSH allowed group=PrivOps authentication=MFA session recording=enabled'
+      description: A named host with populated access and audit settings reaches the enforcing tiers
+    - value: 'Use the bastion host for remote access'
+      description: Route description matches the topic branch only (discovery, no configuration values)
+    - value: 'Remote access to the museum catalogue is available'
+      description: End-user web access keeps a discovery-level topic hit only (relabeled from the first-pass no-match expectation)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -53,6 +69,8 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: backup outage
       description: Generic word pair from old broad template should not match
+    - value: 'TeamViewer tutorial host=demo timeout=5'
+      description: Tutorial/demo-marked sample settings have no topic phrase and are template-excluded at enforcement
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -84,7 +102,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_remote_admin
       matches:
-        - ref: Evidence_remote_admin
+        - ref: Evidence_remote_admin_setting
           min_count: 2
           unique_results: true
         - type: any
@@ -95,19 +113,23 @@ purview:
     - confidence_level: 75
       id_match: Pattern_remote_admin
       matches:
-        - ref: Evidence_remote_admin
+        - ref: Evidence_remote_admin_setting
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_remote_admin
       matches:
         - ref: Evidence_remote_admin
   regexes:
     - id: Pattern_remote_admin
       pattern: (?is)\b(?:remote\s+administration|remote\s+access|remote\s+desktop|jump\s+server|bastion\s+host|remote\s+management|session\s+recording|privileged\s+session)\b
+    - id: Evidence_remote_admin_setting
+      pattern: >-
+        (?is)\b(?:host|port|protocol|allowed\s+group|authentication|MFA|timeout|session\s+recording|policy)\s*[:=]\s*[^,;\r\n]{1,200}
   keywords:
     - id: Evidence_remote_admin
       groups:
@@ -130,8 +152,21 @@ purview:
             - privileged session
       strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope harden (TP-00427): topic vocabulary no longer enforces (an architecture
+      statement about bastion-host remote access previously reached 85 via same-span
+      evidence). Enforcement keeps the remote-administration topic primary but now requires
+      Evidence_remote_admin_setting (host/port/protocol/allowed-group/authentication/MFA/
+      timeout/session-recording/policy key-value assignment): one setting at 75, two unique
+      settings at 85, both template-excluded — the loose setting keys are acceptable only
+      because the topic ID anchor is still required (independent note). The topic branch is
+      demoted to 65 discovery_only; per the independent correction the museum remote-access
+      case is expected as a discovery hit, not no_match. Added settings positive, route-
+      description discovery case, and tutorial negative.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 902 without changing detector or package metadata.'

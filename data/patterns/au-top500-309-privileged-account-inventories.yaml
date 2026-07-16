@@ -1,12 +1,22 @@
 schema: testpattern/v1
 name: Privileged account inventories
 slug: au-top500-309-privileged-account-inventories
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies privileged account inventories patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters.'
+description: >-
+  Identifies inventories that enumerate privileged identities: enforcement requires a populated
+  account record (account/username/login value paired with owner, platform, privilege, vault,
+  status, or review fields), while privileged-account topic vocabulary and PAM policy prose
+  remain discovery-only.
+operation: >-
+  Pattern type: regex (boost_regex engine). Topic phrases (privileged account, service account,
+  admin account, root access, PAM terms) feed a 65 discovery-only tier; enforcement requires
+  Evidence_privileged_account_record — an account/username/login assignment within 180
+  characters of an owner/platform/system/privilege/vault/status/reviewed field — at 75, with
+  additional privileged-access evidence raising it to 85. The shared template exclusion vetoes
+  demo/sample rows at enforcement tiers.
 pattern: >-
   (?is)\b(?:privileged\s+account|service\s+account|admin\s+account|root\s+access|domain\s+admin|elevated\s+privileges|privileged\s+access\s+management|break\s+glass\s+account|emergency\s+access|credential\s+vault|account\s+inventory)\b
 confidence: medium
@@ -40,6 +50,12 @@ test_cases:
       description: Alternative topic phrase match
     - value: root access
       description: Additional topic phrase match
+    - value: 'account=svc_backup owner=Infrastructure platform=AD privilege=Domain Admin vault=CyberArk status=active reviewed=2026-07-01'
+      description: A populated account record with owner, platform, privilege, vault, and review fields reaches the enforcing tiers
+    - value: 'Privileged access management standard for service accounts'
+      description: PAM policy prose matches the topic branch only (discovery, no inventory row)
+    - value: 'Customer service account team roster'
+      description: Business "service account" keeps a discovery-level topic hit only (relabeled from the first-pass no-match expectation)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -47,6 +63,8 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: backup outage
       description: Generic word pair from old broad template should not match
+    - value: 'PAM demo account=admin owner=student status=test'
+      description: Demo/test-marked synthetic row has no topic phrase and is template-excluded at enforcement
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -76,7 +94,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_privileged_account
+      id_match: Evidence_privileged_account_record
       matches:
         - ref: Evidence_privileged_account
           min_count: 2
@@ -87,15 +105,15 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_privileged_account
+      id_match: Evidence_privileged_account_record
       matches:
-        - ref: Evidence_privileged_account
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_privileged_account
       matches:
         - ref: Evidence_privileged_account
@@ -103,6 +121,9 @@ purview:
     - id: Pattern_privileged_account
       pattern: >-
         (?is)\b(?:privileged\s+account|service\s+account|admin\s+account|root\s+access|domain\s+admin|elevated\s+privileges|privileged\s+access\s+management|break\s+glass\s+account|emergency\s+access|credential\s+vault|account\s+inventory)\b
+    - id: Evidence_privileged_account_record
+      pattern: >-
+        (?is)\b(?:account|username|login)\s*[:=]\s*[a-z0-9_.\\\-]{1,64}[\s\S]{0,180}\b(?:owner|platform|system|privilege|vault|status|reviewed)\s*[:=]
   keywords:
     - id: Evidence_privileged_account
       groups:
@@ -123,8 +144,20 @@ purview:
             - account inventory
       strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope harden (TP-00425): topic vocabulary no longer enforces (a service-account
+      access standard previously enforced via same-span evidence). Enforcement now anchors on
+      Evidence_privileged_account_record (account/username/login assignment within 180
+      characters of owner/platform/system/privilege/vault/status/reviewed): 75 with template
+      exclusion, 85 with two additional unique privileged-access evidence terms. The topic
+      branch is demoted to 65 discovery_only; per QA correction the "customer service account"
+      roster case is expected as a discovery hit (the retained concept branch still matches
+      "service account"), not no_match. Added inventory-row positive, PAM-policy discovery
+      case, and demo-row negative.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 900 without changing detector or package metadata.'

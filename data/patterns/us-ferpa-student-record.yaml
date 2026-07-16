@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: U.S. FERPA Student Education Record ID
 slug: us-ferpa-student-record
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -13,7 +13,10 @@ description: >-
 operation: >-
   Matches a "student id"/"student number"/"SIS id"/"enrollment id" context label followed by a 6-12 character
   alphanumeric ID. The label is part of the primary regex; corroborative FERPA education-record keywords within 300
-  characters confirm the academic context.
+  characters confirm the academic context. Purview tiers: the labelled primary alone carries student-identifier
+  semantics and enforces at 75; education-record evidence (transcript, GPA, grade, registrar, course, semester,
+  degree, academic/education record) raises it to 85. Template/training markers and conflicting employee/customer/
+  member ID labels are modelled as keyword NOT evidence on both tiers.
 pattern: \b(?:student\s+(?:id|number)|SIS\s+id|enrollment\s+id)[\s:#]{0,8}[A-Z0-9]{6,12}\b
 confidence: high
 confidence_justification: >-
@@ -57,6 +60,8 @@ test_cases:
       description: SIS id label with 8-digit body
     - value: 'Enrollment ID: STU00412'
       description: Enrollment ID label with mixed alphanumeric body
+    - value: 'Registrar transcript: Student ID A1234567, GPA 3.8, Fall 2026 grades attached.'
+      description: Labelled ID corroborated by registrar, transcript, GPA, and grades reaches the 85 tier
   should_not_match:
     - value: 'Employee ID: A1234567'
       description: '"Employee" label is not a student/enrolment context'
@@ -78,6 +83,59 @@ exports:
   - yaml
   - regex_copy
 scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_us_ferpa_student_id
+      matches:
+        - ref: Keyword_us_ferpa_record
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_us_ferpa_noise
+    - confidence_level: 75
+      id_match: Regex_us_ferpa_student_id
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_us_ferpa_noise
+  regexes:
+    - id: Regex_us_ferpa_student_id
+      pattern: \b(?:student\s+(?:id|number)|SIS\s+id|enrollment\s+id)[\s:#]{0,8}[A-Z0-9]{6,12}\b
+  keywords:
+    - id: Keyword_us_ferpa_record
+      groups:
+        - match_style: word
+          terms:
+            - transcript
+            - GPA
+            - grade point average
+            - grade
+            - registrar
+            - course
+            - semester
+            - degree
+            - academic record
+            - education record
+      strength: specific
+    - id: Keyword_us_ferpa_noise
+      groups:
+        - match_style: word
+          terms:
+            - template
+            - sample
+            - training
+            - placeholder
+            - fictional
+            - employee ID
+            - customer ID
+            - member ID
+      strength: noise
 risk_rating: 7
 risk_description: >-
   This high-confidence identifier detector requires a student ID, student number, SIS ID, or enrollment ID label followed by a six-to-twelve-character value, plus nearby FERPA education-record context. A genuine match persistently links a learner to institutional records and can support impersonation, record lookup, or correlation across disclosed education material. The identifier is not itself an authentication secret, and course templates or non-academic student discount numbers remain documented false positives. Risk 7 SENSITIVE fits a contextualised student-record identifier, while PROTECTED requires linked high-impact records, access credentials, bulk identifiers, or significant damage.
@@ -95,8 +153,20 @@ references:
   - url: https://studentprivacy.ed.gov/ferpa
     title: "FERPA - U.S. Department of Education Student Privacy Policy Office"
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope deployment wiring (TP-01670): add Purview pattern tiers for the existing
+      labelled student/SIS/enrollment regex (mapped unchanged, preserving the authored
+      six-to-twelve-character boundaries) — the labelled primary enforces at 75, and
+      Keyword_us_ferpa_record education-record evidence (transcript, GPA, grade, registrar,
+      course, semester, degree, academic/education record) raises it to 85. Per QA, template/
+      training markers and conflicting employee/customer/member ID labels are implemented as
+      Keyword_us_ferpa_noise keyword NOT evidence (not a filter term list). No 65 discovery
+      tier: that is reserved for a future broader/unlabelled format. Added registrar-transcript
+      positive.
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2070 without changing detector or package metadata.'

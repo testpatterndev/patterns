@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Earnings guidance drafts
 slug: au-top500-196-earnings-guidance-drafts
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -10,7 +10,7 @@ description: >-
   protection regulations.
 operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
 pattern: >-
-  (?is)\b(?:earnings\s+guidance|guidance\s+draft|earnings\s+forecast|profit\s+guidance|revenue\s+guidance|EPS\s+guidance|forward\s+guidance|market\s+guidance|preliminary\s+results|continuous\s+disclosure|ASX\s+announcement)\b
+  (?is)\b(?:earnings\s+guidance|guidance\s+draft|earnings\s+forecast|profit\s+guidance|revenue\s+guidance|EPS\s+guidance|forward\s+guidance|market\s+guidance|preliminary\s+results)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
 jurisdictions:
@@ -48,6 +48,8 @@ test_cases:
       description: Alternative topic phrase match
     - value: profit guidance
       description: Additional topic phrase match
+    - value: 'DRAFT v6 profit guidance: EBITDA $180-195m; board approval pending; ASX release planned 22 Aug'
+      description: Versioned draft guidance with forecast range and approval state
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -55,6 +57,12 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: merger fundraising
       description: Generic word pair from old broad template should not match
+    - value: 'ASX announcement: final FY26 earnings guidance'
+      description: Final released guidance carries no draft/pre-release state marker, so enforcement must not fire
+    - value: Continuous disclosure policy updated
+      description: Final-release vocabulary was demoted out of the primary and must not match at all
+    - value: Training draft using fictional EPS guidance
+      description: Draft alone is not an authored state term and training content must not enforce
 false_positives:
   - description: Common words and phrases related to earnings guidance drafts appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -78,7 +86,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_earnings_guidance
       matches:
-        - ref: Evidence_earnings_guidance
+        - ref: Evidence_guidance_content
+        - ref: Evidence_draft_state
           min_count: 2
           unique_results: true
         - type: any
@@ -89,7 +98,8 @@ purview:
     - confidence_level: 75
       id_match: Pattern_earnings_guidance
       matches:
-        - ref: Evidence_earnings_guidance
+        - ref: Evidence_guidance_content
+        - ref: Evidence_draft_state
         - type: any
           min_matches: 0
           max_matches: 0
@@ -97,29 +107,31 @@ purview:
             - Evidence_template_exclusion
     - confidence_level: 65
       id_match: Pattern_earnings_guidance
-      matches:
-        - ref: Evidence_earnings_guidance
+      discovery_only: true
+      description: Guidance-topic phrase without a draft/pre-release state marker — discovery inventory only
   regexes:
     - id: Pattern_earnings_guidance
       pattern: >-
-        (?is)\b(?:earnings\s+guidance|guidance\s+draft|earnings\s+forecast|profit\s+guidance|revenue\s+guidance|EPS\s+guidance|forward\s+guidance|market\s+guidance|preliminary\s+results|continuous\s+disclosure|ASX\s+announcement)\b
+        (?is)\b(?:earnings\s+guidance|guidance\s+draft|earnings\s+forecast|profit\s+guidance|revenue\s+guidance|EPS\s+guidance|forward\s+guidance|market\s+guidance|preliminary\s+results)\b
   keywords:
-    - id: Evidence_earnings_guidance
+    - id: Evidence_guidance_content
       groups:
         - match_style: word
           terms:
             - earnings guidance
-            - guidance draft
             - earnings forecast
             - profit guidance
             - revenue guidance
             - EPS guidance
             - forward guidance
             - market guidance
+    - id: Evidence_draft_state
+      groups:
+        - match_style: word
+          terms:
+            - guidance draft
             - preliminary results
             - pre-announcement
-            - continuous disclosure
-            - ASX announcement
             - confidential
 risk_description: >-
   This detector finds draft earnings or profit guidance before formal release. Disclosure can reveal expected performance, management adjustments, and announcement timing, allowing trading or strategic action on material nonpublic information. The issuer, investors, and counterparties can suffer serious financial and market-integrity harm, though a normal draft concerns one reporting entity and period. Risk 8 and SENSITIVE are appropriate; broad market intervention, systemic effects, or privileged government economic policy would be required for PROTECTED.
@@ -132,8 +144,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-17'
+    description: 'TP-00322 approved reduced scope: require guidance content conjoined with a draft/pre-release state on the enforcing tiers — Evidence_earnings_guidance split into Evidence_guidance_content (earnings/profit/revenue/EPS/forward/market guidance, earnings forecast) and Evidence_draft_state (guidance draft, preliminary results, pre-announcement, confidential — all pre-existing terms); final-release vocabulary (continuous disclosure, ASX announcement) demoted out of the primary regex (top-level and Pattern_earnings_guidance). Guidance-topic phrase alone is now discovery-only (65). Deferred per QA/independent review: the 85 version/owner/approval workflow tier (undefined references) and draft/final precedence rules. Added draft-v6 positive plus final-announcement, disclosure-policy, and fictional-training negatives.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 797 without changing detector or package metadata.'

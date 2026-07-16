@@ -1,13 +1,14 @@
 schema: testpattern/v1
 name: Defect backlog with customer impact
 slug: au-top500-223-defect-backlog-with-customer-impact
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to defect backlog with customer impact in Australian contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies documents containing references to defect backlog with customer impact in Australian contexts. Higher confidence identifies backlog records that connect product defects to concrete
+  customer impact (BUG/DEFECT/ISSUE identifiers with affected customers/accounts, customer impact, workaround, severity, or release-target detail); defect and customer-impact vocabulary alone
+  remains discovery-only.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
@@ -50,6 +51,8 @@ test_cases:
       description: Alternative topic phrase match
     - value: defect report
       description: Additional topic phrase match
+    - value: 'BUG-4821 Severity 1; customer impact: 318 accounts cannot export; workaround: CSV API; fix version 7.2.'
+      description: Defect ID tied to affected customers, severity, workaround, and release (enforces at 75 via Pattern_defect_customer_link)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -57,6 +60,16 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: product failure
       description: Generic word pair from old broad template should not match
+    - value: Bug tracker lists internal cosmetic issue BUG-9 with no customer impact.
+      description: Defect without the defining customer-impact condition — discovery only, must not enforce
+    - value: 'BUG-42 triaged this sprint; no customer impact observed.'
+      description: Negated customer impact next to a valid defect ID must not enforce (negation-safe evidence regex)
+    - value: Customer impact of the office parking closure is limited to Friday.
+      description: Impact not caused by a product defect — discovery only, must not enforce
+    - value: 'Training example BUG-001: sample customer impact and placeholder workaround.'
+      description: Training/sample/placeholder marks synthetic backlog content — suppressed from enforcement
+    - value: customer impact
+      description: Topic phrase cannot satisfy both defect and impact roles — discovery only, must not enforce
 false_positives:
   - description: Common words and phrases related to defect backlog with customer impact appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -78,7 +91,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_defect_backlog_customer_impact
+      id_match: Pattern_defect_customer_link
       matches:
         - ref: Evidence_defect_backlog_customer_impact
           min_count: 2
@@ -89,15 +102,15 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_defect_backlog_customer_impact
+      id_match: Pattern_defect_customer_link
       matches:
-        - ref: Evidence_defect_backlog_customer_impact
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_defect_backlog_customer_impact
       matches:
         - ref: Evidence_defect_backlog_customer_impact
@@ -105,6 +118,9 @@ purview:
     - id: Pattern_defect_backlog_customer_impact
       pattern: >-
         (?is)\b(?:defect\s+backlog|customer\s+impact|bug\s+tracker|defect\s+report|severity\s+assessment|incident\s+report|product\s+defect|quality\s+issue|customer\s+complaint|root\s+cause\s+analysis)\b
+    - id: Pattern_defect_customer_link
+      pattern: >-
+        (?is)\b(?:BUG|DEFECT|ISSUE)[-_ ]?\d{2,8}\b[\s\S]{0,220}\b(?:affected\s+customers?|affected\s+accounts?|(?<!no\s)customer\s+impact|workaround|severity|fix\s+version|target\s+release)\b
     - id: Pattern_au_top500_223_defect_backlog_with_customer_impact_label_context
       pattern: (?i)\b(?:defect\s+backlog\s+with\s+customer\s+impact)\b
   keywords:
@@ -142,8 +158,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: 'SIT alignment wave1 (TP-00349, reduced scope): enforcement (75/85) now anchors on Pattern_defect_customer_link (BUG/DEFECT/ISSUE id plus affected-customer/impact/workaround/severity/release detail) with a negation-safe fixed-width lookbehind so "no customer impact" cannot enforce (QA-required correction to the proposed evidence regex); topic tier demoted to 65 discovery_only; banned .{0,N} idiom replaced with [\s\S]{0,N}; adversarial tests added including the BUG-42 negation case.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 824 without changing detector or package metadata.'

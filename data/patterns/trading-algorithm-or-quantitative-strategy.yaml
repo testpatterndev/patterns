@@ -1,12 +1,12 @@
 schema: testpattern/v1
 name: Trading Algorithm or Quantitative Strategy
 slug: trading-algorithm-or-quantitative-strategy
-version: 1.3.2
+version: 1.3.3
 type: trainable_classifier
 pattern_class: concept
 engine: universal
-description: Detects proprietary trading algorithms, quantitative investment strategies, or systematic risk models used by government investment vehicles such as QIC (Queensland Investment Corporation). Keyword-based fallback detection is provided for environments without ML classifier support.
-operation: 'Trainable classifier (primary): train on documents containing algorithmic trading logic, quantitative strategy descriptions, backtesting results, and portfolio construction methodologies. Keyword-based fallback: alpha generation / signal / backtest / Sharpe ratio / factor model / systematic / execution algorithm / VWAP / TWAP terms within 300 characters of PROTECTED or proprietary markers.'
+description: Detects proprietary trading algorithms, quantitative investment strategies, or systematic risk models used by government investment vehicles such as QIC (Queensland Investment Corporation). This deployable record is the keyword/regex fallback detector (basis-points anchor with quantitative and proprietary-marker evidence); any trainable ML classifier is a separate tenant artifact with an external identity and is not represented in this record.
+operation: 'Keyword/regex fallback (this deployable record): a basis-points figure anchors detection, with alpha generation / signal / backtest / Sharpe ratio / factor model / systematic / execution algorithm / VWAP / TWAP terms within 300 characters of PROTECTED or proprietary markers as evidence. A trainable ML classifier, if provisioned, is a separate tenant artifact registered under an external identity — no primary ML detector is defined or deployed by this record.'
 pattern: null
 confidence: high
 confidence_justification: 'High confidence: the combination of quantitative finance terminology (alpha, Sharpe ratio, backtest) with proprietary/trade secret markers is highly specific to restricted trading strategy documents. Academic papers discussing these concepts are excluded by requiring proprietary context.'
@@ -48,11 +48,21 @@ test_cases:
       description: Quantitative factor model with portfolio construction rules
     - value: 'PROPRIETARY — TRADE SECRET. QIC Momentum Sleeve v2.1. Backtest Sharpe ratio 2.3, max drawdown 9%. Alpha generation 145 bps annualised. Execution algorithm: TWAP with 10% participation. PROTECTED — not for distribution.'
       description: Proprietary momentum strategy with Sharpe ratio and bps alpha
+    - value: 'Internal memo: quantitative strategy returned 90 bps this quarter.'
+      description: Positive — legitimately satisfies the 75 fallback tier (bps anchor plus primary quantitative-strategy evidence) without proving an ML decision
+    - value: 'PROPRIETARY QIC Alpha Strategy v3.4: momentum signal, Sharpe 1.9, portfolio gross 140%, 225 bps, not for distribution.'
+      description: Enforces at 75 via the fallback (85 additionally requires portfolio-construction evidence not present here)
   should_not_match:
     - value: 'Academic paper: An Analysis of Factor Model Performance. We examine Sharpe ratios across momentum and value factors using publicly available data from 1990-2025.'
       description: Academic paper discussing factor models — no proprietary content
     - value: 'Investopedia: What is VWAP? Volume Weighted Average Price is a trading benchmark used by traders. Sharpe ratio measures risk-adjusted returns.'
       description: Educational content explaining trading concepts
+    - value: 'Academic paper: momentum factor performance averaged 90 bps.'
+      description: Academic-paper exclusion vetoes the fallback tiers despite a bps anchor
+    - value: 'Lecture example: alpha strategy v1.0 earns 100 bps with Sharpe 1.2.'
+      description: Example/lecture exclusion terms suppress enforcement of quoted teaching content
+    - value: '100 bps'
+      description: Numeric anchor alone reaches only the 65 discovery tier — must not enforce
 false_positives:
   - description: Academic research papers on quantitative finance and factor models
     mitigation: Require proprietary/trade secret markers and specific implementation details (not theoretical discussion)
@@ -184,8 +194,11 @@ sensitivity_labels:
   qgiscf_dlm: PROTECTED Financial
 references: []
 created: '2026-02-20'
-updated: '2026-07-15'
+updated: '2026-07-17'
 changelog:
+  - version: 1.3.3
+    date: '2026-07-17'
+    description: 'SIT alignment wave1 (TP-01636, reduced scope): description/operation relabel only — the deployable record is now explicitly described as the keyword/regex fallback (bps anchor plus quantitative/proprietary evidence); the claim of a deployed primary ML detector is removed and any trainable classifier is documented as a separate tenant artifact with an external identity. Fallback tiers left untouched (internally coherent); the incoherent near-miss case renamed as a 75-tier positive and adversarial tests added. The type field and risk_description were deliberately NOT changed (export contract and workbook-aligned risk text respectively).'
   - version: 1.3.2
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1452; detector and package metadata unchanged.'

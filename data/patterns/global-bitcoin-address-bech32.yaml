@@ -1,15 +1,16 @@
 schema: testpattern/v1
 name: Bitcoin Address (Bech32)
 slug: global-bitcoin-address-bech32
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects Bitcoin Address (Bech32) patterns.
+description: Detects Bech32-shaped Bitcoin address candidates (bc1 prefix, lowercase charset, and length shape only). The BIP-173 checksum is NOT validated, so matches are candidates, not verified addresses.
 operation: >-
-  Validation: Bech32 encoding (BIP-173). Corroborative evidence: 3 keywords within 300 characters. Keyword lists: financial-transaction. Uses additional domain-context evidence and explicit exclusion
-  logic for template/sample/test text.
-pattern: \bbc1[a-zA-HJ-NP-Z0-9]{25,39}\b
+  Candidate-shape prefilter: bc1 prefix with lowercase Bech32-style body and length bounds only — no BIP-173 checksum validation is performed (Purview custom SITs provide no Bech32 checksum function).
+  Corroborative evidence: 3 keywords within 300 characters. Keyword lists: financial-transaction. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+pattern: \bbc1[a-z0-9]{25,39}\b
+case_sensitive: true
 confidence: medium
 confidence_justification: >-
   Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false positive rates. Added context gating and exclusion rules improve precision and reduce
@@ -43,7 +44,9 @@ test_cases:
     - value: bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq
       description: Standard Bech32 address
     - value: bc1q0000000000000000000000000000000000
-      description: Minimal Bech32 address
+      description: Bech32-shaped synthetic candidate (shape only — checksum is not validated, so this discovers but proves nothing)
+    - value: Bitcoin payment address bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4
+      description: Address in Bitcoin context surfaces at 65 discovery_only — enforcement withheld without checksum validation
   should_not_match:
     - value: bc2qw508d6qejxtdg4y5r3zarvary0c5xw7k
       description: Wrong prefix (bc2 instead of bc1)
@@ -53,6 +56,10 @@ test_cases:
       description: Testnet prefix (tb1 instead of bc1)
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: Bitcoin address bc1qW508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4
+      description: Mixed case is invalid Bech32 — the lowercase-only shape regex rejects it
+    - value: 'Documentation example: bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4'
+      description: Documentation/example exclusion suppresses even the discovery-only candidate
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -65,31 +72,12 @@ exports:
 scope: narrow
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 65
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_bitcoin_address_bech32
-      matches:
-        - ref: Pattern_global_bitcoin_address_bech32_label_context
-        - ref: Keyword_global_bitcoin_address_bech32_domain_context
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_bitcoin_address_bech32
-      matches:
-        - ref: Keyword_crypto_context
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_bitcoin_address_bech32
@@ -101,7 +89,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_bitcoin_address_bech32
-      pattern: \bbc1[a-zA-HJ-NP-Z0-9]{25,39}\b
+      pattern: \bbc1[a-z0-9]{25,39}\b
     - id: Pattern_global_bitcoin_address_bech32_label_context
       pattern: (?i)\b(?:bitcoin\s+address\s+\(bech32\)|bitcoin|address|bech32)\b
   keywords:
@@ -131,7 +119,7 @@ purview:
             - bech32
       strength: domain
 risk_description: >-
-  The detector validates a Bech32 Bitcoin address under BIP-173 and requires nearby financial-transaction context, so it finds a public blockchain destination identifier rather than a private key or wallet credential. Disclosure can link a pseudonymous address to a person or organisation and make public transaction history easier to trace, profile, or target for fraud. The address alone cannot authorise a transfer and often appears legitimately in invoices, published reports, or payment instructions. Risk 5 OFFICIAL reflects bounded linkage and targeting harm that needs external context; SENSITIVE would require a confidential identity mapping, sensitive transaction record, or other directly harmful association.
+  The detector recognises a Bech32-shaped Bitcoin address candidate (prefix, charset, and length only — no BIP-173 checksum validation) with nearby financial-transaction context, so it finds a likely public blockchain destination identifier rather than a private key or wallet credential. Disclosure can link a pseudonymous address to a person or organisation and make public transaction history easier to trace, profile, or target for fraud. The address alone cannot authorise a transfer and often appears legitimately in invoices, published reports, or payment instructions. Risk 5 OFFICIAL reflects bounded linkage and targeting harm that needs external context; SENSITIVE would require a confidential identity mapping, sensitive transaction record, or other directly harmful association.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -141,8 +129,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-17'
+    description: 'SIT alignment wave1 (TP-00806, reduced scope): the SIT is demoted to a candidate-shape prefilter — both 85 enforcing tiers removed (shape+context cannot prove a checksum; Purview offers no Bech32 checksum function), leaving the 65 discovery_only tier; recommended_confidence 85→65; shape regex tightened to lowercase-only (mixed case is invalid Bech32) with pattern-level case_sensitive: true; description/operation/risk text reworded to Bech32-shaped candidate and the BIP-173 validation claim removed; adversarial tests added. Invalid-checksum negatives were NOT added (a shape-only regex cannot deliver them); the display name field was left unchanged.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1219 without changing detector or package metadata.'

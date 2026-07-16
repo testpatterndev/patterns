@@ -1,13 +1,24 @@
 schema: testpattern/v1
 name: SOC analyst case notes
 slug: au-top500-295-soc-analyst-case-notes
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies soc analyst case notes patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 9 keywords within 300 characters.'
-pattern: (?i)\b(?:soc\s+case|analyst\s+notes|case\s+id|triage)\b
+description: >-
+  Identifies security-operations investigation notes rather than analyst notes across every
+  domain: enforcement requires SOC, SIEM, security-alert, or cyber-incident context near case
+  structure (case/alert IDs, analyst actions, indicators, disposition, severity, escalation),
+  while the SOC-case topic alone remains discovery-only. HR, medical, and customer-support
+  case notes without a security-system anchor are out of scope.
+operation: >-
+  Pattern type: regex (boost_regex engine). The SOC-case topic phrase feeds a 65 discovery-only
+  tier; enforcement requires Evidence_soc_case_structure — a SOC/SIEM/security-alert/
+  cyber-incident anchor within 240 characters of a case ID, alert ID, analyst action,
+  indicator, disposition, severity, or escalation field — at 75, with additional
+  security-operations evidence raising it to 85. The shared template exclusion vetoes
+  training/demo text at enforcement tiers.
+pattern: (?i)\b(?:soc\s+case)\b
 confidence: medium
 confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
 jurisdictions:
@@ -46,6 +57,8 @@ test_cases:
       description: Topic phrase, lowercase
     - value: 'this record references the soc case held on file'
       description: Topic phrase within surrounding text
+    - value: 'SOC case ID=INC-4187 SIEM alert=AL-92 analyst action=isolated host disposition=true positive severity=high'
+      description: SOC and SIEM anchors with case ID, action, disposition, and severity reach the enforcing tiers
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
@@ -53,6 +66,12 @@ test_cases:
       description: Random text should not match phrase marker
     - value: generic policy prose without anchors
       description: Should reject generic mentions without structural anchor terms
+    - value: 'Clinical triage analyst notes case ID 4187'
+      description: Healthcare case notes no longer satisfy the primary (generic analyst notes / case id / triage removed from the ID)
+    - value: case ID
+      description: Same-span generic identifier cannot establish the SOC domain (removed from the ID)
+    - value: 'SOC operating model and analyst roster'
+      description: Governance prose has no SOC-case phrase and no case structure (no discovery hit either)
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -82,7 +101,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_soc_case_notes
+      id_match: Evidence_soc_case_structure
       matches:
         - ref: Evidence_soc_case_notes
           min_count: 2
@@ -93,9 +112,8 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_soc_case_notes
+      id_match: Evidence_soc_case_structure
       matches:
-        - ref: Evidence_soc_case_notes
         - type: any
           min_matches: 0
           max_matches: 0
@@ -106,7 +124,10 @@ purview:
       id_match: Pattern_soc_case_notes
   regexes:
     - id: Pattern_soc_case_notes
-      pattern: (?i)\b(?:soc\s+case|analyst\s+notes|case\s+id|triage)\b
+      pattern: (?i)\b(?:soc\s+case)\b
+    - id: Evidence_soc_case_structure
+      pattern: >-
+        (?is)\b(?:SOC|SIEM|security\s+alert|cyber\s+incident)[\s\S]{0,240}\b(?:case\s+id|alert\s+id|analyst\s+action|indicator|disposition|severity|escalation)\b
   keywords:
     - id: Evidence_soc_case_notes
       groups:
@@ -126,8 +147,21 @@ purview:
             - SIEM alert
       strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope harden (TP-00412): drop the generic "analyst notes", "case id", and
+      "triage" alternatives from the primary (an HR benefits-triage note previously enforced
+      via same-span evidence — cross-domain collision). Enforcement now anchors on
+      Evidence_soc_case_structure (SOC/SIEM/security-alert/cyber-incident anchor within 240
+      characters of case-note structure): 75 with template exclusion, 85 with two additional
+      unique security-operations evidence terms. Topic branch stays 65 discovery_only. Per QA
+      correction, "SOC operating model" prose is expected no_match (not discovery) because no
+      SOC-case phrase remains. The candidate's dead "escalat" evidence alternative is spelled
+      "escalation" so the branch is reachable. Added SOC-record positive and clinical/same-span
+      /governance negatives.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 887 without changing detector or package metadata.'

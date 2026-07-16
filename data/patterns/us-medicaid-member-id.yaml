@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: U.S. Medicaid Member / Recipient ID
 slug: us-medicaid-member-id
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -12,7 +12,9 @@ description: >-
 operation: >-
   Matches a "Medicaid"/"recipient" context token plus an "id"/"number" word followed by an 8-12 character alphanumeric
   ID. The context label is part of the primary regex; corroborative keywords within 300 characters further reduce false
-  positives.
+  positives. Purview mapping splits the two labels: explicit Medicaid-labelled values map to 75 (and 85 with additional
+  program-context evidence), while generic recipient-labelled values are 65 discovery-only unless independent
+  Medicaid-program evidence is present; shipment/template/training conflicts are keyword NOT evidence on enforcing tiers.
 pattern: \b(?:medicaid|recipient)\s+(?:id|number|no\.?)[\s:#]{0,8}[A-Z0-9]{8,12}\b
 confidence: high
 confidence_justification: >-
@@ -49,9 +51,11 @@ test_cases:
     - value: 'Medicaid ID: AB12345678'
       description: Labelled Medicaid ID, alphanumeric body
     - value: Recipient Number 9081726354
-      description: Recipient number label with 10-digit body
+      description: Recipient number label with 10-digit body (65 discovery_only unless Medicaid-program evidence is nearby)
     - value: 'medicaid no. 12345678ABCD'
       description: Lowercase label with abbreviated "no." and 12-char body
+    - value: 'Medicaid ID AB12345678, beneficiary eligibility active under State Health Plan.'
+      description: Explicit Medicaid label with program evidence — enforces at 85
   should_not_match:
     - value: 'Member ID: AB12345678'
       description: '"Member" alone is not a Medicaid/recipient context label'
@@ -59,6 +63,10 @@ test_cases:
       description: Body too short (7 chars, below the 8-char minimum)
     - value: The recipient confirmed receipt of the Medicaid enrollment letter
       description: Prose mentioning Medicaid and recipient but with no ID value
+    - value: Recipient Number 9081726354 on delivery receipt.
+      description: Generic recipient label without Medicaid-program evidence — discovery only, must not enforce
+    - value: Training sample Medicaid ID AB12345678.
+      description: Training/sample terms are NOT evidence on enforcing tiers — must not enforce
 false_positives:
   - description: >-
       Order numbers, claim numbers, or internal reference codes that happen to follow a "recipient number" label in a
@@ -73,6 +81,75 @@ exports:
   - yaml
   - regex_copy
 scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_us_medicaid_id
+      matches:
+        - ref: Keyword_us_medicaid_program
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_us_recipient_noise
+    - confidence_level: 75
+      id_match: Regex_us_medicaid_id
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_us_recipient_noise
+    - confidence_level: 75
+      id_match: Regex_us_recipient_id
+      matches:
+        - ref: Keyword_us_medicaid_program
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_us_recipient_noise
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_us_recipient_id
+  regexes:
+    - id: Regex_us_medicaid_id
+      pattern: (?i)\bmedicaid\s+(?:id|number|no\.?)[\s:#]{0,8}[A-Z0-9]{8,12}\b
+    - id: Regex_us_recipient_id
+      pattern: (?i)\brecipient\s+(?:id|number|no\.?)[\s:#]{0,8}[A-Z0-9]{8,12}\b
+  keywords:
+    - id: Keyword_us_medicaid_program
+      groups:
+        - match_style: word
+          terms:
+            - Medicaid
+            - beneficiary
+            - eligibility
+            - managed care
+            - state health
+            - health plan
+            - claim
+            - coverage
+            - text: CIN
+              case_sensitive: true
+      strength: specific
+    - id: Keyword_us_recipient_noise
+      groups:
+        - match_style: word
+          terms:
+            - shipment
+            - delivery
+            - parcel
+            - award recipient
+            - template
+            - sample
+            - training
+            - placeholder
+      strength: noise
 risk_rating: 6
 risk_description: >-
   This high-confidence regex finds an eight-to-twelve-character Medicaid or recipient identifier only when an explicit Medicaid or recipient number label is present, reflecting one benefits-program identifier rather than a claim or clinical record. With a beneficiary's name, date of birth, or account information, the value could assist benefits impersonation, fraudulent billing, eligibility enquiries, or unauthorized linkage of care. The labeled format reduces accidental matches, although recipient numbers in non-healthcare correspondence and sample onboarding forms remain documented false-positive contexts. Risk 6 and SENSITIVE recognise the direct fraud and privacy path; risk 8 or PROTECTED requires linked eligibility, claims, credentials, clinical content, or a bulk member file.
@@ -90,8 +167,11 @@ references:
   - url: https://www.medicaid.gov/medicaid/data-and-systems/macbis/tmsis/tmsis-blog/99011
     title: "CMS Guidance: Reporting Eligible Identifiers in T-MSIS - Medicaid.gov"
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-17'
+    description: 'SIT alignment wave1 (TP-01672, reduced scope): added the missing Purview mapping using the four approved references — Regex_us_medicaid_id and Regex_us_recipient_id split the labelled branches ((?i) prefix added so the spec''s own capitalised test labels match; Purview regexes in this catalog are authored with explicit inline flags), Medicaid-labelled values enforce at 75 (85 with 2 unique Keyword_us_medicaid_program terms), recipient-labelled values enforce at 75 only with independent program evidence and are otherwise 65 discovery_only; the ''filter''-typed noise list is implemented as Keyword_us_recipient_noise keyword NOT evidence on all enforcing tiers per QA; adversarial tests added. Top-level pattern and description unchanged apart from the operation-text tier mapping.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2071 without changing detector or package metadata.'

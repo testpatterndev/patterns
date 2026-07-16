@@ -1,18 +1,19 @@
 schema: testpattern/v1
 name: Export-controlled university research
 slug: global-top500-360-export-controlled-university-research
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
   Identifies documents containing references to export-controlled university research in international contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
+  applicable data protection regulations. Enforcement is aimed at controlled university research and its technical data; ordinary import/export licensing language is discovery-only unless independent
+  university-research or controlled-technical-data evidence is present.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
   lists: au-government-defence-markers. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
 pattern: >-
-  (?is)\b(?:export\s+controlled|export\s+control|dual[\s-]+use\s+technology|controlled\s+technology|deemed\s+export|technology\s+control\s+plan|restricted\s+research|defence\s+strategic\s+goods|munitions\s+list|export\s+license)\b
+  (?is)\b(?:export[\s-]+controlled|export\s+control|dual[\s-]+use\s+technology|controlled\s+technology|deemed\s+export|technology\s+control\s+plan|restricted\s+research|defence\s+strategic\s+goods|munitions\s+list|export\s+license)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
@@ -45,6 +46,10 @@ test_cases:
       description: Alternative topic phrase match
     - value: controlled technology
       description: Additional topic phrase match
+    - value: Export-controlled university research
+      description: Hyphenated title now anchors (hyphen-tolerant export-controlled branch fixed a verified recall miss)
+    - value: 'Project UQ-ITAR-17, PI N. Singh: foreign-national access to CAD technical data is restricted under the technology control plan, ECCN 9E003.'
+      description: Control-plan anchor with project/technical-data context — enforceable controlled-research content
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -52,6 +57,14 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: student grant
       description: Generic word pair from old broad template should not match
+    - value: The university procurement office explains export license fees for shipping cafeteria equipment overseas.
+      description: Ordinary goods-export administration — export license is discovery only, must not enforce
+    - value: The economics class studies how tariffs influence agricultural exports.
+      description: Academic trade discussion contains no control anchor — must not match
+    - value: 'Training example: "deemed export" and "technology control plan" are terms learners must define.'
+      description: Training/example exclusion suppresses quoted control phrases
+    - value: export license
+      description: Bare contextual phrase — discovery only, must not enforce
 false_positives:
   - description: Common words and phrases related to export-controlled university research appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -93,10 +106,30 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      id_match: Regex_export_controlled_research_ContextualBranch
+      matches:
+        - ref: Keyword_export_controlled_research_IndependentContext
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_export_controlled_research_ContextualBranch
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_export_controlled_research
       pattern: >-
-        (?is)\b(?:export\s+controlled|export\s+control|dual[\s-]+use\s+technology|controlled\s+technology|deemed\s+export|technology\s+control\s+plan|restricted\s+research|defence\s+strategic\s+goods|munitions\s+list|export\s+license)\b
+        (?is)\b(?:export[\s-]+controlled|export\s+control|dual[\s-]+use\s+technology|controlled\s+technology|deemed\s+export|technology\s+control\s+plan|restricted\s+research|defence\s+strategic\s+goods|munitions\s+list)\b
+    - id: Regex_export_controlled_research_ContextualBranch
+      pattern: (?is)\b(?:export\s+license)\b
     - id: Pattern_global_top500_360_export_controlled_university_research_label_context
       pattern: (?i)\b(?:export\-controlled\s+university\s+research)\b
   keywords:
@@ -118,6 +151,26 @@ purview:
             - munitions list
             - export license
       strength: specific
+    - id: Keyword_export_controlled_research_IndependentContext
+      groups:
+        - match_style: word
+          terms:
+            - project ID
+            - principal investigator
+            - sponsor
+            - laboratory
+            - technical data
+            - foreign national
+            - technology control plan
+            - ITAR
+            - text: EAR
+              case_sensitive: true
+            - text: DSGL
+              case_sensitive: true
+            - licence number
+            - license number
+            - access restriction
+      strength: specific
     - id: Keyword_global_top500_360_export_controlled_university_research_domain_context
       groups:
         - match_style: word
@@ -138,8 +191,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-17'
+    description: 'SIT alignment wave1 (TP-01268, reduced scope): export-controlled branch made hyphen-tolerant (export[\s-]+controlled — fixes the verified "Export-controlled university research" recall miss) in the primary and top-level pattern; "export license" moved out of the self-corroborating primary into the approved contextual branch (Regex_export_controlled_research_ContextualBranch) enforcing at 65 only with Keyword_export_controlled_research_IndependentContext university-research/controlled-data evidence (13 terms materialized from the approved definition) and otherwise 65 discovery_only, both with the template-exclusion NOT gate; adversarial tests added. Deliberately less than the first-pass candidate: generic "export control"/"controlled technology" left in the primary (no written-out branch definition covered them) and no 75 named-regime re-tiering.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1906 without changing detector or package metadata.'

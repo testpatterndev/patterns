@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Geographic Coordinates (DMS / MGRS)
 slug: global-gps-coordinates-dms
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -12,10 +12,12 @@ description: >-
   surveying records, defence/geospatial documents and EXIF-derived location data.
 operation: >-
   Reference: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion
-  First alternative matches DMS: degrees + minutes + seconds (optional decimal) with degree/minute/second marks and a
-  trailing N/S/E/W hemisphere letter. Second alternative matches MGRS: grid zone designator (1-2 digit zone + band
-  letter) + 100km square (two letters) + an even run of easting/northing digits.
-pattern: \b\d{1,3}\s?[°º]\s?\d{1,2}\s?['′]\s?\d{1,2}(?:\.\d+)?\s?["″]?\s?[NSEWnsew]\b|(?<![A-Za-z0-9])\d{1,2}[C-HJ-NP-Xc-hj-np-x][A-HJ-NP-Za-hj-np-z][A-HJ-NP-Va-hj-np-v]\s?\d{2,5}\s?\d{2,5}(?![A-Za-z0-9])
+  First alternative matches DMS with hemisphere-bounded ranges: N/S latitude 0-90 and E/W longitude 0-180 degrees,
+  minutes and seconds 0-59 (seconds may carry a decimal), with the 90/180 endpoints requiring zero minutes and
+  seconds; degree/minute/second marks and a trailing hemisphere letter are required. Second alternative matches
+  MGRS: grid zone designator (1-2 digit zone + band letter) + 100km square (two letters) + an even run of
+  easting/northing digits.
+pattern: \b(?:90\s?[°º]\s?0{1,2}\s?['′]\s?0{1,2}(?:\.0+)?\s?["″]?\s?[NSns]\b|[0-8]?\d\s?[°º]\s?[0-5]?\d\s?['′]\s?[0-5]?\d(?:\.\d+)?\s?["″]?\s?[NSns]\b|180\s?[°º]\s?0{1,2}\s?['′]\s?0{1,2}(?:\.0+)?\s?["″]?\s?[EWew]\b|(?:1[0-7]\d|\d{1,2})\s?[°º]\s?[0-5]?\d\s?['′]\s?[0-5]?\d(?:\.\d+)?\s?["″]?\s?[EWew]\b)|(?<![A-Za-z0-9])\d{1,2}[C-HJ-NP-Xc-hj-np-x][A-HJ-NP-Za-hj-np-z][A-HJ-NP-Va-hj-np-v]\s?\d{2,5}\s?\d{2,5}(?![A-Za-z0-9])
 confidence: medium
 confidence_justification: >-
   Medium confidence: the DMS branch is well constrained by the degree/minute/second marks and a hemisphere letter, but
@@ -50,6 +52,10 @@ test_cases:
       description: DMS with prime/double-prime marks and decimal seconds, E hemisphere
     - value: 4QFJ 12345 67890
       description: MGRS reference, grid zone 4Q, square FJ, easting/northing
+    - value: 180° 00' 00" E
+      description: Exact longitude endpoint with zero minutes/seconds is valid
+    - value: 90° 00' 00" N
+      description: Exact latitude endpoint with zero minutes/seconds is valid
   should_not_match:
     - value: 40.4461, -79.9822
       description: Decimal-degree coordinates, covered by the decimal-degrees pattern not this one
@@ -57,6 +63,16 @@ test_cases:
       description: Three numbers with no degree marks or hemisphere - not DMS
     - value: the survey crew recorded the grid reference in the field notebook
       description: Prose mention of a grid reference with no actual coordinate
+    - value: 40° 60' 00" N
+      description: Minutes cannot be 60
+    - value: 999° 99' 99" N
+      description: Out-of-range degrees/minutes/seconds must be rejected
+    - value: 180° 00' 01" E
+      description: Nonzero seconds beyond the longitude endpoint are invalid
+    - value: 91° 10' 10" N
+      description: Latitude above 90 degrees is invalid
+    - value: Surveyors recorded weather conditions before beginning fieldwork.
+      description: Ordinary survey notes contain neither a bounded DMS coordinate nor an MGRS grid reference
 false_positives:
   - description: MGRS-like tokens (zone digits + two letters + digit runs) appearing in part numbers or codes.
     mitigation: Require corroborative location keywords (coordinates, latitude, grid reference, MGRS) within 300 characters.
@@ -77,9 +93,31 @@ sensitivity_labels:
   uk_gov: OFFICIAL
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 65
+  pattern_tiers:
+    - confidence_level: 65
+      id_match: Pattern_gps_dms
+      discovery_only: true
+      description: Bounded DMS coordinate (discovery inventory only — no enforcement tiers authored yet)
+    - confidence_level: 65
+      id_match: Pattern_gps_mgrs
+      discovery_only: true
+      description: MGRS grid reference as authored (discovery inventory only — MGRS hardening deferred)
+  regexes:
+    - id: Pattern_gps_dms
+      pattern: \b(?:90\s?[°º]\s?0{1,2}\s?['′]\s?0{1,2}(?:\.0+)?\s?["″]?\s?[NSns]\b|[0-8]?\d\s?[°º]\s?[0-5]?\d\s?['′]\s?[0-5]?\d(?:\.\d+)?\s?["″]?\s?[NSns]\b|180\s?[°º]\s?0{1,2}\s?['′]\s?0{1,2}(?:\.0+)?\s?["″]?\s?[EWew]\b|(?:1[0-7]\d|\d{1,2})\s?[°º]\s?[0-5]?\d\s?['′]\s?[0-5]?\d(?:\.\d+)?\s?["″]?\s?[EWew]\b)
+      description: DMS coordinate with hemisphere-bounded degree ranges, 0-59 minutes/seconds, and zero-subdivision endpoints
+    - id: Pattern_gps_mgrs
+      pattern: (?<![A-Za-z0-9])\d{1,2}[C-HJ-NP-Xc-hj-np-x][A-HJ-NP-Za-hj-np-z][A-HJ-NP-Va-hj-np-v]\s?\d{2,5}\s?\d{2,5}(?![A-Za-z0-9])
+      description: MGRS grid reference as originally authored (zone/precision hardening deferred pending test coverage)
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-17'
+    description: 'TP-00843 approved reduced scope: harden the DMS branch only — split into hemisphere-bounded latitude (0-90, N/S) and longitude (0-180, E/W) alternatives, constrain minutes/seconds to 0-59, and require zero minutes/seconds at the 90/180 endpoints; documented the bounds in the operation text. The MGRS branch is deliberately unchanged: per QA/independent review the proposed MGRS rewrite is not approval-ready (no valid equal-precision MGRS positive and no zone 00/60/61 boundary tests supplied). Added a minimal purview block with discovery-only 65 tiers derived from the authored regex (Pattern_gps_dms + Pattern_gps_mgrs) so pattern_tiers exist for export; no enforcement tiers authored. Added endpoint positives and out-of-range negatives (60 minutes, 999 degrees, endpoint-plus-one-second, 91 degrees latitude).'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1540 without changing detector or package metadata.'

@@ -1,12 +1,22 @@
 schema: testpattern/v1
 name: Backup catalogs
 slug: au-top500-301-backup-catalogs
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies backup catalogs patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 5 keywords within 300 characters.'
+description: >-
+  Identifies machine or operator backup-catalog records rather than backup governance
+  generally: enforcement requires a structured catalog entry (job/set/media/object field with
+  a completion time, location, or status), while schedule and retention-policy vocabulary
+  remains discovery-only.
+operation: >-
+  Pattern type: regex (boost_regex engine). Topic phrases (backup catalog, backup index,
+  restore point, retention policy) feed a 65 discovery-only tier; enforcement requires
+  Evidence_backup_catalog_entry — a backup job/set, media, object, or restore-index field
+  within 200 characters of a completed/timestamp/location/status field — at 75, with
+  additional backup-domain evidence raising it to 85. The shared template exclusion vetoes
+  tutorial/demo text at enforcement tiers.
 pattern: (?i)\b(?:backup\s+catalog|backup\s+index|restore\s+point|retention\s+policy)\b
 confidence: medium
 confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
@@ -42,6 +52,12 @@ test_cases:
       description: Topic phrase, lowercase
     - value: 'this record references the backup catalog held on file'
       description: Topic phrase within surrounding text
+    - value: 'Backup catalog job ID=BK-771 object=fileserver01 set=FULL-44 completed=2026-07-15T23:00 location=tape-LTO9-18 status=verified'
+      description: A structured catalog entry (job, object, completion, medium, status) reaches the enforcing tiers
+    - value: 'Retention policy requires weekly restore points'
+      description: Governance language matches the topic branch only (discovery, no indexed entry)
+    - value: 'The library catalog retention policy changed'
+      description: Cross-domain "retention policy" keeps a discovery-level topic hit only (relabeled from the first-pass no-match expectation)
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
@@ -78,7 +94,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_backup_catalog
+      id_match: Evidence_backup_catalog_entry
       matches:
         - ref: Evidence_backup_catalog
           min_count: 2
@@ -89,9 +105,8 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_backup_catalog
+      id_match: Evidence_backup_catalog_entry
       matches:
-        - ref: Evidence_backup_catalog
         - type: any
           min_matches: 0
           max_matches: 0
@@ -103,6 +118,9 @@ purview:
   regexes:
     - id: Pattern_backup_catalog
       pattern: (?i)\b(?:backup\s+catalog|backup\s+index|restore\s+point|retention\s+policy)\b
+    - id: Evidence_backup_catalog_entry
+      pattern: >-
+        (?is)\b(?:backup\s+(?:job|set)|media|object|restore\s+index)\s*(?:id)?\s*[:=]\s*\S+[\s\S]{0,200}\b(?:completed|timestamp|location|status)\s*[:=]
   keywords:
     - id: Evidence_backup_catalog
       groups:
@@ -122,8 +140,19 @@ purview:
             - data restoration
       strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope harden (TP-00418): retention/schedule vocabulary no longer enforces (a
+      retention-policy planning sentence previously reached 85 via same-span evidence).
+      Enforcement now anchors on Evidence_backup_catalog_entry (backup job/set, media, object,
+      or restore-index field within 200 characters of completed/timestamp/location/status): 75
+      with template exclusion, 85 with two additional unique backup-domain evidence terms. The
+      topic branch (including "retention policy") stays 65 discovery_only, so the library-
+      catalog neutral case is expected as a discovery hit per the independent correction.
+      Added catalog-entry positive and governance/cross-domain discovery cases.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 893 without changing detector or package metadata.'

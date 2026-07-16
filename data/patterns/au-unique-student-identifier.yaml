@@ -1,16 +1,25 @@
 schema: testpattern/v1
 name: Unique Student Identifier
 slug: au-unique-student-identifier
-version: 1.5.1
+version: 1.5.2
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects Unique Student Identifier (USI) patterns. A 10-character alphanumeric code (uppercase letters and digits) mandatory since January 2023 for higher education in Australia.
+description: >-
+  Detects Unique Student Identifier (USI) patterns. A 10-character alphanumeric code (uppercase
+  letters and digits) mandatory since January 2023 for higher education in Australia. The
+  current Purview export is inventory/discovery only: a match requires the labelled or bare
+  10-character format plus USI-term and education-context evidence, and no tier enforces.
 operation: >-
-  Regex pattern using universal engine. The top-level regex \b[A-Z0-9]{10}\b matches exactly 10 uppercase alphanumeric characters. The Purview engine uses two regexes: Pattern_usi_labeled (labeled
-  format with USI/Unique Student Identifier/student identifier prefix + 10 alphanumeric chars) and Pattern_au_usi (bare 10-char format). Three confidence tiers: High (85) requires USI terms +
-  education context keywords with template exclusion logic; Medium (75) requires USI terms + education context keywords; Low (65) requires USI terms only. Evidence uses 2 keyword groups (7 USI terms,
-  13 education context terms) within 500-character proximity. Keyword lists: au-identity-usi, industry-education.
+  Regex pattern using universal engine. The top-level regex \b[A-Z0-9]{10}\b matches exactly 10
+  uppercase alphanumeric characters. The Purview engine uses two regexes: Pattern_usi_labeled
+  (labeled format with USI/Unique Student Identifier/student identifier prefix + 10
+  alphanumeric chars) and Pattern_au_usi (bare 10-char format). One confidence tier: Low (65),
+  discovery_only — it requires USI-term AND education-context evidence within 500-character
+  proximity and excludes template/sample text; there are no 75/85 enforcing tiers. The defined
+  Guard_usi_same_digits and Guard_usi_exclude_test filters are currently unreferenced and must
+  be wired into any future enforcing tier before enforcement is introduced. Keyword lists:
+  au-identity-usi, industry-education.
 pattern: \b[A-Z0-9]{10}\b
 confidence: low
 confidence_justification: >-
@@ -40,11 +49,13 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: ABC1234567
-      description: USI with mixed letters and digits
+      description: Regex-unit test for the bare 10-character format only — the Purview discovery tier additionally requires USI and education evidence from surrounding context
     - value: 2K48TF3GHP
-      description: Standard USI format
+      description: Regex-unit test for the standard USI format only (see above — not sufficient for the discovery tier without context evidence)
     - value: A1B2C3D4E5
-      description: Alternating format USI
+      description: Regex-unit test for the alternating format only (see above — not sufficient for the discovery tier without context evidence)
+    - value: 'Student USI: 2K48TF3GHP; TAFE enrolment for Certificate IV.'
+      description: Labelled value with education context satisfies the 65 discovery tier (inventory only, no enforcement)
   should_not_match:
     - value: ABC12345
       description: Only 8 characters instead of 10
@@ -56,6 +67,8 @@ test_cases:
       description: Australian mobile phone number (spaced) is not a 10-char contiguous USI; AU packages also gate phone-shaped literals via the regional exclusion
     - value: '0000-000000'
       description: Placeholder sentinel value (separated) is not a 10-char contiguous USI and is also excluded by the sentinel filter
+    - value: The TAFE campus opened a new short course hub.
+      description: Education context alone contains no labelled or bare 10-character identifier
 false_positives:
   - description: Common words and phrases related to unique student identifier appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -161,8 +174,19 @@ purview:
         - "1111111111"
         - "1234567890"
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.2
+    date: '2026-07-17'
+    description: >-
+      Metadata-only reduced-scope fix (TP-00614): the operation prose described three 85/75/65
+      tiers but the record contains one 65 discovery_only tier — rewrite operation/description
+      to state the export is inventory/discovery only, note that Guard_usi_same_digits and
+      Guard_usi_exclude_test are defined but unreferenced and must be wired into any future
+      enforcing tier, annotate the bare authored positives as regex-unit tests (they need
+      surrounding USI/education evidence to reach the discovery tier), and add a labelled
+      education-context positive plus an education-prose negative. Detector unchanged; no
+      enforcement added — enforcing a broad 10-character format awaits tenant evidence.
   - version: 1.5.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1089 without changing detector or package metadata.'

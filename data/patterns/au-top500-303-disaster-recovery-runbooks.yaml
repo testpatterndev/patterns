@@ -1,12 +1,21 @@
 schema: testpattern/v1
 name: Disaster recovery runbooks
 slug: au-top500-303-disaster-recovery-runbooks
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies disaster recovery runbooks patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 6 keywords within 300 characters.'
+description: >-
+  Identifies actionable disaster-recovery runbooks, distinguishing recovery objectives and
+  policy from procedures: enforcement requires DR context plus ordered recovery steps
+  (failover, restore, start/stop, verify, owner, dependency), while RTO/RPO objectives and
+  BCP policy language remain discovery-only.
+operation: >-
+  Pattern type: regex (boost_regex engine). DR topic phrases (disaster recovery, DR runbook,
+  RTO, RPO) feed a 65 discovery-only tier and remain the primary anchor for enforcement, which
+  additionally requires Evidence_dr_runbook_step — a numbered step within 160 characters of a
+  failover/restore/start/stop/verify/validate/owner/dependency term — once at 75 and at least
+  twice at 85. The shared template exclusion vetoes training/demo text at enforcement tiers.
 pattern: (?i)\b(?:disaster\s+recovery|dr\s+runbook|rto|rpo|recovery\s+time\s+objective)\b
 confidence: medium
 confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
@@ -43,6 +52,12 @@ test_cases:
       description: Topic phrase, lowercase
     - value: 'this record references the disaster recovery held on file'
       description: Topic phrase within surrounding text
+    - value: 'DR runbook Step 1 stop payments-api. Step 2 failover database to dr-db02. Step 3 verify transaction health check. Owner=Platform Ops'
+      description: Ordered recovery steps with failover target and validation reach the enforcing tiers
+    - value: 'Disaster recovery target RTO=4h RPO=1h'
+      description: Objectives alone match the topic branch only (discovery, no ordered procedure)
+    - value: 'Economic disaster recovery may take four years'
+      description: Societal usage keeps a discovery-level topic hit only (relabeled from the first-pass no-match expectation)
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
@@ -50,6 +65,8 @@ test_cases:
       description: Random text should not match phrase marker
     - value: generic policy prose without anchors
       description: Should reject generic mentions without structural anchor terms
+    - value: 'Training exercise Step 1 failover demo service'
+      description: A marked training exercise with a demo service has no DR topic phrase and is template-excluded
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -81,9 +98,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_disaster_recovery
       matches:
-        - ref: Evidence_disaster_recovery
+        - ref: Evidence_dr_runbook_step
           min_count: 2
-          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -92,7 +108,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_disaster_recovery
       matches:
-        - ref: Evidence_disaster_recovery
+        - ref: Evidence_dr_runbook_step
         - type: any
           min_matches: 0
           max_matches: 0
@@ -104,6 +120,9 @@ purview:
   regexes:
     - id: Pattern_disaster_recovery
       pattern: (?i)\b(?:disaster\s+recovery|dr\s+runbook|rto|rpo|recovery\s+time\s+objective)\b
+    - id: Evidence_dr_runbook_step
+      pattern: >-
+        (?is)(?:step\s+\d+|\d+[.)])[\s\S]{0,160}?\b(?:failover|restore|start|stop|verify|validate|owner|dependency)\b
   keywords:
     - id: Evidence_disaster_recovery
       groups:
@@ -125,8 +144,20 @@ purview:
             - service restoration
       strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope harden (TP-00419): objectives/policy vocabulary no longer enforces (a
+      business-continuity RTO/RPO policy sentence previously reached 85 via same-span
+      evidence). Enforcement keeps the DR topic primary but now requires
+      Evidence_dr_runbook_step (numbered step within 160 characters of failover/restore/start/
+      stop/verify/validate/owner/dependency, lazy-quantified so multiple steps count
+      separately): one step at 75, two or more at 85, both template-excluded. Topic branch
+      stays 65 discovery_only; per the independent correction the societal "economic disaster
+      recovery" case is expected as a discovery hit, not no_match. Added runbook positive,
+      RTO/RPO discovery case, and training-exercise negative.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 894 without changing detector or package metadata.'

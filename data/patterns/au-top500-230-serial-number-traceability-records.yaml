@@ -1,13 +1,13 @@
 schema: testpattern/v1
 name: Serial number traceability records
 slug: au-top500-230-serial-number-traceability-records
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to serial number traceability records in Australian contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies populated serial/batch/lot traceability records in Australian contexts: a labelled non-placeholder identifier together with a manufacturing, movement, parent-child, or custody
+  relationship. Covers single-item and batch records; bare serial-number field mentions remain discovery-level context only.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Keyword
   lists: pii-personal. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
@@ -55,6 +55,8 @@ test_cases:
       description: Alternative topic phrase match
     - value: batch number
       description: Additional topic phrase match
+    - value: 'Serial number: SN-A94F21; assembled into parent serial P-8801; work order WO-77; manufactured on 2026-07-02.'
+      description: One populated serial linked to a parent and manufacturing events — a valid single-item record without repetition
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -62,6 +64,12 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: product failure
       description: Generic word pair from old broad template should not match
+    - value: Please enter the serial number on the warranty form.
+      description: Empty form prompt — label without a populated identifier must not enforce
+    - value: The journal's serial number is printed on its cover.
+      description: Publication serial mention without a populated traceability record
+    - value: 'Sample form: Serial No: EXAMPLE-1234; parent serial: placeholder.'
+      description: Placeholder values are rejected by the value lookahead and the sample/placeholder exclusion
 false_positives:
   - description: Common words and phrases related to serial number traceability records appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -83,9 +91,9 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_serial_number_traceability
+      id_match: Pattern_traceability_identifier
       matches:
-        - ref: Evidence_serial_number_traceability
+        - ref: Evidence_traceability_relation
           min_count: 2
           unique_results: true
         - type: any
@@ -93,23 +101,31 @@ purview:
           max_matches: 0
           refs:
             - Evidence_template_exclusion
+      description: Populated identifier with multiple distinct traceability relations (linked/dated chain)
     - confidence_level: 75
-      id_match: Pattern_serial_number_traceability
+      id_match: Pattern_traceability_identifier
       matches:
-        - ref: Evidence_serial_number_traceability
+        - ref: Evidence_traceability_relation
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
+      description: One populated non-placeholder identifier plus one traceability relation
     - confidence_level: 65
       id_match: Pattern_serial_number_traceability
       matches:
         - ref: Evidence_serial_number_traceability
+      discovery_only: true
+      description: Serial/lot/part label vocabulary — discovery inventory only
   regexes:
     - id: Pattern_serial_number_traceability
       pattern: >-
         (?is)\b(?:serial\s+number\s+traceability|serial\s+number|traceability\s+record|batch\s+number|lot\s+number|product\s+tracking|manufacturing\s+traceability|component\s+traceability|part\s+number|chain\s+of\s+custody)\b
+    - id: Pattern_traceability_identifier
+      pattern: >-
+        (?is)\b(?:serial|batch|lot|part|component)\s*(?:number|no\.?|id)?\s*[:#=]\s*(?!example|sample|unknown|n/?a)[A-Z0-9][A-Z0-9._/-]{3,39}\b
+      description: Labelled non-placeholder serial/batch/lot/part/component identifier value
     - id: Pattern_au_top500_230_serial_number_traceability_records_label_context
       pattern: (?i)\b(?:serial\s+number\s+traceability\s+records)\b
   keywords:
@@ -127,6 +143,22 @@ purview:
             - component traceability
             - part number
             - chain of custody
+    - id: Evidence_traceability_relation
+      groups:
+        - match_style: word
+          terms:
+            - manufactured on
+            - assembled into
+            - parent serial
+            - child component
+            - shipped to
+            - received from
+            - custody transfer
+            - production line
+            - work order
+            - lot genealogy
+            - movement date
+      strength: domain
     - id: Keyword_au_top500_230_serial_number_traceability_records_domain_context
       groups:
         - match_style: word
@@ -144,8 +176,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-17'
+    description: 'TP-00356 approved reduced scope: implement the reviewer-defined Pattern_traceability_identifier (labelled non-placeholder identifier value with example/sample/unknown/n-a lookahead rejection) and Evidence_traceability_relation dictionary in the higher-confidence branches only — 75 requires one populated identifier plus one traceability relation, 85 requires two distinct relations, both retaining the template NOT-gate; a legitimate single-item record does not need repeated identifiers. The label-vocabulary topic branch is retained at 65 as discovery-only, so bare serial-number mentions (warranty prompts, publication serials) no longer reach 75. Description now covers populated records rather than the PII boilerplate. Added the populated single-item positive plus empty-form, journal-serial, and placeholder-form negatives.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 831 without changing detector or package metadata.'

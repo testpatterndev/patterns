@@ -1,12 +1,23 @@
 schema: testpattern/v1
 name: Environment configuration files
 slug: au-top500-257-environment-configuration-files
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies environment configuration files patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
+description: >-
+  Identifies actual environment configuration files in security and access control contexts:
+  enforcement requires consecutive environment-variable assignment lines (APP_ENV, NODE_ENV,
+  DATABASE_URL, API_BASE_URL and similar) while configuration-topic vocabulary alone remains
+  discovery-only. Sensitive values or internal endpoints are a severity signal, not the
+  definition of the file.
+operation: >-
+  Pattern type: regex (boost_regex engine). Topic phrases (config file, environment variable,
+  application settings) feed a 65 discovery-only tier; enforcement requires
+  Pattern_environment_assignments — two consecutive KEY=value lines drawn from a fixed
+  environment-variable whitelist — at 75, with configuration-topic evidence within 300
+  characters raising it to 85. The shared template exclusion vetoes sample/tutorial text at
+  enforcement tiers.
 pattern: >-
   (?is)\b(?:environment\s+configuration|config\s+file|environment\s+variable|connection\s+string|application\s+settings|environment\s+secrets|configuration\s+management|deployment\s+config|environment\s+settings)\b
 confidence: medium
@@ -39,6 +50,10 @@ test_cases:
       description: Topic phrase, lowercase
     - value: 'this file holds environment configuration values'
       description: Phrase in surrounding text
+    - value: "APP_ENV=production\nAPI_BASE_URL=https://api.internal.corp\nLOG_LEVEL=warn\nFEATURE_LEDGER_V2=true"
+      description: Consecutive populated environment assignments reach the enforcing tiers
+    - value: 'Policy says every environment variable belongs in the settings guide.'
+      description: Configuration-topic prose matches the discovery branch only (no assignment lines, no enforcement)
   should_not_match:
     - value: 'unrelated generic text'
       description: No relevant phrase
@@ -46,6 +61,8 @@ test_cases:
       description: No anchors
     - value: 'template example placeholder'
       description: Template/sample text
+    - value: 'The conference environment affected the speaker''s settings.'
+      description: Ordinary prose use of environment/settings has no topic phrase or assignment line
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -65,26 +82,24 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_environment_config_files
+      id_match: Pattern_environment_assignments
       matches:
         - ref: Evidence_environment_config_files
-          min_count: 2
-          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_environment_config_files
+      id_match: Pattern_environment_assignments
       matches:
-        - ref: Evidence_environment_config_files
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_environment_config_files
       matches:
         - ref: Evidence_environment_config_files
@@ -92,6 +107,9 @@ purview:
     - id: Pattern_environment_config_files
       pattern: >-
         (?is)\b(?:environment\s+configuration|config\s+file|environment\s+variable|connection\s+string|application\s+settings|environment\s+secrets|configuration\s+management|deployment\s+config|environment\s+settings)\b
+    - id: Pattern_environment_assignments
+      pattern: >-
+        (?i)\b(?:APP_ENV|NODE_ENV|ASPNETCORE_ENVIRONMENT|DATABASE_URL|API_BASE_URL|SERVICE_HOST|LOG_LEVEL|FEATURE_[A-Z0-9_]{1,40})[ \t]{0,8}=[ \t]{0,8}[^\s#][^\r\n]{0,200}\r?\n[ \t]{0,8}(?:APP_ENV|NODE_ENV|ASPNETCORE_ENVIRONMENT|DATABASE_URL|API_BASE_URL|SERVICE_HOST|LOG_LEVEL|FEATURE_[A-Z0-9_]{1,40})[ \t]{0,8}=[ \t]{0,8}[^\s#][^\r\n]{0,200}
   keywords:
     - id: Evidence_environment_config_files
       groups:
@@ -118,8 +136,20 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope tier rebalance (TP-00383): configuration-topic vocabulary no longer enforces
+      (a configuration-management policy sentence previously reached 85 via the same-span phrase
+      list) — the topic branch is demoted to 65 discovery_only. Enforcement now anchors on
+      Pattern_environment_assignments (two consecutive KEY=value lines from a fixed
+      environment-variable whitelist): 75 with template exclusion, 85 with additional
+      configuration-topic evidence. The whitelist regex is restructured from the approved
+      candidate to satisfy repo CI (no multiline anchors or nested quantifiers) while keeping
+      the 2+ consecutive-line semantics. Added assignment-block positive, policy-prose
+      discovery case, and generic-prose negative.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 858 without changing detector or package metadata.'

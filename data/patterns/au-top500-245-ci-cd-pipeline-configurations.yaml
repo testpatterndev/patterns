@@ -1,11 +1,13 @@
 schema: testpattern/v1
 name: CI/CD pipeline configurations
 slug: au-top500-245-ci-cd-pipeline-configurations
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies ci/cd pipeline configurations patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
+description: >-
+  Identifies actual CI/CD pipeline definitions and configuration files (jobs/stages/steps structural keys) alongside CI/CD pipeline topic references in Australian security contexts. Currently
+  discovery-only: bare pipeline syntax also appears in public open-source workflows, so enforcement is deferred until internal/secret-bearing pipeline context evidence is defined.
 operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters.'
 pattern: >-
   (?is)\b(?:CI\/CD\s+pipeline|pipeline\s+configuration|build\s+pipeline|deployment\s+pipeline|continuous\s+integration|continuous\s+delivery|pipeline\s+definition|build\s+configuration|pipeline\s+stages|pipeline\s+secrets)\b
@@ -46,6 +48,15 @@ test_cases:
       description: Alternative topic phrase match
     - value: deployment pipeline
       description: Additional topic phrase match
+    - value: |-
+        name: ci
+        jobs:
+          build:
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@v4
+              - run: npm test
+      description: Actual pipeline definition with job, runner, steps, action, and command (structure branch)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -53,6 +64,12 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: source code config
       description: Generic word pair from old broad template should not match
+    - value: Our blog explains continuous integration and delivery.
+      description: Public concept prose must not enforce (discovery inventory only)
+    - value: The water pipeline configuration changed after construction.
+      description: Physical-infrastructure pipeline prose must not enforce
+    - value: 'CI/CD tutorial sample: jobs: demo; run: echo hello.'
+      description: Inline tutorial fragment lacks line-anchored structure and must not match the structure branch
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -71,34 +88,30 @@ purview:
       as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Pattern_cicd_pipeline_configs
-      matches:
-        - ref: Evidence_cicd_pipeline_configs
-          min_count: 2
-          unique_results: true
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_cicd_pipeline_configs
+      id_match: Pattern_cicd_structure
+      discovery_only: true
       matches:
-        - ref: Evidence_cicd_pipeline_configs
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
+      description: Platform-specific pipeline configuration structure — held at non-enforcing (discovery) confidence because public open-source workflow files share the same syntax
     - confidence_level: 65
       id_match: Pattern_cicd_pipeline_configs
       matches:
         - ref: Evidence_cicd_pipeline_configs
+      discovery_only: true
+      description: CI/CD topic phrases — discovery inventory only
   regexes:
     - id: Pattern_cicd_pipeline_configs
       pattern: >-
         (?is)\b(?:CI\/CD\s+pipeline|pipeline\s+configuration|build\s+pipeline|deployment\s+pipeline|continuous\s+integration|continuous\s+delivery|pipeline\s+definition|build\s+configuration|pipeline\s+stages|pipeline\s+secrets)\b
+    - id: Pattern_cicd_structure
+      pattern: >-
+        (?i)(?<=\n)(?:jobs:|stages:|steps:|on:|trigger:|pool:|variables:|[ \t]{2,12}runs-on:|[ \t]{2,12}(?:script|run|uses|image|needs):)
+      description: Line-anchored pipeline YAML structural keys (GitHub Actions / Azure Pipelines / GitLab CI shapes); fixed-length lookbehind used instead of the banned line anchor
   keywords:
     - id: Evidence_cicd_pipeline_configs
       groups:
@@ -125,8 +138,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-17'
+    description: 'TP-00371 approved reduced scope per QA correction: topic-only enforcement was a verified failure (public CI/CD blog prose reached 85 via same-span evidence), so the former 85/75 topic tiers are removed and the topic branch is held at 65 discovery-only. Pattern_cicd_structure (line-anchored jobs/stages/steps/runs-on/script keys, rewritten with a fixed-length lookbehind because ^ anchors are CI-banned for purview regexes) is added at 75 but flagged discovery-only: per independent review it matches public open-source GitHub Actions/Azure pipeline files, so enforcement is deferred until internal/secrets/deploy context evidence is defined as a referenceable group. Description updated to name actual pipeline definitions. Added a real workflow-YAML positive plus blog-prose, water-pipeline, and inline-tutorial negatives.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 846 without changing detector or package metadata.'

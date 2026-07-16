@@ -1,16 +1,17 @@
 schema: testpattern/v1
 name: IBAN values
 slug: au-top500-103-iban-values
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to iban values in financial and compliance documents. Commonly found in Australian regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects references to IBAN and international bank account number topics in financial and compliance documents. Commonly found in Australian regulatory filings, transaction records, and audit
+  documentation. Topic-level phrase detection only; it does not parse or mod-97-validate IBAN values.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Keyword
   lists: financial-deposit-terms.
-pattern: >-
-  (?is)\b(?:international\s+bank\s+account\s+number|bank\s+account|beneficiary\s+account|wire\s+transfer|international\s+payment|correspondent\s+bank|cross[\s-]+border\s+payment|bank\s+identifier|account\s+validation)\b
+pattern: (?is)\b(?:IBAN|international\s+bank\s+account\s+number)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
 jurisdictions:
@@ -43,12 +44,10 @@ test_cases:
   should_match:
     - value: international bank account number
       description: Primary topic phrase match
-    - value: bank account
-      description: Case-insensitive topic phrase match
-    - value: beneficiary account
-      description: Alternative topic phrase match
-    - value: wire transfer
-      description: Additional topic phrase match
+    - value: IBAN payment details
+      description: Explicit IBAN topic phrase match
+    - value: SEPA guide explains IBAN values.
+      description: Reference material with an explicit IBAN mention is intentionally discoverable
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -56,6 +55,10 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: bank transfer
       description: Generic word pair from old broad template should not match
+    - value: Domestic bank account reconciliation.
+      description: Generic domestic banking wording demoted out of the primary - no IBAN or international-account linkage
+    - value: wire transfer approval
+      description: Generic payment wording demoted out of the primary
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -100,8 +103,7 @@ purview:
         - ref: Evidence_iban_values
   regexes:
     - id: Pattern_iban_values
-      pattern: >-
-        (?is)\b(?:international\s+bank\s+account\s+number|bank\s+account|beneficiary\s+account|wire\s+transfer|international\s+payment|correspondent\s+bank|cross[\s-]+border\s+payment|bank\s+identifier|account\s+validation)\b
+      pattern: (?is)\b(?:IBAN|international\s+bank\s+account\s+number)\b
   keywords:
     - id: Evidence_iban_values
       groups:
@@ -130,8 +132,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-17'
+    description: 'Reduced-scope alignment fix (TP-00230): narrow the primary IdMatch to explicit IBAN / international bank account number phrases; generic bank-account, beneficiary-account, wire-transfer, international-payment, correspondent-bank, cross-border-payment, bank-identifier, and account-validation wording is demoted to corroborative evidence only, so domestic banking prose can no longer satisfy every tier of a SIT named IBAN values. Mod-97 value parsing rejected for this concept SIT (separate identifier classifier if ever needed).'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 705 without changing detector or package metadata.'

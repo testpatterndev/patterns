@@ -1,12 +1,22 @@
 schema: testpattern/v1
 name: SLA breach analysis reports
 slug: au-top500-314-sla-breach-analysis-reports
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies sla breach analysis reports patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
+description: >-
+  Identifies analytical reports of missed service commitments: enforcement requires a
+  target-versus-actual comparison ending in breach/missed/below/exceeded/service-credit
+  language, while SLA contract clauses, definitions, and performance-metric vocabulary remain
+  discovery-only.
+operation: >-
+  Pattern type: regex (boost_regex engine). SLA topic phrases (SLA breach, service level
+  agreement, uptime target, response time) feed a 65 discovery-only tier; enforcement requires
+  Evidence_sla_breach_measure — a target/committed value within 160 characters of an
+  actual/achieved value followed within 120 characters by breach/missed/below/exceeded/
+  service-credit wording — at 75, with additional SLA-domain evidence raising it to 85. The
+  shared template exclusion vetoes sample text at enforcement tiers.
 pattern: >-
   (?is)\b(?:SLA\s+breach|service\s+level\s+agreement|SLA\s+violation|uptime\s+target|response\s+time|resolution\s+time|penalty\s+clause|service\s+credit|SLA\s+report|availability\s+target|performance\s+metric|breach\s+analysis)\b
 confidence: medium
@@ -47,6 +57,12 @@ test_cases:
       description: Alternative topic phrase match
     - value: uptime target
       description: Additional topic phrase match
+    - value: 'SLA breach period=July target=99.95% actual=98.72% service credit=$4200 root cause=carrier outage remediation=dual link'
+      description: Target-versus-actual failure with credit, cause, and remediation reaches the enforcing tiers
+    - value: 'SLA availability target=99.95%'
+      description: A commitment without a measured outcome matches the topic branch only (discovery)
+    - value: 'Response time in the fire drill was 30 seconds'
+      description: Generic "response time" keeps a discovery-level topic hit only (relabeled from the first-pass no-match expectation)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -73,7 +89,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_sla_breach
+      id_match: Evidence_sla_breach_measure
       matches:
         - ref: Evidence_sla_breach
           min_count: 2
@@ -84,15 +100,15 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_sla_breach
+      id_match: Evidence_sla_breach_measure
       matches:
-        - ref: Evidence_sla_breach
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_sla_breach
       matches:
         - ref: Evidence_sla_breach
@@ -100,6 +116,9 @@ purview:
     - id: Pattern_sla_breach
       pattern: >-
         (?is)\b(?:SLA\s+breach|service\s+level\s+agreement|SLA\s+violation|uptime\s+target|response\s+time|resolution\s+time|penalty\s+clause|service\s+credit|SLA\s+report|availability\s+target|performance\s+metric|breach\s+analysis)\b
+    - id: Evidence_sla_breach_measure
+      pattern: >-
+        (?is)\b(?:target|committed)\s*[:=]\s*\S+[\s\S]{0,160}\b(?:actual|achieved)\s*[:=]\s*\S+[\s\S]{0,120}\b(?:breach|missed|below|exceeded|service\s+credit)\b
   keywords:
     - id: Evidence_sla_breach
       groups:
@@ -128,8 +147,20 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-17'
+    description: >-
+      Reduced-scope harden (TP-00430): SLA contract/definition vocabulary no longer enforces
+      (an unbreached service-level-agreement sentence previously reached 85 via same-span
+      evidence). Enforcement now anchors on Evidence_sla_breach_measure (target/committed
+      value, then actual/achieved value within 160 characters, then breach/missed/below/
+      exceeded/service-credit wording within 120 characters): 75 with template exclusion, 85
+      with two additional unique SLA-domain evidence terms. The topic branch is demoted to 65
+      discovery_only; per the independent correction the fire-drill "response time" case is
+      expected as a discovery hit, not no_match. Added breach-analysis positive and
+      commitment-only/fire-drill discovery cases.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 905 without changing detector or package metadata.'

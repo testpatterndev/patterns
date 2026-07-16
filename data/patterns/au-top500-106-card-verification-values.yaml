@@ -1,13 +1,15 @@
 schema: testpattern/v1
 name: Card verification values
 slug: au-top500-106-card-verification-values
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to card verification values in financial and compliance documents. Commonly found in Australian regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects references to card verification values in financial and compliance documents. Commonly found in Australian regulatory filings, transaction records, and audit documentation. Phrase-level
+  concept detection anchored on explicit card-verification vocabulary; it does not parse 3- or 4-digit CVV values.
 operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
-pattern: (?is)\b(?:card\s+verification\s+value|card\s+security\s+code|verification\s+code|card\s+validation|PCI\s+DSS|cardholder\s+data|payment\s+card|three[\s-]+digit\s+code)\b
+pattern: (?is)\b(?:card\s+verification\s+value|card\s+security\s+code|card\s+validation)\b
 confidence: medium
 confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection.
 jurisdictions:
@@ -43,8 +45,6 @@ test_cases:
       description: Primary topic phrase match
     - value: card security code
       description: Case-insensitive topic phrase match
-    - value: verification code
-      description: Alternative topic phrase match
     - value: card validation
       description: Additional topic phrase match
   should_not_match:
@@ -54,6 +54,10 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: payroll reimbursement
       description: Generic word pair from old broad template should not match
+    - value: Email verification code expires in ten minutes.
+      description: Generic verification-code wording demoted out of the primary - no card relation
+    - value: PCI DSS cardholder policy update
+      description: PCI and cardholder-data wording demoted out of the primary - corroborative evidence only
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -98,7 +102,7 @@ purview:
         - ref: Evidence_card_verification_values
   regexes:
     - id: Pattern_card_verification_values
-      pattern: (?is)\b(?:card\s+verification\s+value|card\s+security\s+code|verification\s+code|card\s+validation|PCI\s+DSS|cardholder\s+data|payment\s+card|three[\s-]+digit\s+code)\b
+      pattern: (?is)\b(?:card\s+verification\s+value|card\s+security\s+code|card\s+validation)\b
   keywords:
     - id: Evidence_card_verification_values
       groups:
@@ -131,8 +135,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: 'Reduced-scope alignment fix (TP-00233): narrow the primary IdMatch to explicit card-verification concepts (card verification value, card security code, card validation); generic verification-code, PCI DSS, cardholder-data, payment-card, and three-digit-code wording is demoted to corroborative evidence only, so OTP/email-verification prose can no longer satisfy enforceable tiers. Numeric 3/4-digit CVV parsing rejected for this concept SIT (a value detector would need its own retention-policy-reviewed identifier SIT). Bare CVV/CVC/CID acronyms deliberately kept out of the case-insensitive primary; they remain case-sensitive evidence.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 708 without changing detector or package metadata.'

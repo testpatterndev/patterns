@@ -1,14 +1,15 @@
 schema: testpattern/v1
 name: Bitcoin Address (Legacy)
 slug: global-bitcoin-address-legacy
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects Bitcoin Address (Legacy) patterns.
+description: Detects context-gated Base58-shaped legacy Bitcoin address (P2PKH/P2SH) candidates. The Base58Check checksum is NOT validated, so matches are candidates, not verified addresses.
 operation: >-
-  Validation: Base58Check encoding. Corroborative evidence: 3 keywords within 300 characters. Keyword lists: financial-transaction. Uses additional domain-context evidence and explicit exclusion logic
-  for template/sample/test text.
+  Candidate-shape prefilter: leading 1/3 with Base58 body and length bounds only — no Base58Check checksum validation is performed (Purview custom SITs provide no Base58Check function). Bech32 (bc1)
+  addresses are out of scope for this SIT and belong to the dedicated Bech32 SIT. Corroborative evidence: 3 keywords within 300 characters. Keyword lists: financial-transaction. Uses additional
+  domain-context evidence and explicit exclusion logic for template/sample/test text.
 pattern: \b[13][a-km-zA-HJ-NP-Z1-9]{24,33}\b
 confidence: medium
 confidence_justification: >-
@@ -53,6 +54,10 @@ test_cases:
       description: Hyphen breaks the run so no 24-33 char base58 body is contiguous — rejected
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: Bitcoin address bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4
+      description: Bech32 addresses must not route through the legacy SIT — the misrouted bech32 tier was removed
+    - value: Tutorial wallet 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy
+      description: Tutorial exclusion suppresses even the discovery-only candidate
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -65,13 +70,14 @@ exports:
 scope: narrow
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 65
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
+    - confidence_level: 65
+      discovery_only: true
       id_match: Regex_btc_legacy
       matches:
         - ref: Pattern_global_bitcoin_address_legacy_label_context
@@ -81,20 +87,9 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_btc_bech32
-      matches:
-        - ref: Keyword_cryptocurrency
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_btc_legacy
       pattern: \b[13][a-km-zA-HJ-NP-Z1-9]{24,33}\b
-    - id: Regex_btc_bech32
-      pattern: \bbc1[a-z0-9]{39,59}\b
     - id: Pattern_global_bitcoin_address_legacy_label_context
       pattern: (?i)\b(?:bitcoin\s+address\s+\(legacy\)|bitcoin|address|legacy)\b
   keywords:
@@ -133,8 +128,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: 'SIT alignment wave1 (TP-00807, reduced scope): removed the misrouted Bech32 tier and Regex_btc_bech32 from this Legacy SIT (Bech32 belongs to the dedicated global-bitcoin-address-bech32 SIT); the remaining context-gated legacy tier demoted 85→65 discovery_only (shape+context cannot prove Base58Check; Purview offers no checksum function) and recommended_confidence 85→65; description/operation reworded to a context-gated Base58-shaped P2PKH/P2SH candidate with the Base58Check validation claim removed; adversarial tests added. Deliberately NOT implemented: any Base58Check validator (not approved and not available in the export path) and checksum-mutation negatives (undeliverable by a shape-only regex); Keyword_cryptocurrency retained as unreferenced inventory.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1220 without changing detector or package metadata.'

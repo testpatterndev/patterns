@@ -1,15 +1,16 @@
 schema: testpattern/v1
 name: Okta API Token
 slug: global-okta-api-token
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Detects Okta API tokens, which begin with 00 and are followed by 40 base64url
-  characters. Because the structure is short and generic, corroborative Okta context
-  is important to confirm a real token. A leaked token grants Okta admin API access.
-operation: 'Token format 00 followed by exactly 40 base64url characters ([A-Za-z0-9_-]). Corroborative evidence: Okta keywords within 300 characters are strongly recommended to suppress false positives.'
+  Detects Okta API-token candidates, which begin with 00 and are followed by 40 base64url
+  characters. Okta or SSWS context is required for enforcement because the 42-character
+  shape can represent unrelated identifiers; the bare value shape surfaces only as
+  discovery inventory. A leaked token grants Okta admin API access.
+operation: 'Token format 00 followed by exactly 40 base64url characters ([A-Za-z0-9_-]). Structured tiers: 75 requires Okta/SSWS context within 300 characters; 65 exposes the bare value shape as discovery-only. Shared template-exclusion NOT-gate suppresses tutorial/documentation samples.'
 pattern: (?<![A-Za-z0-9_-])00[A-Za-z0-9_-]{40}(?![A-Za-z0-9_-])
 confidence: medium
 confidence_justification: >-
@@ -53,6 +54,8 @@ test_cases:
       description: Wrong prefix (11 instead of 00)
     - value: configure the okta api token in your SSWS authorization header
       description: Prose mention without a token value
+    - value: x00ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn_
+      description: Leading and trailing base64url characters make the candidate part of a longer identifier - both lookaround boundaries must prevent substring extraction
 false_positives:
   - description: Other 42-character identifiers that happen to start with 00 (e.g. some hashes or IDs).
     mitigation: Require corroborative Okta keywords (okta, SSWS) within proximity before alerting.
@@ -63,6 +66,46 @@ exports:
   - yaml
   - regex_copy
 scope: wide
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_okta_api_token
+      matches:
+        - ref: Keyword_okta_token_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_okta_api_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_okta_api_token
+      pattern: (?<![A-Za-z0-9_-])00[A-Za-z0-9_-]{40}(?![A-Za-z0-9_-])
+  keywords:
+    - id: Keyword_okta_token_context
+      groups:
+        - match_style: word
+          terms:
+            - Okta
+            - okta.com
+            - SSWS
+            - OKTA_API_TOKEN
+            - Okta API token
+      strength: specific
 risk_rating: 8
 risk_description: >-
   This medium-confidence pattern detects a 42-character Okta API token beginning with 00, using nearby Okta or SSWS context to distinguish generic identifiers. A live token acts with the creating administrator's privileges and may manage users, applications, sessions, or multifactor settings. The normal match presents serious identity-platform harm, but the actual role may be constrained and the token shape does not prove organisation-wide super-administrator access. Risk 8 and SENSITIVE InfoTech fit administrative API capability with unknown delegated scope; PROTECTED requires confirmed super-administrator authority, broad identity takeover, or significant cross-application impact.
@@ -75,8 +118,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-17'
+    description: 'Reduced-scope alignment fix (TP-00887): materialise structured purview tiers for a SIT that previously had none - Regex_okta_api_token (bounded 00 + 40 base64url with lookaround boundaries) enforced at 75 only with Keyword_okta_token_context (Okta, okta.com, SSWS, OKTA_API_TOKEN, Okta API token) within 300 chars; bare value shape exposed at 65 discovery-only. Both tiers NOT-gated by the shared template-exclusion dictionary. The promised repeated-filler-body rejection filter is NOT implemented (no definition exists) per the independent review''s narrowing.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1553 without changing detector or package metadata.'

@@ -1,15 +1,17 @@
 schema: testpattern/v1
 name: SWIFT or BIC codes
 slug: au-top500-104-swift-or-bic-codes
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to swift or bic codes in financial and compliance documents. Commonly found in Australian regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects references to SWIFT or BIC codes in financial and compliance documents. Commonly found in Australian regulatory filings, transaction records, and audit documentation. Phrase-level
+  payment-rail concept detection anchored on explicit SWIFT/BIC vocabulary; it does not parse 8- or 11-character BIC values.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
   lists: financial-deposit-terms.
-pattern: (?is)\b(?:SWIFT\s+code|BIC\s+code|bank\s+identifier\s+code|correspondent\s+bank|wire\s+transfer|international\s+payment|SWIFT\s+network|bank\s+code|routing\s+code)\b
+pattern: (?is)\b(?:SWIFT\s+code|BIC\s+code|bank\s+identifier\s+code|SWIFT\s+network)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
 jurisdictions:
@@ -47,7 +49,7 @@ test_cases:
       description: Case-insensitive topic phrase match
     - value: bank identifier code
       description: Alternative topic phrase match
-    - value: correspondent bank
+    - value: SWIFT network
       description: Additional topic phrase match
   should_not_match:
     - value: unrelated generic text without domain phrases
@@ -56,6 +58,12 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: bank transfer
       description: Generic word pair from old broad template should not match
+    - value: Domestic routing code changed.
+      description: Generic routing-code wording demoted out of the primary - no SWIFT/BIC linkage
+    - value: correspondent bank arrangements
+      description: Correspondent-bank wording demoted out of the primary - corroborative evidence only
+    - value: wire transfer approval
+      description: Generic payment wording demoted out of the primary
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -100,7 +108,7 @@ purview:
         - ref: Evidence_swift_or_bic_codes
   regexes:
     - id: Pattern_swift_or_bic_codes
-      pattern: (?is)\b(?:SWIFT\s+code|BIC\s+code|bank\s+identifier\s+code|correspondent\s+bank|wire\s+transfer|international\s+payment|SWIFT\s+network|bank\s+code|routing\s+code)\b
+      pattern: (?is)\b(?:SWIFT\s+code|BIC\s+code|bank\s+identifier\s+code|SWIFT\s+network)\b
   keywords:
     - id: Evidence_swift_or_bic_codes
       groups:
@@ -131,8 +139,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: 'Reduced-scope alignment fix (TP-00231): narrow the primary IdMatch to explicit SWIFT/BIC concepts (SWIFT code, BIC code, bank identifier code, SWIFT network); correspondent-bank, wire-transfer, international-payment, bank-code, and routing-code wording is demoted to corroborative evidence only, so domestic routing prose can no longer reach enforceable tiers under a SWIFT/BIC title. 8/11-character BIC value parsing rejected for this concept SIT (separate identifier classifier if ever needed).'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 706 without changing detector or package metadata.'

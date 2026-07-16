@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Competitive intelligence reports
 slug: au-top500-191-competitive-intelligence-reports
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -9,8 +9,9 @@ description: >-
   Identifies documents containing references to competitive intelligence reports in Australian contexts. This information type is classified as personally identifiable information under the Privacy
   Act 1988.
 operation: >-
-  Pattern type: regex (boost_regex engine). Three-tier purview detection: high confidence (95) matches competitor analysis pattern with competitive evidence and template exclusion; medium confidence
-  (75) matches market analysis pattern with competitive evidence; low confidence (65) matches SWOT analysis pattern with strategy evidence. Corroborative evidence: 7 keywords within 300 characters.
+  Pattern type: regex (boost_regex engine). Three-tier purview detection on the competitor-analysis anchor: high confidence (85) requires two unique competitive evidence terms with template exclusion;
+  medium confidence (75) requires competitive evidence with template exclusion; low confidence (65) requires competitive evidence. Competitive positioning/landscape phrases surface at 65 discovery-only.
+  The market-analysis and SWOT regexes are retained as unused inventory (referenced by no tier). Corroborative evidence: 7 keywords within 300 characters.
 pattern: (?i)\b(?:competitor\s+(?:analysis|comparison)|competitive\s+(?:analysis|positioning|landscape))\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
@@ -54,6 +55,12 @@ test_cases:
       description: Random text should not match phrase marker
     - value: generic prose without structural artifact anchors
       description: Should not match plain mentions
+    - value: Our competitive landscape is changing.
+      description: Generic positioning/landscape language is demoted — discovery only, must not enforce
+    - value: Target market research survey results
+      description: The unused market-analysis branch stays dead — must not match
+    - value: SWOT training exercise using fictional competitors
+      description: The unused SWOT branch stays dead and no anchor phrase is present — must not match
 false_positives:
   - description: Common words and phrases related to competitive intelligence reports appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -109,9 +116,20 @@ purview:
       id_match: Pattern_competitor_analysis
       matches:
         - ref: Evidence_competitive
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_competitive_positioning_landscape
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
   regexes:
     - id: Pattern_competitor_analysis
-      pattern: (?i)\b(?:competitor\s+(?:analysis|comparison)|competitive\s+(?:analysis|positioning|landscape))\b
+      pattern: (?i)\b(?:competitor\s+(?:analysis|comparison)|competitive\s+analysis)\b
+    - id: Pattern_competitive_positioning_landscape
+      pattern: (?i)\b(?:competitive\s+(?:positioning|landscape))\b
     - id: Pattern_market_analysis
       pattern: (?i)\b(?:market\s+(?:analysis|research|study)|(?:target|addressable)\s+market)\b
     - id: Pattern_swot
@@ -121,8 +139,6 @@ purview:
       groups:
         - match_style: word
           terms:
-            - competitor
-            - competitive
             - competitor analysis
             - competitive advantage
             - market analysis
@@ -164,8 +180,11 @@ purview:
               case_sensitive: true
       strength: domain
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-17'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-17'
+    description: 'SIT alignment wave1 (TP-00317, reduced scope): hardened only the live Pattern_competitor_analysis branch — "competitive positioning" and "competitive landscape" demoted from the enforcing anchor to a new 65 discovery_only branch (Pattern_competitive_positioning_landscape with template-exclusion NOT gate); bare "competitor"/"competitive" dropped from Evidence_competitive so the anchor can no longer self-corroborate on a single word; stale operation text corrected to the actual 85/75/65 wiring (it described 95/market/SWOT tiers that never existed); dead market/SWOT regexes left inactive; adversarial tests added. Deliberately less than the first-pass candidate: NO named-competitor/comparison/source 75/85 enforcement (references undefined, deferred per QA); "competitor analysis" remains valid concept evidence per review.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 792 without changing detector or package metadata.'
