@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Court Filing Reference
 slug: court-filing-reference
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -50,6 +50,8 @@ test_cases:
       description: Supreme Court child protection filing with cause number
     - value: 'District Court of Queensland — Statement of Claim. Proceeding Number: DC-2026-0392. Registry: Cairns. Plaintiff: [Name]. Defendant: Queensland Health. Claim for damages arising from medical negligence at Cairns Hospital. Particulars of negligence: failure to diagnose appendicitis on presentation 14 August 2025. Damages claimed: $485,000.'
       description: District Court civil claim filing against Queensland Health
+    - value: 'District Court of Queensland DC-2026-0392; Plaintiff M.L.; Defendant Queensland Health; statement of claim; damages $485,000.'
+      description: Court identity, reference, parties, document type, and claim detail enforce
   should_not_match:
     - value: 'Published Judgment: Smith v State of Queensland [2025] QSC 184. The Supreme Court found the defendant liable for negligence. The full judgment is available on the Queensland Courts website.'
       description: Published Supreme Court judgment available on courts website
@@ -57,6 +59,14 @@ test_cases:
       description: Public court directory information
     - value: The Queensland Law Society Journal published an article analysing recent District Court decisions on medical negligence claims, noting an increase in proceeding numbers filed in 2025.
       description: Legal journal article discussing court statistics
+    - value: 'Published Judgment: Smith v State [2025] QSC 184.'
+      description: Published judgment citation — excluded and no filing primary present
+    - value: 'Law-school sample: MAG-2026-0001 plaintiff Example.'
+      description: Academic/sample context is suppressed by the noise exclusion
+    - value: Court filing proceeding number.
+      description: Generic filing words without court identity or parties discover but must not enforce
+    - value: The court registry published holiday opening hours and contact details.
+      description: Public directory information with no proceeding reference or filing document
 false_positives:
   - description: Published court judgments and decisions already in the public domain
     mitigation: 'Negative keyword exclusion: ''published judgment'', ''published decision'', ''available on'', ''QSC'', ''QCA'', ''QDC'' (judgment citation formats).'
@@ -72,90 +82,90 @@ exports:
 scope: narrow
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-    - tier: high
-      confidence_level: 65
-      id_match: primary_keywords
+    - confidence_level: 85
+      id_match: Pattern_court_filing_reference_qld_court_reference_number
+      matches:
+        - ref: Evidence_qld_court_identity
+        - ref: Evidence_qld_filing_detail
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_qld_public_court
+    - confidence_level: 75
+      id_match: Pattern_qld_court_filing
+      matches:
+        - ref: Evidence_qld_court_identity
+        - ref: Evidence_qld_filing_detail
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_qld_public_court
+    - confidence_level: 65
       discovery_only: true
-      description: Court reference number regex match with 2+ primary keywords and filing details
+      id_match: Pattern_qld_court_filing
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_qld_public_court
   regexes:
-    - name: magistrates_court_ref
-      pattern: \bMAG-\d{4}-\d{2,6}\b
-    - name: district_court_ref
-      pattern: \bDC-\d{4}-\d{2,6}\b
-    - name: supreme_court_ref
-      pattern: \bSC-\d{4}-\d{2,6}\b
-    - name: court_filing_terms
-      pattern: (?i)\b(court\s+filing|proceeding\s+number|cause\s+number|registry\s+(?:number|reference)|initiating\s+application|statement\s+of\s+claim)\b
+    - id: Pattern_qld_court_filing
+      pattern: (?i)\b(?:MAG-\d{4}-\d{2,6}|DC-\d{4}-\d{2,6}|SC-\d{4}-\d{2,6}|court\s+filing|proceeding\s+number|cause\s+number|initiating\s+application|originating\s+application|statement\s+of\s+claim)\b
+    - id: Pattern_court_filing_reference_qld_court_reference_number
+      pattern: \b(?:MAG|DC|SC)-\d{4}-\d{2,6}\b
   keywords:
-    - name: primary_keywords
-      words:
-        - court filing
-        - proceeding number
-        - cause number
-        - registry number
-        - registry reference
-        - initiating application
-        - statement of claim
-        - originating application
-        - notice of claim
-        - filed by
+    - id: Evidence_qld_court_identity
+      groups:
+        - match_style: word
+          terms:
+            - Magistrates Court
+            - District Court
+            - Supreme Court
+            - Queensland Courts
+            - registry
       strength: domain
-    - name: classification_markers
-      words:
-        - SENSITIVE
-        - Legal
-        - OFFICIAL
-        - Magistrates Court
-        - District Court
-        - Supreme Court
-        - Queensland Courts
+    - id: Evidence_qld_filing_detail
+      groups:
+        - match_style: word
+          terms:
+            - plaintiff
+            - defendant
+            - applicant
+            - respondent
+            - affidavit
+            - charge
+            - claim
+            - bail application
+            - directions hearing
+            - listed for hearing
       strength: domain
-    - name: corroborative_terms
-      words:
-        - plaintiff
-        - defendant
-        - applicant
-        - respondent
-        - first appearance
-        - directions hearing
-        - affidavit
-        - particulars
-        - damages claimed
-        - bail application
-        - listed for hearing
-        - ODPP
-      strength: domain
-    - name: negative_keywords
-      words:
-        - published judgment
-        - published decision
-        - available on
-        - directory
-        - registry hours
-        - contact details
-        - court location
-        - journal
-        - law society
-        - article
-        - analysing
-        - recent decisions
-        - textbook
-        - academic
-      strength: domain
-  filters:
-    - type: exclude
-      description: Exclude published judgments, directories, and legal journal articles
-      keywords:
-        - published judgment
-        - published decision
-        - directory
-        - registry hours
-        - journal
-        - law society
-        - textbook
-        - academic
+    - id: Filter_qld_public_court
+      groups:
+        - match_style: word
+          terms:
+            - published judgment
+            - published decision
+            - directory
+            - registry hours
+            - journal
+            - law society
+            - textbook
+            - academic
+      strength: noise
 risk_rating: 7
 risk_description: >-
   Despite its name, the detector targets an unpublished Queensland court filing with a proceeding number, registry, parties, claim or charge, and case-specific allegations rather than an isolated public reference number. Disclosure can expose child-protection, criminal, medical, family, or civil claims before adjudication, prejudice parties, and reveal addresses or evidence not yet in the public domain. Published judgments, court directories, legal commentary, and blank forms are excluded, so the normal unit is a substantive filing for one proceeding. Risk 7 supports SENSITIVE Legal; PROTECTED would require a suppression order, protected witness, sealed evidence, or court-restricted material with significant safety or justice consequences.
@@ -165,8 +175,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Legal
 references: []
 created: '2026-03-06'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: 'sit-alignment-validation-2026-07-16 wave1 (TP-00711): normalize the legacy purview block (name:-keyed regexes, name:/words: keywords, exclude filter, single inert 65 discovery tier keyed to an unresolvable primary_keywords id) into referenced Purview ids and add enforcing tiers — the SIT was risk 7 SENSITIVE but could never enforce. New Pattern_qld_court_filing any-of primary (MAG/DC/SC-YYYY-NN references plus court filing, proceeding/cause number, initiating/originating application, statement of claim), Evidence_qld_court_identity and Evidence_qld_filing_detail keyword groups, and Filter_qld_public_court per the approved reference definitions. 75 requires the primary plus Queensland court/registry identity and one filing-detail signal; 85 keys on a MAG/DC/SC reference number and requires identity plus two distinct filing-detail signals (parties/claim/affidavit/hearing); 65 discovery retained. Template-exclusion noise dictionary attached and NOT-gated on all tiers. Adversarial test cases added; recommended_confidence raised to 85.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1506 without changing detector or package metadata.'

@@ -1,15 +1,18 @@
 schema: testpattern/v1
 name: RFC
 slug: mx-rfc
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects RFC patterns.
+description: >-
+  Detects Mexican RFC (Registro Federal de Contribuyentes) taxpayer identifiers in both official formats: the
+  13-character natural-person form (4-letter name stem + 6-digit date + 3-character homoclave) and the 12-character
+  legal-entity form (3-character name stem, which may include Ñ or &, + 6-digit date + 3-character homoclave).
 operation: >-
   Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials, financial-transaction. Uses additional domain-context evidence and explicit exclusion logic for
   template/sample/test text.
-pattern: \b[A-Z]{4}\d{6}[A-Z0-9]{3}\b
+pattern: \b(?:[A-Z]{4}|[A-Z&Ñ]{3})\d{6}[A-Z0-9]{3}\b
 confidence: low
 confidence_justification: >-
   Low confidence: generic pattern format that may match unrelated data. Corroborative evidence keywords are essential for reliable detection. Added context gating and exclusion rules improve precision
@@ -43,13 +46,17 @@ test_cases:
       description: Alternate individual RFC
     - value: ABCD123456Z01
       description: Standard individual RFC format
+    - value: ABC9201011A2
+      description: Legal-entity RFC (3-character name stem + 6-digit date + 3-character homoclave)
   should_not_match:
-    - value: GAR920101ABC
-      description: Only 3 initial letters instead of 4
+    - value: GA920101ABC
+      description: Only 2 initial letters, below both the 3-character legal-entity and 4-letter natural-person stems
     - value: GARS92010ABC
       description: Only 5 date digits instead of 6
     - value: GARS920101AB
       description: Only 2 homoclave characters instead of 3
+    - value: ABC9201011A
+      description: Legal-entity shape with only 2 homoclave characters instead of 3
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -91,6 +98,25 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_mx_rfc_legal_entity
+      matches:
+        - ref: Pattern_mx_rfc_label_context
+        - ref: Keyword_mx_rfc_domain_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_mx_rfc_legal_entity
+      matches:
+        - ref: Keyword_mx_rfc
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_mx_rfc
@@ -100,9 +126,20 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_mx_rfc_legal_entity
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_mx_rfc
       pattern: \b[A-Z]{4}\d{6}[A-Z0-9]{3}\b
+    - id: Regex_mx_rfc_legal_entity
+      pattern: (?i)\b[A-Z&\x{00D1}]{3}\d{6}[A-Z0-9]{3}\b
     - id: Pattern_mx_rfc_label_context
       pattern: (?i)\b(?:rfc)\b
   keywords:
@@ -141,8 +178,15 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Add the legal-entity RFC branch the risk description already claimed: new Regex_mx_rfc_legal_entity ((?i)\b[A-Z&\x{00D1}]{3}\d{6}[A-Z0-9]{3}\b) wired into its own 75-confidence tiers reusing
+      the existing RFC/SAT label, domain-context, and Keyword_mx_rfc evidence plus the shared noise gate, and its own 65 discovery tier — keeping corporate results separately measurable from the
+      retained 4-letter natural-person branch. Top-level pattern extended to the same two-branch alternation; replaced the now-contradictory 3-letter-stem negative (a valid legal-entity RFC) with a
+      2-letter-stem negative and added corporate positive/homoclave-boundary cases.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1348 without changing detector or package metadata.'

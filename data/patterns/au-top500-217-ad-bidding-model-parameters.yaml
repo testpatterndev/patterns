@@ -1,14 +1,20 @@
 schema: testpattern/v1
 name: Ad bidding model parameters
 slug: au-top500-217-ad-bidding-model-parameters
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to ad bidding model parameters in Australian contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters.'
+  Identifies private bidding-model parameters rather than online-advertising vocabulary generally:
+  named parameter assignments (bid floors, pacing multipliers, objective weights, budget caps) enforce,
+  while auction and programmatic-advertising topic terms remain discovery-only.
+operation: >-
+  Pattern type: regex (boost_regex engine). Topic phrases (bidding algorithm, programmatic advertising,
+  cost per click) feed a 65 discovery-only tier; enforcement requires Pattern_bidding_parameters - a
+  named bidding parameter (bid_floor, pacing_multiplier, ctr_weight, target_cpa, ...) bound to a
+  numeric value - at 75, with bidding-topic evidence within 300 characters raising it to 85. The shared
+  template exclusion vetoes sample/training text at enforcement tiers.
 pattern: >-
   (?is)\b(?:ad\s+bidding\s+model\s+parameters|bidding\s+algorithm|bid\s+strategy|auction\s+model|real[\s-]+time\s+bidding|programmatic\s+advertising|bid\s+optimization|proprietary\s+model|trade\s+secret|cost\s+per\s+click)\b
 confidence: medium
@@ -48,7 +54,11 @@ test_cases:
     - value: bid strategy
       description: Alternative topic phrase match
     - value: auction model
-      description: Additional topic phrase match
+      description: Additional topic phrase match (discovery only)
+    - value: 'campaign AU-7: bid_floor=1.35; ctr_weight=0.28; conversion_weight=0.72; pacing_multiplier=0.91'
+      description: Named bidding parameters with numeric values reach the enforcing tiers
+    - value: 'The help page defines real-time bidding and cost per click.'
+      description: Public definition text matches the topic branch only (discovery, not enforcement)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -56,6 +66,10 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: algorithm schematic
       description: Generic word pair from old broad template should not match
+    - value: 'The auction sold a painting after five bids.'
+      description: Art-auction sense carries no ad-bidding topic phrase or parameter assignment
+    - value: 'Training lab sample: bid_floor=1.00 and target_cpa=20.'
+      description: Template/sample exclusion suppresses synthetic parameter values at enforcement tiers
 false_positives:
   - description: Common words and phrases related to ad bidding model parameters appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -77,26 +91,24 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_ad_bidding_model_parameters
+      id_match: Pattern_bidding_parameters
       matches:
         - ref: Evidence_ad_bidding_model_parameters
-          min_count: 2
-          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_ad_bidding_model_parameters
+      id_match: Pattern_bidding_parameters
       matches:
-        - ref: Evidence_ad_bidding_model_parameters
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_ad_bidding_model_parameters
       matches:
         - ref: Evidence_ad_bidding_model_parameters
@@ -104,6 +116,9 @@ purview:
     - id: Pattern_ad_bidding_model_parameters
       pattern: >-
         (?is)\b(?:ad\s+bidding\s+model\s+parameters|bidding\s+algorithm|bid\s+strategy|auction\s+model|real[\s-]+time\s+bidding|programmatic\s+advertising|bid\s+optimization|proprietary\s+model|trade\s+secret|cost\s+per\s+click)\b
+    - id: Pattern_bidding_parameters
+      pattern: >-
+        (?is)\b(?:bid_floor|base_bid|pacing_multiplier|conversion_weight|ctr_weight|budget_cap|reserve_price|target_cpa)\b\s*(?:=|:)?\s*[-+]?[0-9]+(?:\.[0-9]+)?
   keywords:
     - id: Evidence_ad_bidding_model_parameters
       groups:
@@ -130,8 +145,18 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Tier rebalance (TP-00343): topic vocabulary (programmatic advertising, cost per click, bid
+      strategy) no longer enforces - the topic branch is demoted to 65 discovery_only. Enforcement now
+      anchors on Pattern_bidding_parameters (named bidding variables bid_floor/base_bid/
+      pacing_multiplier/conversion_weight/ctr_weight/budget_cap/reserve_price/target_cpa bound to
+      numeric values): 75 with template exclusion, 85 with additional bidding-topic evidence.
+      Description now targets private bidding-model parameters. Added parameter-set positive and
+      art-auction/training-lab negatives.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 818 without changing detector or package metadata.'

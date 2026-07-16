@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Bank Account with Payment Authorisation Token
 slug: bank-account-with-payment-authorisation-token
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -49,11 +49,21 @@ test_cases:
       description: Dual-authorised payment with BSB and signing authority
     - value: 'PROTECTED — Batch payment authorisation. BSB: 032-001, Account: 45678901. Authorised signatory: K. Brown (Delegate Level 4). Payment token: AUTH-2026-00872. Released for processing via BECS direct entry.'
       description: Batch payment with BSB, account, and approval token
+    - value: 'BSB 032-001 Account 45678901; dual authorisation by K Brown and S Tran; ABA file released for processing.'
+      description: Account number plus dual authorisation and release evidence satisfy the non-token enforcing branch
   should_not_match:
     - value: 'Please update your bank details for salary payments. BSB: ___ Account: ___. Submit to HR with a void cheque or bank statement.'
       description: Blank bank details form — no authorisation context
     - value: 'Supplier registration: Company ABC Pty Ltd. Please provide your bank details on the attached form for accounts payable setup. No banking numbers recorded yet.'
       description: Routine supplier onboarding prose with no BSB, account, or token values
+    - value: 'Pay your fee to BSB 064-000 account 12345678.'
+      description: Inbound payment instruction — pay-your exclusion applies and there is no authorisation evidence
+    - value: 'Example: BSB 111-222 account 12345678 AUTH-2026-0001.'
+      description: Example-prefixed training text — noise exclusion overrides credential-shaped content
+    - value: 'BSB 064-000 payment BSB payment.'
+      description: BSB with repeated generic payment words — no account number or authorisation path, so no enforcement
+    - value: Accounts receivable reconciled yesterday's customer deposits.
+      description: Routine financial operations with no BSB, account number, or authorisation content
 false_positives:
   - description: Routine bank detail collection forms for HR or accounts payable
     mitigation: Require authorisation/approval context (not just BSB + account) to distinguish from SENS_Fin patterns
@@ -74,12 +84,13 @@ purview:
     - confidence_level: 85
       id_match: Pattern_bank_account_with_payment_authorisation_token_bsb_format_e_g_064_000_or_064000
       matches:
-        - ref: Evidence_bank_account_with_payment_authorisation_token_primary
-        - ref: Evidence_bank_account_with_payment_authorisation_token_authorisation
-        - ref: Evidence_bank_account_with_payment_authorisation_token_payment_methods
-        - ref: Evidence_bank_account_with_payment_authorisation_token_markers
         - ref: Pattern_bank_account_with_payment_authorisation_token_bank_account_number_6_10_digits
-        - ref: Pattern_bank_account_with_payment_authorisation_token_payment_authorisation_token_format
+        - ref: Evidence_bank_account_with_payment_authorisation_token_payment_methods
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_bank_account_with_payment_authorisation_token_markers
+            - Evidence_bank_account_with_payment_authorisation_token_authorisation
         - type: any
           min_matches: 0
           max_matches: 0
@@ -89,7 +100,16 @@ purview:
     - confidence_level: 75
       id_match: Pattern_bank_account_with_payment_authorisation_token_bsb_format_e_g_064_000_or_064000
       matches:
-        - ref: Evidence_bank_account_with_payment_authorisation_token_primary
+        - ref: Pattern_bank_account_with_payment_authorisation_token_bank_account_number_6_10_digits
+        - type: any
+          min_matches: 1
+          children:
+            - ref: Pattern_bank_account_with_payment_authorisation_token_payment_authorisation_token_format
+            - type: any
+              min_matches: 2
+              refs:
+                - Evidence_bank_account_with_payment_authorisation_token_authorisation
+                - Evidence_bank_account_with_payment_authorisation_token_payment_methods
         - type: any
           min_matches: 0
           max_matches: 0
@@ -183,8 +203,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Financial
 references: []
 created: '2026-02-20'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: 'sit-alignment-validation-2026-07-16 wave1 (TP-00658): tier rebalance — every enforcing branch now requires a nearby 6-10 digit account number; 75 requires BSB+account plus one authorisation path (explicit AUTH token, or dual/signing approval AND payment instruction/release evidence — not both paths); 85 requires BSB+account plus payment method/release evidence and a protected marking or dual-approval signal (drops the old all-elements-conjunctive shape); BSB alone remains 65 discovery. AllDigitsSameFilter and inbound-payment/supplier/template exclusions retained. Adversarial test cases added.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1444 without changing detector or package metadata.'

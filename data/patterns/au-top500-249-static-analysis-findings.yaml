@@ -1,12 +1,20 @@
 schema: testpattern/v1
 name: Static analysis findings
 slug: au-top500-249-static-analysis-findings
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies static analysis findings patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
+description: >-
+  Identifies static analysis findings in security and access control contexts. Higher confidence
+  identifies outputs from static application security or code analysis tools (rule IDs, CWE numbers,
+  severities, file/line locations); static-analysis topic vocabulary alone remains discovery-only.
+operation: >-
+  Pattern type: regex (boost_regex engine). Topic phrases (static analysis, code quality, security
+  findings) feed a 65 discovery-only tier; enforcement requires Pattern_sast_finding - a CWE id,
+  rule/ruleId assignment, or severity level followed within 220 characters by a source file with line
+  location - at 75, with static-analysis topic evidence within 300 characters raising it to 85. The
+  shared template exclusion vetoes sample/training/demo text at enforcement tiers.
 pattern: (?is)\b(?:static\s+analysis|SAST\s+findings|code\s+analysis|security\s+findings|code\s+vulnerability|static\s+scan|code\s+quality|security\s+defect|code\s+review\s+findings|analysis\s+report)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
@@ -45,7 +53,11 @@ test_cases:
     - value: code analysis
       description: Alternative topic phrase match
     - value: security findings
-      description: Additional topic phrase match
+      description: Additional topic phrase match (discovery only)
+    - value: 'Tool: Semgrep; ruleId: sql-injection; CWE-89; severity: HIGH; file src/db.ts:144; tainted input reaches query().'
+      description: Populated SAST finding with rule, CWE, severity and file/line reaches the enforcing tiers
+    - value: 'Article comparing static analysis and code quality.'
+      description: Topic-only article matches the discovery branch, not enforcement
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -53,6 +65,10 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: source code config
       description: Generic word pair from old broad template should not match
+    - value: 'The static display reported air quality.'
+      description: Static/quality words outside the code-analysis sense match nothing
+    - value: 'Semgrep training sample CWE-89 at demo.py:10.'
+      description: Training/sample/demo exclusion suppresses synthetic SAST output at enforcement tiers
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -72,26 +88,24 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_static_analysis_findings
+      id_match: Pattern_sast_finding
       matches:
         - ref: Evidence_static_analysis_findings
-          min_count: 2
-          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_static_analysis_findings
+      id_match: Pattern_sast_finding
       matches:
-        - ref: Evidence_static_analysis_findings
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_static_analysis_findings
       matches:
         - ref: Evidence_static_analysis_findings
@@ -99,6 +113,9 @@ purview:
     - id: Pattern_static_analysis_findings
       pattern: >-
         (?is)\b(?:static\s+analysis|SAST\s+findings|code\s+analysis|security\s+findings|code\s+vulnerability|static\s+scan|code\s+quality|security\s+defect|code\s+review\s+findings|analysis\s+report)\b
+    - id: Pattern_sast_finding
+      pattern: >-
+        (?is)\b(?:CWE-\d{1,4}|rule(?:Id)?\s*[:=]\s*[A-Za-z0-9_.-]+|severity\s*[:=]\s*(?:critical|high|medium|low))[\s\S]{0,220}\b(?:[A-Za-z0-9_.-]+\.(?:js|ts|py|java|cs|go|cpp|c|rb))(?::\d+|\s+line\s+\d+)\b
   keywords:
     - id: Evidence_static_analysis_findings
       groups:
@@ -125,8 +142,16 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Tier rebalance (TP-00375): code-quality/analysis-report topic vocabulary no longer enforces -
+      the topic branch is demoted to 65 discovery_only. Enforcement now anchors on Pattern_sast_finding
+      (CWE id, rule/ruleId assignment, or severity level within 220 characters of a source file with
+      line location): 75 with template exclusion, 85 with additional static-analysis topic evidence.
+      Added populated-SAST-finding positive and air-quality/training-sample negatives.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 850 without changing detector or package metadata.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Commission of Inquiry Legal Submission
 slug: commission-of-inquiry-legal-submission
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -58,6 +58,8 @@ test_cases:
         Terms of Reference Response:
         The State of Queensland acknowledges systemic issues in emergency management coordination.
       description: Draft COI submission on floods response
+    - value: 'CONFIDENTIAL Commission of Inquiry legal submission, draft v4; TOR 7 response; DG approval pending; not for publication.'
+      description: Inquiry, draft legal artefact, approval status, and publication restriction enforce
   should_not_match:
     - value: The Coaldrake Commission of Inquiry published its final report in June 2022. The report recommended significant reforms to Queensland Government integrity frameworks.
       description: Published COI final report
@@ -65,6 +67,14 @@ test_cases:
       description: Tabled public COI submission
     - value: The Commissions of Inquiry Act 1950 (Qld) establishes the legal framework for conducting public inquiries. This guide explains the powers and procedures of Commissions of Inquiry.
       description: Legal guide about COI legislation
+    - value: The Commission of Inquiry published its final report.
+      description: Final published material is excluded
+    - value: Training sample COI draft submission for approval.
+      description: Training/sample context is suppressed by the noise exclusion
+    - value: Commission of Inquiry legal submission.
+      description: The bare label without restriction or internal status discovers but must not enforce
+    - value: The parliamentary library catalogued past public inquiry reports.
+      description: Library cataloguing with no Commission of Inquiry draft submission or restriction
 false_positives:
   - description: Published COI final reports
     mitigation: Negative match on 'final report', 'published', 'findings', 'recommendations released'
@@ -80,55 +90,90 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-    - tier: high
-      confidence_level: 65
-      id_match: primary
+    - confidence_level: 85
+      id_match: Pattern_coi_legal_submission
+      matches:
+        - ref: Evidence_coi_restriction
+        - ref: Evidence_coi_draft_status
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_coi_public_material
+    - confidence_level: 75
+      id_match: Pattern_coi_legal_submission
+      matches:
+        - ref: Evidence_coi_draft_status
+        - ref: Evidence_coi_restriction
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_coi_public_material
+    - confidence_level: 65
       discovery_only: true
-      description: Commission of Inquiry + DRAFT + PROTECTED/CONFIDENTIAL
+      id_match:
+        type: any
+        ids:
+          - Pattern_commission_of_inquiry_legal_submission_inquiry_phrase
+          - Pattern_commission_of_inquiry_legal_submission_coi_abbreviation
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_coi_public_material
   regexes:
-    - pattern: (?i)\bCommission\s+of\s+Inquiry\b
-      description: Commission of Inquiry phrase
-    - pattern: (?i)\bCOI\b
-      description: COI abbreviation
+    - id: Pattern_commission_of_inquiry_legal_submission_inquiry_phrase
+      pattern: (?i)\bCommission\s+of\s+Inquiry\b
+    - id: Pattern_commission_of_inquiry_legal_submission_coi_abbreviation
+      pattern: (?i)\bCOI\b
+    - id: Pattern_coi_legal_submission
+      pattern: (?i)\b(?:(?:Commission\s+of\s+Inquiry|COI)\b[\s\S]{0,300}?\b(?:(?:draft|proposed|legal)\s+submission|terms\s+of\s+reference\s+response)|(?:(?:draft|proposed|legal)\s+submission|terms\s+of\s+reference\s+response)\b[\s\S]{0,300}?\b(?:Commission\s+of\s+Inquiry|COI))\b
   keywords:
-    - group: primary
-      values:
-        - Commission of Inquiry
-        - COI
-        - commission of inquiry
+    - id: Evidence_coi_draft_status
+      groups:
+        - match_style: word
+          terms:
+            - draft submission
+            - proposed submission
+            - legal submission
+            - submission for approval
+            - terms of reference response
+            - internal review
       strength: domain
-    - group: corroborative
-      values:
-        - draft submission
-        - proposed submission
-        - legal submission
-        - submission for approval
-        - terms of reference
-        - DRAFT
-        - PROTECTED
-        - CONFIDENTIAL
-        - not for publication
-        - internal review
+    - id: Evidence_coi_restriction
+      groups:
+        - match_style: word
+          terms:
+            - PROTECTED
+            - CONFIDENTIAL
+            - privilege
+            - not for publication
+            - internal approval
       strength: domain
-    - group: exclusion
-      values:
-        - final report
-        - published
-        - tabled
-        - public submission
-        - Commission website
-        - media report
-        - findings released
-      strength: domain
-  filters:
-    - type: exclude_keyword
-      values:
-        - final report published
-        - tabled in Parliament
-        - public hearing
-      description: Exclude published COI materials
+    - id: Filter_coi_public_material
+      groups:
+        - match_style: word
+          terms:
+            - final report
+            - published
+            - tabled
+            - public submission
+            - Commission website
+            - public hearing
+      strength: noise
 risk_rating: 8
 risk_description: >-
   The detector identifies a draft legal submission to a Queensland Commission of Inquiry, combining inquiry context with draft, approval, confidential, or not-for-publication markers and substantive proposed positions. Premature disclosure can expose candid admissions, legal arguments, unresolved evidence, and the State's response strategy, allowing other participants to anticipate or exploit the submission before approval. Final reports, tabled submissions, public legal guides, and news reporting are excluded, so the normal match is one non-public draft rather than the complete inquiry record. Risk 8 supports SENSITIVE Legal; PROTECTED would require protected witnesses, Cabinet-level strategy, or compromise producing significant whole-of-inquiry or State damage.
@@ -138,8 +183,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Legal
 references: []
 created: '2026-02-20'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: 'sit-alignment-validation-2026-07-16 wave1 (TP-00701): normalize the legacy purview block (raw id-less regexes, group:/values: keywords, exclude_keyword filters, single inert 65 discovery tier) into referenced Purview regex/keyword ids and add enforcing tiers — the SIT was risk 8 SENSITIVE but could never enforce. New Pattern_coi_legal_submission bounded-proximity primary (Commission of Inquiry/COI within 300 chars of draft/proposed/legal submission or terms-of-reference-response wording, both directions); Evidence_coi_draft_status and Evidence_coi_restriction keyword groups and Filter_coi_public_material per the approved reference definitions. 75 requires the bounded primary plus draft-status and one restriction marker; 85 additionally requires two distinct draft/approval/TOR signals; 65 discovery keys on the plain inquiry mention. Template-exclusion noise dictionary attached and NOT-gated on all tiers. Adversarial test cases added; recommended_confidence raised to 85.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1522 without changing detector or package metadata.'

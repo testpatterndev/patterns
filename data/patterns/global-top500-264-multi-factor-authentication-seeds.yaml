@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Multi-factor authentication seeds
 slug: global-top500-264-multi-factor-authentication-seeds
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -32,12 +32,14 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: 'otpauth://totp/Example:alice@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example'
-      description: TOTP provisioning URI with base32 secret
+    - value: 'otpauth://totp/Contoso:alice@corp.invalid?secret=JBSWY3DPEHPK3PXP&issuer=Contoso'
+      description: TOTP provisioning URI with base32 secret (non-template issuer so the shared example exclusion cannot veto the tier)
     - value: 'MFA secret: JBSWY3DPEHPK3PXPJBSWY3DP'
       description: Labelled base32 MFA secret
     - value: 'TOTP seed = NB2W45DFOIZADENBQGQ3TS'
       description: Labelled base32 TOTP seed
+    - value: 'TOTP seed = NB2W45DFOIZADENBQGQ3TS for authenticator enrollment account alice@corp.invalid.'
+      description: Labelled seed with enrolment context now reaches the enforcing keyword-gated tier
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
@@ -47,6 +49,12 @@ test_cases:
       description: Should reject generic mentions without structural anchor terms
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'MFA enrollment requires an authenticator but contains no seed.'
+      description: Authentication wording without a structured base32 value must not fire any tier
+    - value: 'The garden seed catalogue lists product NB2W45DF.'
+      description: Non-authentication "seed" sense with a short code fails the 16-char base32 floor
+    - value: 'Training documentation quotes "MFA secret: JBSWY3DPEHPK3PXPJBSWY3DP" solely to explain classifier terminology.'
+      description: Template/training exclusion suppresses quoted instructional seed material at every tier
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -105,6 +113,8 @@ purview:
           terms:
             - multi-factor authentication
             - mfa seed
+            - mfa secret
+            - totp seed
             - totp secret
             - hotp secret
             - authenticator
@@ -137,8 +147,16 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Tier-gating recall fix (TP-01185): add the literal terms "mfa secret" and "totp seed" to
+      Keyword_mfa_seeds so labelled seeds reach the enforcing 85 keyword-gated tier (primary regex
+      unchanged; unlabelled base32 still discovery-only), and replace the authored otpauth positive's
+      "Example" issuer with a non-template issuer so the shared example exclusion no longer vetoes it.
+      Added labelled-seed positive and near-miss/neutral/quoted-training negatives.
   - version: 1.3.2
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1823 without changing detector or package metadata.'

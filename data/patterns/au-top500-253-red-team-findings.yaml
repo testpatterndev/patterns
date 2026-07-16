@@ -1,12 +1,21 @@
 schema: testpattern/v1
 name: Red team findings
 slug: au-top500-253-red-team-findings
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies red team findings patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
+description: >-
+  Identifies substantive red-team findings rather than engagement administration: populated finding
+  records (RT/FINDING identifiers with exploited paths, affected assets, evidence, impact, severity or
+  remediation) enforce, while red-team/penetration-test topic vocabulary remains discovery-only.
+operation: >-
+  Pattern type: regex (boost_regex engine). Topic phrases (red team, penetration test, security
+  assessment) feed a 65 discovery-only tier; enforcement requires Pattern_red_team_finding_record - an
+  RT/FINDING record identifier within 260 characters of finding content (exploited, attack path,
+  affected asset, evidence, impact, severity, remediation) - at 75, with red-team topic evidence within
+  300 characters raising it to 85. The shared template exclusion vetoes sample/training/demo text at
+  enforcement tiers.
 pattern: >-
   (?is)\b(?:red\s+team|red\s+team\s+findings|adversary\s+simulation|attack\s+simulation|penetration\s+test|offensive\s+security|exploitation\s+report|security\s+assessment|red\s+team\s+engagement|attack\s+scenario)\b
 confidence: medium
@@ -43,7 +52,11 @@ test_cases:
     - value: adversary simulation
       description: Alternative topic phrase match
     - value: attack simulation
-      description: Additional topic phrase match
+      description: Additional topic phrase match (discovery only)
+    - value: 'RT-42 Severity High; attack path: phishing to token replay; affected asset: admin portal; evidence: session capture; remediation: bind tokens.'
+      description: Populated red-team finding record reaches the enforcing tiers
+    - value: "Spreadsheet schedule for next month's red team engagement."
+      description: Engagement scheduling matches the topic branch only (discovery, not enforcement)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -51,6 +64,8 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: source code config
       description: Generic word pair from old broad template should not match
+    - value: 'Pen-test training sample RT-01 with demo exploit.'
+      description: Training/sample/demo marks simulated output and the truncated record lacks finding content
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -65,36 +80,29 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 75
   shared_keywords:
-    - dict: data-record-context
-      as: Evidence_data_record_context
-      match_style: word
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_red_team_findings
+      id_match: Pattern_red_team_finding_record
       matches:
         - ref: Evidence_red_team_findings
-          min_count: 2
-          unique_results: true
-        - ref: Evidence_data_record_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_red_team_findings
+      id_match: Pattern_red_team_finding_record
       matches:
-        - ref: Evidence_red_team_findings
-        - ref: Evidence_data_record_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_red_team_findings
       matches:
         - ref: Evidence_red_team_findings
@@ -102,6 +110,9 @@ purview:
     - id: Pattern_red_team_findings
       pattern: >-
         (?is)\b(?:red\s+team|red\s+team\s+findings|adversary\s+simulation|attack\s+simulation|penetration\s+test|offensive\s+security|exploitation\s+report|security\s+assessment|red\s+team\s+engagement|attack\s+scenario)\b
+    - id: Pattern_red_team_finding_record
+      pattern: >-
+        (?is)\b(?:RT|FINDING)[-_ ]?\d{2,8}\b[\s\S]{0,260}\b(?:exploited|attack path|affected asset|evidence|impact|severity|remediation)\b
   keywords:
     - id: Evidence_red_team_findings
       groups:
@@ -128,8 +139,18 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Tier rebalance (TP-00379): red-team/penetration-test topic vocabulary no longer enforces (a
+      schedule spreadsheet could previously reach 85 because "spreadsheet" satisfied the shared
+      data-record-context gate) - the topic branch is demoted to 65 discovery_only and the
+      data-record-context import removed. Enforcement now anchors on Pattern_red_team_finding_record
+      (RT/FINDING record id within 260 characters of exploited/attack path/affected asset/evidence/
+      impact/severity/remediation content): 75 with template exclusion, 85 with additional red-team
+      topic evidence. Added finding-record positive and schedule/training-sample cases.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 854 without changing detector or package metadata.'

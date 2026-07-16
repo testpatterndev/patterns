@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Central Bank Monetary Policy Pre-Decision
 slug: central-bank-monetary-policy-pre-decision
-version: 1.3.2
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -51,11 +51,21 @@ test_cases:
       description: Central bank board paper with rate recommendation
     - value: 'PROTECTED — EMBARGOED. Monetary policy pre-decision briefing for the Reserve Bank board. Staff recommendation: tighten by 50 bps, moving the official cash rate target to 4.35 per cent. Deliberation notes restricted pending the board decision. Not for distribution.'
       description: Pre-decision monetary policy briefing with bps and per-cent rate indicators
+    - value: 'Reserve Bank Board recommendation: ease 25 basis points to 3.60 per cent; PRE-DECISION; embargoed.'
+      description: Institution, recommendation, action, alternate rate formats, and pre-decision status enforce without a decimal-percent token
+    - value: CONFIDENTIAL Reserve Bank board deliberation recommends holding the cash rate.
+      description: A genuine pre-decision recommendation enforces via the deliberation primary with no numeric rate at all
   should_not_match:
     - value: 'RBA Media Release: At its meeting today, the Reserve Bank Board decided to leave the cash rate target unchanged. The decision was published immediately after the meeting.'
       description: Published RBA decision — public announcement
     - value: Market economists expect the RBA to cut rates at its next meeting. CBA, Westpac, and NAB have all forecast a rate reduction in their public research notes.
       description: Market economist predictions based on public information
+    - value: The RBA cash rate is 3.85%.
+      description: A public numeric rate with no pre-decision, recommendation, or embargo evidence stays discovery only
+    - value: 'Economics exercise: RBA cuts 25 bps to 3.60%.'
+      description: Exercise context with public-style speculation carries no pre-decision evidence and must not enforce
+    - value: A museum exhibit described the history of Australian currency.
+      description: Historical currency material with no rate value, deliberation, recommendation, or embargo
 false_positives:
   - description: Published RBA decisions and media releases
     mitigation: Exclude documents containing 'media release', 'at its meeting today', 'decided to' indicating published decisions
@@ -74,15 +84,18 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_central_bank_monetary_policy_pre_decision_interest_rate_percentages
+      id_match:
+        type: any
+        ids:
+          - Pattern_central_bank_monetary_policy_pre_decision_interest_rate_percentages
+          - Pattern_central_bank_monetary_policy_pre_decision_basis_points_for_rate_changes
+          - Pattern_central_bank_monetary_policy_pre_decision_per_cent_rate_format
+          - Evidence_central_bank_monetary_policy_pre_decision_decision
       matches:
-        - ref: Evidence_central_bank_monetary_policy_pre_decision_primary
         - ref: Evidence_central_bank_monetary_policy_pre_decision_institutions
         - ref: Evidence_central_bank_monetary_policy_pre_decision_decision
         - ref: Evidence_central_bank_monetary_policy_pre_decision_actions
         - ref: Evidence_central_bank_monetary_policy_pre_decision_markers
-        - ref: Pattern_central_bank_monetary_policy_pre_decision_basis_points_for_rate_changes
-        - ref: Pattern_central_bank_monetary_policy_pre_decision_per_cent_rate_format
         - type: any
           min_matches: 0
           max_matches: 0
@@ -90,9 +103,20 @@ purview:
             - Keyword_noise_exclusion
             - Filter_central_bank_monetary_policy_pre_decision_exclusion
     - confidence_level: 75
-      id_match: Pattern_central_bank_monetary_policy_pre_decision_interest_rate_percentages
+      id_match:
+        type: any
+        ids:
+          - Pattern_central_bank_monetary_policy_pre_decision_interest_rate_percentages
+          - Pattern_central_bank_monetary_policy_pre_decision_basis_points_for_rate_changes
+          - Pattern_central_bank_monetary_policy_pre_decision_per_cent_rate_format
+          - Evidence_central_bank_monetary_policy_pre_decision_decision
       matches:
-        - ref: Evidence_central_bank_monetary_policy_pre_decision_primary
+        - ref: Evidence_central_bank_monetary_policy_pre_decision_institutions
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_central_bank_monetary_policy_pre_decision_decision
+            - Evidence_central_bank_monetary_policy_pre_decision_markers
         - type: any
           min_matches: 0
           max_matches: 0
@@ -101,7 +125,12 @@ purview:
             - Filter_central_bank_monetary_policy_pre_decision_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_central_bank_monetary_policy_pre_decision_interest_rate_percentages
+      id_match:
+        type: any
+        ids:
+          - Pattern_central_bank_monetary_policy_pre_decision_interest_rate_percentages
+          - Pattern_central_bank_monetary_policy_pre_decision_basis_points_for_rate_changes
+          - Pattern_central_bank_monetary_policy_pre_decision_per_cent_rate_format
       matches:
         - type: any
           min_matches: 0
@@ -196,8 +225,11 @@ sensitivity_labels:
   qgiscf_dlm: PROTECTED Financial
 references: []
 created: '2026-02-20'
-updated: '2026-07-15'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: 'sit-alignment-validation-2026-07-16 wave1 (TP-00687): enforcing tiers now accept an any-of primary — decimal-percent, basis-point, or per-cent regex, or the board recommendation/deliberation keyword group (previously all tiers keyed solely on the decimal-percent regex, making the 50 bps / 4.35 per cent authored positive unreachable). Every enforcing path now requires the RBA/Reserve Bank institutions group plus pre-decision evidence (decision or embargo/markers group — 75 previously required neither); 85 additionally requires the actions group and protected markers, and no longer conjunctively requires all numeric formats. Discovery 65 keys on the numeric formats. Media-release/economists-expect/published exclusions retained. Adversarial test cases added.'
   - version: 1.3.2
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1453; detector and package metadata unchanged.'

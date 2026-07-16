@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Cabinet Legal Briefing
 slug: cabinet-legal-briefing
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -61,6 +61,8 @@ test_cases:
         For: Cabinet Budget Review Committee
         Subject: Legal risks associated with proposed coal royalty increases
       description: Cabinet legal briefing prepared by Crown Law
+    - value: 'Cabinet Legal Briefing prepared by Crown Law: constitutional risk; LPP; PROTECTED.'
+      description: Legal document identity with provider, risk, privilege, and marking enforces without the CABINET-IN-CONFIDENCE marker
   should_not_match:
     - value: The Cabinet decision was announced by the Premier at a media conference on Tuesday. The government confirmed it will proceed with the legislation following Cabinet approval.
       description: News article about Cabinet decision announcement
@@ -68,6 +70,14 @@ test_cases:
       description: Public Cabinet procedures handbook
     - value: The new cabinet was installed in the conference room last week. The oak cabinet matches the existing furniture in the executive suite.
       description: Furniture reference using word cabinet
+    - value: CABINET-IN-CONFIDENCE agenda for next meeting.
+      description: Marker alone is not legal advice — discovery only, no enforcement
+    - value: Training example Cabinet Legal Briefing marked LPP.
+      description: Training/example context is suppressed by the noise exclusion
+    - value: CABINET-IN-CONFIDENCE Cabinet submission.
+      description: Marker plus generic Cabinet term cannot self-prove legal content
+    - value: Cabinet announced the bill after its regular meeting.
+      description: Public Cabinet announcement with no legal briefing, privilege, or confidential marker
 false_positives:
   - description: News articles about Cabinet decisions and announcements
     mitigation: Require co-occurrence with legal privilege terms (LPP, privilege, legal annexure) within proximity window
@@ -92,14 +102,13 @@ purview:
     - confidence_level: 85
       id_match: Pattern_cabinet_legal_briefing_cabinet_in_confidence_document_marker
       matches:
-        - ref: Evidence_cabinet_legal_briefing_primary
+        - ref: Pattern_cabinet_legal_briefing_cabinet_legal_document_type
         - ref: Evidence_cabinet_legal_briefing_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_cabinet_legal_briefing_exclusion
-        - ref: Pattern_cabinet_legal_briefing_cabinet_legal_document_type
         - type: any
           min_matches: 0
           max_matches: 0
@@ -107,9 +116,19 @@ purview:
             - Keyword_noise_exclusion
             - Filter_cabinet_legal_briefing_exclusion
     - confidence_level: 75
-      id_match: Pattern_cabinet_legal_briefing_cabinet_in_confidence_document_marker
+      id_match:
+        type: any
+        ids:
+          - Pattern_cabinet_legal_briefing_cabinet_in_confidence_document_marker
+          - Pattern_cabinet_legal_briefing_cabinet_legal_document_type
+          - Pattern_cabinet_legal_briefing_legal_advice_for_cabinet
       matches:
-        - ref: Evidence_cabinet_legal_briefing_primary
+        - ref: Evidence_cabinet_legal_briefing_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_cabinet_legal_briefing_exclusion
         - type: any
           min_matches: 0
           max_matches: 0
@@ -118,7 +137,12 @@ purview:
             - Filter_cabinet_legal_briefing_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_cabinet_legal_briefing_cabinet_in_confidence_document_marker
+      id_match:
+        type: any
+        ids:
+          - Pattern_cabinet_legal_briefing_cabinet_in_confidence_document_marker
+          - Pattern_cabinet_legal_briefing_cabinet_legal_document_type
+          - Pattern_cabinet_legal_briefing_legal_advice_for_cabinet
       matches:
         - type: any
           min_matches: 0
@@ -131,6 +155,8 @@ purview:
       pattern: (?i)CABINET[- ]IN[- ]CONFIDENCE
     - id: Pattern_cabinet_legal_briefing_cabinet_legal_document_type
       pattern: (?i)\bCabinet\s+(?:Legal\s+)?(?:Annexure|Briefing|Submission)\b
+    - id: Pattern_cabinet_legal_briefing_legal_advice_for_cabinet
+      pattern: (?i)\blegal\s+advice\s+prepared\s+for\s+(?:the\s+)?Cabinet\b
   keywords:
     - id: Evidence_cabinet_legal_briefing_primary
       groups:
@@ -189,8 +215,11 @@ sensitivity_labels:
   qgiscf_dlm: PROTECTED Legal
 references: []
 created: '2026-02-20'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: 'sit-alignment-validation-2026-07-16 wave1 (TP-00686): any-of primary across the CABINET-IN-CONFIDENCE marker, the Cabinet Legal Annexure/Briefing/Submission document-type regex, and a new legal-advice-prepared-for-Cabinet literal regex (previously all tiers required the exact marker, making two authored positives unreachable). Every enforcing branch now requires the legal corroborative group (75 previously enforced on marker plus generic Cabinet wording with zero legal evidence); 85 keys on the marker plus legal document type and the corroborative group. Public handbook/announcement exclusion group now NOT-gated at 75 as well as 85; furniture and noise exclusions retained on all tiers. Adversarial test cases added.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1458 without changing detector or package metadata.'

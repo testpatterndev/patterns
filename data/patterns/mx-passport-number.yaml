@@ -1,18 +1,22 @@
 schema: testpattern/v1
 name: Mexico Passport Number
 slug: mx-passport-number
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
 description: >-
   Detects Mexican passport numbers issued by the Secretaría de Relaciones Exteriores (SRE). Older passports use a
-  single letter followed by 7-8 digits; newer books carry an 8-9 character alphanumeric serial. Because the format is
-  short and loosely structured, corroborative keyword proximity is strongly recommended to reduce false positives.
+  single letter followed by 7-8 digits; newer books carry an 8-9 character alphanumeric serial. Mixed alphanumeric
+  serials are broad candidates that also match order IDs, booking codes, and product serials — they are not treated
+  as Mexican passport numbers without issuer or passport-document evidence. Because the format is short and loosely
+  structured, corroborative keyword proximity is strongly recommended to reduce false positives.
 operation: >-
   Reference: https://en.wikipedia.org/wiki/Mexican_passport
   Matches a single letter followed by 7-8 digits, or an 8-9 character alphanumeric serial containing at least one
-  letter and one digit. Corroborative evidence: keywords within 300 characters.
+  letter and one digit. Corroborative evidence: keywords within 300 characters. Purview tiers: both serial shapes are
+  discovery-only at 65; enforcement at 75 requires Mexico/passport context, with the mixed modern serial requiring an
+  explicit SRE or labelled passport cue (travel-document prose alone does not enforce it).
 pattern: (?<![A-Za-z0-9])(?:[A-Za-z][0-9]{7,8}|(?=[A-Za-z0-9]*[A-Za-z])(?=[A-Za-z0-9]*[0-9])[A-Za-z0-9]{8,9})(?![A-Za-z0-9])
 confidence: medium
 confidence_justification: >-
@@ -56,6 +60,8 @@ test_cases:
       description: All-letter string with no digit is not a Mexican passport serial
     - value: traiga su pasaporte mexicano vigente a la cita
       description: Prose mention of a Mexican passport without an actual number
+    - value: SRE passport 123456789
+      description: All-digit token fails the Mexican serial model even under an SRE/passport label
 false_positives:
   - description: Alphanumeric reference codes, order IDs and serial numbers of 8-9 characters that mix letters and digits.
     mitigation: Require corroborative passport keywords (passport, pasaporte, SRE) within 300 characters.
@@ -64,6 +70,73 @@ exports:
   - yaml
   - regex_copy
 scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 75
+      id_match: Regex_mx_passport_legacy
+      matches:
+        - ref: Keyword_mx_passport_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_mx_passport_modern
+      matches:
+        - ref: Keyword_mx_passport_labelled_cue
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_mx_passport_legacy
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_mx_passport_modern
+  regexes:
+    - id: Regex_mx_passport_legacy
+      pattern: (?<![A-Za-z0-9])[A-Za-z][0-9]{7,8}(?![A-Za-z0-9])
+    - id: Regex_mx_passport_modern
+      pattern: (?<![A-Za-z0-9])(?=[A-Za-z0-9]{8,9}(?![A-Za-z0-9]))(?=[A-Za-z0-9]*[A-Za-z])(?=[A-Za-z0-9]*[0-9])[A-Za-z0-9]{8,9}(?![A-Za-z0-9])
+  keywords:
+    - id: Keyword_mx_passport_context
+      groups:
+        - match_style: word
+          terms:
+            - pasaporte
+            - numero de pasaporte
+            - número de pasaporte
+            - Mexican passport
+            - text: SRE
+              case_sensitive: true
+            - Secretaria de Relaciones Exteriores
+            - Secretaría de Relaciones Exteriores
+            - passport number
+            - travel document
+      strength: specific
+    - id: Keyword_mx_passport_labelled_cue
+      groups:
+        - match_style: word
+          terms:
+            - pasaporte
+            - numero de pasaporte
+            - número de pasaporte
+            - Mexican passport
+            - text: SRE
+              case_sensitive: true
+            - Secretaria de Relaciones Exteriores
+            - Secretaría de Relaciones Exteriores
+            - passport number
+      strength: specific
 risk_description: >-
   The Mexican passport SIT covers older one-letter plus seven- or eight-digit numbers and newer mixed alphanumeric serials of eight or nine characters, with passport evidence; it is not a passport image or SRE record. Disclosure might aid a visa, airline, or identity-verification pretext after the traveller's biographical details are obtained elsewhere. One ordinary match concerns one holder, while the newer loosely structured branch overlaps order IDs, booking codes, and product serials. Risk 5 and OFFICIAL recognise the bounded identifier harm; SENSITIVE would require document contents, credentials, or a linked travel and identity profile.
 sensitivity_labels:
@@ -75,8 +148,14 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-16'
+    description: >-
+      Add the previously missing Purview detector block: separate legacy (letter + 7-8 digits) and modern (8-9 character mixed alphanumeric) primaries so their collision rates tier independently;
+      both shapes discovery-only at 65; enforcement at 75 requires pasaporte/SRE/Mexican-passport context, with the modern serial gated on an explicit SRE or labelled passport cue (travel-document
+      prose supports only the legacy branch); shared template/sample/training noise NOT-group on both enforcing tiers.
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2043 without changing detector or package metadata.'

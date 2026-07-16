@@ -1,11 +1,15 @@
 schema: testpattern/v1
 name: NPI
 slug: us-npi
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects NPI patterns.
+description: >-
+  Detects US National Provider Identifier (NPI) values structurally: a ten-digit number beginning with 1 or 2.
+  Detection is structural only — the NPI Luhn checksum (80840 prefix) is NOT enforced. Confidence comes from
+  healthcare context tiers (NPI-specific terms at 85, broader provider/claims context at 75, bare shape
+  discovery-only at 65), and an all-same-digit guard rejects repeated-digit values such as 1111111111.
 operation: >-
   Checksum: Luhn with 80840 prefix (NOT enforced in this regex-only pattern; structural detection only). Reference:
   https://www.cms.gov/Regulations-and-Guidance/Administrative-Simplification/NationalProvIdentStand/Downloads/NPIcheckdigit.pdf
@@ -58,8 +62,8 @@ test_cases:
       description: NPI starting with 1
     - value: '2345678901'
       description: NPI starting with 2
-    - value: '1111111111'
-      description: Repeated-digit NPI
+    - value: '1234567893'
+      description: NPI-checksum-valid value with non-repeating digits
   should_not_match:
     - value: 3234567890
       description: Starts with 3 (must start with 1 or 2)
@@ -67,6 +71,8 @@ test_cases:
       description: Starts with 0 (must start with 1 or 2)
     - value: 123456789
       description: Only 9 digits instead of 10
+    - value: '1111111111'
+      description: All-same-digit value rejected by the classifier's own AllDigitsSameFilter guard
 false_positives:
   - description: >-
       Medical terminology in health education materials, research publications, clinical guidelines, or public health
@@ -161,8 +167,14 @@ sensitivity_labels:
   nz_gov: "CONFIDENTIAL"
   ca_gov: "Protected B"
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Resolve the test/filter contradiction: the authored positive 1111111111 was unconditionally vetoed by the classifier's own AllDigitsSameFilter — replaced with the non-repeating,
+      NPI-checksum-valid 1234567893 and moved 1111111111 to should_not_match. Regex, tiers, and filters unchanged; description expanded to state structural-only detection (no Luhn enforcement),
+      context tiers, and same-digit rejection. Checksum enforcement deliberately deferred to a separate evidence-backed change.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1432 without changing detector or package metadata.'

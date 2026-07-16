@@ -1,13 +1,13 @@
 schema: testpattern/v1
 name: GPS Coordinates (Decimal Degrees)
 slug: global-gps-coordinates
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects GPS Coordinates (Decimal Degrees) patterns. Requires location/GPS context keywords
 operation: 'Corroborative evidence: 3 keywords within 300 characters. Keyword lists: emerging-geolocation. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.'
-pattern: '-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}'
+pattern: '(?<![\d.])-?(?:90\.0{4,}|[0-8]?\d\.\d{4,})\s*,\s*-?(?:180\.0{4,}|(?:1[0-7]\d|\d{1,2})\.\d{4,})(?!\d)'
 confidence: medium
 confidence_justification: >-
   Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false positive rates. Added context gating and exclusion rules improve precision and reduce
@@ -40,7 +40,15 @@ test_cases:
       description: New York GPS coordinates
     - value: '-37.8136, 144.9631'
       description: Melbourne GPS coordinates
+    - value: '90.0000, -180.0000'
+      description: Exact latitude/longitude endpoints with all-zero fractions are valid
   should_not_match:
+    - value: '91.0000, 151.0000'
+      description: Latitude above the 90-degree bound is geographically impossible
+    - value: '-33.0000, 181.0000'
+      description: Longitude above the 180-degree bound is geographically impossible
+    - value: '90.0001, 180.0000'
+      description: Latitude endpoint with a nonzero fractional part is invalid
     - value: '-33.86, 151.20'
       description: Too few decimal places (2 instead of minimum 4)
     - value: 40.7128, -74.006
@@ -111,7 +119,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_gps_decimal
-      pattern: '-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}'
+      pattern: '(?<![\d.])-?(?:90\.0{4,}|[0-8]?\d\.\d{4,})\s*,\s*-?(?:180\.0{4,}|(?:1[0-7]\d|\d{1,2})\.\d{4,})(?!\d)'
     - id: Pattern_global_gps_coordinates_label_context
       pattern: (?i)\b(?:gps\s+coordinates\s+\(decimal\s+degrees\)|gps|coordinates|decimal|degrees)\b
   keywords:
@@ -143,8 +151,14 @@ purview:
             - degrees
       strength: domain
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Bound the decimal components geographically in the top-level pattern and Regex_gps_decimal: latitude -90..90 and longitude -180..180 (previously any signed 1-3 digit degree value), retaining
+      the comma separator and 4-decimal minimum; the exact +/-90 and +/-180 endpoints only accept an all-zero fractional part, and lookaround guards prevent substring matches inside out-of-range
+      values. Tier structure and evidence unchanged; added boundary and overflow test cases.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1237 without changing detector or package metadata.'

@@ -1,11 +1,13 @@
 schema: testpattern/v1
 name: PII data-flow maps
 slug: au-top500-260-pii-data-flow-maps
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies pii data-flow maps patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
+description: >-
+  Identifies maps or inventories that trace personal-data movement between systems — populated source-to-destination flow edges naming personal-data categories. PII-processing topic language
+  (privacy notices, data-processing prose) without flow/lineage structure is discovery-only. Detects potential exposure of sensitive security information in Australian systems.
 operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters.'
 pattern: >-
   (?is)\b(?:pii\s+data[\s-]+flow\s+maps|data\s+flow|pii\s+mapping|personal\s+information|data\s+lineage|data\s+inventory|privacy\s+impact|data\s+processing|data\s+subject|information\s+flow|data\s+architecture)\b
@@ -48,9 +50,17 @@ test_cases:
       description: Alternative topic phrase match
     - value: personal information
       description: Additional topic phrase match
+    - value: 'Source: Web signup -> Destination: CRM via API; data: name, email address, customer ID; store: AU-East SQL; retention: 7 years.'
+      description: Populated source-to-destination flow edge naming PII categories, transfer method, store, and retention (enforcement branch)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
+    - value: 'Privacy policy: we process personal information fairly.'
+      description: Processing-principles prose without a mapped flow must not enforce (discovery-only)
+    - value: The river data flow model predicts water levels.
+      description: Hydrology data-flow prose is not a PII flow map and must not enforce
+    - value: 'Privacy workshop sample map: Source A -> CRM, example email.'
+      description: Workshop/sample/example instructional content must not enforce
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
     - value: source code config
@@ -74,9 +84,9 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_pii_data_flow_maps
+      id_match: Pattern_pii_flow_edge
       matches:
-        - ref: Evidence_pii_data_flow_maps
+        - ref: Pattern_pii_flow_edge
           min_count: 2
           unique_results: true
         - type: any
@@ -85,15 +95,15 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_pii_data_flow_maps
+      id_match: Pattern_pii_flow_edge
       matches:
-        - ref: Evidence_pii_data_flow_maps
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_pii_data_flow_maps
       matches:
         - ref: Evidence_pii_data_flow_maps
@@ -101,6 +111,9 @@ purview:
     - id: Pattern_pii_data_flow_maps
       pattern: >-
         (?is)\b(?:pii\s+data[\s-]+flow\s+maps|data\s+flow|pii\s+mapping|personal\s+information|data\s+lineage|data\s+inventory|privacy\s+impact|data\s+processing|data\s+subject|information\s+flow|data\s+architecture)\b
+    - id: Pattern_pii_flow_edge
+      pattern: >-
+        (?is)\b(?:source|from)\s*[:=]\s*[^;|\r\n]{2,80}[\s\S]{0,120}\b(?:destination|to|system|store)\s*[:=]\s*[^;|\r\n]{2,80}[\s\S]{0,160}\b(?:email address|name|phone|customer id|health data|personal information|PII)\b
   keywords:
     - id: Evidence_pii_data_flow_maps
       groups:
@@ -128,8 +141,14 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Tier rebalance: enforcement now anchors on new Pattern_pii_flow_edge — a populated source/from-to-destination/system/store flow edge that names a personal-data category — at 75 (one edge,
+      noise-gated) and 85 (two unique edges, noise-gated); the PII/privacy topic branch is demoted to discovery-only 65 so privacy-notice and data-processing prose can no longer enforce.
+      Description now identifies maps or inventories that trace personal-data movement between systems.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 861 without changing detector or package metadata.'

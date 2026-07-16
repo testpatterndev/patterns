@@ -1,13 +1,14 @@
 schema: testpattern/v1
 name: Circuit schematics
 slug: au-top500-211-circuit-schematics
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to circuit schematics in Australian contexts. This information type is classified as personally identifiable information under applicable data protection
-  regulations.
+  Identifies documents containing circuit schematic or layout content in Australian contexts. Enforcement denotes actual schematic or layout artifacts (reference designators with pin/net/node/footprint
+  relations, netlists, sheet numbers, EDA design files) — circuit-design topic language alone, i.e. the discipline of circuit design, is discovery-only. This information type is classified as personally
+  identifiable information under applicable data protection regulations.
 operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
 pattern: >-
   (?is)\b(?:circuit\s+schematics|circuit\s+design|schematic\s+diagram|PCB\s+layout|electronic\s+design|intellectual\s+property|proprietary\s+design|hardware\s+design|component\s+layout|board\s+schematic)\b
@@ -48,9 +49,15 @@ test_cases:
       description: Alternative topic phrase match
     - value: PCB layout
       description: Additional topic phrase match
+    - value: 'Sheet 3: U14 pin 7 connects to net VREF; R22 10k; source board.kicad_sch rev B.'
+      description: Reference designators with pin/net relations plus an EDA filename prove schematic content (artifact enforcement branch)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
+    - value: 'Tutorial sample schematic: U1 pin 1 to NET_A.'
+      description: Tutorial/sample teaching material must not enforce (single artifact token, noise-gated)
+    - value: The seating layout places component teams near each other.
+      description: Layout/component words in organisational prose are not schematic content
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
     - value: algorithm schematic
@@ -76,10 +83,10 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_circuit_schematics
+      id_match: Pattern_circuit_artifact
       matches:
-        - ref: Evidence_circuit_schematics
-          min_count: 2
+        - ref: Pattern_circuit_artifact
+          min_count: 3
           unique_results: true
         - type: any
           min_matches: 0
@@ -87,15 +94,18 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_circuit_schematics
+      id_match: Pattern_circuit_artifact
       matches:
-        - ref: Evidence_circuit_schematics
+        - ref: Pattern_circuit_artifact
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_circuit_schematics
       matches:
         - ref: Evidence_circuit_schematics
@@ -103,6 +113,9 @@ purview:
     - id: Pattern_circuit_schematics
       pattern: >-
         (?is)\b(?:circuit\s+schematics|circuit\s+design|schematic\s+diagram|PCB\s+layout|electronic\s+design|intellectual\s+property|proprietary\s+design|hardware\s+design|component\s+layout|board\s+schematic)\b
+    - id: Pattern_circuit_artifact
+      pattern: >-
+        (?im)(?:\b(?:R|C|U|Q|D|J)\d+\b[^\r\n]{0,80}\b(?:pin|net|node|footprint)\b|\b(?:\.kicad_sch|\.sch|\.brd|\.pcb|netlist|sheet\s+\d+)\b)
   keywords:
     - id: Evidence_circuit_schematics
       groups:
@@ -129,8 +142,14 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Tier rebalance: enforcement now anchors on new Pattern_circuit_artifact (reference designator + pin/net/node/footprint relation, or netlist/sheet-number/EDA-file token) — 75 requires the anchor
+      plus two unique artifact tokens, 85 three, both noise-gated; the circuit-design topic branch is demoted to discovery-only 65 so design-discipline prose can no longer enforce. Description now
+      states enforcement denotes schematic/layout content, not the discipline of circuit design.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 812 without changing detector or package metadata.'

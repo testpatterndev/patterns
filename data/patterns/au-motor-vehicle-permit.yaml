@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Motor Vehicle Permit
 slug: au-motor-vehicle-permit
-version: 2.3.1
+version: 2.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -10,7 +10,8 @@ description: >-
   keyword lists. Includes generic fallback tier.
 operation: >-
   State-specific regexes for each jurisdiction's licence format combined with a consolidated permit-term keyword list and jurisdiction agency keyword list. State context uses regex patterns for state
-  names and abbreviations rather than keyword lists. 3 confidence tiers: generic + permit terms + agency keywords with exclusion (85), generic + permit terms (75), generic + permit terms only (65).
+  names and abbreviations rather than keyword lists. Per-jurisdiction confidence tiers: state format + permit terms + matching jurisdiction + agency keywords with template exclusion (85), state format
+  + permit terms + matching jurisdiction (75); the generic fallback shape is discovery-only (65) with broad permit terms and an AU mobile-number NONE-of gate.
 pattern: \b(?:(?!0{8}\b)\d{8}|\d{4}[A-Z]{2})\b
 confidence: low
 confidence_justification: 'Low confidence: generic digit patterns match many non-licence identifiers. State-specific regex combined with permit-term and jurisdiction-agency keywords essential for reliable detection.'
@@ -66,6 +67,8 @@ test_cases:
       description: Placeholder numeric value excluded by sentinel filter
     - value: '111111111'
       description: All-same digit sequence excluded by sentinel filter
+    - value: Mobile 0412345678 for proof of identity contact.
+      description: Australian mobile number must be suppressed by the AU mobile-number NONE-of gate and must not reach an enforceable tier
 false_positives:
   - description: Generic numeric sequences matching licence digit counts.
     mitigation: Require permit-term keywords and state context for reliable detection.
@@ -107,9 +110,87 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_permit_generic
+      id_match: Pattern_permit_nsw
       matches:
         - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_nsw
+        - ref: Evidence_permit_agency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 85
+      id_match: Pattern_permit_vic
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_vic
+        - ref: Evidence_permit_agency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 85
+      id_match: Pattern_permit_qld
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_qld
+        - ref: Evidence_permit_agency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 85
+      id_match: Pattern_permit_sa
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_sa
+        - ref: Evidence_permit_agency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 85
+      id_match: Pattern_permit_wa
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_wa
+        - ref: Evidence_permit_agency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 85
+      id_match: Pattern_permit_tas
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_tas
+        - ref: Evidence_permit_agency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 85
+      id_match: Pattern_permit_nt
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_nt
+        - ref: Evidence_permit_agency
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 85
+      id_match: Pattern_permit_act
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_act
         - ref: Evidence_permit_agency
         - type: any
           min_matches: 0
@@ -117,13 +198,55 @@ purview:
           children:
             - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_permit_generic
+      id_match: Pattern_permit_nsw
       matches:
         - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_nsw
+    - confidence_level: 75
+      id_match: Pattern_permit_vic
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_vic
+    - confidence_level: 75
+      id_match: Pattern_permit_qld
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_qld
+    - confidence_level: 75
+      id_match: Pattern_permit_sa
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_sa
+    - confidence_level: 75
+      id_match: Pattern_permit_wa
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_wa
+    - confidence_level: 75
+      id_match: Pattern_permit_tas
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_tas
+    - confidence_level: 75
+      id_match: Pattern_permit_nt
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_nt
+    - confidence_level: 75
+      id_match: Pattern_permit_act
+      matches:
+        - ref: Evidence_permit_terms
+        - ref: Pattern_jurisdiction_act
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_permit_generic
       matches:
         - ref: Evidence_permit_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Guard_au_mobile_number
   regexes:
     - id: Pattern_permit_nsw
       pattern: \b(?:(?!0{8}\b)\d{8}|\d{4}[A-Z]{2})\b
@@ -159,6 +282,8 @@ purview:
       pattern: (?i)\b(?:NT|Northern\s+Territory|Motor\s+Vehicle\s+Registry|MVR)\b
     - id: Pattern_jurisdiction_act
       pattern: (?i)\b(?:ACT|Australian\s+Capital\s+Territory|Access\s+Canberra)\b
+    - id: Guard_au_mobile_number
+      pattern: (?i)\b(?:\+?61[ -]?4|04)\d(?:[ -]?\d){7}\b
   keywords:
     - id: Evidence_permit_terms
       groups:
@@ -228,8 +353,14 @@ purview:
         - "123456789"
         - "1234567890"
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 2.4.0
+    date: '2026-07-16'
+    description: >-
+      Wire the 16 already-declared state-format and jurisdiction regexes into the tiers: 8 state-paired 85 branches (state format + permit terms + matching jurisdiction + agency with template
+      exclusion) and 8 state-paired 75 branches (state format + permit terms + matching jurisdiction); demote the generic fallback to discovery-only 65 and gate it with a new Guard_au_mobile_number
+      NONE-of regex so Australian mobile numbers no longer reach any enforceable tier. Same-digit and numeric-sentinel filters retained.
   - version: 2.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 560 without changing detector or package metadata.'

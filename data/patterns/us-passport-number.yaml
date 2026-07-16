@@ -1,19 +1,19 @@
 schema: testpattern/v1
 name: US Passport Number
 slug: us-passport-number
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
 description: >-
-  Detects US passport numbers, which consist of 8 to 9 digits optionally preceded by a single uppercase letter. Older US
-  passports use a 9-digit numeric format, while newer passport books and cards may include a single alpha prefix
-  followed by 8 digits. Due to the relatively simple format, corroborative keyword proximity is strongly recommended to
-  reduce false positives.
+  Detects US passport numbers in exactly two accepted formats: a nine-digit numeric value (older US passports), or a
+  single uppercase letter followed by exactly eight digits (newer passport books and cards). Bare eight-digit values
+  and letter-plus-nine-digit values are not valid US passport numbers. Due to the relatively simple format,
+  corroborative keyword proximity is strongly recommended to reduce false positives.
 operation: >-
   Reference: https://travel.state.gov/content/travel/en/passports/passport-help/next-generation-passport.html
   Corroborative evidence: 5 keywords within 300 characters. Keyword lists: pii-civic-credentials.
-pattern: \b[A-Z]?\d{8,9}\b
+pattern: \b(?:[A-Z]\d{8}|\d{9})\b
 confidence: medium
 confidence_justification: >-
   The US passport number format is short and loosely structured, consisting of an optional letter followed by 8-9
@@ -56,6 +56,10 @@ test_cases:
       description: Two-letter prefix is not a valid US passport number format
     - value: '1234567'
       description: Only 7 digits, which is below the minimum length for a US passport number
+    - value: '12345678'
+      description: Bare eight-digit value is the unsupported short cross-product (only letter + 8 digits or 9 digits are valid)
+    - value: A123456789
+      description: Letter plus nine digits is the unsupported long cross-product
 false_positives:
   - description: Other 8-9 digit numbers such as order IDs, reference codes, phone numbers, and account identifiers
     mitigation: >-
@@ -101,7 +105,7 @@ purview:
       id_match: Regex_us_passport
   regexes:
     - id: Regex_us_passport
-      pattern: \b[A-Z]?\d{8,9}\b
+      pattern: \b(?:[A-Z]\d{8}|\d{9})\b
   keywords:
     - id: Keyword_us_passport_specific
       groups:
@@ -148,8 +152,14 @@ sensitivity_labels:
   nz_gov: "RESTRICTED"
   ca_gov: "Protected B"
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Replace the optional-letter/variable-length cross-product \b[A-Z]?\d{8,9}\b with the explicit alternation \b(?:[A-Z]\d{8}|\d{9})\b in both the top-level pattern and Regex_us_passport — the old
+      shape admitted bare eight-digit values and letter-plus-nine-digit values that the description never declared. Context tiers, same-digit guard, and noise gate unchanged; added short/long
+      cross-product negatives.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1433 without changing detector or package metadata.'
