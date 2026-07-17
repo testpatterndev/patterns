@@ -24,6 +24,8 @@ const kwDir = join(BASE, 'data', 'keywords')
 const REQUIRED = ['schema', 'name', 'slug', 'type', 'confidence', 'jurisdictions', 'regulations', 'data_categories', 'test_cases']
 const KW_TYPES = new Set(['keyword_list', 'keyword_dictionary'])
 const PACKAGE_TAG_SCHEMA = 'testpattern.package-tags.v1'
+const CLASSIFIER_ID_SCHEMA = 'testpattern.classifier-ids.v1'
+const CLASSIFIER_ID_PATTERN = /^TP-\d{5}$/
 const PACKAGE_COMPONENT_TIERS = new Set(['small', 'medium', 'large'])
 const PACKAGE_SECTORS = new Set(['generic-enterprise', 'public-sector', 'legal-investigations', 'healthcare', 'financial-services', 'education', 'critical-infrastructure'])
 const PACKAGE_ADDONS = new Set(['ai-readiness', 'payment-card-pci', 'credentials-secrets', 'health-phi', 'legal-privilege', 'critical-infrastructure', 'student-child-data'])
@@ -164,6 +166,52 @@ if (!existsSync(packageTagsPath)) {
       }
       for (const slug of Object.keys(rows)) {
         if (!patternSlugs.has(slug)) errors.push(`data/package-tags.json references unknown pattern '${slug}'`)
+      }
+    }
+  }
+}
+
+// ── Stable catalogue classifier IDs ──
+// Slugs remain the human-readable source identity. This append-only registry gives
+// integrations a compact identifier without putting tenant Purview GUIDs in YAML.
+const classifierIdsPath = join(BASE, 'data', 'classifier-ids.json')
+if (!existsSync(classifierIdsPath)) {
+  errors.push('data/classifier-ids.json missing — run npm run sync:classifier-ids')
+} else {
+  let registry
+  try { registry = JSON.parse(readFileSync(classifierIdsPath, 'utf-8')) }
+  catch (e) { errors.push(`data/classifier-ids.json parse error — ${e.message.split('\n')[0]}`) }
+
+  if (registry) {
+    if (registry.schema !== CLASSIFIER_ID_SCHEMA) errors.push(`data/classifier-ids.json schema must be ${CLASSIFIER_ID_SCHEMA}`)
+    if (!Number.isInteger(registry.nextNumber) || registry.nextNumber < 1 || registry.nextNumber > 100000) {
+      errors.push('data/classifier-ids.json nextNumber must be an integer from 1 through 100000')
+    }
+    const rows = registry.patterns
+    if (!rows || typeof rows !== 'object' || Array.isArray(rows)) {
+      errors.push('data/classifier-ids.json must contain a patterns object')
+    } else {
+      const seenIds = new Map()
+      let maximumNumber = 0
+      for (const [slug, classifierId] of Object.entries(rows)) {
+        if (!CLASSIFIER_ID_PATTERN.test(classifierId)) {
+          errors.push(`${slug}: invalid classifier ID '${classifierId}' (expected TP-00001 format)`)
+          continue
+        }
+        if (seenIds.has(classifierId)) {
+          errors.push(`${slug}: classifier ID '${classifierId}' is already assigned to '${seenIds.get(classifierId)}'`)
+        }
+        seenIds.set(classifierId, slug)
+        maximumNumber = Math.max(maximumNumber, Number(classifierId.slice(3)))
+      }
+      for (const slug of patternSlugs) {
+        if (!rows[slug]) errors.push(`${slug}: missing stable classifier ID`)
+      }
+      for (const slug of Object.keys(rows)) {
+        if (!patternSlugs.has(slug)) warns.push(`${slug}: retired classifier ID is retained by the append-only registry`)
+      }
+      if (Number.isInteger(registry.nextNumber) && registry.nextNumber <= maximumNumber) {
+        errors.push(`data/classifier-ids.json nextNumber must be greater than allocated ID TP-${String(maximumNumber).padStart(5, '0')}`)
       }
     }
   }

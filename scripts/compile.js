@@ -10,6 +10,7 @@ const REQUIRED_PATTERN_FIELDS = ['schema', 'name', 'slug', 'type', 'confidence',
 const REQUIRED_COLLECTION_FIELDS = ['schema', 'name', 'slug', 'description', 'patterns']
 const REQUIRED_KEYWORD_FIELDS = ['schema', 'name', 'slug', 'type', 'keywords']
 const PACKAGE_TAGS_FILE = join(DATA_DIR, 'package-tags.json')
+const CLASSIFIER_IDS_FILE = join(DATA_DIR, 'classifier-ids.json')
 
 function walkDir(dir) {
   const files = []
@@ -50,8 +51,20 @@ function loadPackageTags() {
   }
 }
 
+function loadClassifierIds() {
+  if (!existsSync(CLASSIFIER_IDS_FILE)) {
+    throw new Error(`${relative(DATA_DIR, CLASSIFIER_IDS_FILE)} is required; run npm run sync:classifier-ids`)
+  }
+  const data = JSON.parse(readFileSync(CLASSIFIER_IDS_FILE, 'utf-8'))
+  if (data.schema !== 'testpattern.classifier-ids.v1' || !data.patterns || typeof data.patterns !== 'object') {
+    throw new Error(`Invalid classifier ID registry: ${relative(DATA_DIR, CLASSIFIER_IDS_FILE)}`)
+  }
+  return data
+}
+
 console.log('Compiling patterns...')
 const packageTags = loadPackageTags()
+const classifierIds = loadClassifierIds()
 
 // ── Load keyword dictionaries first (for reference resolution) ──
 const keywordFiles = walkDir(join(DATA_DIR, 'keywords'))
@@ -83,6 +96,12 @@ for (const file of patternFiles) {
     : REQUIRED_PATTERN_FIELDS
 
   if (!validate(data, reqFields, file)) continue
+  const classifierId = classifierIds.patterns[data.slug]
+  if (!classifierId) {
+    console.error(`  ERROR missing classifier ID for pattern: ${data.slug}`)
+    process.exit(1)
+  }
+  data.classifier_id = classifierId
   if (packageTags) {
     const tags = packageTags.patterns[data.slug]
     if (tags) data.package_tags = tags
