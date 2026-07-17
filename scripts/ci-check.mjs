@@ -17,6 +17,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
+import { purviewBanned } from './lib/purview-banned.mjs'
 
 const BASE = fileURLToPath(new URL('..', import.meta.url))
 const patDir = join(BASE, 'data', 'patterns')
@@ -42,28 +43,9 @@ const errors = [], warns = []
 
 const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(b, fl) }
 
-// Purview (Boost.RegEx) banned constructs — patterns with a purview block fail CI; others warn.
-const stripClasses = (src) => src.replace(/\[(?:[^\]\\]|\\.)*\]/g, '[]')
-function purviewBanned(src) {
-  const s = stripClasses(src)
-  const issues = []
-  if (/[+*]\)[*+]|[+*]\)\{/.test(s)) issues.push('nested quantifier')
-  if (/(?<!\\)\.(?:[*+]|\{\d+,?\d*\})/.test(s)) issues.push('unbounded/braced dot quantifier')
-  // Char classes are already stripped to literal `[]`, so any surviving ^ or $ is outside
-  // a class. Only unescaped anchors count — `\^`/`\$` are literal chars, not anchors.
-  if (/(?<!\\)\^|(?<!\\)\$/.test(s)) issues.push('^/$ anchor')
-  // Strip escaped characters first so literal `\(` / `\)` (e.g. parenthesised phone
-  // renderings like `\(020\)`) are not miscounted as capturing groups — Boost/Purview
-  // accepts literal parens fine; only real unnamed capture groups are the concern.
-  const captures = (s.replace(/\\./g, '').replace(/\(\?[:=!<]/g, '(?x').match(/\((?!\?)/g) || []).length
-  if (captures > 1) issues.push(`${captures} capturing groups`)
-  // Boost.RegEx allows FIXED-length lookbehinds (e.g. `\s{3}`) — only variable-length
-  // quantifiers (*, +, ?, {n,}, {n,m}) inside the body are banned. Note this also flags a
-  // `?` belonging to a nested (?:...) group inside the lookbehind body; that's acceptable
-  // since a nested group makes the lookbehind's length variable-risk regardless.
-  if (/\(\?<[=!][^)]*(?:[*+?]|\{\d+,)/.test(s)) issues.push('variable-length lookbehind')
-  return issues
-}
+// Purview (Boost.RegEx) banned constructs — patterns with a purview block fail CI; others
+// warn. Implementation and the live upload evidence behind each rule live in
+// scripts/lib/purview-banned.mjs (tested by scripts/lib/__tests__/purview-banned.test.mjs).
 
 for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   let p
