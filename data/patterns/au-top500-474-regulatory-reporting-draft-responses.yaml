@@ -1,19 +1,30 @@
 schema: testpattern/v1
 name: Regulatory reporting draft responses
 slug: au-top500-474-regulatory-reporting-draft-responses
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to regulatory reporting draft responses in Australian contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters.'
-pattern: (?is)\b(?:regulatory\s+reporting\s+draft\s+responses|regulatory\s+reporting|draft\s+response|regulator\s+inquiry|compliance\s+reporting|statutory\s+obligation|regulatory\s+submission)\b
+  Identifies pre-submission draft responses, submissions, and reports prepared for Australian
+  regulators, including APRA, ASIC, AUSTRAC, ACCC, OAIC, and Queensland regulators. Topic phrases are
+  discovery-only; enforcement requires Australian authority context and substantive reporting content,
+  while high confidence also requires a structured regulator matter or submission reference.
+operation: >-
+  Regex_au_regulatory_reporting_draft recognises draft regulator-facing responses, submissions, and
+  reports. The topic alone is discovery-only at 65. Australian regulator context plus at least two
+  distinct reporting-period, event, disclosure, affected-record, data-quality, control, corrective-
+  action, legal-review, or outstanding-evidence signals reaches 75; a structured Australian authority
+  reference raises it to 85. Enforcing tiers reject templates, published or instructional material, and
+  exam or test records.
+pattern: >-
+  (?is)\b(?:regulatory\s+reporting\s+draft\s+(?:responses?|submissions?|reports?)|draft\s+(?:regulatory\s+)?(?:response|submission|report)\s+(?:to|for)\s+(?:the\s+)?(?:APRA|ASIC|AUSTRAC|ACCC|OAIC|regulator|regulatory\s+authority|supervisory\s+authority|Australian\s+(?:regulator|regulatory\s+authority)|Queensland\s+(?:regulator|regulatory\s+authority))|draft\s+response\s+to\s+(?:an?\s+)?(?:(?:APRA|ASIC|AUSTRAC|ACCC|OAIC)\s+)?(?:regulatory|statutory)\s+(?:request|notice|reporting\s+obligation))\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
+confidence_justification: >-
+  Medium confidence requires Australian regulator context and multiple substantive draft-reporting
+  signals. High confidence adds a structured authority matter or submission reference.
 jurisdictions:
-  - global
+  - au
 regulations:
   - AML/CTF Act (Cth)
   - HRIPA (Cth)
@@ -25,43 +36,53 @@ regulations:
 frameworks:
   - ISO 27001
   - ISO 27701
+  - QGISCF
 data_categories:
-  - pii
+  - government
+  - legal
 corroborative_evidence:
   keywords:
-    - regulatory reporting draft responses
-    - regulatory
-    - reporting
-    - draft
-    - responses
-    - privacy
-    - compliance
-    - risk
+    - AUSTRAC regulatory reporting draft response
+    - ASIC draft regulatory submission
+    - APRA draft prudential report
+    - Queensland regulator draft response
+    - reporting period
+    - proposed disclosure
+    - data quality issue
+    - evidence outstanding
   proximity: 300
 test_cases:
   should_match:
-    - value: regulatory reporting draft responses
-      description: Primary topic phrase match
-    - value: regulatory reporting
-      description: Case-insensitive topic phrase match
-    - value: draft response
-      description: Alternative topic phrase match
-    - value: regulator inquiry
-      description: Additional topic phrase match
+    - value: Regulatory reporting draft response
+      description: Low-tier probe - draft reporting topic without Australian authority or substantive evidence
+    - value: 'AUSTRAC regulatory reporting draft response: reporting period, reportable transaction, proposed disclosure, affected records, data quality issue, control weakness, corrective action, and legal review'
+      description: Medium-tier probe - substantive Australian reporting draft without a formal matter reference
+    - value: 'Draft submission to the Queensland regulator: reporting period, reportable event, proposed disclosure, affected records, data quality exception, corrective action, and evidence outstanding'
+      description: Medium-tier probe - substantive Queensland regulator draft without a formal matter reference
+    - value: 'AUSTRAC regulatory reporting draft response, AUSTRAC matter reference: AUR-2026-77: reporting period, reportable transaction, proposed disclosure, affected records, data quality issue, control weakness, corrective action, legal review, and evidence outstanding'
+      description: High-tier probe - substantive draft with a structured AUSTRAC matter reference
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: data inventory compliance
-      description: Generic word pair from old broad template should not match
+    - value: 'ASIC compliance guidance explains how to prepare a regulatory reporting draft response with a reporting period, proposed disclosure, control weakness, and legal review.'
+      description: Generic compliance guidance is not an operational regulator-facing draft
+    - value: 'AUSTRAC published report on regulatory reporting draft responses summarises reporting periods, reportable transactions, proposed disclosures, and data quality issues.'
+      description: Published reporting material is not a confidential pre-submission draft
+    - value: 'The compliance exam asks a candidate to prepare an AUSTRAC regulatory reporting draft response with a reporting period, proposed disclosure, corrective action, and legal review.'
+      description: Exam or test answers are outside the regulatory-reporting-draft SIT
+    - value: 'Template: AUSTRAC regulatory reporting draft response, AUSTRAC matter reference: AUR-2026-77, reporting period, reportable transaction, proposed disclosure, control weakness, corrective action, and legal review.'
+      description: Explicit draft-response templates must not enforce
+    - value: 'Draft response to a customer complaint: reporting period, affected records, proposed resolution, corrective action, and legal review.'
+      description: Adjacent customer-response draft is outside the regulator-facing SIT
+    - value: 'Draft response to an RTI request: affected records, proposed disclosure, legal review, and evidence outstanding.'
+      description: Adjacent access-request draft is outside the regulatory-reporting SIT
 false_positives:
-  - description: Common words and phrases related to regulatory reporting draft responses appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Australian regulatory guidance and published statutory reports can discuss reporting periods, reportable events, disclosures, controls, and legal review without containing a live draft.
+    mitigation: Keep draft-reporting topics discovery-only and reject explicit guidance, instructional, public, and published framing from enforcing tiers.
+  - description: Compliance exams and training drafts can reproduce realistic regulator references, reporting fields, approval notes, and corrective actions.
+    mitigation: Reject exam, test, candidate-answer, template, demo, sample-data, and training-example framing from enforcing tiers.
+  - description: Customer complaints, RTI requests, audit responses, and other adjacent drafts can contain affected records, proposed disclosures, legal review, and corrective action.
+    mitigation: Require an explicitly draft response, submission, or report to an Australian regulator or regulatory reporting obligation.
 exports:
   - purview_xml
   - yaml
@@ -69,58 +90,106 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_regulatory_reporting
+      id_match: Regex_au_regulatory_reporting_draft
       matches:
-        - ref: Evidence_regulatory_reporting
+        - ref: Evidence_au_regulator_context
+        - ref: Evidence_au_regulatory_reporting_content
+          min_count: 2
+          unique_results: true
+        - ref: Regex_au_regulatory_reporting_reference
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_regulatory_reporting_non_record
+    - confidence_level: 75
+      id_match: Regex_au_regulatory_reporting_draft
+      matches:
+        - ref: Evidence_au_regulator_context
+        - ref: Evidence_au_regulatory_reporting_content
           min_count: 2
           unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-    - confidence_level: 75
-      id_match: Pattern_regulatory_reporting
-      matches:
-        - ref: Evidence_regulatory_reporting
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Regex_au_regulatory_reporting_non_record
     - confidence_level: 65
-      id_match: Pattern_regulatory_reporting
-      matches:
-        - ref: Evidence_regulatory_reporting
+      discovery_only: true
+      id_match: Regex_au_regulatory_reporting_draft
   regexes:
-    - id: Pattern_regulatory_reporting
-      pattern: (?is)\b(?:regulatory\s+reporting\s+draft\s+responses|regulatory\s+reporting|draft\s+response|regulator\s+inquiry|compliance\s+reporting|statutory\s+obligation|regulatory\s+submission)\b
+    - id: Regex_au_regulatory_reporting_draft
+      pattern: >-
+        (?is)\b(?:regulatory\s+reporting\s+draft\s+(?:responses?|submissions?|reports?)|draft\s+(?:regulatory\s+)?(?:response|submission|report)\s+(?:to|for)\s+(?:the\s+)?(?:APRA|ASIC|AUSTRAC|ACCC|OAIC|regulator|regulatory\s+authority|supervisory\s+authority|Australian\s+(?:regulator|regulatory\s+authority)|Queensland\s+(?:regulator|regulatory\s+authority))|draft\s+response\s+to\s+(?:an?\s+)?(?:(?:APRA|ASIC|AUSTRAC|ACCC|OAIC)\s+)?(?:regulatory|statutory)\s+(?:request|notice|reporting\s+obligation))\b
+    - id: Regex_au_regulatory_reporting_reference
+      pattern: >-
+        (?i)\b(?:APRA|ASIC|AUSTRAC|ACCC|OAIC|Australian\s+(?:regulator|regulatory\s+authority)|Queensland\s+(?:regulator|regulatory\s+authority))\s+(?:reporting|response|submission|inquiry|matter|notice|request)\s*(?:number|no\.?|reference|ref\.?|ID)\s*[:#-]\s*[A-Z]{2,10}[-/][A-Z0-9/-]{3,30}\b
+    - id: Regex_au_regulatory_reporting_non_record
+      pattern: >-
+        (?i)\b(?:(?:public|published)\s+(?:(?:annual|statutory|regulatory)\s+)?(?:guide|guidance|report|review|summary|statement|standard)|(?:generic|public|regulatory|compliance)\s+guidance|how\s+to\s+(?:prepare|write|complete|submit|respond)|(?:practice|certification|student|candidate|staff|compliance|reporting)\s+(?:exam(?:ination)?|test)|(?:exam(?:ination)?|test)\s+(?:question|answer|paper|score|result)|answer\s+key|candidate\s+(?:answer|response))\b
   keywords:
-    - id: Evidence_regulatory_reporting
+    - id: Evidence_au_regulator_context
       groups:
         - match_style: word
           terms:
-            - regulatory reporting draft responses
-            - regulatory reporting
-            - draft response
-            - regulator inquiry
-            - AUSTRAC
-            - ASIC
-            - APRA
-            - compliance reporting
-            - statutory obligation
-            - regulatory submission
-            - privacy
-            - compliance
+            - text: APRA
+              case_sensitive: true
+            - Australian Prudential Regulation Authority
+            - text: ASIC
+              case_sensitive: true
+            - Australian Securities and Investments Commission
+            - text: AUSTRAC
+              case_sensitive: true
+            - Australian Transaction Reports and Analysis Centre
+            - text: ACCC
+              case_sensitive: true
+            - Australian Competition and Consumer Commission
+            - text: OAIC
+              case_sensitive: true
+            - Office of the Australian Information Commissioner
+            - Australian regulator
+            - Australian regulatory authority
+            - Queensland regulator
+            - Queensland regulatory authority
+            - Commonwealth regulator
+      strength: domain
+    - id: Evidence_au_regulatory_reporting_content
+      groups:
+        - match_style: word
+          terms:
+            - reporting period
+            - reportable event
+            - reportable transaction
+            - response to question
+            - proposed disclosure
+            - affected records
+            - data quality issue
+            - data quality exception
+            - control weakness
+            - corrective action
+            - legal review
+            - evidence outstanding
+            - regulatory obligation
+            - statutory report
+      strength: domain
 risk_description: >-
-  The regex targets draft responses to regulator inquiries, regulatory reporting, submissions, and related pre-filing correspondence rather than a final public report. A genuine draft may expose untested facts, potential admissions, control failures, legal arguments, remediation commitments, and internal disagreements that could prejudice the organisation before positions are settled. The affected unit is one regulatory matter with serious legal, commercial, and reputational consequences, while templates and general reporting guidance remain possible matches. Risk 8 SENSITIVE Personal-Privacy fits the non-public response; PROTECTED is not met without a protected investigation, critical-service exposure, market-wide consequence, or credible significant damage.
+  The detector targets pre-submission responses, reports, and submissions to Australian regulators,
+  supported by named authority context and substantive reporting content rather than a final public
+  report. A genuine draft may expose untested facts, potential admissions, affected records, control
+  failures, legal arguments, corrective actions, and outstanding evidence before positions are settled.
+  The affected unit is one regulatory matter with serious legal, commercial, operational, and
+  reputational consequences. Risk 8 SENSITIVE Personal-Privacy fits the non-public response; PROTECTED
+  is not met without a protected investigation, critical-service exposure, market-wide consequence, or
+  credible significant damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -130,8 +199,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-18'
+    description: 'Profile quality: rebuild the Australian regulatory-reporting-draft SIT with exact 65 discovery, 75 Australian authority plus substantive-content, and 85 structured-reference tiers; add guidance, publication, exam, template, and adjacent-record adversarial probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1060 without changing detector or package metadata.'

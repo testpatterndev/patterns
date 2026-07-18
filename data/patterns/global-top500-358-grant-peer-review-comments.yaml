@@ -1,21 +1,29 @@
 schema: testpattern/v1
 name: Grant peer review comments
 slug: global-top500-358-grant-peer-review-comments
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to grant peer review comments in international contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations. Enforcement targets confidential assessment output (reviewer feedback, scores, panel decisions, funding recommendations); grant-application language is discovery-only unless
-  independent review-output evidence is present.
+  Identifies grant peer-review comments and assessment records containing substantive reviewer
+  observations, scores, or funding outcomes. Grant-review and application phrases are retained for
+  discovery at 65; populated assessment fields raise confidence to 75, while formal proposal or
+  reviewer references plus an explicit funding outcome raise confidence to 85.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_grant_peer_review_topic recognises grant-review, reviewer-feedback, panel, decision, and
+  grant-application topics. The topic alone is discovery-only at 65. A populated score, rank,
+  strength, weakness, reviewer-comment, moderation, or conflict field is required at 75. The 85 tier
+  additionally requires a formal proposal, application, reviewer, review, or panel reference and a
+  funding outcome. Enforcing tiers reject templates, guidance, journal/code review, performance
+  review, lending, and investment collisions.
 pattern: >-
-  (?is)\b(?:grant\s+peer\s+review|peer\s+review\s+comments|reviewer\s+feedback|funding\s+decision|review\s+panel|reviewer\s+score|funding\s+recommendation|grant\s+committee|grant\s+application)\b
+  (?is)\b(?:grant\s+peer\s+review|peer\s+review\s+comments?|reviewer\s+feedback|funding\s+decision|review\s+panel|reviewer\s+score|funding\s+recommendation|grant\s+committee|grant\s+application)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence is appropriate because grant-review language is not unique to a live assessment.
+  Enforcement requires populated assessment structure, and high confidence adds both a formal record
+  reference and an explicit funding outcome.
 jurisdictions:
   - global
 regulations:
@@ -24,51 +32,48 @@ data_categories:
   - pii
 corroborative_evidence:
   keywords:
-    - grant peer review comments
-    - grant
-    - peer
-    - review
-    - comments
-    - education
-    - research
-    - administration
+    - criterion score
+    - panel rank
+    - strengths
+    - weaknesses
+    - reviewer comments
+    - moderation note
+    - conflict declaration
+    - funding recommendation
+    - panel decision
   proximity: 300
 test_cases:
   should_match:
-    - value: grant peer review
-      description: Primary topic phrase match
-    - value: peer review comments
-      description: Case-insensitive topic phrase match
-    - value: reviewer feedback
-      description: Alternative topic phrase match
-    - value: grant application
-      description: Contextual-branch phrase — discovers only unless independent review-output evidence is present
-    - value: 'Proposal GR-884 reviewer R2: criterion 1 score 3/5; weakness: feasibility; panel rank 14; funding recommendation: do not fund.'
-      description: Reviewer output anchors (funding recommendation) with review-field evidence — enforceable assessment content
+    - value: The grants office noted that grant peer review comments are pending.
+      description: Low-tier probe - grant-review topic without populated assessment content
+    - value: 'Grant peer review comments. Criterion 1 score: 3/5. Weakness: feasibility.'
+      description: Medium-tier probe - populated assessment fields without a formal reference or funding outcome
+    - value: 'Grant application review. Overall score: 82. Strengths: sound method. Weaknesses: limited sample.'
+      description: Medium-tier probe - application topic with substantive reviewer output
+    - value: 'Proposal ID: GR-884; Reviewer ID: R2; criterion 1 score: 3/5; weakness: feasibility; panel rank: 14; funding recommendation: do not fund.'
+      description: High-tier probe - populated assessment, formal references, and explicit funding outcome
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
-    - value: student grant
-      description: Generic word pair from old broad template should not match
-    - value: Grant application GR-884 lists the project title, applicant, budget, and closing date but contains no reviewer material.
-      description: Application without review output — discovery only, must not enforce
-    - value: The community foundation announced a new research funding round for local history projects.
-      description: Research-funding topic language was removed from the anchor — must not match
-    - value: 'Reviewer training exercise: classify the example phrases "reviewer feedback" and "funding recommendation".'
-      description: Training/example exclusion suppresses quoted detector vocabulary
-    - value: grant application
-      description: Bare contextual phrase — discovery only, must not enforce
+    - value: 'Journal peer review comments. Reviewer comments: revise the literature review. Overall score: 3/5.'
+      description: Journal-review collision must not enforce as grant assessment content
+    - value: 'Pull request code review: reviewer feedback. Weakness: missing null check. Overall score: 4/5.'
+      description: Software-review collision must not enforce
+    - value: 'Investment committee funding decision. Criterion score: 8/10. Recommendation: proceed with the venture capital round.'
+      description: Commercial investment decision must not enforce as a grant decision
+    - value: 'Loan application funding decision. Overall score: 720. Decision status: approved.'
+      description: Lending decision must not enforce as grant peer review
+    - value: 'Public guidance explains grant peer review comments, criterion score: 3/5, Proposal ID: GR-884, and funding recommendation: do not fund.'
+      description: Guidance containing realistic assessment vocabulary must not enforce
+    - value: 'Training example: Proposal ID: GR-884; grant peer review comments; criterion score: 3/5; funding recommendation: do not fund.'
+      description: Structurally complete training content must not enforce
 false_positives:
-  - description: Common words and phrases related to grant peer review comments appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Grant-program guidance, application instructions, and training examples can reproduce review labels and sample scores without containing a live assessment.
+    mitigation: Keep topic phrases discovery-only, require populated assessment fields for enforcement, and reject explicit guidance, template, and training framing.
+  - description: Journal peer review, source-code review, employee appraisal, lending, and investment decisions use reviewer, score, weakness, recommendation, and funding language.
+    mitigation: Apply domain-collision exclusions to enforcing tiers and require a grant-review topic together with assessment structure.
 exports:
   - purview_xml
   - yaml
@@ -76,100 +81,86 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_grant_peer_review_topic
+      matches:
+        - ref: Pattern_grant_peer_review_assessment_field
+        - ref: Pattern_grant_peer_review_formal_reference
+        - ref: Evidence_grant_peer_review_funding_outcome
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_grant_peer_review_collision
     - confidence_level: 75
-      id_match: Regex_grant_peer_review
+      id_match: Regex_grant_peer_review_topic
       matches:
-        - ref: Pattern_global_top500_358_grant_peer_review_comments_label_context
-        - ref: Keyword_global_top500_358_grant_peer_review_comments_domain_context
+        - ref: Pattern_grant_peer_review_assessment_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 65
-      id_match: Regex_grant_peer_review
-      matches:
-        - ref: Keyword_grant_peer_review
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 65
-      id_match: Regex_grant_peer_review_ContextualBranch
-      matches:
-        - ref: Keyword_grant_peer_review_IndependentContext
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+            - Evidence_grant_peer_review_collision
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_grant_peer_review_ContextualBranch
+      id_match: Regex_grant_peer_review_topic
       matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_grant_peer_review_collision
   regexes:
-    - id: Regex_grant_peer_review
+    - id: Regex_grant_peer_review_topic
       pattern: >-
-        (?is)\b(?:grant\s+peer\s+review|peer\s+review\s+comments|reviewer\s+feedback|funding\s+decision|review\s+panel|reviewer\s+score|funding\s+recommendation|grant\s+committee)\b
-    - id: Regex_grant_peer_review_ContextualBranch
-      pattern: (?is)\b(?:grant\s+application)\b
-    - id: Pattern_global_top500_358_grant_peer_review_comments_label_context
-      pattern: (?i)\b(?:grant\s+peer\s+review\s+comments)\b
+        (?is)\b(?:grant\s+peer\s+review|peer\s+review\s+comments?|reviewer\s+feedback|funding\s+decision|review\s+panel|reviewer\s+score|funding\s+recommendation|grant\s+committee|grant\s+application)\b
+    - id: Pattern_grant_peer_review_assessment_field
+      pattern: >-
+        (?im)\b(?:criterion(?:\s+\d+)?\s+score|overall\s+score|panel\s+rank)\s*[:#-]\s*(?:\d+(?:\.\d+)?(?:\s*/\s*\d+)?|[A-E]|excellent|good|fair|poor)\b|\b(?:strengths?|weaknesses?|reviewer\s+comments?|moderation\s+notes?|conflict\s+declaration)\s*[:#-]\s*[^\r\n]{3,120}
+    - id: Pattern_grant_peer_review_formal_reference
+      pattern: >-
+        (?i)\b(?:proposal|application|reviewer|review|panel)\s*(?:id|no\.?|number|ref(?:erence)?)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{1,24}\b
   keywords:
-    - id: Keyword_grant_peer_review
+    - id: Evidence_grant_peer_review_funding_outcome
       groups:
         - match_style: word
           terms:
-            - grant peer review
-            - peer review comments
-            - reviewer feedback
-            - grant application
-            - funding decision
-            - review panel
-            - grant proposal
-            - reviewer score
-            - assessment criteria
             - funding recommendation
-            - grant committee
-            - research funding
-      strength: specific
-    - id: Keyword_grant_peer_review_IndependentContext
-      groups:
-        - match_style: word
-          terms:
-            - reviewer ID
-            - reviewer role
-            - criterion score
-            - panel rank
-            - strengths
-            - weaknesses
-            - recommendation
-            - conflict declaration
-            - moderation note
+            - recommended for funding
+            - not recommended for funding
+            - do not fund
+            - fund with conditions
+            - panel decision
             - decision status
+            - final ranking
+            - reserve list
       strength: specific
-    - id: Keyword_global_top500_358_grant_peer_review_comments_domain_context
+    - id: Evidence_grant_peer_review_collision
       groups:
         - match_style: word
           terms:
-            - grant peer review comments
-            - grant
-            - peer
-            - review
-            - comments
-      strength: domain
+            - journal peer review
+            - manuscript review
+            - code review
+            - pull request
+            - performance review
+            - employee appraisal
+            - loan application
+            - credit decision
+            - investment committee
+            - venture capital
+            - public guidance
+            - guidance document
+      strength: noise
 risk_description: >-
   The detector recognizes grant-peer-review, reviewer-feedback, peer-review-comment, or grant-application language in an education and research setting. Authentic comments can reveal confidential criticism, reviewer reasoning, proposal weaknesses, unpublished ideas, and funding recommendations, enabling retaliation, lobbying, plagiarism, or interference with a competitive award. The normal record affects a bounded proposal and participants rather than an entire funding program, yet career, intellectual-property, and procedural harm can be serious. Risk 8 and SENSITIVE are proportionate; PROTECTED would require systemic compromise of a major grant process, protected research, or significant broad damage.
 sensitivity_labels:
@@ -181,8 +172,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-17'
+updated: '2026-07-18'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-18'
+    description: 'Profile quality: replace self-corroborating topic tiers with exact 65 discovery, 75 populated-assessment, and 85 formal-reference-plus-outcome tiers; add grant-specific review, lending, investment, guidance, and training adversarial coverage.'
   - version: 1.3.0
     date: '2026-07-17'
     description: 'SIT alignment wave1 (TP-01266, reduced scope): Regex_grant_peer_review narrowed to review-output anchors (grant application, grant proposal, assessment criteria, research funding removed — they self-corroborated at 65); "grant application" re-wired as the approved contextual branch (Regex_grant_peer_review_ContextualBranch) enforcing at 65 only with Keyword_grant_peer_review_IndependentContext review-field evidence (10 terms materialized from the approved definition) and otherwise 65 discovery_only, both with the template-exclusion NOT gate; adversarial tests added. Deliberately less than the first-pass candidate: grant proposal / assessment criteria / research funding are deleted from the primary (their contextual gating had no written-out branch definition) and remain evidence-only; no 75/85 re-tiering.'

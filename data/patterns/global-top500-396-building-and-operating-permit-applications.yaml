@@ -1,20 +1,27 @@
 schema: testpattern/v1
 name: Building and operating permit applications
 slug: global-top500-396-building-and-operating-permit-applications
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to building and operating permit applications in international contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
+  Identifies building, construction, development/planning, occupancy, and site-operating permit
+  application records across jurisdictions. Topic phrases are discovery-only; enforcement requires
+  multiple application fields, while high confidence also requires a labelled application, permit,
+  case, or file reference plus authority or decision context.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 1 keywords within 240 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Pattern_permit_application_topic recognises permit-application topics. The topic alone is
+  discovery-only at 65. At least two distinct applicant, property, project, status, or submission
+  fields reach 75. Three fields, a labelled application/reference value, and issuing-authority or
+  decision evidence reach 85. The 75 and 85 tiers reject explicit template, sample, demo, tutorial,
+  and training-example content.
 pattern: >-
-  (?is)\b(?:building\s+and\s+operating\s+permit\s+applications|building\s+permit|construction\s+permit|operating\s+permit|development\s+application|planning\s+approval|building\s+code|occupancy\s+certificate|site\s+plan|building\s+inspection|permit\s+approval|construction\s+compliance)\b
+  (?i)\b(?:building\s+and\s+operating\s+permit\s+applications?|building\s+permit(?:\s+applications?)?|construction\s+permit(?:\s+applications?)?|operating\s+permit(?:\s+applications?)?|development\s+applications?|planning\s+(?:permit\s+applications?|applications?)|occupancy\s+(?:permit|certificate)(?:\s+applications?)?)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires multiple independent application-record fields rather than a topic
+  phrase alone. High confidence adds a labelled record reference and authority or decision evidence.
 jurisdictions:
   - global
 regulations:
@@ -23,18 +30,22 @@ data_categories:
   - pii
 corroborative_evidence:
   keywords:
-    - building and operating permit applications
+    - applicant name
+    - site address
+    - parcel number
+    - scope of work
+    - application status
+    - application number
+    - issuing authority
   proximity: 240
 test_cases:
   should_match:
-    - value: building and operating permit applications
-      description: Primary topic phrase match
-    - value: building permit
-      description: Case-insensitive topic phrase match
-    - value: construction permit
-      description: Alternative topic phrase match
-    - value: operating permit
-      description: Additional topic phrase match
+    - value: building permit application
+      description: 65-confidence probe - permit topic without application-record fields
+    - value: 'Development application: applicant name, site address, and scope of work'
+      description: 75-confidence probe - multiple independent application fields
+    - value: 'Building permit application Application No: BP-2026-004812; applicant name, site address, parcel number, status approved by the City Building Department'
+      description: 85-confidence probe - formal reference, three fields, and authority/decision context
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -42,17 +53,25 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: welfare registry
       description: Generic word pair from old broad template should not match
+    - value: Building code inspection and construction compliance handbook
+      description: Related construction guidance without a permit-application topic
+    - value: Residence permit application with applicant name and case number
+      description: Foreign permit domain collision outside property and site operations
+    - value: Building permit applications increased 12 percent in the quarterly city statistics
+      description: Aggregate permit statistics without an individual application record
+    - value: 'Training example: Building permit application Application No: BP-2026-004812; applicant name, site address, parcel number, status approved by the City Building Department'
+      description: Explicit training content must not enforce
 false_positives:
   - description: >-
-      Common words and phrases related to building and operating permit applications appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal
-      data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
+      Planning guidance, fee schedules, public notices, and aggregate permit statistics can contain
+      building, development, or operating-permit topics without an individual application record.
+    mitigation: Keep topic-only matches discovery-only and require multiple applicant, site, project, status, or submission fields for enforcement.
   - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+      Residence, work, event, and equipment permits use similar application language but are outside
+      the building, development/planning, occupancy, and site-operating scope.
+    mitigation: Limit the primary matcher to the intended property and site-operating permit phrases rather than generic permit applications.
+  - description: Training fixtures and API examples can contain realistic application numbers, field labels, and decision wording.
+    mitigation: Reject explicit template, sample-data, demo, tutorial, and training-example framing at enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -60,67 +79,95 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 240
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_permit_application_topic
+      matches:
+        - ref: Evidence_application_record_fields
+          min_count: 3
+          unique_results: true
+        - ref: Pattern_labelled_application_reference
+        - ref: Evidence_authority_or_decision
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_building_permit
+      id_match: Pattern_permit_application_topic
       matches:
-        - ref: Pattern_global_top500_396_building_and_operating_permit_applications_label_context
-        - ref: Keyword_global_top500_396_building_and_operating_permit_applications_domain_context
+        - ref: Evidence_application_record_fields
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
     - confidence_level: 65
-      id_match: Regex_building_permit
-      matches:
-        - ref: Keyword_building_permit
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+      discovery_only: true
+      id_match: Pattern_permit_application_topic
   regexes:
-    - id: Regex_building_permit
+    - id: Pattern_permit_application_topic
       pattern: >-
-        (?is)\b(?:building\s+and\s+operating\s+permit\s+applications|building\s+permit|construction\s+permit|operating\s+permit|development\s+application|planning\s+approval|building\s+code|occupancy\s+certificate|site\s+plan|building\s+inspection|permit\s+approval|construction\s+compliance)\b
-    - id: Pattern_global_top500_396_building_and_operating_permit_applications_label_context
-      pattern: (?i)\b(?:building\s+and\s+operating\s+permit\s+applications)\b
+        (?i)\b(?:building\s+and\s+operating\s+permit\s+applications?|building\s+permit(?:\s+applications?)?|construction\s+permit(?:\s+applications?)?|operating\s+permit(?:\s+applications?)?|development\s+applications?|planning\s+(?:permit\s+applications?|applications?)|occupancy\s+(?:permit|certificate)(?:\s+applications?)?)\b
+    - id: Pattern_labelled_application_reference
+      pattern: >-
+        (?i)\b(?:application|permit|case|file)\s*(?:number|no\.?|reference|ref\.?|ID)\s*[:#-]\s*[A-Z0-9][A-Z0-9./-]{4,}\b
   keywords:
-    - id: Keyword_building_permit
+    - id: Evidence_application_record_fields
       groups:
         - match_style: word
           terms:
-            - building and operating permit applications
-            - building permit
-            - construction permit
-            - operating permit
-            - development application
-            - planning approval
-            - building code
-            - occupancy certificate
-            - site plan
-            - building inspection
-            - permit approval
-            - construction compliance
-      strength: specific
-    - id: Keyword_global_top500_396_building_and_operating_permit_applications_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - building and operating permit applications
-            - building
-            - operating
-            - permit
-            - applications
+            - applicant name
+            - property owner
+            - site address
+            - project address
+            - parcel number
+            - lot number
+            - scope of work
+            - proposed use
+            - estimated cost
+            - contractor name
+            - architect
+            - zoning district
+            - application date
+            - application status
+            - fee paid
+            - submitted by
       strength: domain
+    - id: Evidence_authority_or_decision
+      groups:
+        - match_style: word
+          terms:
+            - issuing authority
+            - planning department
+            - building department
+            - development services
+            - zoning administrator
+            - municipality
+            - local authority
+            - permit issued
+            - application approved
+            - application denied
+            - approval conditions
+            - decision date
+            - reviewing officer
+      strength: specific
 risk_description: >-
-  This regex identifies building permit, construction permit, and operating permit application content rather than a credential or personal identifier. The normal file concerns a property or business proposal and may include applicant contact details and plans, but much of the permitting outcome is routinely disclosed through public registers. Standalone harm is limited unless detailed security layouts, private residences, or confidential engineering material accompany the application. Risk 5 supports OFFICIAL; SENSITIVE would require those security-sensitive plans, protected occupants, or a consolidated non-public development dossier.
+  This concept detector inventories property and site-operating permit topics but only enforces when
+  multiple application-record fields are present; its strongest tier also requires a labelled record
+  reference and authority or decision context. The normal file concerns a property or business
+  proposal and may include applicant contact details and plans, but much of the permitting outcome is
+  routinely disclosed through public registers. Standalone harm is limited unless detailed security
+  layouts, private residences, or confidential engineering material accompany the application. Risk 5
+  supports OFFICIAL; SENSITIVE would require those security-sensitive plans, protected occupants, or a
+  consolidated non-public development dossier.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -130,8 +177,16 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-18'
+    description: >-
+      Profile quality hardening: narrow the primary from general building-code and inspection phrases
+      to building, development/planning, occupancy, and operating-permit topics; add exact 65/75/85
+      tiers with topic-only discovery, multi-field medium evidence, and formal-reference plus
+      authority/decision high evidence. Replace generic copied context and add related-domain,
+      aggregate-statistics, and training negatives.
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1942 without changing detector or package metadata.'

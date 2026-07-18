@@ -1,20 +1,29 @@
 schema: testpattern/v1
 name: Land registry ownership files
 slug: global-top500-393-land-registry-ownership-files
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to land registry ownership files in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies land-title and cadastral ownership records containing populated proprietor, tenure,
+  parcel, legal-description, or encumbrance fields. Land-registry topics are retained for discovery
+  at 65; populated register fields raise confidence to 75, while a formal title or parcel reference
+  plus substantive ownership-interest evidence raise confidence to 85.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 1 keywords within 240 characters. Keyword
-  lists: corporate-ip. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_land_registry_topic recognises jurisdiction-neutral English land-registry, title-deed,
+  cadastral, deed-registry, ownership, transfer, and encumbrance topics. The topic alone is
+  discovery-only at 65. A populated proprietor, legal-description, tenure, share, estate, parcel,
+  lot, or encumbrance field is required at 75. The 85 tier additionally requires a formal title,
+  folio, parcel, deed, instrument, or cadastral reference and substantive ownership or registered-
+  interest evidence. Enforcing tiers reject templates, practice guides, and non-land title collisions.
 pattern: >-
-  (?is)\b(?:land\s+registry\s+ownership\s+files|title\s+deed|property\s+ownership|land\s+title|cadastral\s+record|property\s+transfer|land\s+registration|certificate\s+of\s+title|property\s+boundary|registered\s+proprietor|encumbrance\s+record)\b
+  (?is)\b(?:land\s+registry\s+ownership\s+files?|title\s+deed|property\s+ownership|land\s+title|title\s+register|cadastral\s+record|property\s+transfer|land\s+registration|certificate\s+of\s+title|property\s+boundary|registered\s+(?:owner|proprietor)|encumbrance\s+record|registry\s+of\s+deeds|deeds\s+registry)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence is appropriate because land-title phrases also occur in public guidance and
+  non-land ownership contexts. Enforcement requires populated register fields, and high confidence
+  adds both a formal land-record reference and substantive ownership-interest evidence.
 jurisdictions:
   - global
 regulations:
@@ -23,38 +32,47 @@ data_categories:
   - pii
 corroborative_evidence:
   keywords:
-    - land registry ownership files
+    - registered proprietor
+    - legal description
+    - tenure
+    - ownership share
+    - title number
+    - folio reference
+    - transferor
+    - transferee
+    - easement
+    - caveat
   proximity: 240
-  keyword_lists:
-    - corporate-ip
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: land registry ownership files
-      description: Primary topic phrase match
-    - value: title deed
-      description: Case-insensitive topic phrase match
-    - value: property ownership
-      description: Alternative topic phrase match
-    - value: land title
-      description: Additional topic phrase match
+    - value: The archive contains land registry ownership files.
+      description: Low-tier probe - land-registry topic without populated register content
+    - value: 'Title deed. Registered owner: Maya Chen. Legal description: Lot 14 on Plan RP8821.'
+      description: Medium-tier probe - populated ownership fields without a formal title reference or interest evidence
+    - value: 'Cadastral record. Parcel: Section 8 Block 3. Encumbrance: access easement.'
+      description: Medium-tier probe - populated cadastral fields without a formal record reference
+    - value: 'Land title. Title number: 12/8841. Registered proprietor: Maya Chen. Tenure: fee simple. Ownership share: 1/2. Easement: E-441.'
+      description: High-tier probe - populated register, formal title reference, and substantive ownership interests
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
-    - value: welfare registry
-      description: Generic word pair from old broad template should not match
+    - value: 'Motor vehicle title. Title number: MV-8841. Registered owner: Maya Chen. Ownership share: 1/1.'
+      description: Vehicle-title collision must not enforce as land ownership
+    - value: 'Domain registry property ownership. Parcel ID: DOM-8841. Registered owner: Example Pty Ltd. Transferor: Reseller Ltd.'
+      description: Domain and digital-property collision must not enforce
+    - value: 'Ship registry certificate of title. Deed number: SH-8841. Registered proprietor: Oceanic Ltd. Mortgagee: Maritime Bank.'
+      description: Vessel-title collision must not enforce
+    - value: 'HM Land Registry practice guide explains title number: AB12345, registered proprietor: Jane Doe, and tenure: freehold.'
+      description: Public practice guidance containing realistic register fields must not enforce
+    - value: 'Training example: Land title. Title number: 12/8841. Registered proprietor: Maya Chen. Tenure: fee simple. Ownership share: 1/2.'
+      description: Structurally complete training content must not enforce
 false_positives:
-  - description: Common words and phrases related to land registry ownership files appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Land-registry practice guides, conveyancing training, and sample title documents can reproduce realistic references and populated register fields.
+    mitigation: Keep title topics discovery-only, require populated fields for enforcement, and reject explicit practice-guide, template, and training framing.
+  - description: Vehicle, vessel, aircraft, domain, intellectual-property, software, virtual-property, and digital-asset records also use title, owner, parcel, transfer, and registry language.
+    mitigation: Apply non-land title collision exclusions to enforcing tiers and require land-title or cadastral topic evidence.
 exports:
   - purview_xml
   - yaml
@@ -62,64 +80,94 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 240
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_land_registry_topic
+      matches:
+        - ref: Pattern_land_registry_populated_field
+        - ref: Pattern_land_registry_formal_reference
+        - ref: Evidence_land_registry_interest
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_land_registry_collision
     - confidence_level: 75
-      id_match: Regex_land_registry
+      id_match: Regex_land_registry_topic
       matches:
-        - ref: Pattern_global_top500_393_land_registry_ownership_files_label_context
-        - ref: Keyword_global_top500_393_land_registry_ownership_files_domain_context
+        - ref: Pattern_land_registry_populated_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_land_registry_collision
     - confidence_level: 65
-      id_match: Regex_land_registry
+      discovery_only: true
+      id_match: Regex_land_registry_topic
       matches:
-        - ref: Keyword_land_registry
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_land_registry_collision
   regexes:
-    - id: Regex_land_registry
+    - id: Regex_land_registry_topic
       pattern: >-
-        (?is)\b(?:land\s+registry\s+ownership\s+files|title\s+deed|property\s+ownership|land\s+title|cadastral\s+record|property\s+transfer|land\s+registration|certificate\s+of\s+title|property\s+boundary|registered\s+proprietor|encumbrance\s+record)\b
-    - id: Pattern_global_top500_393_land_registry_ownership_files_label_context
-      pattern: (?i)\b(?:land\s+registry\s+ownership\s+files)\b
+        (?is)\b(?:land\s+registry\s+ownership\s+files?|title\s+deed|property\s+ownership|land\s+title|title\s+register|cadastral\s+record|property\s+transfer|land\s+registration|certificate\s+of\s+title|property\s+boundary|registered\s+(?:owner|proprietor)|encumbrance\s+record|registry\s+of\s+deeds|deeds\s+registry)\b
+    - id: Pattern_land_registry_populated_field
+      pattern: >-
+        (?im)\b(?:registered\s+(?:owner|proprietor)|legal\s+description|tenure|ownership\s+share|estate|parcel|lot(?:\s+and\s+plan)?|encumbrances?)\s*[:#-]\s*[^\r\n]{2,120}
+    - id: Pattern_land_registry_formal_reference
+      pattern: >-
+        (?i)\b(?:title|folio|parcel|deed|instrument|cadastral)\s+(?:no\.?|number|reference|ref\.?|id)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{2,30}\b
   keywords:
-    - id: Keyword_land_registry
+    - id: Evidence_land_registry_interest
       groups:
         - match_style: word
           terms:
-            - land registry ownership files
-            - title deed
-            - property ownership
-            - land title
-            - cadastral record
-            - property transfer
-            - land registration
-            - certificate of title
-            - property boundary
-            - conveyancing
-            - registered proprietor
-            - encumbrance record
+            - transferor
+            - transferee
+            - fee simple
+            - freehold
+            - leasehold
+            - joint tenants
+            - tenants in common
+            - ownership share
+            - registered interest
+            - date registered
+            - easement
+            - caveat
+            - mortgagee
+            - consideration
       strength: specific
-    - id: Keyword_global_top500_393_land_registry_ownership_files_domain_context
+    - id: Evidence_land_registry_collision
       groups:
         - match_style: word
           terms:
-            - land registry ownership files
-            - land
-            - ownership
-            - files
-      strength: domain
+            - motor vehicle
+            - vehicle title
+            - ship registry
+            - vessel title
+            - aircraft registry
+            - aircraft title
+            - domain registry
+            - domain name
+            - intellectual property
+            - software asset
+            - virtual property
+            - game item
+            - non-fungible token
+            - practice guide
+            - conveyancing textbook
+      strength: noise
 risk_description: >-
   This classifier recognises title deeds, land titles, property ownership, and related registry-file terminology. Much ownership information is public or used in routine conveyancing, so a normal record generally causes limited harm unless it also exposes a home address, financial terms, protected owner, or a non-public ownership structure. Misuse usually requires correlation with identity, valuation, or transaction data to support targeting or fraud. Risk 5 and OFFICIAL fit the ordinary unit; SENSITIVE would require protected locations, complete transaction files, or a compiled portfolio revealing consequential private interests.
 sensitivity_labels:
@@ -131,8 +179,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-18'
+    description: 'Profile quality: replace phrase-only enforcement with exact 65 discovery, 75 populated-register, and 85 formal-reference-plus-ownership-interest tiers; add non-land title, practice-guide, and training adversarial coverage.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1939 without changing detector or package metadata.'

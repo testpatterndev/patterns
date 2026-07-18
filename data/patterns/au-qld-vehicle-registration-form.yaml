@@ -1,13 +1,27 @@
 schema: testpattern/v1
 name: QLD Vehicle Registration Form
 slug: au-qld-vehicle-registration-form
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
-description: Detects QLD vehicle registration forms containing ownership details and vehicle identifiers.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+engine: boost_regex
+description: >-
+  Identifies Queensland vehicle registration application, transfer, renewal, and certificate forms.
+  Queensland form topics are discovery-only; enforcement requires multiple registration-record
+  fields, while high confidence also requires an official F3518/F3520 form number and a populated VIN,
+  registration-number, or plate-number field.
+operation: >-
+  Pattern_vehicle_registration_form recognises vehicle-registration form topics. A Queensland-context
+  topic is discovery-only at 65. Queensland context plus at least two distinct operator, vehicle, or
+  transfer fields reaches 75. Three fields, an F3518 or F3520 form reference, and a labelled vehicle
+  identifier value reach 85. The 75 and 85 tiers reject explicit template, sample, demo, tutorial, and
+  training-example content.
+pattern: >-
+  (?i)\b(?:Queensland|QLD|TMR)\s+(?:vehicle\s+registration\s+(?:application|transfer(?:\s+application)?|renewal(?:\s+(?:notice|form|application))?|certificate|form)|registration\s+(?:transfer|renewal)\s+(?:application|form|notice))\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence requires Queensland context and multiple independent registration-record fields.
+  High confidence adds a current official form reference and a labelled vehicle identifier value.
 jurisdictions:
   - au
 regulations:
@@ -27,26 +41,45 @@ data_categories:
   - transport
 test_cases:
   should_match:
-    - value: 'TMR vehicle registration form: registration renewal and CTP insurance'
-      description: Test match 1
-    - value: QLD Transport and Main Roads vehicle transfer and registration certificate
-      description: Test match 2
-    - value: Vehicle inspection roadworthy certificate for registration renewal
-      description: Test match 3
+    - value: Queensland vehicle registration application
+      description: 65-confidence probe - Queensland form topic without record fields
+    - value: 'Queensland vehicle registration transfer application: registered operator, garage address, and date of acquisition'
+      description: 75-confidence probe - Queensland form with multiple registration-record fields
+    - value: 'TMR Vehicle Registration Transfer Application F3520: registered operator, garage address, date of acquisition; VIN: JH4KA8260MC001234'
+      description: 85-confidence probe - official form reference, three fields, and populated VIN
   should_not_match:
     - value: Vehicle for sale listing
-      description: Non-match 1
+      description: Sale listing without a registration form
     - value: Registration for the conference
-      description: Non-match 2
+      description: Non-vehicle registration
+    - value: 'Service NSW vehicle registration transfer application: registered operator, garage address, and VIN: JH4KA8260MC001234'
+      description: Foreign state registration form without Queensland context
+    - value: 'New Zealand vehicle registration application: registered person, vehicle details, and plate number: ABC123'
+      description: Foreign national registration form terminology
+    - value: Queensland guide to vehicle registration application fees and eligibility
+      description: Public guidance without registration-record fields
+    - value: 'Training example: TMR Vehicle Registration Transfer Application F3520; registered operator, garage address, date of acquisition; VIN: JH4KA8260MC001234'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Generic registration in non-vehicle contexts.
-    mitigation: Require TMR or vehicle registration specific terms.
+  - description: Registration guidance, fee pages, renewal reminders, and vehicle-sale material can mention Queensland vehicle registration without containing a form or record.
+    mitigation: Keep Queensland topic-only matches discovery-only and require multiple operator, vehicle, or transfer fields for enforcement.
+  - description: Other Australian states and countries use the same vehicle-registration application and transfer terminology.
+    mitigation: Require explicit Queensland, QLD, TMR, or Queensland-government context at every tier.
+  - description: Blank examples and training fixtures can reproduce official form numbers, field labels, and realistic vehicle identifiers.
+    mitigation: Reject explicit template, sample-data, demo, tutorial, and training-example framing at enforcing tiers.
 exports:
   - yaml
 scope: narrow
 risk_rating: 4
 risk_description: >-
-  The Queensland keyword pattern recognises TMR vehicle registration, renewal, transfer, registration certificates, CTP insurance, inspection, and roadworthy forms rather than vehicle-sale listings or unrelated registration. A completed form may connect an owner to a vehicle, address, identifier, and insurer, which can support correlation or low-level impersonation when combined with further identity data. The ordinary unit is routine administrative paperwork and does not provide vehicle access, payment authority, or a movement history. Risk 4 OFFICIAL remains appropriate; SENSITIVE is not met without protected ownership, financial credentials, detailed tracking, or a larger linked vehicle dossier.
+  The detector inventories Queensland vehicle-registration form topics but only enforces when multiple
+  operator, vehicle, or transfer fields are present; its strongest tier also requires an official form
+  reference and a populated vehicle identifier. A completed form may connect an owner to a vehicle,
+  address, identifier, and insurer, which can support correlation or low-level impersonation when
+  combined with further identity data. The ordinary unit is routine administrative paperwork and does
+  not provide vehicle access, payment authority, or a movement history. Risk 4 OFFICIAL remains
+  appropriate; SENSITIVE is not met without protected ownership, financial credentials, detailed
+  tracking, or a larger linked vehicle dossier.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -64,68 +97,94 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_vehicle_registration
+      id_match: Pattern_vehicle_registration_form
       matches:
-        - ref: Evidence_vehicle_registration
-        - ref: Evidence_tmr_forms
+        - ref: Evidence_qld_context
+        - ref: Evidence_registration_record_fields
+          min_count: 3
+          unique_results: true
+        - ref: Pattern_official_registration_form
+        - ref: Pattern_labelled_vehicle_identifier
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_tmr_form
+      id_match: Pattern_vehicle_registration_form
       matches:
-        - ref: Evidence_vehicle_general
+        - ref: Evidence_qld_context
+        - ref: Evidence_registration_record_fields
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_vehicle_registration_form
+      matches:
+        - ref: Evidence_qld_context
   regexes:
-    - id: Pattern_vehicle_registration
-      pattern: (?i)\b(?:vehicle\s+registration\s+(?:transfer|application|renewal)|f3520|registration\s+(?:renewal|transfer)\s+(?:form|application))\b
-    - id: Pattern_tmr_form
-      pattern: (?i)\b(?:transport\s+and\s+main\s+roads|tmr|department\s+of\s+transport)\b
+    - id: Pattern_vehicle_registration_form
+      pattern: >-
+        (?i)\b(?:Queensland\s+vehicle\s+registration|vehicle\s+registration\s+(?:application|transfer(?:\s+application)?|renewal(?:\s+(?:notice|form|application))?|certificate|form)|registration\s+(?:transfer|renewal)\s+(?:application|form|notice)|application\s+to\s+(?:register|transfer)\s+(?:a\s+)?vehicle)\b
+    - id: Pattern_official_registration_form
+      pattern: (?i)\b(?:F3518|F3520)\b
+    - id: Pattern_labelled_vehicle_identifier
+      pattern: >-
+        (?i)\b(?:(?:vehicle\s+identification\s+number|VIN)\s*[:#-]\s*[A-HJ-NPR-Z0-9]{17}|(?:registration|plate)\s+(?:number|no\.?)\s*[:#-]\s*[A-Z0-9-]{5,10})\b
   keywords:
-    - id: Evidence_vehicle_registration
+    - id: Evidence_qld_context
       groups:
         - match_style: word
           terms:
-            - vehicle registration
-            - registration transfer
-            - registration renewal
-            - safety certificate
-            - roadworthy
-            - written off
-            - personalised plates
-            - registration number
-      strength: specific
-    - id: Evidence_tmr_forms
-      groups:
-        - match_style: word
-          terms:
+            - Queensland
+            - Queensland Government
+            - State of Queensland
+            - qld.gov.au
             - Transport and Main Roads
+            - Department of Transport and Main Roads
+            - text: QLD
+              case_sensitive: true
             - text: TMR
               case_sensitive: true
-            - Department of Transport
-            - F3000
-            - F3520
-            - F3525
-            - Customer Reference Number
-            - text: CRN
-              case_sensitive: true
-      strength: domain
-    - id: Evidence_vehicle_general
+      strength: specific
+    - id: Evidence_registration_record_fields
       groups:
         - match_style: word
           terms:
-            - vehicle
-            - registration
-            - text: VIN
-              case_sensitive: true
-            - plate number
             - registered operator
-            - transfer of ownership
+            - customer reference number
+            - garage address
+            - registration number
+            - vehicle identification number
+            - engine number
+            - vehicle make
+            - vehicle model
+            - body shape
+            - CTP insurer
+            - compulsory third party
+            - acquirer
+            - disposer
+            - date of acquisition
+            - vehicle details
+            - applicant signature
+            - transfer date
       strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-18'
+    description: >-
+      Profile quality hardening: convert the keyword-list concept to a regex-backed detector with
+      exact 65/75/85 tiers. Keep Queensland form topics discovery-only at 65, require multiple
+      registration-record fields at 75, and require F3518/F3520 plus a populated vehicle identifier
+      at 85. Remove copied driver/marine form context and add foreign-jurisdiction, guidance, and
+      training negatives.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 590 without changing detector or package metadata.'

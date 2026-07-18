@@ -1,21 +1,31 @@
 schema: testpattern/v1
 name: Grant peer review comments
 slug: au-top500-358-grant-peer-review-comments
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to grant peer review comments in Australian contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Identifies Australian grant peer-review comments and assessment records containing substantive
+  assessor observations, scores, or funding outcomes. Grant-review and application phrases are
+  retained for discovery at 65; Australian funding context plus populated assessment fields raise
+  confidence to 75, while a formal record reference and explicit funding outcome raise it to 85.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:grant\s+peer\s+review\s+comments|peer\s+review|reviewer\s+comments|funding\s+application|panel\s+feedback|merit\s+assessment|research\s+funding|grant\s+application)\b
+  Regex_au_grant_peer_review_topic recognises grant-review, assessor-comment, panel, decision, and
+  grant-application topics. The topic alone is discovery-only at 65. Australian funder or scheme
+  context plus a populated score, rank, strength, weakness, assessor-comment, moderation, or conflict
+  field is required at 75. The 85 tier additionally requires a formal proposal, application,
+  assessor, reviewer, or panel reference and a funding outcome. Enforcing tiers reject templates,
+  guidance, adjacent review domains, lending and investment decisions, and foreign grant schemes.
+pattern: >-
+  (?is)\b(?:grant\s+peer\s+review|peer\s+review\s+comments?|assessor\s+(?:comments?|feedback|report)|reviewer\s+(?:comments?|feedback)|grant\s+review\s+panel|funding\s+(?:decision|recommendation)|grant\s+application)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence is appropriate because grant-review language is not unique to a live Australian
+  assessment. Enforcement requires both Australian grant context and populated assessment structure;
+  high confidence adds a formal record reference and an explicit funding outcome.
 jurisdictions:
-  - global
+  - au
 regulations:
   - AML/CTF Act (Cth)
   - HRIPA (Cth)
@@ -31,39 +41,51 @@ data_categories:
   - pii
 corroborative_evidence:
   keywords:
-    - grant peer review comments
-    - grant
-    - peer
-    - review
-    - comments
-    - education
-    - research
-    - administration
+    - Australian Research Council
+    - NHMRC
+    - MRFF
+    - criterion score
+    - assessor comments
+    - strengths
+    - weaknesses
+    - funding recommendation
   proximity: 300
 test_cases:
   should_match:
-    - value: grant peer review comments
-      description: Primary topic phrase match
-    - value: peer review
-      description: Case-insensitive topic phrase match
-    - value: reviewer comments
-      description: Alternative topic phrase match
-    - value: funding application
-      description: Additional topic phrase match
+    - value: The Australian Research Council noted that grant peer review comments are pending.
+      description: Low-tier probe - Australian grant-review topic without populated assessment content
+    - value: 'Australian Research Council grant application review. Criterion 1 score: 4/5. Weaknesses: limited methodology.'
+      description: Medium-tier probe - Australian context and populated assessment without a formal reference or funding outcome
+    - value: 'NHMRC grant application. Application ID: APP-884; Overall score: 5/7; Strengths: strong design; funding recommendation: not recommended for funding.'
+      description: High-tier probe - Australian context, populated assessment, formal reference, and explicit funding outcome
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
-    - value: student grant
-      description: Generic word pair from old broad template should not match
+    - value: 'Journal peer review comments. Reviewer comments: revise the literature review. Overall score: 3/5.'
+      description: Journal-review collision must not enforce as grant assessment content
+    - value: 'Pull request code review: reviewer feedback. Weaknesses: missing null checks. Overall score: 4/5.'
+      description: Software-review collision must not enforce
+    - value: 'Investment committee funding decision. Criterion score: 8/10. Funding recommendation: proceed with the venture capital round.'
+      description: Commercial investment decision must not enforce as a grant decision
+    - value: 'Loan application funding decision. Application ID: LN-884. Overall score: 720. Decision status: approved.'
+      description: Lending decision must not enforce as grant peer review
+    - value: 'NIH grant application. Application ID: R01-884; Overall score: 24; Weaknesses: limited cohort; funding recommendation: do not fund.'
+      description: United States grant assessment must not enforce as Australian grant review
+    - value: 'UKRI grant application. Proposal reference: UK-884; Overall score: 76; Strengths: strong impact; funding recommendation: recommended for funding.'
+      description: United Kingdom grant assessment must not enforce as Australian grant review
+    - value: 'Public guidance from the Australian Research Council explains grant peer review comments, Criterion 1 score: 4/5, Application ID: APP-884, and funding recommendation: do not fund.'
+      description: Australian guidance containing realistic assessment vocabulary must not enforce
+    - value: 'Training example: NHMRC grant application; Application ID: APP-884; Overall score: 5/7; funding recommendation: do not fund.'
+      description: Structurally complete Australian training content must not enforce
 false_positives:
-  - description: Common words and phrases related to grant peer review comments appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Australian grant-program guidance, application instructions, and training examples can reproduce assessment labels and sample scores without containing a live review.
+    mitigation: Keep topic phrases discovery-only, require populated assessment fields for enforcement, and reject explicit guidance, template, and training framing.
+  - description: Journal peer review, source-code review, employee appraisal, lending, and investment decisions use reviewer, score, weakness, recommendation, and funding language.
+    mitigation: Apply adjacent-domain exclusions to enforcing tiers and require independent Australian grant context together with assessment structure.
+  - description: Overseas funders use almost identical grant-application, scoring, panel, and funding-outcome records.
+    mitigation: Require an Australian funder, scheme, or government-grant signal and reject explicit foreign funding-body context from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -71,72 +93,131 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_grant_peer_review
+      id_match: Regex_au_grant_peer_review_topic
       matches:
-        - ref: Evidence_grant_peer_review
-          min_count: 2
-          unique_results: true
+        - ref: Evidence_au_grant_context
+        - ref: Pattern_au_grant_peer_review_assessment_field
+        - ref: Pattern_au_grant_peer_review_formal_reference
+        - ref: Evidence_au_grant_funding_outcome
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Evidence_au_grant_adjacent_collision
+            - Evidence_foreign_grant_context
     - confidence_level: 75
-      id_match: Pattern_grant_peer_review
+      id_match: Regex_au_grant_peer_review_topic
       matches:
-        - ref: Evidence_grant_peer_review
+        - ref: Evidence_au_grant_context
+        - ref: Pattern_au_grant_peer_review_assessment_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Evidence_au_grant_adjacent_collision
+            - Evidence_foreign_grant_context
     - confidence_level: 65
-      id_match: Pattern_grant_peer_review
-      matches:
-        - ref: Evidence_grant_peer_review
+      discovery_only: true
+      id_match: Regex_au_grant_peer_review_topic
   regexes:
-    - id: Pattern_grant_peer_review
-      pattern: (?is)\b(?:grant\s+peer\s+review\s+comments|peer\s+review|reviewer\s+comments|funding\s+application|panel\s+feedback|merit\s+assessment|research\s+funding|grant\s+application)\b
-    - id: Pattern_au_top500_358_grant_peer_review_comments_label_context
-      pattern: (?i)\b(?:grant\s+peer\s+review\s+comments)\b
+    - id: Regex_au_grant_peer_review_topic
+      pattern: >-
+        (?is)\b(?:grant\s+peer\s+review|peer\s+review\s+comments?|assessor\s+(?:comments?|feedback|report)|reviewer\s+(?:comments?|feedback)|grant\s+review\s+panel|funding\s+(?:decision|recommendation)|grant\s+application)\b
+    - id: Pattern_au_grant_peer_review_assessment_field
+      pattern: >-
+        (?im)\b(?:(?:criterion|assessment\s+criterion)(?:\s+\d+)?\s+score|overall\s+score|panel\s+rank(?:ing)?)\s*[:#-]\s*(?:\d+(?:\.\d+)?(?:\s*/\s*\d+)?|[A-E]|excellent|good|fair|poor)\b|\b(?:strengths?|weaknesses?|assessor\s+comments?|reviewer\s+comments?|moderation\s+notes?|conflict\s+declaration|relative\s+to\s+opportunity)\s*[:#-]\s*[^\r\n]{3,120}
+    - id: Pattern_au_grant_peer_review_formal_reference
+      pattern: >-
+        (?i)\b(?:proposal|application|assessor|reviewer|review|panel)\s*(?:id|no\.?|number|ref(?:erence)?)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{1,24}\b
   keywords:
-    - id: Evidence_grant_peer_review
+    - id: Evidence_au_grant_context
       groups:
         - match_style: word
           terms:
-            - grant peer review comments
-            - grant
-            - peer review
-            - reviewer comments
             - text: ARC
               case_sensitive: true
+            - Australian Research Council
             - NHMRC
-            - funding application
-            - assessor
-            - panel feedback
-            - merit assessment
-            - research funding
-            - grant application
+            - National Health and Medical Research Council
+            - MRFF
+            - Medical Research Future Fund
+            - GrantConnect
+            - Australian Government
+            - Commonwealth of Australia
+            - Business Grants Hub
+            - Community Grants Hub
+            - Queensland Government
+            - Advance Queensland
       strength: specific
-    - id: Keyword_au_top500_358_grant_peer_review_comments_domain_context
+    - id: Evidence_au_grant_funding_outcome
       groups:
         - match_style: word
           terms:
-            - grant peer review comments
-            - grant
-            - peer
-            - review
-            - comments
-      strength: domain
+            - funding recommendation
+            - recommended for funding
+            - not recommended for funding
+            - do not fund
+            - fund with conditions
+            - fundable
+            - not fundable
+            - above the funding line
+            - below the funding line
+            - panel recommendation
+            - final ranking
+            - reserve list
+      strength: specific
+    - id: Evidence_au_grant_adjacent_collision
+      groups:
+        - match_style: word
+          terms:
+            - journal peer review
+            - manuscript review
+            - code review
+            - pull request
+            - performance review
+            - employee appraisal
+            - loan application
+            - credit decision
+            - investment committee
+            - venture capital
+            - public guidance
+            - guidance document
+      strength: noise
+    - id: Evidence_foreign_grant_context
+      groups:
+        - match_style: word
+          terms:
+            - text: NIH
+              case_sensitive: true
+            - National Institutes of Health
+            - text: NSF
+              case_sensitive: true
+            - National Science Foundation
+            - text: UKRI
+              case_sensitive: true
+            - UK Research and Innovation
+            - Horizon Europe
+            - European Research Council
+            - Health Research Council of New Zealand
+      strength: noise
 risk_description: >-
-  This detector recognises grant peer review comments, peer review, and reviewer comments with nearby funding or assessment context. A normal true positive contains candid evaluation of an applicant's proposal, track record, feasibility, weaknesses, and funding recommendation, where disclosure can prejudice selection and damage professional relationships. Published review guidance, journal peer-review discussion, and blank scoring templates can also collide with the medium-confidence concept pattern. Risk 8 SENSITIVE fits one confidential review, while PROTECTED requires a major funding round compromise, protected-source exposure, or significant institutional damage.
+  This detector recognises Australian grant-review topics at discovery and requires Australian funder
+  or scheme context plus populated assessment fields for enforcement; high confidence also confirms
+  a formal record reference and funding outcome. A normal true positive contains candid evaluation of
+  an applicant's proposal, track record, feasibility, weaknesses, and funding recommendation, where
+  disclosure can prejudice selection and damage professional relationships. Guidance, journal review,
+  and foreign grant records are explicitly rejected from enforcement. Risk 8 SENSITIVE fits one
+  confidential review, while PROTECTED requires a major funding round compromise, protected-source
+  exposure, or significant institutional damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -146,8 +227,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-18'
+    description: 'Profile quality: add exact 65 discovery, 75 Australian-context-plus-assessment, and 85 formal-reference-plus-funding-outcome tiers; reject adjacent review domains, foreign grant schemes, guidance, and training content.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 945 without changing detector or package metadata.'

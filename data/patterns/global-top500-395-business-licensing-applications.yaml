@@ -1,20 +1,26 @@
 schema: testpattern/v1
 name: Business licensing applications
 slug: global-top500-395-business-licensing-applications
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to business licensing applications in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies business and trade licence application records, including renewal and variation
+  applications. Topic phrases are retained for discovery; enforcement requires at least two populated
+  applicant, enterprise, premises, activity, or licence fields, and high confidence also requires a
+  formal application, licence, or permit reference.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 1 keywords within 240 characters. Keyword
-  lists: industry-education. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_business_licensing_application recognises business or trade licence and business-permit
+  applications. The topic alone is discovery-only at 65. Two distinct populated application fields
+  raise it to 75; a formal application, licence, or permit identifier reaches 85. Enforcing tiers
+  reject explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:business\s+licensing\s+applications|business\s+license|trade\s+license|operating\s+license|license\s+application|business\s+registration|commercial\s+permit|license\s+renewal|regulatory\s+approval|business\s+permit|license\s+holder|zoning\s+approval)\b
+  (?is)\b(?:business\s+licensing\s+applications?|(?:business|trade)\s+licen[cs]e\s+(?:applications?|renewal\s+applications?|variation\s+applications?)|applications?\s+for\s+(?:a\s+)?(?:business|trade)\s+licen[cs]e|business\s+permit\s+applications?)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires two populated application fields rather than licensing terminology
+  alone. High confidence adds a formal reference tied to the application, licence, or permit.
 jurisdictions:
   - global
 regulations:
@@ -23,38 +29,38 @@ data_categories:
   - pii
 corroborative_evidence:
   keywords:
-    - business licensing applications
+    - legal business name
+    - premises address
+    - business activity
+    - licence category
+    - application number
   proximity: 240
-  keyword_lists:
-    - industry-education
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: business licensing applications
-      description: Primary topic phrase match
-    - value: business license
-      description: Case-insensitive topic phrase match
-    - value: trade license
-      description: Alternative topic phrase match
-    - value: operating license
-      description: Additional topic phrase match
+    - value: Business licence application
+      description: Low-tier probe - licensing-application topic without populated fields
+    - value: 'Business licence application; Legal business name: River Street Cafe; Premises address: 10 Queen Street; Business activity: food service'
+      description: Medium-tier probe - multiple populated application fields without a formal reference
+    - value: 'Business licence application; Application ID: BL-2026-1048; Legal business name: River Street Cafe; Premises address: 10 Queen Street; Licence category: food premises'
+      description: High-tier probe - populated application with a formal licensing reference
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: welfare registry
-      description: Generic word pair from old broad template should not match
+    - value: 'Building and operating permit application: site plan, zoning approval, occupancy certificate, and construction inspection'
+      description: Building-permit application belongs to the adjacent permit SIT
+    - value: 'Export licence application for controlled goods; exporter name and destination country'
+      description: Export-control licensing is not routine business licensing
+    - value: 'Professional licence application: applicant name, profession, qualifications, and registration board'
+      description: Individual professional licensing must not collide
+    - value: The software license application tracks the license holder, entitlement, and renewal date.
+      description: Software entitlement workflow is not a government business-licence application
+    - value: 'Training example: Business licence application; Application ID: BL-2026-1048; Legal business name: River Street Cafe; Premises address: 10 Queen Street'
+      description: Explicit training content must not enforce even with realistic fields and an identifier
 false_positives:
-  - description: Common words and phrases related to business licensing applications appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Licensing authority guidance and blank application forms can contain the title and all expected field labels without containing a submitted application.
+    mitigation: Keep title-only material at discovery and require multiple labels with populated values; reserve 85 for a formal application or licence reference.
+  - description: Building, export, professional, and software licensing workflows share applicant, approval, holder, and renewal language.
+    mitigation: Restrict the primary to business or trade licence and business-permit applications rather than generic licence, permit, registration, or approval phrases.
+  - description: Training fixtures can contain realistic business names, premises, categories, and application numbers.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -62,66 +68,57 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 240
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_business_licensing
+    - confidence_level: 85
+      id_match: Regex_business_licensing_application
       matches:
-        - ref: Pattern_global_top500_395_business_licensing_applications_label_context
-        - ref: Keyword_global_top500_395_business_licensing_applications_domain_context
+        - ref: Evidence_business_licensing_populated_field
+          min_count: 2
+          unique_results: true
+        - ref: Evidence_business_licensing_formal_reference
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_business_licensing_application
+      matches:
+        - ref: Evidence_business_licensing_populated_field
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
-      id_match: Regex_business_licensing
-      matches:
-        - ref: Keyword_business_licensing
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+      discovery_only: true
+      id_match: Regex_business_licensing_application
   regexes:
-    - id: Regex_business_licensing
+    - id: Regex_business_licensing_application
       pattern: >-
-        (?is)\b(?:business\s+licensing\s+applications|business\s+license|trade\s+license|operating\s+license|license\s+application|business\s+registration|commercial\s+permit|license\s+renewal|regulatory\s+approval|business\s+permit|license\s+holder|zoning\s+approval)\b
-    - id: Pattern_global_top500_395_business_licensing_applications_label_context
-      pattern: (?i)\b(?:business\s+licensing\s+applications)\b
-  keywords:
-    - id: Keyword_business_licensing
-      groups:
-        - match_style: word
-          terms:
-            - business licensing applications
-            - business license
-            - trade license
-            - operating license
-            - license application
-            - business registration
-            - commercial permit
-            - license renewal
-            - regulatory approval
-            - business permit
-            - license holder
-            - zoning approval
-      strength: specific
-    - id: Keyword_global_top500_395_business_licensing_applications_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - business licensing applications
-            - business
-            - licensing
-            - applications
-      strength: domain
+        (?is)\b(?:business\s+licensing\s+applications?|(?:business|trade)\s+licen[cs]e\s+(?:applications?|renewal\s+applications?|variation\s+applications?)|applications?\s+for\s+(?:a\s+)?(?:business|trade)\s+licen[cs]e|business\s+permit\s+applications?)\b
+    - id: Evidence_business_licensing_populated_field
+      pattern: >-
+        (?i)\b(?:legal\s+business\s+name|trading\s+name|trade\s+name|business\s+address|premises\s+address|entity\s+type|business\s+structure|business\s+activity|activity\s+description|applicant\s+name|responsible\s+person|licen[cs]e\s+(?:category|type)|proposed\s+commencement\s+date)\s*[:=]\s*[A-Z0-9][A-Za-z0-9&.,'()/# -]{1,80}
+    - id: Evidence_business_licensing_formal_reference
+      pattern: >-
+        (?i)\b(?:(?:business\s+licen[cs]e\s+)?(?:application|licen[cs]e|permit)\s*(?:number|no\.?|reference|ref\.?|ID)\s*[:#=-]\s*[A-Z0-9][A-Z0-9/-]{3,})\b
 risk_description: >-
-  The pattern finds business, trade, and operating licence application material supported by nearby government-service context. A normal application primarily describes an enterprise, premises, responsible officer, and eligibility information used in routine regulation, much of which may later be public. Disclosure can inconvenience an applicant or reveal limited contact and commercial details, but significant misuse usually needs financial records, identity evidence, or confidential plans. Risk 5 and OFFICIAL are justified; SENSITIVE would require complete personal vetting material, substantial trade secrets, or a non-public enforcement issue.
+  The detector targets business and trade licensing applications with populated enterprise,
+  premises, activity, applicant, or licence fields rather than generic registration, approval, or
+  renewal language. A normal application describes an enterprise, premises, responsible officer, and
+  eligibility information used in routine regulation, much of which may later be public. Disclosure
+  can inconvenience an applicant or reveal limited contact and commercial details, but significant
+  misuse usually needs financial records, identity evidence, or confidential plans. Risk 5 and
+  OFFICIAL are justified; SENSITIVE would require complete personal vetting material, substantial
+  trade secrets, or a non-public enforcement issue.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -131,8 +128,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-18'
+    description: Restrict discovery to business and trade licensing applications; require populated application fields at 75 and a formal application, licence, or permit reference at 85.
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1941 without changing detector or package metadata.'

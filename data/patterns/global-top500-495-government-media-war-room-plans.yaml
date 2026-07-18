@@ -1,56 +1,66 @@
 schema: testpattern/v1
 name: Government media war-room plans
 slug: global-top500-495-government-media-war-room-plans
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to government media war-room plans in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies operational government media war-room plans used to coordinate monitoring, rapid
+  response, approvals, rebuttals, and spokesperson activity. War-room plan topics are retained for
+  discovery; enforcement requires independent government-office context and multiple operational
+  workflow elements, and high confidence also requires populated assignments, times, or issue references.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 1 keywords within 240 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_government_media_war_room recognises government, ministerial, cabinet, departmental, and
+  generic media war-room plans. The topic alone is discovery-only at 65. Government-office context
+  plus two distinct war-room workflow elements raises it to 75; two populated operational details
+  reach 85. Enforcing tiers reject explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:government\s+media\s+war[\s-]+room\s+plans|war\s+room|media\s+operations|rapid\s+response|crisis\s+communications|media\s+monitoring|opposition\s+research|press\s+strategy|talking\s+points|media\s+briefing|government\s+communications|spin\s+room)\b
+  (?is)\b(?:government\s+media\s+war[\s-]+room\s+plans?|(?:government|ministerial|cabinet|departmental)\s+(?:media|communications)\s+war[\s-]+room(?:\s+(?:plan|playbook|operating\s+protocol))?|media\s+war[\s-]+room\s+(?:plan|playbook|operating\s+protocol))\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires government-office context and multiple operational workflow elements
+  rather than generic communications language. High confidence adds multiple populated live-plan details.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - government
 corroborative_evidence:
   keywords:
-    - government media war-room plans
+    - minister's office
+    - media monitoring shift
+    - issue escalation
+    - holding statement
+    - spokesperson assignment
   proximity: 240
 test_cases:
   should_match:
-    - value: government media war-room plans
-      description: Primary topic phrase match
-    - value: war room
-      description: Case-insensitive topic phrase match
-    - value: media operations
-      description: Alternative topic phrase match
-    - value: rapid response
-      description: Additional topic phrase match
+    - value: Media war-room plan
+      description: Low-tier probe - war-room plan topic without government or workflow evidence
+    - value: 'Government media war-room plan for the minister''s office: media monitoring shift, issue escalation, holding statement, spokesperson assignment, and approval chain'
+      description: Medium-tier probe - government war-room workflow without populated live-plan details
+    - value: 'Government media war-room plan for the minister''s office: media monitoring shift; issue escalation; holding statement; spokesperson assignment; War-room lead: Priya Shah; Activation time: 06:30 AEST; Issue reference: MED-2026-44'
+      description: High-tier probe - government workflow with named ownership, activation time, and issue reference
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: voter sovereign debt
-      description: Generic word pair from old broad template should not match
+    - value: 'Strategic communications plan: audience segments, key messages, stakeholder engagement, media strategy, and publication calendar'
+      description: Generic strategic communications belongs to the adjacent communications-plan SIT
+    - value: 'National emergency response plan: emergency operations centre, incident commander, evacuation zones, public warnings, and recovery priorities'
+      description: Emergency command planning is not a media war-room plan
+    - value: 'Corporate media war-room plan for a product recall: media monitoring shift, issue escalation, holding statement, spokesperson assignment, and approval chain'
+      description: Corporate crisis response lacks government-office context
+    - value: 'Election campaign media war-room plan: rapid response roster, rebuttal line, media inquiry log, response owner, and daily media grid'
+      description: Candidate campaign operations are not government communications
+    - value: 'Training example: Government media war-room plan for the minister''s office; media monitoring shift; issue escalation; War-room lead: Priya Shah; Activation time: 06:30 AEST'
+      description: Explicit training content must not enforce even with realistic live-plan details
 false_positives:
-  - description: Common words and phrases related to government media war-room plans appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Strategic communications plans, emergency plans, and public-affairs guidance use monitoring, messaging, approval, spokesperson, and briefing language without establishing a media war room.
+    mitigation: Require an explicit media war-room plan before considering operational workflow evidence.
+  - description: Corporate crisis teams and election campaigns can operate realistic media war rooms with rapid-response rosters, rebuttal lines, and inquiry logs.
+    mitigation: Require independent government-office, ministerial, cabinet, departmental, or agency context at every enforcing tier.
+  - description: Exercises and training scenarios can contain named leads, activation times, issue references, and realistic escalation procedures.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, training-exercise, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -58,79 +68,107 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 240
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_media_war_room
+    - confidence_level: 85
+      id_match: Regex_government_media_war_room
       matches:
-        - ref: Pattern_global_top500_495_government_media_war_room_plans_label_context
-        - ref: Keyword_global_top500_495_government_media_war_room_plans_domain_context
+        - ref: Evidence_government_media_context
+        - ref: Evidence_media_war_room_workflow
+          min_count: 2
+          unique_results: true
+        - ref: Evidence_media_war_room_live_detail
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_government_media_war_room
+      matches:
+        - ref: Evidence_government_media_context
+        - ref: Evidence_media_war_room_workflow
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
-      id_match: Regex_media_war_room
-      matches:
-        - ref: Keyword_media_war_room
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+      discovery_only: true
+      id_match: Regex_government_media_war_room
   regexes:
-    - id: Regex_media_war_room
+    - id: Regex_government_media_war_room
       pattern: >-
-        (?is)\b(?:government\s+media\s+war[\s-]+room\s+plans|war\s+room|media\s+operations|rapid\s+response|crisis\s+communications|media\s+monitoring|opposition\s+research|press\s+strategy|talking\s+points|media\s+briefing|government\s+communications|spin\s+room)\b
-    - id: Pattern_global_top500_495_government_media_war_room_plans_label_context
-      pattern: (?i)\b(?:government\s+media\s+war\-room\s+plans)\b
+        (?is)\b(?:government\s+media\s+war[\s-]+room\s+plans?|(?:government|ministerial|cabinet|departmental)\s+(?:media|communications)\s+war[\s-]+room(?:\s+(?:plan|playbook|operating\s+protocol))?|media\s+war[\s-]+room\s+(?:plan|playbook|operating\s+protocol))\b
+    - id: Evidence_media_war_room_live_detail
+      pattern: >-
+        (?i)\b(?:(?:war[\s-]+room|monitoring\s+shift|rapid\s+response)\s+(?:lead|owner|coordinator)\s*[:=-]\s*[A-Z][A-Za-z.'-]{1,30}(?:\s+[A-Z][A-Za-z.'-]{1,30}){1,3}|(?:activation|briefing|clearance|response)\s+(?:time|deadline)\s*[:=-]\s*(?:[01]?\d|2[0-3])[:.][0-5]\d(?:\s*(?:AM|PM|UTC|GMT|[A-Z]{2,4}))?|(?:issue|response)\s+(?:ID|reference|ref\.?)\s*[:#=-]\s*[A-Z0-9][A-Z0-9/-]{3,})\b
   keywords:
-    - id: Keyword_media_war_room
+    - id: Evidence_government_media_context
       groups:
         - match_style: word
           terms:
-            - government media war-room plans
-            - war room
-            - media operations
-            - rapid response
-            - crisis communications
-            - media monitoring
-            - opposition research
-            - press strategy
-            - talking points
-            - media briefing
-            - government communications
-            - spin room
-      strength: specific
-    - id: Keyword_global_top500_495_government_media_war_room_plans_domain_context
+            - minister's office
+            - cabinet office
+            - government department
+            - department media team
+            - government spokesperson
+            - public information officer
+            - agency communications branch
+            - agency media unit
+            - communications directorate
+            - ministerial adviser
+            - departmental secretary
+      strength: domain
+    - id: Evidence_media_war_room_workflow
       groups:
         - match_style: word
           terms:
-            - government media war-room plans
-            - government
-            - media
-            - war
-            - room
-            - plans
+            - media monitoring shift
+            - rapid response roster
+            - issue escalation
+            - rebuttal line
+            - holding statement
+            - spokesperson assignment
+            - approval chain
+            - clearance deadline
+            - press briefing cadence
+            - media inquiry log
+            - response owner
+            - monitoring lead
+            - morning media scan
+            - daily media grid
       strength: domain
 risk_description: >-
-  The classifier responds to government war rooms, rapid response, crisis communications, media monitoring, opposition research, press strategy, and talking points; it does not require a current operational plan. A genuine plan can reveal message timing, decision roles, anticipated criticism, research priorities, and response triggers, allowing an adversary to pre-empt communications or exploit uncertainty during a crisis. Consequence is serious but normally confined to one campaign, issue, or event, while ordinary public-relations material uses many of the same phrases. Risk 8 and SENSITIVE fit that bounded strategic harm; PROTECTED would require a live national emergency or security operation where disclosure could cause significant service, public-safety, or state damage.
+  The detector targets media war-room plans with government-office and operational workflow evidence
+  rather than generic rapid-response, talking-point, or communications language. A genuine plan can
+  reveal message timing, decision roles, anticipated criticism, research priorities, and response
+  triggers, allowing an adversary to pre-empt communications or exploit uncertainty during a crisis.
+  Consequence is serious but normally confined to one issue or event. Risk 8 and SENSITIVE fit that
+  bounded strategic harm; PROTECTED would require a live national emergency or security operation
+  where disclosure could cause significant service, public-safety, or state damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
-  qgiscf_dlm: SENSITIVE Personal-Privacy
+  qgiscf_dlm: SENSITIVE Government
   us_gov: CUI Specified
   uk_gov: SECRET
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-18'
+    description: Restrict enforcement to government media war-room plans with operational workflow evidence at 75 and multiple populated live-plan details at 85.
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2034 without changing detector or package metadata.'

@@ -1,22 +1,31 @@
 schema: testpattern/v1
 name: Data classification matrices
 slug: au-top500-463-data-classification-matrices
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to data classification matrices in Australian contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Identifies Australian government data-classification matrices that map information categories to
+  classification levels and handling controls. Matrix topics are retained for discovery at 65;
+  Australian PSPF or QGISCF context plus multiple schema fields raises confidence to 75, while a
+  populated category-to-Australian-marking row raises it to 85.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
-  lists: classification-australia-government, classification-corporate.
+  Regex_au_data_classification_matrix recognises explicit data, information, sensitivity, protective
+  marking, and information-security classification matrices. The topic alone is discovery-only at
+  65. Australian government or classification-framework context plus three distinct schema or
+  handling fields is required at 75. A populated information-category to Australian classification
+  value mapping additionally raises confidence to 85. Enforcing tiers reject explicit templates,
+  guidance, and foreign classification regimes.
 pattern: >-
-  (?is)\b(?:data\s+classification\s+matrices|classification\s+matrix|data\s+classification|sensitivity\s+level|protective\s+marking|official\s+sensitive|information\s+classification|handling\s+instructions|security\s+classification)\b
+  (?is)\b(?:data\s+classification|information\s+classification|data\s+sensitivity|sensitivity\s+classification|classification\s+and\s+handling|protective\s+marking|information\s+security\s+classification)\s+matri(?:x|ces)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
+confidence_justification: >-
+  Medium confidence requires both Australian framework context and several matrix-schema fields
+  rather than generic classification language. High confidence adds a populated category-to-marking
+  relationship using Australian government classification values.
 jurisdictions:
-  - global
+  - au
 regulations:
   - AML/CTF Act (Cth)
   - HRIPA (Cth)
@@ -29,104 +38,183 @@ frameworks:
   - ISO 27001
   - ISO 27701
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
-    - data classification matrices
-    - data
-    - classification
-    - matrices
-    - privacy
-    - compliance
-    - risk
-  proximity: 300
+    - PSPF
+    - QGISCF
+    - data category
+    - classification level
+    - handling requirement
+    - access restriction
+    - protective marking
+  proximity: 500
   keyword_lists:
     - classification-australia-government
     - classification-corporate
 test_cases:
   should_match:
-    - value: data classification matrices
-      description: Primary topic phrase match
-    - value: classification matrix
-      description: Case-insensitive topic phrase match
-    - value: data classification
-      description: Alternative topic phrase match
-    - value: sensitivity level
-      description: Additional topic phrase match
+    - value: The Queensland Government data classification matrix is scheduled for review.
+      description: Low-tier probe - Australian matrix topic without schema fields or populated mappings
+    - value: 'Queensland Government data classification matrix: Information type | Classification level | Handling requirement | Access restriction'
+      description: Medium-tier probe - Australian context and substantive schema without a populated mapping
+    - value: 'QGISCF data classification matrix: Information type | Classification level | Handling requirement | Access restriction; Information type: Cabinet submissions | Classification level: OFFICIAL: Sensitive'
+      description: High-tier probe - Australian framework, substantive schema, and populated category-to-marking mapping
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
-    - value: data inventory compliance
-      description: Generic word pair from old broad template should not match
+    - value: 'Enterprise data inventory: information asset | data owner | data steward | system of record | data lineage'
+      description: Data inventories belong to the adjacent inventory domain
+    - value: 'Data retention and deletion schedule: information type | retention period | disposal method | legal hold'
+      description: Retention schedules are not classification matrices
+    - value: 'Role-based access control matrix: role | system | permission | approval status'
+      description: Entitlement matrices do not map information categories to classifications
+    - value: The machine-learning report shows a confusion matrix for data classification accuracy.
+      description: Statistical model evaluation must not collide with governance matrices
+    - value: 'Corporate data classification matrix: Data category | Classification level | Handling requirement | Access restriction; Data category: Customer records | Classification level: Confidential'
+      description: Corporate matrix without Australian government context must not enforce
+    - value: 'US Government data classification matrix: Data category | Classification level | Handling requirement | Access restriction; Data category: Source code | Classification level: CUI'
+      description: United States classification matrix must not enforce as Australian
+    - value: 'New Zealand Government information classification matrix: Information type | Classification level | Handling requirement | Access restriction; Information type: Cabinet papers | Classification level: IN-CONFIDENCE'
+      description: New Zealand classification matrix must not enforce as Australian
+    - value: 'Public guidance for the Queensland Government data classification matrix: Information type | Classification level | Handling requirement | Access restriction; Information type: Cabinet submissions | Classification level: PROTECTED'
+      description: Australian public guidance containing a realistic populated row must not enforce
+    - value: 'Training example: QGISCF data classification matrix; Information type | Classification level | Handling requirement; Information type: Cabinet submissions | Classification level: PROTECTED'
+      description: Structurally complete Australian training content must not enforce
 false_positives:
-  - description: Common words and phrases related to data classification matrices appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Australian classification policies, glossaries, public guidance, and awareness material discuss PSPF or QGISCF levels and controls without containing a live matrix.
+    mitigation: Keep matrix topics discovery-only and require several independent schema fields; reject explicit guidance and training framing from enforcing tiers.
+  - description: Data inventories, retention schedules, access-control matrices, and machine-learning confusion matrices use overlapping data, classification, owner, and control terms.
+    mitigation: Restrict the primary to an explicit classification matrix and reserve high confidence for a populated information-category to classification-level relationship.
+  - description: Corporate and overseas government matrices can use the same schema fields and similar classification labels.
+    mitigation: Require explicit Australian government or framework context and reject named foreign regimes from enforcing tiers.
 exports:
   - purview_xml
   - yaml
   - regex_copy
 scope: wide
 purview:
-  patterns_proximity: 300
-  recommended_confidence: 75
+  patterns_proximity: 500
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_classification_matrix
+      id_match: Regex_au_data_classification_matrix
       matches:
-        - ref: Evidence_classification_matrix
-          min_count: 2
+        - ref: Evidence_au_classification_context
+        - ref: Evidence_au_classification_matrix_schema
+          min_count: 3
+          unique_results: true
+        - ref: Pattern_au_classification_populated_mapping
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_classification_guidance_collision
+            - Evidence_foreign_classification_context
+    - confidence_level: 75
+      id_match: Regex_au_data_classification_matrix
+      matches:
+        - ref: Evidence_au_classification_context
+        - ref: Evidence_au_classification_matrix_schema
+          min_count: 3
           unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-    - confidence_level: 75
-      id_match: Pattern_classification_matrix
-      matches:
-        - ref: Evidence_classification_matrix
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Evidence_classification_guidance_collision
+            - Evidence_foreign_classification_context
     - confidence_level: 65
-      id_match: Pattern_classification_matrix
-      matches:
-        - ref: Evidence_classification_matrix
+      discovery_only: true
+      id_match: Regex_au_data_classification_matrix
   regexes:
-    - id: Pattern_classification_matrix
+    - id: Regex_au_data_classification_matrix
       pattern: >-
-        (?is)\b(?:data\s+classification\s+matrices|classification\s+matrix|data\s+classification|sensitivity\s+level|protective\s+marking|official\s+sensitive|information\s+classification|handling\s+instructions|security\s+classification)\b
+        (?is)\b(?:data\s+classification|information\s+classification|data\s+sensitivity|sensitivity\s+classification|classification\s+and\s+handling|protective\s+marking|information\s+security\s+classification)\s+matri(?:x|ces)\b
+    - id: Pattern_au_classification_populated_mapping
+      pattern: >-
+        (?i)\b(?:(?:data\s+category|information\s+type|record\s+type)\s*[:=]\s*[A-Z0-9][A-Za-z0-9 /&_'().-]{2,60}\s*(?:\||;|,|->|=>)\s*(?:classification|security|sensitivity|protective\s+marking)\s*(?:level|label|marking)?\s*[:=]\s*(?:public|official(?:\s*(?::|-)\s*sensitive)?|sensitive|protected|secret|top\s+secret)|(?:(?:[A-Z][A-Za-z0-9 /&_'().-]{2,40}\s+(?:data|records?|information|submissions?))|source\s+code)\s*(?:\||->|=>)\s*(?:public|official(?:\s*(?::|-)\s*sensitive)?|sensitive|protected|secret|top\s+secret))\b
   keywords:
-    - id: Evidence_classification_matrix
+    - id: Evidence_au_classification_context
       groups:
         - match_style: word
           terms:
-            - data classification matrices
-            - classification matrix
-            - data classification
+            - Australian Government
+            - Commonwealth of Australia
+            - Queensland Government
+            - Protective Security Policy Framework
+            - text: PSPF
+              case_sensitive: true
+            - Queensland Government Information Security Classification Framework
+            - text: QGISCF
+              case_sensitive: true
+            - text: AUSTEO
+              case_sensitive: true
+      strength: specific
+    - id: Evidence_au_classification_matrix_schema
+      groups:
+        - match_style: word
+          terms:
+            - data category
+            - information type
+            - record type
+            - classification level
             - sensitivity level
+            - sensitivity label
             - protective marking
-            - official sensitive
-            - information classification
-            - handling instructions
-            - security classification
-            - PSPF
-            - privacy
-            - compliance
+            - handling requirements
+            - handling requirement
+            - access restriction
+            - storage requirement
+            - transmission requirement
+            - sharing restriction
+            - encryption required
+            - retention requirement
+            - disposal requirement
+            - approved recipients
+      strength: domain
+    - id: Evidence_classification_guidance_collision
+      groups:
+        - match_style: word
+          terms:
+            - public guidance
+            - guidance document
+            - implementation guide
+            - awareness training
+            - training material
+      strength: noise
+    - id: Evidence_foreign_classification_context
+      groups:
+        - match_style: word
+          terms:
+            - US Government
+            - Controlled Unclassified Information
+            - text: CUI
+              case_sensitive: true
+            - UK Government
+            - text: UK OFFICIAL
+              case_sensitive: true
+            - New Zealand Government
+            - IN-CONFIDENCE
+            - Canadian Government
+      strength: noise
 risk_description: >-
-  This concept regex responds to data-classification matrices, sensitivity levels, labels, handling requirements, and classification-scheme language rather than proving a populated control matrix is present. An actual matrix may reveal internal taxonomy and handling thresholds that help an insider imitate trusted language or understand policy boundaries, but generic frameworks do not expose the protected content itself. The ordinary impact is low because many such artefacts are policy-facing and lack repository mappings, exceptions, or enforcement weaknesses. Risk 5 OFFICIAL is suitable; SENSITIVE is not met without live asset mappings, confidential exceptions, or actionable control and access details.
+  This detector discovers explicit classification-matrix topics and requires Australian government or
+  framework context plus substantive schema fields for enforcement; high confidence also confirms a
+  populated category-to-marking mapping. An actual matrix may reveal internal taxonomy and handling
+  thresholds that help an insider imitate trusted language or understand policy boundaries, but
+  generic frameworks do not expose protected content by themselves. The ordinary impact is low
+  because many such artefacts are policy-facing and lack repository mappings, exceptions, or
+  enforcement weaknesses. Risk 5 OFFICIAL is suitable; SENSITIVE is not met without live asset
+  mappings, confidential exceptions, or actionable control and access details.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -136,8 +224,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-18'
+    description: 'Profile quality: add exact 65 discovery, 75 Australian-framework-plus-schema, and 85 populated Australian-marking tiers; reject adjacent matrix domains, foreign regimes, guidance, and training content; correct the detector category from pii to security.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1049 without changing detector or package metadata.'

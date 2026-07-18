@@ -1,20 +1,31 @@
 schema: testpattern/v1
 name: Regulatory examination responses
 slug: au-top500-168-regulatory-examination-responses
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to regulatory examination responses in Australian contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
+  Identifies Australian regulator-facing responses and submissions addressing examinations,
+  supervisory or prudential reviews, inquiries, and findings, including matters involving APRA,
+  ASIC, AUSTRAC, ACCC, OAIC, and Queensland regulators. Topic phrases are discovery-only; enforcement
+  requires Australian authority context and substantive management-response evidence, while high
+  confidence also requires a structured regulator matter reference.
+operation: >-
+  Regex_au_regulatory_examination_response recognises examination, review, inquiry, and finding
+  responses. The topic alone is discovery-only at 65. Australian regulator context plus at least two
+  distinct response, finding, root-cause, remediation, ownership, due-date, dispute, control-gap, or
+  evidence signals reaches 75; a structured Australian authority reference raises it to 85. Enforcing
+  tiers reject templates, published or instructional material, and exam or test records.
 pattern: >-
-  (?is)\b(?:regulatory\s+examination\s+responses|regulatory\s+examination|regulator\s+response|APRA\s+examination|ASIC\s+review|prudential\s+review|compliance\s+examination|regulatory\s+inquiry|supervisory\s+review|remediation\s+plan|regulatory\s+finding|examination\s+report)\b
+  (?is)\b(?:(?:regulatory|supervisory|prudential|compliance)\s+(?:examination|review|inquiry)\s+(?:response|submission)|(?:APRA|ASIC|AUSTRAC|ACCC|OAIC|Australian\s+(?:regulator|regulatory\s+authority)|Queensland\s+(?:regulator|regulatory\s+authority))\s+(?:examination|review|inquiry)\s+(?:response|submission)|response\s+to\s+(?:the\s+)?(?:regulator(?:'s)?|APRA|ASIC|AUSTRAC|ACCC|OAIC|Australian\s+(?:regulator|regulatory\s+authority)|Queensland\s+(?:regulator|regulatory\s+authority))\s+(?:examination|review|finding|inquiry)|matter\s+requiring\s+attention\s+response)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
+confidence_justification: >-
+  Medium confidence requires Australian regulator context and multiple substantive response signals
+  rather than examination vocabulary alone. High confidence adds a structured authority matter
+  reference.
 jurisdictions:
-  - global
+  - au
 regulations:
   - AML/CTF Act (Cth)
   - HRIPA (Cth)
@@ -26,42 +37,53 @@ regulations:
 frameworks:
   - ISO 27001
   - ISO 27701
+  - QGISCF
 data_categories:
-  - pii
+  - government
+  - legal
 corroborative_evidence:
   keywords:
-    - regulatory examination responses
-    - regulatory
-    - examination
-    - responses
-    - corporate
-    - legal
-    - governance
+    - APRA prudential review response
+    - ASIC regulatory examination response
+    - AUSTRAC inquiry response
+    - Queensland regulator review response
+    - management response to finding
+    - root cause analysis
+    - remediation action
+    - evidence attached
   proximity: 300
 test_cases:
   should_match:
-    - value: regulatory examination responses
-      description: Primary topic phrase match
-    - value: regulatory examination
-      description: Case-insensitive topic phrase match
-    - value: regulator response
-      description: Alternative topic phrase match
-    - value: APRA examination
-      description: Additional topic phrase match
+    - value: Regulatory examination response
+      description: Low-tier probe - response topic without Australian authority or substantive evidence
+    - value: 'APRA prudential review response: management response to finding, root cause analysis, remediation action, action owner, target completion date, and evidence attached'
+      description: Medium-tier probe - Australian prudential response evidence without a formal matter reference
+    - value: 'Queensland regulator review response: response to finding, root cause analysis, control gap, remediation commitment, action owner, and target completion date'
+      description: Medium-tier probe - Queensland regulatory response evidence without a formal matter reference
+    - value: 'ASIC regulatory examination response, ASIC matter reference: ASIC-EX-2026-041: management response to finding, root cause analysis, control gap, remediation commitment, corrective action owner, and evidence attached'
+      description: High-tier probe - substantive Australian response with a structured ASIC matter reference
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: board policy
-      description: Generic word pair from old broad template should not match
+    - value: 'ASIC compliance guidance on preparing a regulatory examination response covers management response to finding, root cause analysis, remediation action, and evidence requirements.'
+      description: Generic compliance guidance is not an operational examination response
+    - value: 'APRA published report on the regulatory examination response program summarises management responses, root causes, and remediation actions.'
+      description: Published regulator material is not a confidential entity response
+    - value: 'APRA compliance examination response for a staff certification test: candidate answer, score, management response, corrective action, and evidence attached.'
+      description: Staff exam or test answers are outside the regulatory-response SIT
+    - value: 'Template: ASIC regulatory examination response, ASIC matter reference: ASIC-EX-2026-041, management response to finding, root cause analysis, remediation action, and evidence attached.'
+      description: Explicit response templates must not enforce
+    - value: 'Queensland Government internal audit management response: root cause analysis, control gap, remediation action, action owner, and evidence attached.'
+      description: Adjacent internal-audit response without a regulator examination topic
+    - value: 'Draft response to a customer complaint: root cause analysis, corrective action, action owner, and target completion date.'
+      description: Adjacent customer-response record is outside the regulatory-examination SIT
 false_positives:
-  - description: Common words and phrases related to regulatory examination responses appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Australian regulatory guidance and published examination material can discuss findings, root causes, remediation, owners, and evidence without containing an entity's response.
+    mitigation: Keep the response topic discovery-only and reject explicit guidance, instructional, public, and published framing from enforcing tiers.
+  - description: Staff examinations, certification tests, and training responses can reproduce realistic regulatory-response language and references.
+    mitigation: Reject exam, test, candidate-answer, template, demo, sample-data, and training-example framing from enforcing tiers.
+  - description: Internal audit, customer complaint, RTI, and other adjacent response records can contain management actions, owners, deadlines, and evidence.
+    mitigation: Require an examination, supervisory review, prudential review, inquiry, or regulator-finding response as the primary topic.
 exports:
   - purview_xml
   - yaml
@@ -69,59 +91,106 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_regulatory_examination
+      id_match: Regex_au_regulatory_examination_response
       matches:
-        - ref: Evidence_regulatory_examination
+        - ref: Evidence_au_regulator_context
+        - ref: Evidence_au_regulatory_examination_content
+          min_count: 2
+          unique_results: true
+        - ref: Regex_au_regulatory_examination_reference
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_regulatory_non_record
+    - confidence_level: 75
+      id_match: Regex_au_regulatory_examination_response
+      matches:
+        - ref: Evidence_au_regulator_context
+        - ref: Evidence_au_regulatory_examination_content
           min_count: 2
           unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-    - confidence_level: 75
-      id_match: Pattern_regulatory_examination
-      matches:
-        - ref: Evidence_regulatory_examination
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Regex_au_regulatory_non_record
     - confidence_level: 65
-      id_match: Pattern_regulatory_examination
-      matches:
-        - ref: Evidence_regulatory_examination
+      discovery_only: true
+      id_match: Regex_au_regulatory_examination_response
   regexes:
-    - id: Pattern_regulatory_examination
+    - id: Regex_au_regulatory_examination_response
       pattern: >-
-        (?is)\b(?:regulatory\s+examination\s+responses|regulatory\s+examination|regulator\s+response|APRA\s+examination|ASIC\s+review|prudential\s+review|compliance\s+examination|regulatory\s+inquiry|supervisory\s+review|remediation\s+plan|regulatory\s+finding|examination\s+report)\b
+        (?is)\b(?:(?:regulatory|supervisory|prudential|compliance)\s+(?:examination|review|inquiry)\s+(?:response|submission)|(?:APRA|ASIC|AUSTRAC|ACCC|OAIC|Australian\s+(?:regulator|regulatory\s+authority)|Queensland\s+(?:regulator|regulatory\s+authority))\s+(?:examination|review|inquiry)\s+(?:response|submission)|response\s+to\s+(?:the\s+)?(?:regulator(?:'s)?|APRA|ASIC|AUSTRAC|ACCC|OAIC|Australian\s+(?:regulator|regulatory\s+authority)|Queensland\s+(?:regulator|regulatory\s+authority))\s+(?:examination|review|finding|inquiry)|matter\s+requiring\s+attention\s+response)\b
+    - id: Regex_au_regulatory_examination_reference
+      pattern: >-
+        (?i)\b(?:APRA|ASIC|AUSTRAC|ACCC|OAIC|Australian\s+(?:regulator|regulatory\s+authority)|Queensland\s+(?:regulator|regulatory\s+authority))\s+(?:examination|review|inquiry|finding|matter|notice)\s*(?:number|no\.?|reference|ref\.?|ID)\s*[:#-]\s*[A-Z]{2,10}[-/][A-Z0-9/-]{3,30}\b
+    - id: Regex_au_regulatory_non_record
+      pattern: >-
+        (?i)\b(?:(?:public|published)\s+(?:(?:regulatory|prudential|supervisory)\s+)?(?:guide|guidance|report|review|summary|statement|standard)|(?:generic|public|regulatory|compliance)\s+guidance|how\s+to\s+(?:prepare|write|complete|submit|respond)|(?:practice|certification|student|candidate|staff)\s+(?:exam(?:ination)?|test)|(?:exam(?:ination)?|test)\s+(?:question|answer|paper|score|result)|answer\s+key|candidate\s+(?:answer|response))\b
   keywords:
-    - id: Evidence_regulatory_examination
+    - id: Evidence_au_regulator_context
       groups:
         - match_style: word
           terms:
-            - regulatory examination responses
-            - regulatory examination
-            - regulator response
-            - APRA examination
-            - ASIC review
-            - prudential review
-            - compliance examination
-            - regulatory inquiry
-            - supervisory review
-            - remediation plan
-            - regulatory finding
-            - examination report
+            - text: APRA
+              case_sensitive: true
+            - Australian Prudential Regulation Authority
+            - text: ASIC
+              case_sensitive: true
+            - Australian Securities and Investments Commission
+            - text: AUSTRAC
+              case_sensitive: true
+            - Australian Transaction Reports and Analysis Centre
+            - text: ACCC
+              case_sensitive: true
+            - Australian Competition and Consumer Commission
+            - text: OAIC
+              case_sensitive: true
+            - Office of the Australian Information Commissioner
+            - Australian regulator
+            - Australian regulatory authority
+            - Queensland regulator
+            - Queensland regulatory authority
+            - Commonwealth regulator
+      strength: domain
+    - id: Evidence_au_regulatory_examination_content
+      groups:
+        - match_style: word
+          terms:
+            - management response
+            - response to finding
+            - finding disputed
+            - issue disputed
+            - root cause analysis
+            - control gap
+            - remediation commitment
+            - remediation action
+            - corrective action owner
+            - action owner
+            - target completion date
+            - response due date
+            - evidence attached
+            - supporting evidence
+      strength: domain
 risk_description: >-
-  The detector finds regulatory examination responses, regulator responses, and Australian Prudential Regulation Authority examination material with seven contextual signals. A genuine response can reveal control deficiencies, remediation commitments, disputed findings, internal evidence, and the regulator's areas of concern, enabling concealment or market disadvantage before the examination concludes. Harm is serious for the regulated entity and government oversight process but normally confined to one examination. Risk 8 supports SENSITIVE Government; PROTECTED would require compromise of a major supervisory operation, protected sources, or significant financial-system damage.
+  The detector finds Australian regulator-facing examination, supervisory-review, inquiry, and
+  finding responses supported by named authority context and substantive management-response
+  evidence. A genuine response can reveal control deficiencies, disputed findings, root causes,
+  remediation commitments, accountable owners, deadlines, and internal evidence, enabling concealment
+  or prejudice before the regulatory matter concludes. Harm is serious for the regulated entity and
+  government oversight process but normally confined to one matter. Risk 8 supports SENSITIVE
+  Government; PROTECTED would require compromise of a major supervisory operation, protected sources,
+  or significant financial-system or government damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -131,8 +200,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-18'
+    description: 'Profile quality: rebuild the Australian regulatory-examination SIT with exact 65 discovery, 75 Australian authority plus substantive-response, and 85 structured-reference tiers; add guidance, publication, exam, template, and adjacent-record adversarial probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 769 without changing detector or package metadata.'
