@@ -1,15 +1,26 @@
 schema: testpattern/v1
 name: Ministerial/Executive Briefing
 slug: au-ministerial-briefing
-version: 1.5.1
-type: keyword_list
+version: 1.6.0
+type: regex
 pattern_class: concept
-description: Detects ministerial briefings, DG briefs, and executive decision documents in Australian government.
+engine: boost_regex
+description: >-
+  Identifies substantive Australian ministerial, Director-General, secretary, and executive briefing
+  documents. Topic phrases are retained for discovery; enforcement requires issue, recommendation,
+  option, risk, financial, stakeholder, communications, decision, or implementation content, and high
+  confidence also requires a formal brief reference or decision/approval signal.
 operation: >-
-  Keyword-based detection matching ministerial brief, briefing note, DG briefing, and for decision patterns.
-  Corroborative evidence: 12 keywords within 300 characters.
+  Regex_executive_brief recognises ministerial, Director-General, DG, secretary, and executive brief
+  topics. The topic alone is discovery-only at 65. Substantive decision-support content raises it to 75;
+  that content plus a formal brief reference or decision/approval signal reaches 85. Enforcing tiers
+  reject explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:ministerial\s+brief(?:ing)?|brief(?:ing)?\s+(?:for\s+)?(?:the\s+)?minister|DG\s+brief(?:ing)?|director[\s-]?general\s+brief(?:ing)?|secretary\s+brief(?:ing)?|brief(?:ing)?\s+for\s+(?:the\s+)?secretary)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence requires substantive decision-support content. High confidence adds formal
+  reference, decision, or approval evidence.
 jurisdictions:
   - au
 regulations:
@@ -24,20 +35,26 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: 'Ministerial brief: for decision by the Minister'
-      description: Test match 1
-    - value: Briefing note for the Director General with key issues and recommendations
-      description: Test match 2
-    - value: DG briefing prepared for approval with policy recommendations
-      description: Test match 3
+    - value: Ministerial brief
+      description: Low-tier probe - briefing topic without decision-support content
+    - value: 'Ministerial brief: key issues, policy options, recommendations, stakeholder positions, risks, communications lines, and implementation timing'
+      description: Medium-tier probe - substantive decision support without formal reference or action signal
+    - value: 'Ministerial brief reference: MB-2026-104, for decision by the Minister: key issues, options, recommendations, risks, stakeholder positions, and implementation timing'
+      description: High-tier probe - substantive brief with formal reference and decision signal
   should_not_match:
     - value: A brief summary of the project
       description: Non-match 1
     - value: The minister of music at the church
-      description: Non-match 2
+      description: Non-government minister usage
+    - value: 'The public handbook explains how to write a ministerial brief.'
+      description: Public process guidance without a live brief
+    - value: 'Training example: ministerial brief MB-2026-104 for decision with recommendations and risks'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Generic use of brief, minister, or briefing in non-government contexts.
-    mitigation: Require government-specific keywords like ministerial, for decision, or director general.
+  - description: Public writing guidance and general government commentary discuss ministerial briefs, recommendations, options, and risks without containing a live decision document.
+    mitigation: Keep briefing topics discovery-only and require issue, recommendation, option, risk, financial, stakeholder, communications, decision, or implementation content.
+  - description: Training briefs can contain realistic references, decision signals, options, recommendations, and risks.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - yaml
 scope: narrow
@@ -61,83 +78,57 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_ministerial_brief
+      id_match: Regex_executive_brief
       matches:
-        - ref: Keyword_ministerial
-        - ref: Keyword_briefing
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_dg_brief
-      matches:
-        - ref: Keyword_briefing
+        - ref: Evidence_executive_brief_content
+        - ref: Evidence_executive_brief_action
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Regex_secretary_brief
+      id_match: Regex_executive_brief
       matches:
-        - ref: Keyword_executive
+        - ref: Evidence_executive_brief_content
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_executive_brief
   regexes:
-    - id: Regex_ministerial_brief
-      pattern: (?i)\b(?:ministerial\s+brief(?:ing)?|brief(?:ing)?\s+(?:for\s+)?(?:the\s+)?minister)\b
-    - id: Regex_dg_brief
-      pattern: (?i)\b(?:dg\s+brief(?:ing)?|director[\s\-]?general\s+brief(?:ing)?)\b
-    - id: Regex_secretary_brief
-      pattern: (?i)\b(?:secretary\s+brief(?:ing)?|brief(?:ing)?\s+for\s+(?:the\s+)?secretary)\b
+    - id: Regex_executive_brief
+      pattern: >-
+        (?is)\b(?:ministerial\s+brief(?:ing)?|brief(?:ing)?\s+(?:for\s+)?(?:the\s+)?minister|DG\s+brief(?:ing)?|director[\s-]?general\s+brief(?:ing)?|secretary\s+brief(?:ing)?|brief(?:ing)?\s+for\s+(?:the\s+)?secretary)\b
+    - id: Evidence_executive_brief_action
+      pattern: >-
+        (?i)\b(?:brief\s*(?:number|no\.?|reference|ref\.?)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{3,}|for\s+(?:ministerial\s+)?(?:decision|approval)|minister(?:'s)?\s+decision|decision\s*[:=]\s*(?:approved|not\s+approved|noted))\b
   keywords:
-    - id: Keyword_ministerial
+    - id: Evidence_executive_brief_content
       groups:
         - match_style: word
           terms:
-            - ministerial
-            - ministerial approval
-            - brief for the minister
-            - minister's office
-            - portfolio minister
-            - assistant minister
-      strength: specific
-    - id: Keyword_briefing
-      groups:
-        - match_style: word
-          terms:
-            - briefing
-            - briefing note
-            - briefing document
-            - brief for decision
-            - for decision
-            - for information
-            - for approval
             - key issues
             - recommendations
-      strength: specific
-    - id: Keyword_executive
-      groups:
-        - match_style: word
-          terms:
-            - executive
-            - director general
-            - text: DG
-              case_sensitive: true
-            - secretary
-            - deputy secretary
-            - chief executive
-            - text: SES
-              case_sensitive: true
+            - policy options
+            - financial implications
+            - stakeholder positions
+            - risks
+            - communications lines
+            - decision required
+            - implementation timing
+            - legal advice
+            - next steps
       strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.6.0
+    date: '2026-07-04'
+    description: Split executive-brief discovery, decision-support content, and formal action evidence into calibrated 65/75/85 tiers; narrow enforcement and exclude training content.
   - version: 1.5.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 558 without changing detector or package metadata.'

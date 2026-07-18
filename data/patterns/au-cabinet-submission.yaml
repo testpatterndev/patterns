@@ -1,15 +1,25 @@
 schema: testpattern/v1
 name: Cabinet Submission
 slug: au-cabinet-submission
-version: 1.4.1
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
-description: Detects Cabinet submissions, memoranda, and decision documents at federal and state government levels.
+engine: boost_regex
+description: >-
+  Identifies substantive Australian federal and state Cabinet submissions, memoranda, and approval
+  papers. Topic phrases are retained for discovery; enforcement requires purpose, recommendation,
+  financial, consultation, implementation, risk, regulatory, or decision-sought sections, and high
+  confidence also requires a formal Cabinet marking, minute, decision, or submission identifier.
 operation: >-
-  Keyword-based detection matching cabinet submission, cabinet memorandum, cabinet decision, and related terms.
-  Corroborative evidence: 7 keywords within 300 characters.
+  Regex_cabinet recognises Cabinet submission, memorandum, decision, and approval topics. The topic
+  alone is discovery-only at 65. Substantive submission sections raise it to 75; those sections plus a
+  Cabinet-in-Confidence marking or formal submission/minute/decision identifier reach 85. Enforcing
+  tiers reject explicit templates and training examples.
+pattern: (?is)\b(?:cabinet\s+(?:submission|memorandum|decision|approval)|for\s+cabinet\s+(?:consideration|approval))\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence requires substantive submission content rather than a title. High confidence adds
+  formal Cabinet handling or record identifiers.
 jurisdictions:
   - au
 regulations:
@@ -23,20 +33,26 @@ data_categories:
   - cabinet
 test_cases:
   should_match:
-    - value: 'Cabinet submission for consideration: policy reform proposal'
-      description: Test match 1
-    - value: Cabinet memorandum regarding National Cabinet decision outcomes
-      description: Test match 2
-    - value: 'For Cabinet approval: infrastructure funding allocation'
-      description: Test match 3
+    - value: Cabinet submission
+      description: Low-tier probe - Cabinet topic without submission content
+    - value: 'Cabinet submission: purpose, recommendations, financial implications, consultation, implementation plan, risks, and decision sought'
+      description: Medium-tier probe - substantive submission sections without formal marking or identifier
+    - value: 'Cabinet-in-Confidence Cabinet submission number: CAB-2026-104: purpose, recommendations, financial implications, consultation, risks, implementation plan, and decision sought'
+      description: High-tier probe - substantive submission with Cabinet marking and formal identifier
   should_not_match:
     - value: Kitchen cabinet installation guide
       description: Non-match 1
     - value: The filing cabinet was full
-      description: Non-match 2
+      description: Furniture usage
+    - value: 'The public guide explains how agencies prepare a Cabinet submission.'
+      description: Public process guidance without a submission record
+    - value: 'Training example: Cabinet-in-Confidence Cabinet submission CAB-2026-104 with recommendations and decision sought'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Generic use of cabinet referring to furniture.
-    mitigation: Require government-specific context like submission, memorandum, or decision.
+  - description: Public process guidance, historical commentary, and generic policy material discuss Cabinet submissions, recommendations, and decisions without containing a live submission.
+    mitigation: Keep Cabinet topics discovery-only and require substantive purpose, recommendation, financial, consultation, implementation, risk, regulatory, or decision-sought content.
+  - description: Training submissions can contain realistic Cabinet markings, numbers, sections, recommendations, and decisions sought.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - yaml
 scope: narrow
@@ -62,7 +78,17 @@ purview:
     - confidence_level: 85
       id_match: Regex_cabinet
       matches:
-        - ref: Keyword_cabinet
+        - ref: Evidence_cabinet_submission_content
+        - ref: Evidence_cabinet_formal_record
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_cabinet
+      matches:
+        - ref: Evidence_cabinet_submission_content
         - type: any
           min_matches: 0
           max_matches: 0
@@ -71,44 +97,34 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_cabinet
-      matches:
-        - ref: Keyword_government
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_cabinet
       pattern: (?i)\b(?:cabinet\s+(?:submission|memorandum|decision|approval)|for\s+cabinet\s+(?:consideration|approval))\b
+    - id: Evidence_cabinet_formal_record
+      pattern: >-
+        (?i)\b(?:Cabinet-in-Confidence|Cabinet\s+(?:submission|minute|decision)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{3,}|CAB(?:INET)?[-/][A-Z0-9][A-Z0-9/-]{3,}|Cabinet\s+minute\s+(?:no\.?\s*)?\d+)\b
   keywords:
-    - id: Keyword_cabinet
+    - id: Evidence_cabinet_submission_content
       groups:
         - match_style: word
           terms:
-            - Cabinet submission
-            - Cabinet minute
-            - Cabinet-in-Confidence
-            - Cabinet memorandum
-            - Cabinet decision
-            - PM&C
-            - Department of Prime Minister
-            - for Cabinet
-      strength: specific
-    - id: Keyword_government
-      groups:
-        - match_style: word
-          terms:
-            - government
-            - Australian Government
-            - Commonwealth
-            - department
-            - agency
-            - public sector
-      strength: generic
+            - purpose
+            - recommendations
+            - decision sought
+            - financial implications
+            - consultation
+            - implementation plan
+            - risk assessment
+            - regulatory impact
+            - human rights implications
+            - stakeholder impacts
+      strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-04'
+    description: Split Cabinet discovery, substantive submission, and formal-record evidence into calibrated 65/75/85 tiers; narrow enforcement and exclude training content.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 525 without changing detector or package metadata.'

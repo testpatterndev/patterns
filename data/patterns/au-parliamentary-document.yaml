@@ -1,15 +1,27 @@
 schema: testpattern/v1
 name: Parliamentary Document
 slug: au-parliamentary-document
-version: 1.4.1
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
-description: Detects parliamentary documents including QTBs, Senate Estimates briefs, and parliamentary correspondence.
+engine: boost_regex
+description: >-
+  Identifies substantive Australian question-time briefs, Senate Estimates briefs, parliamentary
+  question responses, and parliamentary correspondence briefs. Topic phrases are retained for
+  discovery; enforcement requires likely-question, response, talking-point, media-line, key-fact,
+  supplementary-question, answer, portfolio, or hearing content, and high confidence also requires
+  draft, embargo, clearance, question-number, or other pre-release handling evidence.
 operation: >-
-  Keyword-based detection matching parliamentary question, Senate Estimates, QTB, and talking points patterns.
-  Corroborative evidence: 12 keywords within 300 characters.
+  Regex_parliamentary_brief recognises QTB, question-time, Senate Estimates, estimates-committee,
+  parliamentary-question-response, and parliamentary-correspondence brief topics. The topic alone is
+  discovery-only at 65. Substantive question/response content raises it to 75; pre-release handling or
+  formal question/brief evidence reaches 85. Enforcing tiers reject explicit templates and training.
+pattern: >-
+  (?is)\b(?:QTB|question\s+time\s+brief|Senate\s+Estimates\s+brief|estimates\s+committee\s+brief|parliamentary\s+question\s+response|parliamentary\s+correspondence\s+brief)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence requires substantive question/response material. High confidence adds pre-release
+  handling or formal question/brief evidence.
 jurisdictions:
   - au
 regulations:
@@ -24,20 +36,26 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: 'QTB: likely question for Senate Estimates committee hearing'
-      description: Test match 1
-    - value: Parliamentary question with talking points and suggested response
-      description: Test match 2
-    - value: Brief for parliamentary correspondence to House of Representatives
-      description: Test match 3
+    - value: question time brief
+      description: Low-tier probe - parliamentary brief topic without response content
+    - value: 'Question time brief: likely question, suggested response, talking points, media lines, key facts, anticipated supplementary question, and portfolio issue'
+      description: Medium-tier probe - substantive response content without pre-release handling
+    - value: 'Question time brief QTB-204: likely question, proposed answer, talking points, media lines, key facts, not for release, and clearance required'
+      description: High-tier probe - substantive response with formal brief and pre-release handling
   should_not_match:
     - value: The parliamentary cafe serves lunch daily
       description: Non-match 1
     - value: A tour of Parliament House
-      description: Non-match 2
+      description: Tourism context
+    - value: 'The public guide explains the purpose of question time briefs.'
+      description: Public process guidance without a live response brief
+    - value: 'Training example: question time brief QTB-204 with likely question, proposed answer, and not for release'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: References to parliament or Senate in tourism or general contexts.
-    mitigation: Require document-specific terms like QTB, estimates, or talking points.
+  - description: Public parliamentary guidance, published transcripts, and media commentary discuss questions, answers, talking points, and estimates without containing a pre-release response brief.
+    mitigation: Keep parliamentary brief topics discovery-only and require likely-question, response, talking-point, media-line, key-fact, supplementary, answer, portfolio, or hearing content.
+  - description: Training briefs can contain realistic question numbers, draft answers, media lines, embargoes, and clearance instructions.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - yaml
 scope: narrow
@@ -61,62 +79,67 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match:
-        type: any
-        ids:
-          - Regex_qtb
-          - Regex_senate_estimates
+      id_match: Regex_parliamentary_brief
       matches:
-        - ref: Keyword_parliamentary
+        - ref: Evidence_parliamentary_response_content
+        - ref: Evidence_parliamentary_prerelease
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Regex_parliamentary
+      id_match: Regex_parliamentary_brief
       matches:
-        - ref: Keyword_question_time
+        - ref: Evidence_parliamentary_response_content
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_parliamentary_brief
   regexes:
-    - id: Regex_qtb
-      pattern: (?i)\b(?:qtb|question\s+time\s+brief)\b
-    - id: Regex_senate_estimates
-      pattern: (?i)\b(?:senate\s+estimates|estimates\s+(?:brief|hearing|committee))\b
-    - id: Regex_parliamentary
-      pattern: (?i)\b(?:parliamentary\s+(?:correspondence|question)|for\s+parliament)\b
+    - id: Regex_parliamentary_brief
+      pattern: >-
+        (?is)\b(?:QTB|question\s+time\s+brief|Senate\s+Estimates\s+brief|estimates\s+committee\s+brief|parliamentary\s+question\s+response|parliamentary\s+correspondence\s+brief)\b
   keywords:
-    - id: Keyword_parliamentary
+    - id: Evidence_parliamentary_response_content
       groups:
         - match_style: word
           terms:
-            - parliamentary business
-            - parliamentary briefing
-            - parliamentary sitting
-            - Senate
-            - House of Representatives
-            - parliamentary question
-            - estimates committee
-      strength: domain
-    - id: Keyword_question_time
-      groups:
-        - match_style: word
-          terms:
-            - question time
-            - text: QTB
-              case_sensitive: true
             - likely question
+            - suggested response
+            - proposed answer
             - talking points
             - media lines
-            - suggested response
+            - key facts
+            - anticipated supplementary
+            - portfolio issue
+            - committee hearing
+      strength: domain
+    - id: Evidence_parliamentary_prerelease
+      groups:
+        - match_style: word
+          terms:
+            - draft response
+            - draft answer
+            - not for release
+            - embargoed
+            - clearance required
+            - approved lines
+            - question number
+            - brief number
+            - text: QTB-
+              case_sensitive: true
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-04'
+    description: Split parliamentary-brief discovery, substantive response content, and pre-release evidence into calibrated 65/75/85 tiers; narrow enforcement and exclude training content.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 566 without changing detector or package metadata.'
