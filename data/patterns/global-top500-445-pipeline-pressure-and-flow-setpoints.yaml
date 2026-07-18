@@ -1,26 +1,32 @@
 schema: testpattern/v1
 name: Pipeline pressure and flow setpoints
 slug: global-top500-445-pipeline-pressure-and-flow-setpoints
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to pipeline pressure and flow setpoints in international contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
+  Identifies substantive pipeline pressure, flow, operating-limit, and control-setpoint records. Topic
+  phrases are retained for discovery; enforcement requires a populated pressure or flow value, and high
+  confidence also requires a pipeline segment, station, valve, control tag, or other live asset reference.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_pipeline_pressure_flow recognises pipeline pressure/flow setpoints, MAOP, and pipeline-control
+  setpoint topics. The topic alone is discovery-only at 65. A populated pressure or flow value raises it
+  to 75; a value plus a pipeline segment, compressor/metering/valve station, or control-tag reference
+  reaches 85. Enforcing tiers reject explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:pipeline\s+pressure|flow\s+setpoint|pipeline\s+operations|maximum\s+allowable\s+operating\s+pressure|compressor\s+station|metering\s+station|pipeline\s+control|pressure\s+relief|flow\s+rate|pipeline\s+safety|leak\s+detection)\b
+  (?is)\b(?:pipeline\s+pressure\s+(?:and\s+)?flow\s+setpoints?|pipeline\s+pressure\s+setpoint|pipeline\s+flow\s+setpoint|maximum\s+allowable\s+operating\s+pressure|pipeline\s+control\s+setpoint)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires a populated engineering value rather than a pipeline topic alone. High
+  confidence adds a specific station, segment, valve, or control reference, reducing matches on safety
+  standards and engineering lessons.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - pipeline pressure and flow setpoints
@@ -34,14 +40,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: pipeline pressure
-      description: Primary topic phrase match
-    - value: flow setpoint
-      description: Case-insensitive topic phrase match
-    - value: pipeline operations
-      description: Alternative topic phrase match
-    - value: maximum allowable operating pressure
-      description: Additional topic phrase match
+    - value: pipeline pressure setpoint
+      description: Low-tier probe - topic without a populated engineering value
+    - value: 'Pipeline pressure setpoint: normal 6.8 MPa and high limit 7.2 MPa'
+      description: Medium-tier probe - populated pressure values without a live asset reference
+    - value: 'Pipeline pressure and flow setpoints for compressor station CS-04 and pipeline segment PL-17: PT-204 high trip 7.2 MPa, flow 620 m3/h'
+      description: High-tier probe - populated values with station, segment, and control-tag detail
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -49,15 +53,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: pipeline flow
       description: Generic word pair from old broad template should not match
+    - value: 'The public pipeline safety guide explains maximum allowable operating pressure.'
+      description: Public guidance without populated operating values
+    - value: 'Training example: pipeline pressure setpoint for compressor station CS-04 is 7.2 MPa'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to pipeline pressure and flow setpoints appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Pipeline standards and engineering courses discuss MAOP, pressure relief, compressor stations, and flow limits without exposing current operating values.
+    mitigation: Keep topic-only matches discovery-only and require a populated pressure or flow value for enforcement.
+  - description: Worked examples can include realistic station names, segment IDs, control tags, and pressure values.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -65,65 +69,56 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_pipeline_pressure_flow
+      matches:
+        - ref: Evidence_pipeline_engineering_value
+        - ref: Evidence_pipeline_live_asset
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_pipeline_pressure_flow
       matches:
-        - ref: Pattern_global_top500_445_pipeline_pressure_and_flow_setpoints_label_context
-        - ref: Keyword_global_top500_445_pipeline_pressure_and_flow_setpoints_domain_context
+        - ref: Evidence_pipeline_engineering_value
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_pipeline_pressure_flow
-      matches:
-        - ref: Keyword_pipeline_pressure_flow
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_pipeline_pressure_flow
       pattern: >-
-        (?is)\b(?:pipeline\s+pressure|flow\s+setpoint|pipeline\s+operations|maximum\s+allowable\s+operating\s+pressure|compressor\s+station|metering\s+station|pipeline\s+control|pressure\s+relief|flow\s+rate|pipeline\s+safety|leak\s+detection)\b
-    - id: Pattern_global_top500_445_pipeline_pressure_and_flow_setpoints_label_context
-      pattern: (?i)\b(?:pipeline\s+pressure\s+and\s+flow\s+setpoints)\b
+        (?is)\b(?:pipeline\s+pressure\s+(?:and\s+)?flow\s+setpoints?|pipeline\s+pressure\s+setpoint|pipeline\s+flow\s+setpoint|maximum\s+allowable\s+operating\s+pressure|pipeline\s+control\s+setpoint)\b
+    - id: Evidence_pipeline_engineering_value
+      pattern: '(?i)\b\d+(?:\.\d+)?\s*(?:kPa|MPa|bar|psi|m3/h|L/s|bbl/day|percent)\b'
   keywords:
-    - id: Keyword_pipeline_pressure_flow
+    - id: Evidence_pipeline_live_asset
       groups:
         - match_style: word
           terms:
-            - pipeline pressure
-            - flow setpoint
-            - pipeline operations
-            - MAOP
-            - maximum allowable operating pressure
+            - pipeline segment
             - compressor station
             - metering station
-            - pipeline control
-            - pressure relief
-            - flow rate
-            - pipeline safety
-            - leak detection
+            - valve station
+            - station ID
+            - segment ID
+            - line number
+            - control tag
+            - text: SCADA
+              case_sensitive: true
       strength: specific
-    - id: Keyword_global_top500_445_pipeline_pressure_and_flow_setpoints_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - pipeline pressure and flow setpoints
-            - pipeline
-            - pressure
-            - flow
-            - setpoints
-      strength: domain
 risk_description: >-
   This regex identifies pipeline pressure, flow setpoints, operating-pressure limits, and pipeline-operations records with eight contextual signals. A genuine setpoint file reveals normal and maximum operating boundaries, allowing a capable adversary to plan unsafe manipulation, service disruption, or concealment of abnormal conditions. The normal bounded record presents serious operational and potential environmental harm, but meaningful exploitation still needs system access, asset mapping, and control over the relevant equipment. For the global catalogue analogue, the confirmed substantive record is the consequence unit. Live limits and alarm thresholds reveal how to induce unsafe or disruptive conditions in a pipeline. Additional access is needed, but the information creates a credible path to significant service, environmental or life-safety damage. Risk 9 and PROTECTED InfoTech therefore apply to the confirmed record itself. Require site/segment identifiers plus actual values, limits, alarms or control tags; generic safety guidance remains audit-only. This is confidence and exception handling, not a reason to reduce the consequence of a true positive.
 sensitivity_labels:
@@ -135,8 +130,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-15'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: require populated pressure or flow values at 75 and a pipeline segment, station, valve, or control reference at 85; add public-guidance and training rejection tests.'
   - version: 1.2.2
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1985; detector and package metadata unchanged.'

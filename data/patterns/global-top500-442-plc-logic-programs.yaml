@@ -1,25 +1,33 @@
 schema: testpattern/v1
 name: PLC logic programs
 slug: global-top500-442-plc-logic-programs
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to plc logic programs in international contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Identifies substantive programmable-logic-controller programs and logic records. Topic phrases are
+  retained for discovery; enforcement requires program structure such as rungs, contacts, coils,
+  timers, function blocks, variables, or I/O addresses, and high confidence also requires a controller,
+  rack, slot, production asset, or deployable I/O reference.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
-  lists: industry-critical-infrastructure. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:programmable\s+logic\s+controller|ladder\s+logic|structured\s+text|function\s+block|rung\s+diagram|IEC\s+61131|control\s+program|industrial\s+automation|I\/O\s+module|scan\s+cycle)\b
+  Regex_plc_logic_programs recognises PLC-program, ladder-logic, IEC 61131, rung-logic, and
+  controller-language topics. The topic alone is discovery-only at 65. Concrete program structure
+  raises it to 75; program structure plus deployable controller, I/O, rack, slot, or production-asset
+  context reaches 85. Enforcing tiers reject explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:programmable\s+logic\s+controller|PLC\s+logic\s+program|ladder\s+logic|IEC\s*61131|rung\s+logic|(?:PLC|controller)[^.\n]{0,30}(?:structured\s+text|function\s+block|control\s+program))\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires PLC program structure rather than a controller-product mention. High
+  confidence adds deployable hardware, I/O, or production context, reducing matches on manuals and
+  programming lessons.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - plc logic programs
@@ -32,18 +40,14 @@ corroborative_evidence:
   proximity: 300
   keyword_lists:
     - industry-critical-infrastructure
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: programmable logic controller
-      description: Primary topic phrase match
-    - value: ladder logic
-      description: Case-insensitive topic phrase match
-    - value: structured text
-      description: Alternative topic phrase match
-    - value: function block
-      description: Additional topic phrase match
+    - value: PLC logic program
+      description: Low-tier probe - controller-program topic without code structure
+    - value: 'PLC logic program in ladder logic: rung 12 uses a contact, output coil, and TON timer'
+      description: Medium-tier probe - substantive program structure without deployment context
+    - value: 'PLC logic program for S7-1500 controller rack 1 slot 2: rung 12 drives output coil Q0.0 for the production line safety interlock'
+      description: High-tier probe - program structure with controller, rack, I/O, and production context
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -51,15 +55,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: plc function block
       description: Generic word pair from old broad template should not match
+    - value: 'The IEC 61131 standard defines several PLC programming languages.'
+      description: Public standard discussion without controller program structure
+    - value: 'Training example: PLC logic program rung 12 output coil Q0.0 for S7-1500 rack 1'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to plc logic programs appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: PLC standards, vendor manuals, and programming courses discuss ladder logic, function blocks, contacts, coils, and timers without exposing a deployable program.
+    mitigation: Keep topic-only matches discovery-only and require concrete program structure for enforcement.
+  - description: Training labs can contain realistic rungs, I/O addresses, controller models, rack locations, and safety-interlock examples.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -67,17 +71,26 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_plc_logic_programs
+      matches:
+        - ref: Evidence_plc_code_structure
+        - ref: Evidence_plc_deployment_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_plc_logic_programs
       matches:
-        - ref: Pattern_global_top500_442_plc_logic_programs_label_context
-        - ref: Keyword_global_top500_442_plc_logic_programs_domain_context
+        - ref: Evidence_plc_code_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -86,46 +99,43 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_plc_logic_programs
-      matches:
-        - ref: Keyword_plc_logic_programs
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_plc_logic_programs
-      pattern: (?is)\b(?:programmable\s+logic\s+controller|ladder\s+logic|structured\s+text|function\s+block|rung\s+diagram|IEC\s+61131|control\s+program|industrial\s+automation|I\/O\s+module|scan\s+cycle)\b
-    - id: Pattern_global_top500_442_plc_logic_programs_label_context
-      pattern: (?i)\b(?:plc\s+logic\s+programs)\b
+      pattern: >-
+        (?is)\b(?:programmable\s+logic\s+controller|PLC\s+logic\s+program|ladder\s+logic|IEC\s*61131|rung\s+logic|(?:PLC|controller)[^.\n]{0,30}(?:structured\s+text|function\s+block|control\s+program))\b
   keywords:
-    - id: Keyword_plc_logic_programs
+    - id: Evidence_plc_code_structure
       groups:
         - match_style: word
           terms:
-            - text: PLC
-              case_sensitive: true
-            - programmable logic controller
-            - ladder logic
-            - structured text
-            - function block
-            - rung diagram
-            - IEC 61131
-            - control program
-            - industrial automation
-            - I/O module
-            - scan cycle
-            - Allen-Bradley
-      strength: specific
-    - id: Keyword_global_top500_442_plc_logic_programs_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - plc logic programs
-            - plc
-            - logic
-            - programs
+            - rung
+            - contact
+            - output coil
+            - timer
+            - function block diagram
+            - variable declaration
+            - program organization unit
+            - I/O address
       strength: domain
+    - id: Evidence_plc_deployment_context
+      groups:
+        - match_style: word
+          terms:
+            - controller model
+            - rack
+            - slot
+            - download to controller
+            - production line
+            - safety interlock
+            - text: S7-1500
+              case_sensitive: true
+            - text: ControlLogix
+              case_sensitive: true
+            - text: Q0.0
+              case_sensitive: true
+            - text: I0.0
+              case_sensitive: true
+      strength: specific
 risk_description: >-
   This regex recognises programmable logic controllers, ladder logic, structured text, and function-block programs with seven operational-technology signals. A genuine program exposes control sequences, interlocks, timers, and fail-state behaviour, allowing an attacker or unauthorised insider to identify manipulation points or sabotage production. The normal program presents serious operational and possible safety harm, but direct impact still requires controller access, compatible deployment, and knowledge of the physical process. Risk 8 remains SENSITIVE InfoTech; PROTECTED would require deployable logic for a critical service, bypass of safety controls, or likely significant physical and public harm.
 sensitivity_labels:
@@ -137,8 +147,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: align the global PLC detector with the reviewed program-structure contract; require code structure at 75 and deployable controller, I/O, rack, slot, or production context at 85; reject standards and training examples.'
   - version: 1.2.2
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1982 without changing detector or package metadata.'

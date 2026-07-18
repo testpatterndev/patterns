@@ -1,26 +1,34 @@
 schema: testpattern/v1
 name: Dam safety and integrity reports
 slug: global-top500-460-dam-safety-and-integrity-reports
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to dam safety and integrity reports in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies substantive dam-safety, integrity, surveillance, failure, inundation, and consequence
+  reports. Topic phrases are retained for discovery; enforcement requires condition or monitoring
+  findings, and high confidence also requires a severe weakness, overdue remediation, emergency action,
+  failure mode, or downstream consequence.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_dam_safety recognises dam-safety report topics. The topic alone is discovery-only at 65.
+  Spillway, embankment, seepage, instrumentation, inspection, defect, or remedial-work findings raise it
+  to 75; those findings plus severe failure, instability, overtopping, emergency, or downstream-impact
+  evidence reach 85. Enforcing tiers reject explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:dam\s+safety|dam\s+integrity|structural\s+inspection|dam\s+failure|spillway\s+capacity|flood\s+risk|seismic\s+assessment|embankment\s+stability|inundation\s+map|critical\s+infrastructure|consequence\s+classification|surveillance\s+report)\b
+  (?is)\b(?:dam\s+safety\s+and\s+integrity\s+reports?|dam\s+safety\s+report|dam\s+integrity\s+report|dam\s+surveillance\s+report|dam\s+failure\s+analysis|dam\s+inundation\s+map|dam\s+consequence\s+category)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires an engineering condition or monitoring finding rather than a public dam
+  reference. High confidence adds a severe weakness or consequence, distinguishing actionable reports
+  from standards and routine summaries.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - location
+  - security
 corroborative_evidence:
   keywords:
     - dam safety and integrity reports
@@ -34,30 +42,28 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: dam safety
-      description: Primary topic phrase match
-    - value: dam integrity
-      description: Case-insensitive topic phrase match
-    - value: structural inspection
-      description: Alternative topic phrase match
-    - value: dam failure
-      description: Additional topic phrase match
+    - value: dam safety and integrity report
+      description: Low-tier probe - report topic without engineering findings
+    - value: 'Dam surveillance report: piezometer readings show increased seepage at the eastern embankment; remedial works are scheduled'
+      description: Medium-tier probe - engineering condition findings without severe failure evidence
+    - value: 'Dam integrity report: excessive seepage and a longitudinal crack indicate embankment instability; emergency action is required for downstream population at risk'
+      description: High-tier probe - condition findings with severe weakness and downstream consequence
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
     - value: dam safety report
-      description: Generic word pair from old broad template should not match
+      description: Bare report title surfaces only in discovery
+    - value: 'The public ANCOLD standard describes dam safety management principles.'
+      description: Public standard without asset-specific engineering findings
+    - value: 'Training example: dam integrity report with excessive seepage, instability, and emergency action'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to dam safety and integrity reports appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Public standards, annual summaries, and emergency-planning guidance discuss dam safety, surveillance, seepage, and failure consequences without revealing a live engineering weakness.
+    mitigation: Keep report titles discovery-only and require a condition, instrumentation, defect, or remediation finding for enforcement.
+  - description: Exercises and training scenarios can include severe seepage, cracks, instability, emergency actions, and downstream consequences.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -65,17 +71,26 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_dam_safety
+      matches:
+        - ref: Evidence_dam_condition_finding
+        - ref: Evidence_dam_severe_consequence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_dam_safety
       matches:
-        - ref: Pattern_global_top500_460_dam_safety_and_integrity_reports_label_context
-        - ref: Keyword_global_top500_460_dam_safety_and_integrity_reports_domain_context
+        - ref: Evidence_dam_condition_finding
         - type: any
           min_matches: 0
           max_matches: 0
@@ -84,47 +99,39 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_dam_safety
-      matches:
-        - ref: Keyword_dam_safety
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_dam_safety
       pattern: >-
-        (?is)\b(?:dam\s+safety|dam\s+integrity|structural\s+inspection|dam\s+failure|spillway\s+capacity|flood\s+risk|seismic\s+assessment|embankment\s+stability|inundation\s+map|critical\s+infrastructure|consequence\s+classification|surveillance\s+report)\b
-    - id: Pattern_global_top500_460_dam_safety_and_integrity_reports_label_context
-      pattern: (?i)\b(?:dam\s+safety\s+and\s+integrity\s+reports)\b
+        (?is)\b(?:dam\s+safety\s+and\s+integrity\s+reports?|dam\s+safety\s+report|dam\s+integrity\s+report|dam\s+surveillance\s+report|dam\s+failure\s+analysis|dam\s+inundation\s+map|dam\s+consequence\s+category)\b
   keywords:
-    - id: Keyword_dam_safety
+    - id: Evidence_dam_condition_finding
       groups:
         - match_style: word
           terms:
-            - dam safety
-            - dam integrity
-            - structural inspection
-            - dam failure
-            - spillway capacity
-            - flood risk
-            - seismic assessment
-            - embankment stability
-            - inundation map
-            - critical infrastructure
-            - consequence classification
-            - surveillance report
-      strength: specific
-    - id: Keyword_global_top500_460_dam_safety_and_integrity_reports_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - dam safety and integrity reports
-            - dam
-            - safety
-            - integrity
-            - reports
+            - spillway
+            - embankment
+            - seepage
+            - piezometer
+            - deformation
+            - inspection finding
+            - defect
+            - monitoring instrument
+            - remedial works
       strength: domain
+    - id: Evidence_dam_severe_consequence
+      groups:
+        - match_style: word
+          terms:
+            - excessive seepage
+            - instability
+            - crack
+            - overtopping
+            - failure mode
+            - remediation overdue
+            - emergency action
+            - population at risk
+            - downstream consequence
+      strength: specific
 risk_description: >-
   This concept SIT recognises dam safety, structural inspection, spillway capacity, embankment stability, inundation maps, and related integrity language; it does not prove that a current engineering report or defect register is present. A genuine report can disclose failure modes, degraded components, flood consequences, and inspection gaps that support sabotage, unsafe interference, or targeted disinformation. The normal exposure is serious for one dam operator and downstream community, while public safety standards and educational engineering material remain common matches. Risk 8 and SENSITIVE fit that contained consequence; PROTECTED would require a current exploitable weakness with a credible prospect of major flooding, widespread service loss, or significant life-safety damage.
 sensitivity_labels:
@@ -136,8 +143,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: align the global dam detector with the reviewed engineering-finding contract; require condition findings at 75 and severe weakness, emergency, failure, or downstream-consequence evidence at 85.'
   - version: 1.2.2
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2000 without changing detector or package metadata.'

@@ -1,25 +1,32 @@
 schema: testpattern/v1
 name: Electric grid dispatch plans
 slug: global-top500-447-electric-grid-dispatch-plans
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to electric grid dispatch plans in international contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Identifies substantive electric-grid generation dispatch, unit-commitment, and power-system dispatch
+  plans. Topic phrases are retained for discovery; enforcement requires populated generation, reserve,
+  energy, or reactive-power quantities, and high confidence also requires current interval, generating
+  unit, constraint, interconnector, or grid-operator detail.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 8 keywords within 300 characters. Uses additional domain-context
-  evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?i)\b(?:dispatch\s+schedule|generation\s+dispatch|unit\s+commitment)\b
+  Regex_electric_grid_dispatch recognises grid dispatch, generation schedule, unit commitment, and
+  power-system dispatch topics. The topic alone is discovery-only at 65. Populated MW, MWh, MVAr, or
+  percentage quantities raise it to 75; quantities plus current interval, unit, constraint,
+  interconnector, or operator context reach 85. Enforcing tiers reject explicit templates and training.
+pattern: >-
+  (?is)\b(?:electric\s+grid\s+dispatch\s+plan|generation\s+dispatch\s+schedule|generation\s+dispatch|unit\s+commitment\s+schedule|power\s+system\s+dispatch\s+plan)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires populated dispatch quantities rather than general market commentary. High
+  confidence adds a current interval, named unit, constraint, interconnector, or operator reference.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - electric grid dispatch plans
@@ -33,30 +40,26 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: 'Dispatch schedule'
-      description: Topic phrase present
-    - value: 'dispatch schedule'
-      description: Topic phrase, lowercase
-    - value: 'this record references the dispatch schedule held on file'
-      description: Topic phrase within surrounding text
+    - value: electric grid dispatch plan
+      description: Low-tier probe - dispatch topic without populated quantities
+    - value: 'Generation dispatch schedule: unit commitment 420 MW and reserve requirement 35 MW'
+      description: Medium-tier probe - populated quantities without current unit or interval detail
+    - value: 'Current generation dispatch schedule for generating unit GT-04, dispatch interval 14:05, constraint ID QNI-17: target 420 MW and reserve 35 MW'
+      description: High-tier probe - populated quantities with current unit, interval, and constraint detail
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
     - value: placeholder value 12345
       description: Random text should not match phrase marker
-    - value: generic policy prose without anchors
-      description: Should reject generic mentions without structural anchor terms
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: 'The annual report discusses electricity generation investment and market trends.'
+      description: Public commentary without a dispatch plan or populated schedule
+    - value: 'Training example: current generation dispatch schedule for unit GT-04 at 420 MW, interval 14:05'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to electric grid dispatch plans appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Public market reports and grid-planning material can discuss generation dispatch, unit commitment, reserves, and MW quantities.
+    mitigation: Recommend the 85 tier, which additionally requires current interval, generating-unit, constraint, interconnector, or operator detail.
+  - description: Training simulations can include realistic unit IDs, intervals, constraints, and dispatch quantities.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -64,17 +67,17 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 85
       id_match: Regex_electric_grid_dispatch
       matches:
-        - ref: Pattern_global_top500_447_electric_grid_dispatch_plans_label_context
-        - ref: Keyword_global_top500_447_electric_grid_dispatch_plans_domain_context
+        - ref: Evidence_dispatch_quantity
+        - ref: Evidence_dispatch_live_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -83,7 +86,7 @@ purview:
     - confidence_level: 75
       id_match: Regex_electric_grid_dispatch
       matches:
-        - ref: Keyword_electric_grid_dispatch
+        - ref: Evidence_dispatch_quantity
         - type: any
           min_matches: 0
           max_matches: 0
@@ -100,37 +103,27 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_electric_grid_dispatch
-      pattern: (?i)\b(?:dispatch\s+schedule|generation\s+dispatch|unit\s+commitment)\b
-    - id: Pattern_global_top500_447_electric_grid_dispatch_plans_label_context
-      pattern: (?i)\b(?:electric\s+grid\s+dispatch\s+plans)\b
+      pattern: >-
+        (?is)\b(?:electric\s+grid\s+dispatch\s+plan|generation\s+dispatch\s+schedule|generation\s+dispatch|unit\s+commitment\s+schedule|power\s+system\s+dispatch\s+plan)\b
+    - id: Evidence_dispatch_quantity
+      pattern: '(?i)\b\d+(?:\.\d+)?\s*(?:MW|MWh|MVAr|percent)\b'
   keywords:
-    - id: Keyword_electric_grid_dispatch
+    - id: Evidence_dispatch_live_context
       groups:
         - match_style: word
           terms:
-            - electric grid
-            - dispatch plan
-            - generation dispatch
-            - unit commitment
-            - load forecast
+            - current interval
+            - dispatch interval
+            - generating unit
+            - unit ID
+            - constraint ID
+            - transmission constraint
+            - interconnector
             - grid operator
-            - transmission schedule
-            - power dispatch
-            - energy management system
             - system operator
-            - grid reliability
-            - AEMO
+            - text: SCADA
+              case_sensitive: true
       strength: specific
-    - id: Keyword_global_top500_447_electric_grid_dispatch_plans_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - electric grid dispatch plans
-            - electric
-            - grid
-            - dispatch
-            - plans
-      strength: domain
 risk_description: >-
   The classifier detects dispatch-schedule language supported by eight terms associated with electric-grid operations. A genuine dispatch plan can reveal generation commitments, timing, reserve posture, and operational dependencies, allowing market manipulation or targeted disruption of grid balancing. The normal schedule creates serious operational and commercial harm, but the phrase-level match does not prove real-time control access, critical vulnerabilities, or a plan whose loss would significantly interrupt electricity supply. For the global catalogue analogue, the confirmed substantive record is the consequence unit. Current generation/load schedules, constraints and reserve posture enable market manipulation or targeted disruption and can contribute to significant grid instability. Risk 9 and PROTECTED InfoTech therefore apply to the confirmed record itself. Require current interval, grid/asset identity, dispatch quantities and constraint/reserve fields; public market commentary stays audit-only. This is confidence and exception handling, not a reason to reduce the consequence of a true positive.
 sensitivity_labels:
@@ -142,8 +135,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-15'
+updated: '2026-07-04'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: require populated dispatch quantities at 75 and current interval, generating-unit, constraint, interconnector, or grid-operator context at 85; add public-commentary and training rejection tests.'
   - version: 1.3.2
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1987; detector and package metadata unchanged.'
