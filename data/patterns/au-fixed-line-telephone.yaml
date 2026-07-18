@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Landline Number
 slug: au-fixed-line-telephone
-version: 2.3.1
+version: 2.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,8 +9,9 @@ description: >-
   Identifies Australian fixed-line telephone numbers across domestic bracketed, unbracketed, and international formats for area codes 02, 03, 07, and 08. Uses lookaround boundaries and supports hyphen
   separators within digit groups.
 operation: >-
-  Lookaround-bounded regex matching Australian fixed-line numbers in three notation styles. Area codes restricted to 2, 3, 7, 8. Supports hyphen and space separators. Corroborative evidence: 3 tiers
-  with telecom-specific, office-context, and shared generic phone-context keywords within 300 characters.
+  Lookaround-bounded regex matching Australian fixed-line numbers in three notation styles. Area codes
+  are restricted to 2, 3, 7, and 8. The bare format is discovery-only at 65, generic phone context
+  enforces at 75, and a fixed-line-specific label plus independent contact-record context reaches 85.
 pattern: (?<!\d)(?:\(0[2378]\)\s*\d{4}[\s\-]?\d{4}|0[2378][\s\-]?\d{4}[\s\-]?\d{4}|\+61\s?[2378]\s?\d{4}[\s\-]?\d{4})(?!\d)
 confidence: medium
 confidence_justification: 'Medium confidence: area code prefix narrows scope but 10-digit sequences are common. Hyphen-separated formatting and corroborative keywords improve precision.'
@@ -45,14 +46,14 @@ corroborative_evidence:
     - au-telecom-terms
 test_cases:
   should_match:
-    - value: 'Fixed line: (02) 9876 5432'
-      description: Sydney landline with brackets
-    - value: 'Desk phone: 07 3456-7890'
-      description: Brisbane landline with hyphen separator
+    - value: '(02) 9876 5432'
+      description: Low-tier probe - Sydney landline structure without context
+    - value: 'Phone: 07 3456-7890'
+      description: Medium-tier probe - Brisbane landline with generic phone context
     - value: 'DDI: +61 3 9876 5432'
-      description: Melbourne in international format
-    - value: 'PSTN: 08 8234 5678'
-      description: Adelaide plain format
+      description: Medium-tier fixed-line label without independent record context
+    - value: 'Staff directory - landline contact details: 08 8234 5678'
+      description: High-tier probe - fixed-line label in an independent contact-record context
   should_not_match:
     - value: '0912345678'
       description: Area code 09 is not valid
@@ -62,6 +63,8 @@ test_cases:
       description: Area code 6 is mobile/special, not fixed-line
     - value: '1023456789'
       description: Embedded in longer number
+    - value: 'Documentation example: staff directory landline contact details 02 9876 5432'
+      description: Structurally complete but explicitly documented example must not enforce
 false_positives:
   - description: 10-digit reference numbers or account codes with matching digit patterns.
     mitigation: Lookaround boundaries and telecom keywords required for detection.
@@ -83,19 +86,17 @@ sensitivity_labels:
   ca_gov: Protected A
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Evidence_template_exclusion
-      match_style: word
-    - dict: phone-context
-      as: Evidence_phone_context
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_fixedline_all
       matches:
         - ref: Evidence_fixedline_specific
+        - ref: Evidence_contact_record
         - type: any
           min_matches: 0
           max_matches: 0
@@ -104,20 +105,39 @@ purview:
     - confidence_level: 75
       id_match: Pattern_fixedline_all
       matches:
-        - ref: Evidence_fixedline_office
+        - ref: Evidence_fixedline_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_fixedline_all
-      matches:
-        - ref: Evidence_phone_context
   regexes:
     - id: Pattern_fixedline_all
       pattern: (?<!\d)(?:\(0[2378]\)\s*\d{4}[\s\-]?\d{4}|0[2378][\s\-]?\d{4}[\s\-]?\d{4}|\+61\s?[2378]\s?\d{4}[\s\-]?\d{4})(?!\d)
   keywords:
+    - id: Evidence_fixedline_context
+      groups:
+        - match_style: word
+          terms:
+            - phone
+            - telephone
+            - tel
+            - contact number
+            - phone number
+            - fixed line
+            - landline
+            - desk phone
+            - direct dial
+            - text: DDI
+              case_sensitive: true
+            - text: PSTN
+              case_sensitive: true
+            - switchboard
+            - office line
+      strength: domain
     - id: Evidence_fixedline_specific
       groups:
         - match_style: word
@@ -133,21 +153,24 @@ purview:
             - reception
             - office line
       strength: domain
-    - id: Evidence_fixedline_office
+    - id: Evidence_contact_record
       groups:
         - match_style: word
           terms:
-            - front desk
-            - administration
-            - main office
-            - enquiries
-            - head office
-            - branch office
-            - after hours
+            - contact details
+            - contact record
+            - subscriber details
+            - telephone directory
+            - staff directory
+            - customer contact
+            - emergency contact
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 2.4.0
+    date: '2026-07-18'
+    description: 'Profile quality: replace broad office evidence with bare-format discovery, generic phone-context medium, and fixed-line-plus-contact-record high tiers; add template rejection and exact-tier tests.'
   - version: 2.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 543 without changing detector or package metadata.'

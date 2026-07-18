@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: PayID (New Payments Platform)
 slug: au-payid
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -12,9 +12,8 @@ description: >-
 operation: >-
   Regex pattern (boost_regex engine). Pattern_au_payid anchors on the PayID label and uses a bounded
   proximity lookahead requiring a payment-address value (email, +61/04xx mobile, or 11-digit ABN) within
-  80 characters. Three confidence tiers: High (85) requires PayID/NPP evidence (min 2) with template
-  exclusion; Medium (75) requires PayID/NPP evidence with template exclusion; Low (65) requires PayID/NPP
-  evidence. Evidence uses one keyword group (14 NPP/PayID terms) within 300-character proximity.
+  80 characters. The labelled alias is discovery-only at 65, payment-action context enforces at 75,
+  and independent NPP/Osko/bank context raises it to 85. Enforcing tiers reject explicit templates.
 pattern: (?i)\bpay[\s-]?id\b\s*(?:number|address|is)?\s*[:=#-]?\s*(?=[\s\S]{0,80}?(?:[A-Za-z0-9._%+-]{1,40}@[A-Za-z0-9.-]{1,40}\.[A-Za-z]{2,10}|\+61[\s-]?4\d{2}[\s-]?\d{3}[\s-]?\d{3}|\b04\d{2}[\s-]?\d{3}[\s-]?\d{3}\b|\bABN[:\s]*\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b))
 confidence: medium
 confidence_justification: >-
@@ -54,15 +53,21 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-  - value: 'Please pay via PayID: john.smith@example.com to settle the invoice by Friday'
-  - value: My PayID is 0412 345 678 linked to my everyday account with the bank
+  - value: 'PayID: accounts@agency.gov.au'
+    description: Low-tier probe - labelled alias without transaction context
+  - value: 'Please pay the invoice via PayID: accounts@agency.gov.au'
+    description: Medium-tier probe - labelled alias with payment-action context
   - value: Send the funds to PayID +61 412 345 678 registered with NAB via Osko
-  - value: Business PayID ABN 51 824 753 556 registered for the invoice payment
+    description: High-tier probe - payment action with independent bank/network context
+  - value: Business PayID ABN 51 824 753 556 for the invoice payment
+    description: Medium-tier ABN alias with payment context
   should_not_match:
   - value: PayID lets you send money using just a mobile number or email address
   - value: Employee ID 12345 recorded in the payroll system this morning
   - value: Your payment reference is INV-2024-0087 for this transaction
   - value: PayID number 51 824 753 556 noted in the shared spreadsheet
+  - value: 'Tutorial example: send payment to PayID +61 412 345 678 via Osko'
+    description: Structurally complete but explicitly framed tutorial content
 false_positives:
 - description: A PayID label followed by a contact email or phone that is not actually a registered payment alias may match.
   mitigation: Require corroborating NPP/Osko payment keywords within the proximity window before treating a match as a payment instruction.
@@ -86,7 +91,7 @@ sensitivity_labels:
   qgiscf_dlm: OFFICIAL
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
   - dict: template-exclusion
     as: Evidence_template_exclusion
@@ -95,9 +100,8 @@ purview:
   - confidence_level: 85
     id_match: Pattern_au_payid
     matches:
-    - ref: Evidence_au_payid
-      min_count: 2
-      unique_results: true
+    - ref: Evidence_payment_action
+    - ref: Evidence_npp_network
     - type: any
       min_matches: 0
       max_matches: 0
@@ -106,46 +110,54 @@ purview:
   - confidence_level: 75
     id_match: Pattern_au_payid
     matches:
-    - ref: Evidence_au_payid
+    - ref: Evidence_payment_action
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Evidence_template_exclusion
   - confidence_level: 65
+    discovery_only: true
     id_match: Pattern_au_payid
-    matches:
-    - ref: Evidence_au_payid
   regexes:
   - id: Pattern_au_payid
     pattern: (?i)\bpay[\s-]?id\b\s*(?:number|address|is)?\s*[:=#-]?\s*(?=[\s\S]{0,80}?(?:[A-Za-z0-9._%+-]{1,40}@[A-Za-z0-9.-]{1,40}\.[A-Za-z]{2,10}|\+61[\s-]?4\d{2}[\s-]?\d{3}[\s-]?\d{3}|\b04\d{2}[\s-]?\d{3}[\s-]?\d{3}\b|\bABN[:\s]*\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b))
   keywords:
-  - id: Evidence_au_payid
+  - id: Evidence_payment_action
     groups:
     - match_style: word
       terms:
-      - PayID
+      - payment address
+      - pay anyone
+      - beneficiary account
+      - transfer funds
+      - send payment
+      - send the funds
+      - settle the invoice
+      - invoice payment
+      - pay the invoice
+    strength: specific
+  - id: Evidence_npp_network
+    groups:
+    - match_style: word
+      terms:
       - New Payments Platform
       - text: NPP
         case_sensitive: true
       - Osko
       - Osko payment
-      - payment address
-      - pay anyone
-      - real-time payment
       - PayID registration
-      - PayID name
       - financial institution
+      - registered with
+      - bank
       - faster payments
-      - text: BSB
-        case_sensitive: true
-      - beneficiary account
-      - transfer funds
-      - send payment
-    strength: specific
+    strength: domain
 created: '2026-07-07'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-18'
+    description: 'Profile quality: replace self-corroborating PayID terms with payment-action and NPP/network evidence; add discovery-only low, cumulative high, template rejection, and exact-tier tests.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2084 without changing detector or package metadata.'

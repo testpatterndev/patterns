@@ -1,18 +1,25 @@
 schema: testpattern/v1
 name: Penetration testing reports
 slug: au-top500-252-penetration-testing-reports
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies penetration testing reports patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
+description: >-
+  Identifies substantive penetration-testing reports, findings, and offensive-security assessments.
+  The title phrase alone is retained for discovery; enforcement requires report-content evidence such
+  as methodology, scoped testing, vulnerabilities, exploit detail, or CVSS severity.
 operation: >-
-  Pattern type: regex (boost_regex engine). Three-tier purview detection: high confidence (95) matches pentest report pattern with CVSS severity evidence and template exclusion; medium confidence (85)
-  matches with CVSS severity plus pentest methodology evidence; low confidence (75) matches with vulnerability finding or security assessment evidence. Corroborative evidence: 7 keywords within 300
-  characters.
+  Pattern_pentest_report recognises penetration-test, pen-test, offensive-security-assessment, and
+  external-security-test report phrases. The phrase alone is discovery-only at 65. Pentest methodology,
+  vulnerability, or severity content raises it to 75; both a vulnerability finding and CVSS/severity
+  evidence are required at 85. Enforcing tiers reject explicit templates and training examples.
 pattern: (?i)\b(?:penetration\s+test(?:ing)?\s+(?:report|findings?|assessment)|pen\s*test\s+(?:report|results)|offensive\s+security\s+(?:assessment|report)|external\s+(?:penetration|security)\s+test)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
+confidence_justification: >-
+  Medium confidence: a report title is not enough to prove that the document contains exploitable
+  findings. Methodology, finding, or severity content is required for enforcement, and the high tier
+  requires independent evidence of both a vulnerability and its assessed severity.
 jurisdictions:
   - au
 regulations:
@@ -22,7 +29,6 @@ frameworks:
   - CIS Controls
   - ISO 27001
 data_categories:
-  - credentials
   - security
 corroborative_evidence:
   keywords:
@@ -37,11 +43,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 'Penetration testing report'
-      description: Topic phrase present
-    - value: 'penetration testing report'
-      description: Topic phrase, lowercase
-    - value: 'this record references the penetration testing report held on file'
-      description: Topic phrase within surrounding text
+      description: Low-tier probe - report title without substantive content
+    - value: 'Penetration testing report - scope of work, rules of engagement, and testing methodology'
+      description: Medium-tier probe - report title with engagement methodology
+    - value: 'Penetration testing report: SQL injection vulnerability, proof of concept, CVSS score 9.8, critical severity'
+      description: High-tier probe - vulnerability finding with independent severity evidence
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
@@ -49,11 +55,15 @@ test_cases:
       description: Random text should not match phrase marker
     - value: generic prose without structural artifact anchors
       description: Should not match plain mentions
+    - value: 'Security policy requires an annual penetration test but does not contain a report or findings.'
+      description: Control requirement, not a penetration-testing report
+    - value: 'Training example: penetration testing report with SQL injection vulnerability and CVSS score 9.8'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
-    mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
-  - description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer documentation.
-    mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce false positives from technical writing.
+  - description: Policies, procurement scopes, and audit schedules may mention a penetration-testing report without containing any assessment results.
+    mitigation: Keep the title-only tier discovery-only and require methodology, vulnerability, or severity content before enforcement.
+  - description: Security courses and sample reports can contain realistic vulnerabilities, exploit language, and CVSS scores.
+    mitigation: Exclude explicit template, tutorial, demo, and training-example framing from the medium and high tiers.
 exports:
   - purview_xml
   - yaml
@@ -82,8 +92,7 @@ purview:
       id_match: Pattern_pentest_report
       matches:
         - ref: Evidence_cvss_severity
-          min_count: 2
-          unique_results: true
+        - ref: Evidence_vulnerability_finding
         - type: any
           min_matches: 0
           max_matches: 0
@@ -92,20 +101,39 @@ purview:
     - confidence_level: 75
       id_match: Pattern_pentest_report
       matches:
-        - ref: Evidence_cvss_severity
+        - ref: Evidence_pentest_content
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_pentest_report
-      matches:
-        - ref: Evidence_cvss_severity
   regexes:
     - id: Pattern_pentest_report
       pattern: (?i)\b(?:penetration\s+test(?:ing)?\s+(?:report|findings?|assessment)|pen\s*test\s+(?:report|results)|offensive\s+security\s+(?:assessment|report)|external\s+(?:penetration|security)\s+test)\b
   keywords:
+    - id: Evidence_pentest_content
+      groups:
+        - match_style: word
+          terms:
+            - CVSS score
+            - critical severity
+            - high severity
+            - severity rating
+            - rules of engagement
+            - scope of work
+            - assessment methodology
+            - testing methodology
+            - vulnerability
+            - exploitable
+            - proof of concept
+            - remote code execution
+            - privilege escalation
+            - authentication bypass
+            - SQL injection
+      strength: domain
     - id: Evidence_cvss_severity
       groups:
         - match_style: word
@@ -153,30 +181,12 @@ purview:
             - text: XSS
               case_sensitive: true
       strength: domain
-    - id: Evidence_security_assessment
-      groups:
-        - match_style: word
-          terms:
-            - security assessment
-            - security audit
-            - security review
-            - security testing
-            - security evaluation
-            - executive summary
-            - findings summary
-            - risk summary
-            - CVSS
-            - text: CWE
-              case_sensitive: true
-            - vulnerability scan
-            - Nessus
-            - Qualys
-            - Nmap
-            - attack surface
-      strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-18'
+    description: 'Profile quality: replace obsolete tier prose and phrase-only tests with title discovery, substantive methodology/finding medium, vulnerability-plus-severity high, relevant false-positive guidance, template rejection, and exact-tier adversarial tests.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 853 without changing detector or package metadata.'

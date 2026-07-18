@@ -1,17 +1,18 @@
 schema: testpattern/v1
 name: Australian Passport Number
 slug: au-travel-document-id
-version: 2.2.1
+version: 2.3.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Identifies Australian passport numbers using a broad letter-prefix pattern covering single-letter and
-  two-letter series. Requires corroborative evidence from travel-credential and issuing-nation keywords.
+  Identifies candidate Australian passport numbers using a broad one- or two-letter prefix followed by
+  seven digits. The regex does not validate an issued passport series; Australian travel-document and
+  issuing-nation evidence are required for enforcement.
 operation: >-
-  Word-boundary regex matching 1-2 uppercase letters followed by exactly 7 digits. Covers all current
-  and historical Australian passport series. Corroborative evidence: 3 tiers with travel-credential and
-  issuing-nation keywords within 300 characters.
+  Word-boundary regex matching 1-2 uppercase letters followed by exactly 7 digits. The bare candidate is
+  discovery-only at 65, travel-credential context enforces at 75, and independent Australian issuing
+  context is additionally required at 85. Enforcing tiers reject explicit templates.
 pattern: \b[A-Z]{1,2}\d{7}\b
 confidence: low
 confidence_justification: >-
@@ -47,13 +48,13 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: PA1234567
-      description: Two-letter prefix with 7 digits
-    - value: N1234567
-      description: Single-letter prefix with 7 digits
-    - value: R1234567
-      description: Modern R-series ePassport format
-    - value: AB1234567
-      description: Two-letter Australian passport format
+      description: Low-tier probe - candidate shape without passport context
+    - value: 'Passport number: N1234567'
+      description: Medium-tier probe - candidate with travel-document context
+    - value: 'Australian passport number R1234567 issued by DFAT'
+      description: High-tier probe - travel-document and Australian issuing context
+    - value: 'Travel document reference: AB1234567'
+      description: Medium-tier two-letter candidate with travel context
   should_not_match:
     - value: '1234567'
       description: No letter prefix
@@ -61,6 +62,8 @@ test_cases:
       description: Three-letter prefix is invalid
     - value: PA123456
       description: Only 6 digits after the letter prefix, one short of the required 7
+    - value: 'Documentation example: Australian passport number PA1234567'
+      description: Structurally complete but explicitly documented example
 false_positives:
   - description: Serial numbers and part codes using letter+digit format.
     mitigation: Require travel-credential keywords in proximity.
@@ -84,7 +87,7 @@ sensitivity_labels:
   ca_gov: "Protected B"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -110,14 +113,8 @@ purview:
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_travel_doc_code
-      matches:
-        - ref: Evidence_civic_identity
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_travel_doc_code
       pattern: \b[A-Z]{1,2}\d{7}\b
@@ -144,18 +141,12 @@ purview:
             - Australian
             - Commonwealth of Australia
             - Department of Foreign Affairs
-    - id: Evidence_civic_identity
-      groups:
-        - match_style: word
-          terms:
-            - identity document
-            - proof of identity
-            - identity verification
-            - government issued
-            - official document
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 2.3.0
+    date: '2026-07-18'
+    description: 'Profile quality: correct the description to a broad passport candidate shape; add bare discovery, travel-context medium, Australian-issuer high, template rejection, and exact-tier tests.'
   - version: 2.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1088 without changing detector or package metadata.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Mobile Number
 slug: au-cellular-subscriber-id
-version: 2.1.1
+version: 2.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,8 +9,10 @@ description: >-
   Identifies Australian mobile telephone numbers in domestic (04XX) and international (+614XX) notation. Uses lookaround boundaries to prevent embedded numeric matches. Supports space-only separation
   between digit groups for high precision.
 operation: >-
-  Lookaround-bounded regex matching Australian cellular subscriber numbers. Domestic prefix 04 followed by 8 digits, or international prefix +61 4 followed by 8 digits, with optional single-space
-  separators. Corroborative evidence: 3 tiers with telecom and personal-context keywords within 300 characters.
+  Lookaround-bounded regex matching Australian cellular subscriber numbers. Domestic prefix 04 is
+  followed by 8 digits, or international prefix +61 4 by 8 digits, with optional single-space
+  separators. The bare format is discovery-only at 65, generic phone context enforces at 75, and a
+  mobile-specific label plus independent contact-record context reaches 85.
 pattern: (?<!\d)(?:04\s?\d{2}\s?\d{3}\s?\d{3}|\+61\s?4\d{2}\s?\d{3}\s?\d{3})(?!\d)
 confidence: medium
 confidence_justification: >-
@@ -49,14 +51,14 @@ corroborative_evidence:
     - au-telecom-terms
 test_cases:
   should_match:
-    - value: 'Cellular: 0412 345 678'
-      description: Standard domestic format with spaces
-    - value: 'Subscriber: +61 412 345 678'
-      description: International format with spaces
-    - value: 'Handset: 0498 765 432'
-      description: Domestic with context keyword
+    - value: '0412 345 678'
+      description: Low-tier probe - domestic mobile structure without context
+    - value: 'Phone: +61 412 345 678'
+      description: Medium-tier probe - international mobile structure with generic phone context
+    - value: 'Customer record - mobile number: 0498 765 432'
+      description: High-tier probe - mobile-specific label in an independent customer-record context
     - value: 'SMS contact: 0400 000 111'
-      description: Domestic with double-zero grouping
+      description: Medium-tier mobile label without independent record context
   should_not_match:
     - value: '10412345678'
       description: Embedded in longer number — leading digit prevents match
@@ -66,6 +68,8 @@ test_cases:
       description: Only 8 digits after prefix, too short
     - value: '+61 3 9876 5432'
       description: International landline prefix (+61 3) is not a mobile (+61 4) number
+    - value: 'Documentation example: customer record mobile number 0412 345 678'
+      description: Structurally complete but explicitly documented example must not enforce
 false_positives:
   - description: 10-digit sequences starting with 04 in reference numbers or dates.
     mitigation: Lookaround boundaries prevent embedded matches. Corroborative keywords required.
@@ -92,64 +96,64 @@ purview:
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
+    - dict: phone-context
+      as: Evidence_phone_context
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_cellular_combined
       matches:
-        - ref: Evidence_telecom_primary
+        - ref: Evidence_mobile_specific
+        - ref: Evidence_contact_record
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
       id_match: Pattern_cellular_combined
       matches:
-        - ref: Evidence_telecom_context
+        - ref: Evidence_phone_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_cellular_combined
-      matches:
-        - ref: Evidence_personal_record
   regexes:
     - id: Pattern_cellular_combined
       pattern: (?<!\d)(?:04\s?\d{2}\s?\d{3}\s?\d{3}|\+61\s?4\d{2}\s?\d{3}\s?\d{3})(?!\d)
   keywords:
-    - id: Evidence_telecom_primary
+    - id: Evidence_mobile_specific
       groups:
         - match_style: word
           terms:
-            - cellular
-            - handset
-            - subscriber
+            - cellular number
+            - mobile number
+            - mobile phone
+            - handset number
             - wireless number
             - SMS contact
             - text number
-            - call back
-            - dial
-    - id: Evidence_telecom_context
+    - id: Evidence_contact_record
       groups:
         - match_style: word
           terms:
-            - personal details
+            - contact details
             - customer record
             - client file
             - account holder
-            - next of kin
-            - emergency
-            - notification
-    - id: Evidence_personal_record
-      groups:
-        - match_style: word
-          terms:
-            - record
-            - file
-            - form
-            - register
-            - roster
-            - directory
+            - staff directory
+            - emergency contact
+            - subscriber details
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 2.2.0
+    date: '2026-07-18'
+    description: 'Profile quality: replace generic record-word evidence with bare-format discovery, phone-context medium, and mobile-label-plus-contact-record high tiers; add template rejection and exact-tier tests.'
   - version: 2.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 526 without changing detector or package metadata.'

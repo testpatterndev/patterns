@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Replicate API Key
 slug: global-replicate-api-key
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -11,19 +11,18 @@ description: >-
   access to Replicate's hosted model inference API and any prompts, images, or data routed
   through it.
 operation: >-
-  Prefixed token format r8_ followed by an exactly 37-character body drawn from [0-9A-Za-z_-]
-  (Replicate's own docs state tokens are 40-character strings that always start with r8_ -- the
-  body is 40 minus the 3-character prefix; the body charset including underscore and hyphen is
-  confirmed by TruffleHog's production detector). Corroborative evidence: keywords within 300
-  characters.
+  A broad r8_ candidate is retained at 65 for discovery. The 75 tier requires the documented
+  37-character [0-9A-Za-z_-] body and rejects explicit template context. The 85 tier additionally
+  requires a Replicate label or endpoint nearby. Replicate documents the 40-character total length,
+  and TruffleHog corroborates the body charset.
 pattern: (?<![0-9A-Za-z_-])r8_[0-9A-Za-z_-]{37}(?![0-9A-Za-z_-])
 confidence: high
 confidence_justification: >-
   High confidence: the r8_ prefix and exact 40-character total token length are explicitly
   documented on Replicate's own security/API-tokens page, the body charset ([0-9A-Za-z_-]) is
-  confirmed by TruffleHog's production Replicate detector, and Replicate is a confirmed GitHub
-  secret-scanning partner (replicate_api_token), so false positives on the
-  prefix+length+charset combination alone are extremely unlikely.
+  confirmed by TruffleHog's production detector, and Replicate is a confirmed GitHub
+  secret-scanning partner. The exact format enforces at medium confidence; an explicit Replicate
+  label is required for the maximum-rejection high tier.
 jurisdictions:
   - global
 regulations:
@@ -50,10 +49,12 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
+    - value: r8_ABCDEFGHIJKLMNOPQRSTUVWX
+      description: Low-tier probe - plausible prefixed candidate with a noncanonical body length
     - value: r8_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk
-      description: Replicate API token, r8_ prefix + 37-char alphanumeric body
+      description: Medium-tier probe - exact Replicate token structure without nearby vendor context
     - value: 'REPLICATE_API_TOKEN=r8_zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIh'
-      description: Labelled Replicate token in an env assignment
+      description: High-tier probe - exact token with an unambiguous Replicate label
     - value: Using replicate with token r8_0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZa
       description: Replicate brand mention followed by a token value
     - value: r8_ABCDEFGHIJ_KLMNOPQRST-UVWXYZ0123456_-
@@ -65,11 +66,11 @@ test_cases:
       description: Body too short (36 chars, below the fixed 37-char length)
     - value: remember to rotate the replicate api token before deploying
       description: Prose mention without a token value
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Documentation example: REPLICATE_API_TOKEN=r8_zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIh'
+      description: Exact but explicitly documented example must not enforce
 false_positives:
   - description: Documentation or examples showing placeholder r8_ strings.
-    mitigation: Require corroborative Replicate keywords and check for placeholder markers (example, xxxx).
+    mitigation: Suppress explicit template/example framing; treat an exact bare token as medium and require an unambiguous Replicate label for high confidence.
   - description: The common English verb "replicate" (e.g. "replicate this dataset") appearing in text near an unrelated token or hash of similar length.
     mitigation: The brand-name keyword term is case-sensitive (Replicate, capitalised) and additional unambiguous terms (replicate.com, REPLICATE_API_TOKEN) disambiguate from the generic verb.
 exports:
@@ -90,13 +91,13 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 85
       id_match: Regex_replicate_api_key
       matches:
         - ref: Keyword_replicate_api_key
@@ -105,7 +106,7 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 65
+    - confidence_level: 75
       id_match: Regex_replicate_api_key
       matches:
         - type: any
@@ -113,7 +114,12 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_replicate_candidate
   regexes:
+    - id: Regex_replicate_candidate
+      pattern: (?<![0-9A-Za-z_-])r8_[0-9A-Za-z_-]{20,50}(?![0-9A-Za-z_-])
     - id: Regex_replicate_api_key
       pattern: (?<![0-9A-Za-z_-])r8_[0-9A-Za-z_-]{37}(?![0-9A-Za-z_-])
   keywords:
@@ -127,11 +133,13 @@ purview:
             - api.replicate.com
             - REPLICATE_API_TOKEN
             - replicate api
-            - api key
       strength: specific
 created: '2026-07-06'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-18'
+    description: 'Profile quality: add broad candidate discovery, exact-format medium, and vendor-labelled high tiers with explicit template rejection and tier-specific tests.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2126 without changing detector or package metadata.'

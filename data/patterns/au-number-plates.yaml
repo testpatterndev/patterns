@@ -1,18 +1,20 @@
 schema: testpattern/v1
-name: Au Number Plates
+name: Australian Number Plate
 slug: au-number-plates
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects Australian number plate patterns. Standard plate formats only; personalised plates excluded. Requires vehicle/registration keyword context.
+description: >-
+  Detects five implemented Australian standard number-plate shapes for NSW, Victoria, Queensland,
+  South Australia, and Western Australia. It does not validate issuance and excludes personalised
+  plate formats; registration and transport-agency evidence controls enforcement.
 operation: >-
-  Regex pattern using universal engine. The top-level regex matches three NSW-centric plate formats: AA99AA (2 letters, 2 digits, 2 letters), 9AA999 (digit, 2 letters, 3 digits), and 999AA9 (3 digits,
-  2 letters, digit), with optional spaces/hyphens. The Purview engine uses five state-specific regexes: Pattern_au_plate_nsw (AA99AA), Pattern_au_plate_vic (9AA999), Pattern_au_plate_qld (999AA9),
-  Pattern_au_plate_sa (S999AAA), and Pattern_au_plate_wa (1AAA999). Three confidence tiers: High (85) requires registration context + transport agency keywords with template exclusion; Medium (75)
-  requires registration context keywords with serial code exclusion; Low (65) requires vehicle terms only. Evidence uses 3 keyword groups (9 registration terms, 10 transport agency terms, 9 vehicle
-  terms) within 500-character proximity. Keyword lists: pii-personal.
-pattern: \b[A-Z]{2}[\s\-]?\d{2}[\s\-]?[A-Z]{2}\b
+  The universal and Purview implementations cover AA99AA, 9AA999, 999AA9, S999AAA, and 1AAA999, with
+  optional spaces or hyphens where defined. A bare shape is discovery-only at 65, registration context
+  enforces at 75, and independent transport-agency context raises it to 85. Serial/model and explicit
+  template context are excluded from enforcing tiers.
+pattern: \b(?:[A-Z]{2}[\s\-]?\d{2}[\s\-]?[A-Z]{2}|\d[A-Z]{2}[\s\-]?\d{3}|\d{3}[\s\-]?[A-Z]{2}[\s\-]?\d|S\d{3}[\s\-]?[A-Z]{3}|1[A-Z]{3}[\s\-]?\d{3})\b
 confidence: low
 confidence_justification: >-
   Low confidence: short alphanumeric plate formats can easily match product codes, abbreviations, and other non-vehicle identifiers. Corroborative evidence keywords such as registration, rego, or
@@ -44,11 +46,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: AB12CD
-      description: NSW standard plate format (AA99AA)
-    - value: XY99ZZ
-      description: NSW plate upper range
-    - value: DL45KM
-      description: Standard NSW format
+      description: Low-tier probe - bare NSW-shaped candidate
+    - value: 'Vehicle registration: 1AB234'
+      description: Medium-tier probe - registration context without a transport agency
+    - value: 'TMR vehicle registration plate: 123AB4'
+      description: High-tier probe - Queensland shape with registration and agency context
   should_not_match:
     - value: ABC123
       description: Three letters followed by three digits (not a valid format)
@@ -56,6 +58,10 @@ test_cases:
       description: Alternating letters and digits (not a valid format)
     - value: 1234AB
       description: Four digits followed by two letters (not a valid format)
+    - value: 'Model code AB12CD for the replacement assembly'
+      description: Plate-shaped product code with explicit model/code context
+    - value: 'Training example: TMR vehicle registration plate 123AB4'
+      description: Structurally complete but explicitly framed training content
 false_positives:
   - description: Common words and phrases related to au number plates appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -81,7 +87,7 @@ sensitivity_labels:
   ca_gov: Protected A
 purview:
   patterns_proximity: 500
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Evidence_template_exclusion
@@ -101,6 +107,7 @@ purview:
         - ref: Evidence_transport_agency
       excludes:
         - ref: Evidence_template_exclusion
+        - ref: Evidence_serial_code_exclusion
     - confidence_level: 75
       id_match:
         type: any
@@ -114,7 +121,9 @@ purview:
         - ref: Evidence_registration_context
       excludes:
         - ref: Evidence_serial_code_exclusion
+        - ref: Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match:
         type: any
         ids:
@@ -123,8 +132,6 @@ purview:
           - Pattern_au_plate_qld
           - Pattern_au_plate_sa
           - Pattern_au_plate_wa
-      matches:
-        - ref: Evidence_vehicle_terms
   regexes:
     - id: Pattern_au_plate_nsw
       pattern: \b[A-Z]{2}[\s\-]?\d{2}[\s\-]?[A-Z]{2}\b
@@ -199,8 +206,11 @@ purview:
               case_sensitive: true
       strength: noise
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-18'
+    description: 'Profile quality: align the universal regex with all five implemented state formats; add bare discovery, registration medium, agency-corroborated high, serial/template rejection, and exact-tier tests.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 564 without changing detector or package metadata.'

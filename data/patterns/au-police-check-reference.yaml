@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: National Police Check Reference
 slug: au-police-check-reference
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -12,10 +12,9 @@ description: >-
 operation: >-
   Regex pattern (boost_regex engine). Pattern_au_police_check_reference matches a national police check /
   criminal history check phrase followed within 60 characters by a reference / certificate / application /
-  receipt label and an alphanumeric reference value. Three confidence tiers: High (85) requires police-check
-  evidence (min 2) with template exclusion; Medium (75) requires police-check evidence with template
-  exclusion; Low (65) requires police-check evidence. Evidence uses one keyword group (14 police-check terms)
-  within 300-character proximity.
+  receipt label and an alphanumeric reference value. The labelled shape is discovery-only at 65. Issuing
+  authority or check-record context raises it to 75, and both are required at 85. Enforcing tiers reject
+  explicit template and onboarding-example content.
 pattern: (?i)\b(?:nationally\s+coordinated\s+criminal\s+history\s+check|national\s+police\s+(?:check|certificate|clearance)|criminal\s+history\s+check|police\s+check)\b[\s\S]{0,60}?\b(?:reference|ref|certificate|application|receipt)\s*(?:no|number|id|#)?\s*[:#-]?\s*[A-Z]{0,5}[-/]?\d{3,14}(?:[-/][A-Z0-9]{2,12}){0,4}\b
 confidence: medium
 confidence_justification: >-
@@ -54,13 +53,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: Nationally Coordinated Criminal History Check reference number NPC-2025-4837291 attached
-      description: Full NCCHC phrase with hyphenated reference number
+      description: Medium-tier probe - check reference with record context but no issuing authority
     - value: 'National Police Certificate reference: 20259988771 issued by Victoria Police for the role'
-      description: National Police Certificate with numeric reference
+      description: High-tier probe - certificate reference with authority and record context
     - value: Please quote police check receipt no ACIC5578420 when following up on the application
-      description: Police check phrase with receipt reference
+      description: Medium-tier probe - receipt reference with follow-up context
     - value: Criminal history check certificate CHC-2025-000318 confirms no disclosable court outcomes
-      description: Criminal history check with certificate reference
+      description: Medium-tier probe - certificate reference with outcome context
+    - value: Police check reference NPC-4837291
+      description: Low-tier probe - labelled reference without independent authority or record context
   should_not_match:
     - value: The applicant provided a valid national police check last month for the position
       description: Police check phrase with no reference value nearby
@@ -68,6 +69,8 @@ test_cases:
       description: Criminal history declaration, not a criminal history check reference
     - value: Police officers attended the scene at 3pm to take statements from witnesses
       description: Generic police prose with no check reference
+    - value: 'Onboarding example: National Police Certificate reference 20259988771 issued by Victoria Police'
+      description: Structurally complete but explicitly framed example
 false_positives:
   - description: A police-check phrase near an unrelated reference number could match without being a certificate reference.
     mitigation: Require corroborating ACIC / criminal-history keywords within the proximity window.
@@ -91,7 +94,7 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Evidence_template_exclusion
@@ -100,9 +103,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_au_police_check_reference
       matches:
-        - ref: Evidence_au_police_check_reference
-          min_count: 2
-          unique_results: true
+        - ref: Evidence_police_check_authority
+        - ref: Evidence_check_record_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -111,44 +113,68 @@ purview:
     - confidence_level: 75
       id_match: Pattern_au_police_check_reference
       matches:
-        - ref: Evidence_au_police_check_reference
+        - ref: Evidence_authority_or_record_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_au_police_check_reference
-      matches:
-        - ref: Evidence_au_police_check_reference
   regexes:
     - id: Pattern_au_police_check_reference
       pattern: (?i)\b(?:nationally\s+coordinated\s+criminal\s+history\s+check|national\s+police\s+(?:check|certificate|clearance)|criminal\s+history\s+check|police\s+check)\b[\s\S]{0,60}?\b(?:reference|ref|certificate|application|receipt)\s*(?:no|number|id|#)?\s*[:#-]?\s*[A-Z]{0,5}[-/]?\d{3,14}(?:[-/][A-Z0-9]{2,12}){0,4}\b
   keywords:
-    - id: Evidence_au_police_check_reference
+    - id: Evidence_authority_or_record_context
       groups:
         - match_style: word
           terms:
-            - Nationally Coordinated Criminal History Check
-            - National Police Check
-            - National Police Certificate
             - text: ACIC
               case_sensitive: true
-            - text: NPC
-              case_sensitive: true
-            - criminal history
-            - police clearance
-            - disclosable court outcome
             - accredited body
             - National Police Checking Service
-            - criminal record
-            - background check
+            - Victoria Police
+            - attached
+            - issued by
+            - applicant
+            - application follow-up
+            - following up
+            - for the role
+            - disclosable court outcome
             - spent convictions
+            - screening result
+      strength: domain
+    - id: Evidence_police_check_authority
+      groups:
+        - match_style: word
+          terms:
+            - text: ACIC
+              case_sensitive: true
+            - accredited body
+            - National Police Checking Service
             - Victoria Police
       strength: specific
+    - id: Evidence_check_record_context
+      groups:
+        - match_style: word
+          terms:
+            - attached
+            - issued by
+            - applicant
+            - application follow-up
+            - following up
+            - for the role
+            - disclosable court outcome
+            - spent convictions
+            - screening result
+      strength: domain
 created: '2026-07-07'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-18'
+    description: 'Profile quality: replace self-corroborating police-check terms with separate issuing-authority and record-context evidence; add discovery-only low, cumulative high, template rejection, and exact-tier tests.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2085 without changing detector or package metadata.'

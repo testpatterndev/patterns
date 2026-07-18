@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Global Phone Number (E.164)
 slug: global-phone-e164
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -32,10 +32,9 @@ confidence_justification: >-
   Medium confidence: the mandatory literal "+" prefix is distinctive and rare outside telecom contexts,
   but the digits that follow it carry no checksum and the regex cannot validate the
   country-code/national-number split against a real assignment table, so E.164-shaped values remain a
-  high digit-collision format at heart. Per the phone-family convention set by au-fixed-line-telephone
-  (every tier requires positive corroborative evidence; a +CC prefix alone is insufficient gating), no
-  zero-evidence tier is offered: the 75 tier requires generic phone-context evidence and the 85 tier
-  requires specific international-phone keywords with template/noise exclusion.
+  high digit-collision format at heart. The bare structure is therefore discovery-only; the 75 tier
+  requires phone context and the 85 tier requires both phone context and an international-phone label,
+  with template/noise exclusion on both enforcing tiers.
 jurisdictions:
   - global
 regulations:
@@ -63,21 +62,19 @@ corroborative_evidence:
     - phone-context
 test_cases:
   should_match:
-    - value: 'Contact: +442079460958'
+    - value: '+442079460958'
       description: >-
-        UK Ofcom-reserved London drama number (020 7946 0958, leading 0 dropped per E.164/+44 convention),
-        contiguous digits, no separators
-    - value: 'Call +1 2125550147 for support'
+        Low-tier probe - UK Ofcom-reserved London drama number in bare E.164 form
+    - value: 'Phone: +1 2125550147'
       description: >-
-        NANPA-reserved US fictional 555-01XX exchange in +1 international form, one space after the
-        1-digit country code
+        Medium-tier probe - NANPA-reserved fictional number with generic phone context
     - value: 'Fax: +91 9876543210'
       description: >-
         India (+91), illustrative synthetic value — no official DoT/TRAI reserved test-number block exists
         for India (verified absent during research), so a structurally valid but non-allocated-looking
         descending-digit sequence is used
-    - value: 'International line: +374 10123456'
-      description: Armenia (+374), 3-digit country code, illustrative synthetic subscriber number
+    - value: 'International phone number: +374 10123456'
+      description: High-tier probe - 3-digit country code with explicit international-phone context
   should_not_match:
     - value: '+0123456789'
       description: Leading digit after the + is 0 — E.164 country codes never start with 0
@@ -87,6 +84,8 @@ test_cases:
       description: Only 6 digits after the +, below the practical 8-digit minimum this pattern enforces (ITU specifies only a 15-digit maximum, no minimum)
     - value: '+123456789012345678'
       description: 18 digits after the +, three more than E.164's 15-digit maximum — no valid sub-length cut satisfies the trailing digit boundary
+    - value: 'Documentation example: international phone number +44 2079460958'
+      description: Structurally valid but explicitly documented example must not enforce
 false_positives:
   - description: >-
       A syntactically valid "+" followed by 8-15 digits does not confirm the country code is actually
@@ -112,7 +111,7 @@ exports:
 scope: narrow
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: phone-context
       as: Evidence_phone_context
@@ -124,12 +123,16 @@ purview:
     - confidence_level: 85
       id_match: Regex_global_phone_e164
       matches:
+        - ref: Evidence_phone_context
         - ref: Keyword_global_phone_specific
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_global_phone_e164
     - confidence_level: 75
       id_match: Regex_global_phone_e164
       matches:
@@ -170,8 +173,11 @@ references:
   - url: https://www.itu.int/rec/T-REC-E.123
     title: "ITU-T Recommendation E.123: Notation for national and international telephone numbers"
 created: '2026-07-06'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-18'
+    description: 'Profile quality: add bare E.164 discovery, phone-context medium, and international-phone high tiers; require cumulative high evidence, exclude templates, and add exact-tier probes.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2123 without changing detector or package metadata.'

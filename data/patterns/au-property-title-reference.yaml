@@ -1,17 +1,17 @@
 schema: testpattern/v1
 name: NSW Property Title Reference (Lot/DP)
 slug: au-property-title-reference
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects Australian property title references including Lot/DP, Lot/SP, Title References, and Folio Identifiers. Requires property/title/lot/DP keyword context.
 operation: >-
-  Regex pattern using universal engine. The top-level regex \b\d+/\d{5,7}\b matches a generic lot/plan format of digits, a forward slash, and 5-7 digits. The Purview engine uses four regexes of
-  decreasing specificity: Pattern_property_lot_dp (Lot + number + DP/SP/PS/LP/CP plan number), Pattern_property_title_ref (Title Ref/CT/Folio format), Pattern_property_lot_plan (numeric/DP format),
-  and Pattern_property_generic (bare digits/digits format). Three confidence tiers: High (85) requires land registry + state geography keywords with template exclusion logic; Medium (75) requires land
-  registry keywords; Low (65) requires property context keywords. Evidence uses 3 keyword groups (9 land registry terms, 11 state geography terms, 10 property context terms) within 500-character
-  proximity. Keyword lists: pii-personal, au-major-cities, au-states-full, au-states-abbreviations.
+  The Purview implementation uses explicit Lot/DP-style, title/folio, numeric-plan, and generic
+  digits/slash/digits regexes. All candidate shapes are discovery-only at 65. Explicit title or
+  lot-plan structures with land-registry context enforce at 75; a labelled Lot/DP-style value with
+  both land-registry and state context reaches 85. Enforcing tiers reject explicit templates, while
+  generic digits/slash/digits values never enforce by themselves.
 pattern: (?i)\b(?:Lot|LOT)\s+\d+(?:/|\s+on\s+)(?:DP|SP|PS|LP|CP)\s*\d{3,7}\b
 confidence: low
 confidence_justification: >-
@@ -52,15 +52,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 1/12345
-      description: Lot 1 in DP 12345
+      description: Low-tier probe - generic lot/plan candidate without registry context
     - value: 23/1234567
       description: Lot 23 in larger DP
     - value: 100/99999
       description: High lot number in DP
     - value: 'NSW Land Registry title: 12/DP123456'
       description: Bare lot-on-plan form with land-registry context (wired Pattern_property_lot_plan 75 tier)
-    - value: Lot 7/SP98765 on strata title
-      description: Explicit Lot-labelled strata-plan form (existing Pattern_property_lot_dp branch)
+    - value: Lot 7/SP98765 on strata title, NSW
+      description: High-tier probe - labelled lot/plan with registry and state context
   should_not_match:
     - value: 1/1234
       description: Only 4 digits after slash (below minimum of 5)
@@ -72,6 +72,8 @@ test_cases:
       description: Lot-plan-shaped token in invoice context without land-registry evidence must not fire the 75 tier
     - value: The subdivision plan is under review.
       description: Property topic without an identifier
+    - value: 'Documentation example: NSW land title Lot 7/SP98765'
+      description: Structurally complete but explicitly documented example
 false_positives:
   - description: Common words and phrases related to nsw property title reference (lot/dp) appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -97,7 +99,7 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 500
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Evidence_template_exclusion
@@ -118,14 +120,29 @@ purview:
       id_match: Pattern_property_title_ref
       matches:
         - ref: Evidence_land_registry
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
       id_match: Pattern_property_lot_plan
       matches:
         - ref: Evidence_land_registry
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
-      id_match: Pattern_property_generic
-      matches:
-        - ref: Evidence_property_context
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Pattern_property_lot_dp
+          - Pattern_property_title_ref
+          - Pattern_property_lot_plan
+          - Pattern_property_generic
   regexes:
     - id: Pattern_property_lot_dp
       pattern: (?i)\b(?:Lot|LOT)\s+\d+(?:/|\s+on\s+)(?:DP|SP|PS|LP|CP)\s*\d{3,7}\b
@@ -195,8 +212,11 @@ purview:
     - id: Guard_property_same_digits
       type: AllDigitsSameFilter
 created: '2026-02-08'
-updated: '2026-07-17'
+updated: '2026-07-18'
 changelog:
+  - version: 1.6.0
+    date: '2026-07-18'
+    description: 'Profile quality: keep generic lot/plan candidates discovery-only, enforce explicit title/plan structures with registry context, retain state-corroborated high, and add exact-tier/template tests.'
   - version: 1.5.0
     date: '2026-07-17'
     description: 'TP-00093 approved reduced scope: wire the previously declared-but-unwired Pattern_property_lot_plan regex into a 75 tier gated by the existing Evidence_land_registry group, without changing the bounded DP/SP/PS/LP/CP syntax; existing AllDigitsSameFilter guard retained. Deferred per QA/independent review: the proposed 85 matching-state tier — Evidence_state_geography is one pooled list and cannot pair a plan prefix with its jurisdiction. Added bare-lot-plan and Lot-labelled positives plus invoice and topic-only negatives.'

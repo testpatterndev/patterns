@@ -1,16 +1,16 @@
 schema: testpattern/v1
 name: Australian Citizenship Certificate
 slug: au-citizenship-certificate
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects Australian Citizenship Certificate number patterns including prefixed formats (ACC, CDM, ACS, CAS followed by 4-8 digits) and numeric-only formats (0 + 10 digits).
 operation: >-
-  Regex pattern using universal engine. The top-level regex \b(ACC|CDM|ACS|CAS)[\s]?\d{4,8}\b matches a certificate type prefix followed by an optional space and 4-8 digits. The Purview engine uses
-  two regexes: Pattern_au_citizenship_cert (prefixed format) and Pattern_au_citizenship_cert_numeric (11-digit format starting with 0). Three confidence tiers: High (85) requires citizenship-specific
-  terms + Home Affairs context keywords with template exclusion logic; Medium (75) requires citizenship-specific terms; Low (65) requires immigration context keywords. Evidence uses 3 keyword groups
-  (8 citizenship-specific terms, 7 Home Affairs terms, 10 immigration context terms) within 300-character proximity. Keyword lists: au-government-citizenship-immigration, pii-civic-credentials.
+  The Purview implementation covers prefixed ACC/CDM/ACS/CAS values and an 11-digit numeric candidate
+  beginning with 0. Both shapes are discovery-only at 65. A prefixed value with citizenship-certificate
+  context enforces at 75; citizenship plus Home Affairs context reaches 85. The numeric shape only
+  enforces at 85 because it is otherwise too generic. Enforcing tiers reject explicit templates.
 pattern: \b(?:ACC|CDM|ACS|CAS)\s?\d{4,8}\b
 confidence: medium
 confidence_justification: 'Medium confidence: the 3-letter prefix (ACC, CDM, ACS, CAS) provides good structural specificity. Corroborative keywords are recommended to distinguish from other prefixed reference codes.'
@@ -38,11 +38,13 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: ACC12345678
-      description: Citizenship certificate ACC prefix with 8 digits
-    - value: CDM 1234
-      description: CDM prefix with space and 4 digits
-    - value: ACS56789
-      description: ACS prefix certificate number with 5 digits
+      description: Low-tier probe - prefixed candidate without certificate context
+    - value: 'Citizenship certificate number: ACS56789'
+      description: Medium-tier probe - prefixed value with certificate context
+    - value: 'Department of Home Affairs Australian citizenship certificate: CDM 1234'
+      description: High-tier probe - certificate and issuing-department context
+    - value: 'Home Affairs citizenship certificate evidence number 01234567891'
+      description: High-tier numeric candidate with strong certificate and issuer context
   should_not_match:
     - value: XYZ12345
       description: Invalid prefix (XYZ instead of ACC/CDM/ACS/CAS)
@@ -50,6 +52,8 @@ test_cases:
       description: Too few digits after prefix (3 instead of 4-8)
     - value: ACC123456789
       description: Too many digits after prefix (9 instead of 4-8)
+    - value: 'Template: Department of Home Affairs citizenship certificate ACC12345678'
+      description: Structurally complete but explicitly framed template content
 false_positives:
   - description: Common words and phrases related to australian citizenship certificate appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -80,7 +84,11 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_au_citizenship_cert
+      id_match:
+        type: any
+        ids:
+          - Pattern_au_citizenship_cert
+          - Pattern_au_citizenship_cert_numeric
       matches:
         - ref: Evidence_citizenship_specific
         - ref: Evidence_home_affairs
@@ -90,11 +98,18 @@ purview:
       id_match: Pattern_au_citizenship_cert
       matches:
         - ref: Evidence_citizenship_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
-      id_match: Pattern_au_citizenship_cert_numeric
-      matches:
-        - ref: Evidence_citizenship_specific
-        - ref: Evidence_immigration_context
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Pattern_au_citizenship_cert
+          - Pattern_au_citizenship_cert_numeric
   regexes:
     - id: Pattern_au_citizenship_cert
       pattern: \b(?:ACC|CDM|ACS|CAS)\s?\d{4,8}\b
@@ -142,8 +157,11 @@ purview:
     - id: Guard_au_citizenship_cert_same_digits
       type: AllDigitsSameFilter
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-18'
+    description: 'Profile quality: make prefixed and numeric certificate candidates discovery-only, require certificate context at medium and Home Affairs context at high, with template rejection and exact-tier tests.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 529 without changing detector or package metadata.'

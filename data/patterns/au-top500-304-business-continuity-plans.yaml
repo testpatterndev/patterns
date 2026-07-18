@@ -1,18 +1,25 @@
 schema: testpattern/v1
 name: Business continuity plans
 slug: au-top500-304-business-continuity-plans
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies business continuity plans patterns in security and access control contexts. Detects potential exposure of sensitive security information in Australian systems.
+description: >-
+  Identifies substantive business-continuity, continuity-of-operations, and BCP documents. The title
+  phrase alone is retained for discovery; enforcement requires plan content such as a business impact
+  analysis, recovery strategy, alternate site, vital records, crisis team, or notification tree.
 operation: >-
-  Pattern type: regex (boost_regex engine). Three-tier purview detection: high confidence (95) matches business continuity pattern with BCP component evidence and template exclusion; medium confidence
-  (85) matches with BCP component plus crisis management evidence; low confidence (75) matches with IT operations evidence. Corroborative evidence: 6 keywords within 300 characters. Keyword lists:
-  industry-education.
+  Pattern_business_continuity recognises business-continuity plans/programs, BCP documents/procedures,
+  and continuity-of-operations plans. The title phrase alone is discovery-only at 65. A concrete
+  continuity or recovery component raises it to 75; both continuity components and crisis/activation
+  evidence are required at 85. Enforcing tiers reject explicit templates and training examples.
 pattern: (?i)\b(?:business\s+continuity\s+(?:plan|management|program)|bcp\s+(?:document|plan|procedures?)|continuity\s+of\s+(?:operations?|business)\s+plan)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
+confidence_justification: >-
+  Medium confidence: organizations routinely mention a BCP in policies, contracts, and audit requests
+  without including the plan. Concrete recovery content is required for enforcement, and the high tier
+  additionally requires crisis-management or activation detail.
 jurisdictions:
   - au
 regulations:
@@ -27,7 +34,6 @@ frameworks:
   - PCI-DSS
   - SOC 2
 data_categories:
-  - credentials
   - security
 corroborative_evidence:
   keywords:
@@ -43,11 +49,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 'Business continuity plan'
-      description: Topic phrase present
-    - value: 'business continuity plan'
-      description: Topic phrase, lowercase
-    - value: 'this record references the business continuity plan held on file'
-      description: Topic phrase within surrounding text
+      description: Low-tier probe - title phrase without substantive plan content
+    - value: 'Business continuity plan - business impact analysis, recovery strategy, alternate site, and vital records'
+      description: Medium-tier probe - concrete recovery components without crisis-activation detail
+    - value: 'Business continuity plan - critical business function, alternate site, crisis team, emergency contact, and notification tree'
+      description: High-tier probe - recovery components plus crisis/activation detail
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
@@ -55,11 +61,15 @@ test_cases:
       description: Random text should not match phrase marker
     - value: generic prose without structural artifact anchors
       description: Should not match plain mentions
+    - value: 'The supplier must maintain a business continuity plan and provide annual assurance.'
+      description: Contractual requirement, not the plan itself
+    - value: 'Training example: business continuity plan with recovery strategy, alternate site, crisis team, and call tree'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
-    mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
-  - description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer documentation.
-    mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce false positives from technical writing.
+  - description: Policies, supplier clauses, audit requests, and risk registers may require or reference a business-continuity plan without containing operational recovery detail.
+    mitigation: Keep the title-only tier discovery-only and require a concrete BCP component before enforcement.
+  - description: Training exercises and template plans can contain realistic recovery, alternate-site, crisis-team, and call-tree content.
+    mitigation: Exclude explicit template, tutorial, demo, and training-example framing from the medium and high tiers.
 exports:
   - purview_xml
   - yaml
@@ -88,8 +98,7 @@ purview:
       id_match: Pattern_business_continuity
       matches:
         - ref: Evidence_bcp_components
-          min_count: 2
-          unique_results: true
+        - ref: Evidence_crisis_management
         - type: any
           min_matches: 0
           max_matches: 0
@@ -105,9 +114,8 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_business_continuity
-      matches:
-        - ref: Evidence_bcp_components
   regexes:
     - id: Pattern_business_continuity
       pattern: (?i)\b(?:business\s+continuity\s+(?:plan|management|program)|bcp\s+(?:document|plan|procedures?)|continuity\s+of\s+(?:operations?|business)\s+plan)\b
@@ -140,21 +148,12 @@ purview:
             - war room
             - command centre
       strength: specific
-    - id: Evidence_it_operations
-      groups:
-        - match_style: word
-          terms:
-            - IT operations
-            - infrastructure
-            - system administration
-            - change management
-            - incident management
-            - problem management
-            - ITIL
-      strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-18'
+    description: 'Profile quality: replace obsolete tier prose and phrase-only tests with title discovery, concrete recovery-component medium, component-plus-crisis high, relevant false-positive guidance, template rejection, and exact-tier adversarial tests.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 895 without changing detector or package metadata.'

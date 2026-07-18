@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Electronic Mail Address
 slug: global-electronic-mail-id
-version: 2.2.1
+version: 2.3.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -10,8 +10,10 @@ description: >-
   top-level domain of 2+ characters. Uses word-boundary anchoring distinct from substring matching.
 operation: >-
   Regex matching email addresses with alphanumeric local part, @ separator, domain with dot-separated
-  labels, and TLD of 2+ characters. Corroborative evidence: 3 tiers with correspondence-label and
-  context keywords within 300 characters.
+  labels, and TLD of 2+ characters. The bare format is discovery-only at 65, an explicit email or
+  correspondence label enforces at 75, and a labelled address in an independent customer,
+  account-holder, or communication record context reaches 85. Explicit templates are excluded from
+  enforcing tiers.
 pattern: \b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b
 confidence: high
 confidence_justification: >-
@@ -49,14 +51,14 @@ corroborative_evidence:
     - correspondence-address-labels
 test_cases:
   should_match:
-    - value: 'Inbox: john.smith@example.com'
-      description: Standard email with label
-    - value: 'Correspondence: jane_doe+work@company.com.au'
-      description: Email with plus addressing and .com.au domain
+    - value: alerts@agency.gov.au
+      description: Low-tier probe - valid email structure without correspondence context
+    - value: 'Inbox: service.desk@agency.gov.au'
+      description: Medium-tier probe - email with an explicit correspondence label
+    - value: 'Customer record - email address: jane_doe+work@company.com.au'
+      description: High-tier probe - labelled email in an independent customer-record context
     - value: Send to info@government.gov.au
-      description: Government email address
-    - value: 'Reply to: support@service.org'
-      description: Support email with label
+      description: Medium-tier labelled government email address
   should_not_match:
     - value: The ratio is 3@4 per unit
       description: At symbol used in non-email context
@@ -64,6 +66,8 @@ test_cases:
       description: Local address without valid TLD
     - value: '@mention in chat'
       description: Social media mention, no local part
+    - value: 'Documentation example: user@example.com'
+      description: Reserved-domain example explicitly framed as documentation
 false_positives:
   - description: At symbols in code, formulas, or social media handles.
     mitigation: Require valid TLD of 2+ characters after the domain dot.
@@ -85,17 +89,34 @@ sensitivity_labels:
   ca_gov: "Protected A"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_electronic_mail
       matches:
         - ref: Evidence_correspondence_label
         - ref: Evidence_correspondence_context
-    - confidence_level: 65
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
       id_match: Pattern_electronic_mail
       matches:
         - ref: Evidence_correspondence_label
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_electronic_mail
   regexes:
     - id: Pattern_electronic_mail
       pattern: \b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b
@@ -106,6 +127,8 @@ purview:
           terms:
             - electronic mail
             - correspondence address
+            - email
+            - email address
             - inbox
             - mailbox
             - e-mail address
@@ -128,8 +151,11 @@ purview:
             - communication
       strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
+  - version: 2.3.0
+    date: '2026-07-18'
+    description: 'Profile quality: add bare-address discovery, labelled medium, and independent record-context high tiers; exclude explicit templates and add exact-tier adversarial tests.'
   - version: 2.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1227 without changing detector or package metadata.'
