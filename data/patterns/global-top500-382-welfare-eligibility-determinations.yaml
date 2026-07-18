@@ -1,20 +1,26 @@
 schema: testpattern/v1
 name: Welfare eligibility determinations
 slug: global-top500-382-welfare-eligibility-determinations
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to welfare eligibility determinations in international contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
+  Identifies individual welfare, social-assistance, and income-support eligibility decisions. Topic
+  phrases are retained for discovery; enforcement requires applicant, household, income, dependant,
+  means-test, benefit-category, outcome, review-right, or effective-date fields, and high confidence
+  also requires a formal case/application reference or recorded eligibility decision.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 1 keywords within 240 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_welfare_eligibility recognises welfare, social-assistance, and income-support eligibility
+  determinations. The topic alone is discovery-only at 65. Substantive assessment fields raise it to
+  75; a formal case/application reference or decision status reaches 85. Enforcing tiers reject
+  explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:welfare\s+eligibility\s+determinations|eligibility\s+assessment|welfare\s+benefits|means\s+test|income\s+support|social\s+assistance|benefit\s+determination|welfare\s+application|eligibility\s+criteria|welfare\s+recipient|benefit\s+entitlement|social\s+welfare)\b
+  (?is)\b(?:welfare\s+(?:benefit\s+)?eligibility\s+(?:determination|decision)|social\s+assistance\s+eligibility\s+(?:determination|decision)|income\s+support\s+eligibility\s+(?:determination|decision))s?\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires substantive claimant assessment fields. High confidence adds a formal
+  case/application reference or recorded decision status.
 jurisdictions:
   - global
 regulations:
@@ -27,30 +33,24 @@ corroborative_evidence:
   proximity: 240
 test_cases:
   should_match:
-    - value: welfare eligibility determinations
-      description: Primary topic phrase match
-    - value: eligibility assessment
-      description: Case-insensitive topic phrase match
-    - value: welfare benefits
-      description: Alternative topic phrase match
-    - value: means test
-      description: Additional topic phrase match
+    - value: welfare eligibility determination
+      description: Low-tier probe - welfare decision topic without assessment fields
+    - value: 'Welfare eligibility determination: applicant household, household income, dependant children, means test result, benefit category, assessment outcome, review rights, and effective date'
+      description: Medium-tier probe - substantive determination without formal reference or decision status
+    - value: 'Welfare eligibility determination, application reference: WEL-2026-104: applicant household, household income, dependant children, means test result, benefit category, assessment outcome, decision approved, review rights, and effective date'
+      description: High-tier probe - substantive determination with formal application reference and decision
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: welfare registry
-      description: Generic word pair from old broad template should not match
+    - value: The policy describes welfare benefits and means-test thresholds.
+      description: Public policy discussion without an individual determination
+    - value: The scholarship eligibility assessment reviews household income.
+      description: Non-welfare eligibility context
+    - value: 'Training example: welfare eligibility determination WEL-2026-104 with household income, assessment outcome, and decision approved'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to welfare eligibility determinations appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Welfare policy, published eligibility criteria, and unrelated scholarship or insurance assessments discuss income, dependants, means tests, and outcomes.
+    mitigation: Require a welfare, social-assistance, or income-support eligibility determination before considering claimant assessment fields.
+  - description: Training determinations can contain realistic applicant details, references, outcomes, and review rights.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -58,63 +58,57 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 240
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_welfare_eligibility
+      matches:
+        - ref: Evidence_welfare_assessment
+        - ref: Evidence_welfare_formal_decision
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_welfare_eligibility
       matches:
-        - ref: Pattern_global_top500_382_welfare_eligibility_determinations_label_context
-        - ref: Keyword_global_top500_382_welfare_eligibility_determinations_domain_context
+        - ref: Evidence_welfare_assessment
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_welfare_eligibility
-      matches:
-        - ref: Keyword_welfare_eligibility
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_welfare_eligibility
       pattern: >-
-        (?is)\b(?:welfare\s+eligibility\s+determinations|eligibility\s+assessment|welfare\s+benefits|means\s+test|income\s+support|social\s+assistance|benefit\s+determination|welfare\s+application|eligibility\s+criteria|welfare\s+recipient|benefit\s+entitlement|social\s+welfare)\b
-    - id: Pattern_global_top500_382_welfare_eligibility_determinations_label_context
-      pattern: (?i)\b(?:welfare\s+eligibility\s+determinations)\b
+        (?is)\b(?:welfare\s+(?:benefit\s+)?eligibility\s+(?:determination|decision)|social\s+assistance\s+eligibility\s+(?:determination|decision)|income\s+support\s+eligibility\s+(?:determination|decision))s?\b
+    - id: Evidence_welfare_formal_decision
+      pattern: >-
+        (?i)\b(?:(?:case|claim|application|customer)\s+(?:number|no\.?|reference|ref\.?|ID)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{3,}|decision\s*[:=-]?\s*(?:approved|eligible|ineligible|declined|denied))\b
   keywords:
-    - id: Keyword_welfare_eligibility
+    - id: Evidence_welfare_assessment
       groups:
         - match_style: word
           terms:
-            - welfare eligibility determinations
-            - eligibility assessment
-            - welfare benefits
-            - means test
-            - income support
-            - social assistance
-            - benefit determination
-            - welfare application
-            - eligibility criteria
-            - welfare recipient
-            - benefit entitlement
-            - social welfare
-      strength: specific
-    - id: Keyword_global_top500_382_welfare_eligibility_determinations_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - welfare eligibility determinations
-            - welfare
-            - eligibility
-            - determinations
+            - applicant household
+            - household income
+            - dependant children
+            - dependent children
+            - means test result
+            - eligibility criteria met
+            - eligibility criteria not met
+            - benefit category
+            - assessment outcome
+            - review rights
+            - effective date
       strength: domain
 risk_description: >-
   The detector recognises welfare-benefit determinations, eligibility assessments, and means-test records with government-service context. An actual determination can reveal household income, dependants, disability or hardship indicators, supporting documents, and the agency's decision, creating stigma, fraud targeting, or unfair treatment. The harm is serious for an applicant and household but generally contained to one benefits case and reversible through administrative review. Risk 8 warrants SENSITIVE Personal-Privacy; PROTECTED would require protected addresses, acute safety risks, or large-scale compromise of highly vulnerable recipients.
@@ -127,8 +121,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: Restrict detection to welfare eligibility decisions and add independent assessment plus formal case/decision evidence at calibrated 65/75/85 confidence.
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1928 without changing detector or package metadata.'

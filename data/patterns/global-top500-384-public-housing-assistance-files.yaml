@@ -1,20 +1,26 @@
 schema: testpattern/v1
 name: Public housing assistance files
 slug: global-top500-384-public-housing-assistance-files
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to public housing assistance files in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies individual public or social housing assistance applications, files, cases, and allocation
+  decisions. Topic phrases are retained for discovery; enforcement requires household, income,
+  accommodation, housing-need, bedroom-entitlement, waitlist, priority, subsidy, allocation, or support
+  fields, and high confidence also requires a formal housing reference or recorded decision.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 1 keywords within 240 characters. Keyword
-  lists: industry-education. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_housing_assistance recognises public/social housing, rental assistance, and housing-voucher
+  applications and decisions. The topic alone is discovery-only at 65. Substantive housing-assessment
+  fields raise it to 75; a formal register/application reference or decision reaches 85. Enforcing
+  tiers reject explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:public\s+housing\s+assistance\s+files|housing\s+application|rental\s+assistance|housing\s+voucher|tenant\s+eligibility|housing\s+subsidy|social\s+housing|housing\s+waitlist|accommodation\s+support|housing\s+authority|rent\s+supplement|housing\s+allocation)\b
+  (?is)\b(?:public\s+housing\s+assistance\s+(?:application|file|case)|social\s+housing\s+(?:application|file|case)|rental\s+assistance\s+application|housing\s+voucher\s+application|public\s+housing\s+allocation\s+decision)s?\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires substantive household and housing-assessment fields. High confidence adds
+  a formal register/application reference or recorded decision.
 jurisdictions:
   - global
 regulations:
@@ -31,30 +37,24 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: public housing assistance files
-      description: Primary topic phrase match
-    - value: housing application
-      description: Case-insensitive topic phrase match
-    - value: rental assistance
-      description: Alternative topic phrase match
-    - value: housing voucher
-      description: Additional topic phrase match
+    - value: public housing assistance file
+      description: Low-tier probe - housing-assistance file topic without assessment fields
+    - value: 'Public housing assistance application: applicant household, household income, current accommodation, housing need, bedroom entitlement, waitlist category, priority status, rental subsidy, allocation outcome, and support needs'
+      description: Medium-tier probe - substantive application without formal reference or decision
+    - value: 'Public housing assistance application, housing register number: HOU-2026-104: applicant household, household income, current accommodation, housing need, waitlist category, priority status, allocation outcome, support needs, and decision approved'
+      description: High-tier probe - substantive application with register reference and decision
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: welfare registry
-      description: Generic word pair from old broad template should not match
+    - value: The housing authority publishes its social housing allocation policy.
+      description: Public policy discussion without an individual application
+    - value: The bank received a housing application for a mortgage.
+      description: Private mortgage application outside public housing assistance
+    - value: 'Training example: public housing assistance application HOU-2026-104 with household income, priority status, allocation outcome, and decision approved'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to public housing assistance files appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Housing policy, property-management files, and mortgage applications discuss income, accommodation, priority, allocation, and support without containing a public-housing case.
+    mitigation: Require a public/social housing, rental-assistance, or housing-voucher application or allocation decision before considering assessment fields.
+  - description: Training housing files can contain realistic household details, register references, priority categories, offers, and decisions.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -62,64 +62,56 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 240
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_housing_assistance
+      matches:
+        - ref: Evidence_housing_assessment
+        - ref: Evidence_housing_formal_decision
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_housing_assistance
       matches:
-        - ref: Pattern_global_top500_384_public_housing_assistance_files_label_context
-        - ref: Keyword_global_top500_384_public_housing_assistance_files_domain_context
+        - ref: Evidence_housing_assessment
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_housing_assistance
-      matches:
-        - ref: Keyword_housing_assistance
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_housing_assistance
       pattern: >-
-        (?is)\b(?:public\s+housing\s+assistance\s+files|housing\s+application|rental\s+assistance|housing\s+voucher|tenant\s+eligibility|housing\s+subsidy|social\s+housing|housing\s+waitlist|accommodation\s+support|housing\s+authority|rent\s+supplement|housing\s+allocation)\b
-    - id: Pattern_global_top500_384_public_housing_assistance_files_label_context
-      pattern: (?i)\b(?:public\s+housing\s+assistance\s+files)\b
+        (?is)\b(?:public\s+housing\s+assistance\s+(?:application|file|case)|social\s+housing\s+(?:application|file|case)|rental\s+assistance\s+application|housing\s+voucher\s+application|public\s+housing\s+allocation\s+decision)s?\b
+    - id: Evidence_housing_formal_decision
+      pattern: >-
+        (?i)\b(?:(?:application|case|housing\s+register|property\s+offer)\s+(?:number|no\.?|reference|ref\.?|ID)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{3,}|decision\s*[:=-]?\s*(?:approved|eligible|declined|denied|waitlisted|allocated))\b
   keywords:
-    - id: Keyword_housing_assistance
+    - id: Evidence_housing_assessment
       groups:
         - match_style: word
           terms:
-            - public housing assistance files
-            - housing application
-            - rental assistance
-            - housing voucher
-            - tenant eligibility
-            - housing subsidy
-            - social housing
-            - housing waitlist
-            - accommodation support
-            - housing authority
-            - rent supplement
-            - housing allocation
-      strength: specific
-    - id: Keyword_global_top500_384_public_housing_assistance_files_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - public housing assistance files
-            - public
-            - housing
-            - assistance
-            - files
+            - applicant household
+            - household income
+            - current accommodation
+            - housing need
+            - bedroom entitlement
+            - waitlist category
+            - priority status
+            - rental subsidy
+            - allocation outcome
+            - support needs
       strength: domain
 risk_description: >-
   The classifier finds housing applications, rental-assistance records, housing vouchers, and public-housing files with government-service context. A genuine file may contain household members, income, disability or safety needs, current address, arrears, and reasons for housing insecurity, enabling fraud, stigma, or unwanted location disclosure. The ordinary case creates serious harm for one vulnerable household but does not automatically reveal a protected refuge or an entire tenant register. Risk 8 supports SENSITIVE Personal-Privacy; PROTECTED would require confidential safe accommodation, an active threat, or broad compromise of high-risk applicants.
@@ -132,8 +124,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: Restrict detection to public housing assistance cases and add independent housing assessment plus formal register/decision evidence at calibrated 65/75/85 confidence.
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1930 without changing detector or package metadata.'
