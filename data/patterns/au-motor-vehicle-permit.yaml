@@ -1,20 +1,26 @@
 schema: testpattern/v1
-name: Australian Motor Vehicle Permit
+name: Australian Driver's Licence Number
 slug: au-motor-vehicle-permit
-version: 2.4.0
+version: 2.5.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Identifies Australian driver's licence numbers across all 8 states and territories using state-specific digit/letter formats. State context provided via regex-based jurisdiction matching rather than
-  keyword lists. Includes generic fallback tier.
+  Identifies Australian driver's licence numbers across all 8 states and territories using state-specific digit/letter
+  formats (NSW 8-digit / 4+2 letter forms, QLD/VIC 8-10 digit, SA letter+digits, WA/NT/TAS 6-8 digit, ACT 10 digit, and
+  related jurisdiction shapes). State context is supplied via jurisdiction and agency regexes rather than keyword-only
+  lists. A generic fallback shape is discovery-only and is gated against AU mobile-number overmatch. The stable slug
+  au-motor-vehicle-permit is retained for catalog compatibility; this detector is a driver's-licence identifier, not a
+  separate vehicle-permit product.
 operation: >-
-  State-specific regexes for each jurisdiction's licence format combined with a consolidated permit-term keyword list and jurisdiction agency keyword list. State context uses regex patterns for state
-  names and abbreviations rather than keyword lists. Per-jurisdiction confidence tiers: state format + permit terms + matching jurisdiction + agency keywords with template exclusion (85), state format
-  + permit terms + matching jurisdiction (75); the generic fallback shape is discovery-only (65) with broad permit terms and an AU mobile-number NONE-of gate.
+  State-specific regexes for each jurisdiction's licence format combined with a consolidated licence/permit-term keyword
+  list and jurisdiction agency keyword list. State context uses regex patterns for state names and abbreviations rather
+  than keyword lists. Per-jurisdiction confidence tiers: state format + licence terms + matching jurisdiction + agency
+  keywords with template exclusion (85), state format + licence terms + matching jurisdiction (75); the generic fallback
+  shape is discovery-only (65) with broad licence terms and an AU mobile-number NONE-of gate.
 pattern: \b(?:(?!0{8}\b)\d{8}|\d{4}[A-Z]{2})\b
 confidence: low
-confidence_justification: 'Low confidence: generic digit patterns match many non-licence identifiers. State-specific regex combined with permit-term and jurisdiction-agency keywords essential for reliable detection.'
+confidence_justification: 'Low confidence: generic digit patterns match many non-licence identifiers. State-specific regex combined with licence-term and jurisdiction-agency keywords essential for reliable detection.'
 jurisdictions:
   - au
 regulations:
@@ -37,7 +43,7 @@ corroborative_evidence:
     - licence number
     - license number
     - driving licence
-    - motor vehicle permit
+    - driver licence number
   proximity: 300
   keyword_lists:
     - au-vehicle-permit-terms
@@ -71,11 +77,13 @@ test_cases:
       description: Australian mobile number must be suppressed by the AU mobile-number NONE-of gate and must not reach an enforceable tier
 false_positives:
   - description: Generic numeric sequences matching licence digit counts.
-    mitigation: Require permit-term keywords and state context for reliable detection.
+    mitigation: Require licence-term keywords and state context for reliable detection.
   - description: Australian mobile telephone numbers can satisfy the generic 10-digit licence fallback and caused material overmatch.
-    mitigation: Use the AU mobile number NONE-of regex gate on permit-number tiers where phone numbers are not valid positive evidence.
+    mitigation: Use the AU mobile number NONE-of regex gate on licence-number tiers where phone numbers are not valid positive evidence.
   - description: Policy documents discussing licence formats without actual data.
     mitigation: Layer with form-field or database-column context signals.
+  - description: Case-insensitive state abbreviations (SA, WA, ACT) can match ordinary English words.
+    mitigation: Enforce tiers require licence terms in addition to jurisdiction regexes; treat bare jurisdiction hits as insufficient.
 regional_tuning:
   - jurisdiction: au
     signal: au-mobile-number-overmatch-numeric-id-20260525
@@ -92,7 +100,12 @@ exports:
 scope: wide
 risk_rating: 5
 risk_description: >-
-  This detector recognises one Australian state or territory driver-licence or motor-vehicle permit number through jurisdiction-specific formats. If tied to the holder, the identifier can strengthen identity verification fraud or help correlate transport and licensing correspondence. The number alone is not a licence image, does not reveal driving history, and cannot authenticate a person without additional evidence; low-confidence formats may also collide with mobile or account numbers. Risk 5 and OFFICIAL represent the bounded credential-reference risk of the atomic identifier.
+  This detector recognises one Australian state or territory driver's licence number through jurisdiction-specific
+  formats. If tied to the holder, the identifier can strengthen identity verification fraud or help correlate transport
+  and licensing correspondence. The number alone is not a licence image, does not reveal driving history, and cannot
+  authenticate a person without additional evidence; low-confidence formats may also collide with mobile or account
+  numbers. Risk 5 and OFFICIAL represent the bounded credential-reference risk of the atomic identifier. The catalog
+  slug remains au-motor-vehicle-permit for compatibility only.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -353,8 +366,15 @@ purview:
         - "123456789"
         - "1234567890"
 created: '2026-02-08'
-updated: '2026-07-16'
+updated: '2026-07-18'
 changelog:
+  - version: 2.5.0
+    date: '2026-07-18'
+    description: >-
+      Adversarial accuracy pass: rename display name to Australian Driver's Licence Number and rewrite description/
+      risk_description/operation to match the actual state licence-format detectors. Keep slug au-motor-vehicle-permit
+      as the stable catalog ID for package and workbook compatibility. Prefer driver-licence corroborative keywords;
+      document SA/WA/ACT case-insensitive abbreviation FP residual. Detection regexes and tier wiring unchanged.
   - version: 2.4.0
     date: '2026-07-16'
     description: >-

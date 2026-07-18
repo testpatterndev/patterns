@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: US Passport Number
 slug: us-passport-number
-version: 1.4.0
+version: 1.4.1
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -9,10 +9,11 @@ description: >-
   Detects US passport numbers in exactly two accepted formats: a nine-digit numeric value (older US passports), or a
   single uppercase letter followed by exactly eight digits (newer passport books and cards). Bare eight-digit values
   and letter-plus-nine-digit values are not valid US passport numbers. Due to the relatively simple format,
-  corroborative keyword proximity is strongly recommended to reduce false positives.
+  corroborative keyword proximity is strongly recommended to reduce false positives. Keywords are US-scoped
+  (passport / US passport / State Department); foreign-passport labels are not treated as US passport evidence.
 operation: >-
   Reference: https://travel.state.gov/content/travel/en/passports/passport-help/next-generation-passport.html
-  Corroborative evidence: 5 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Corroborative evidence: US-scoped passport and travel-document keywords within 300 characters. Keyword lists: pii-civic-credentials.
 pattern: \b(?:[A-Z]\d{8}|\d{9})\b
 confidence: medium
 confidence_justification: >-
@@ -38,7 +39,7 @@ corroborative_evidence:
     - passport number
     - passport no
     - travel document
-    - australian passport
+    - US passport
   proximity: 300
   keyword_lists:
 
@@ -60,6 +61,8 @@ test_cases:
       description: Bare eight-digit value is the unsupported short cross-product (only letter + 8 digits or 9 digits are valid)
     - value: A123456789
       description: Letter plus nine digits is the unsupported long cross-product
+    - value: 'Australian passport A12345678'
+      description: AU-labelled passport number is excluded by foreign-passport noise NOT-group (AU passport is a different SIT)
 false_positives:
   - description: Other 8-9 digit numbers such as order IDs, reference codes, phone numbers, and account identifiers
     mitigation: >-
@@ -91,6 +94,7 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_us_passport_foreign
     - confidence_level: 75
       id_match: Regex_us_passport
       matches:
@@ -100,9 +104,16 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_us_passport_foreign
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_us_passport
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_us_passport_foreign
   regexes:
     - id: Regex_us_passport
       pattern: \b(?:[A-Z]\d{8}|\d{9})\b
@@ -138,6 +149,19 @@ purview:
             - consulate
             - embassy
       strength: domain
+    - id: Keyword_us_passport_foreign
+      groups:
+        - match_style: word
+          terms:
+            - Australian passport
+            - Mexico passport
+            - Mexican passport
+            - Canadian passport
+            - British passport
+            - UK passport
+            - NZ passport
+            - New Zealand passport
+      strength: domain
   filters:
     - id: Guard_us_passport_same_digits
       type: AllDigitsSameFilter
@@ -152,8 +176,15 @@ sensitivity_labels:
   nz_gov: "RESTRICTED"
   ca_gov: "Protected B"
 created: '2026-02-08'
-updated: '2026-07-16'
+updated: '2026-07-18'
 changelog:
+  - version: 1.4.1
+    date: '2026-07-18'
+    description: >-
+      Adversarial accuracy pass: remove the non-US corroborative keyword "australian passport" (a US SIT must not
+      treat foreign-passport labels as positive evidence) and replace it with "US passport". Add Keyword_us_passport_foreign
+      NOT-group (Australian/Mexican/Canadian/British/UK/NZ passport labels) on 85/75/65 so foreign-labelled values do not
+      enforce or inventory as US passport. Added foreign-passport decoy negative.
   - version: 1.4.0
     date: '2026-07-16'
     description: >-

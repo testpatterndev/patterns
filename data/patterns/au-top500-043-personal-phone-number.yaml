@@ -1,19 +1,21 @@
 schema: testpattern/v1
 name: Personal phone number
 slug: au-top500-043-personal-phone-number
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
   Identifies documents containing references to personal phone number in Australian contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations. Phrase-level concept detector: it matches contact-number wording, not telephone digits; generic telephone/contact/direct-dial labels without a personal qualifier are
+  protection regulations. Phrase-level concept detector: it matches contact-number wording, not telephone digits.
+  Enforcing tiers require a personal/home qualifier (personal phone number, home phone, personal mobile, call-back
+  number, phone contact). Bare mobile/cell/telephone/contact/SMS/direct-dial labels without that qualifier are
   discovery-only.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
   lists: au-telecom-terms, phone-international. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
 pattern: >-
-  (?is)\b(?:personal\s+phone\s+number|mobile\s+number|cell\s+number|telephone\s+number|contact\s+number|home\s+phone|phone\s+contact|call\s+back\s+number|SMS\s+number|direct\s+dial|personal\s+mobile)\b
+  (?is)\b(?:personal\s+phone\s+number|home\s+phone|phone\s+contact|call\s+back\s+number|personal\s+mobile)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
@@ -49,13 +51,17 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: personal phone number
-      description: Primary topic phrase match
+      description: Primary personal-qualified topic phrase match (enforce-eligible)
+    - value: home phone
+      description: Home-qualified phone label (enforce-eligible)
+    - value: personal mobile
+      description: Personal-qualified mobile label (enforce-eligible)
+    - value: call back number
+      description: Call-back number label (enforce-eligible)
     - value: mobile number
-      description: Case-insensitive topic phrase match
-    - value: cell number
-      description: Alternative topic phrase match
+      description: Bare mobile label still matches discovery-only generic branch
     - value: telephone number
-      description: Additional topic phrase match
+      description: Bare telephone label still matches discovery-only generic branch
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -67,6 +73,10 @@ test_cases:
       description: Corporate switchboard decoy — generic telephone label must not reach the enforcing personal-phone tiers
     - value: Shared service desk contact number for IT support.
       description: Shared service-desk decoy — generic contact label must not reach the enforcing personal-phone tiers
+    - value: Staff directory mobile number for the service desk.
+      description: Bare mobile number without personal/home qualifier must not reach enforcing personal-phone tiers
+    - value: Handset cell number printed on the asset tag.
+      description: Bare cell number without personal qualifier must not reach enforcing personal-phone tiers
 false_positives:
   - description: Common words and phrases related to personal phone number appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -114,13 +124,13 @@ purview:
     - confidence_level: 65
       id_match: Pattern_phone_generic_label
       discovery_only: true
-      description: Generic telephone/contact/direct-dial/SMS labels without a personal qualifier — discovery inventory only
+      description: Generic mobile/cell/telephone/contact/direct-dial/SMS labels without a personal/home qualifier — discovery inventory only
   regexes:
     - id: Pattern_personal_phone
       pattern: >-
-        (?is)\b(?:personal\s+phone\s+number|mobile\s+number|cell\s+number|home\s+phone|phone\s+contact|call\s+back\s+number|personal\s+mobile)\b
+        (?is)\b(?:personal\s+phone\s+number|home\s+phone|phone\s+contact|call\s+back\s+number|personal\s+mobile)\b
     - id: Pattern_phone_generic_label
-      pattern: (?is)\b(?:telephone\s+number|contact\s+number|SMS\s+number|direct\s+dial)\b
+      pattern: (?is)\b(?:mobile\s+number|cell\s+number|telephone\s+number|contact\s+number|SMS\s+number|direct\s+dial)\b
     - id: Pattern_au_top500_043_personal_phone_number_label_context
       pattern: (?i)\b(?:personal\s+phone\s+number)\b
   keywords:
@@ -129,17 +139,13 @@ purview:
         - match_style: word
           terms:
             - personal phone number
-            - mobile number
-            - cell number
-            - telephone number
-            - contact number
             - home phone
             - landline
             - phone contact
             - call back number
-            - SMS number
-            - direct dial
             - personal mobile
+            - private mobile
+            - home mobile
     - id: Keyword_au_top500_043_personal_phone_number_domain_context
       groups:
         - match_style: word
@@ -148,7 +154,7 @@ purview:
             - personal
             - phone
 risk_description: >-
-  The Australian Personal phone number concept regex detects labels including personal phone number, mobile number, home phone, and call-back number. It does not parse telephone digits or establish a subscriber, so blank contact forms, database headings, and process instructions are normal matches. A completed number linked to a person could enable nuisance contact, smishing, or social engineering, but those elements are not supplied by the phrase alone. Risk 3 and OFFICIAL reflect negligible standalone disclosure, with an actual person-linked contact route setting the SENSITIVE threshold.
+  The Australian Personal phone number concept regex detects personal/home-qualified contact labels (personal phone number, home phone, personal mobile, call-back number). It does not parse telephone digits or establish a subscriber, so blank contact forms and database headings with those labels are normal matches. Bare mobile/cell/telephone labels remain discovery-only so corporate directories do not enforce as personal phone. Risk 3 and OFFICIAL reflect negligible standalone disclosure, with an actual person-linked contact route setting the SENSITIVE threshold.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -158,8 +164,15 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-17'
+updated: '2026-07-18'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-18'
+    description: >-
+      Adversarial accuracy pass completing the reduced-scope intent: move bare mobile number / cell number out of
+      Pattern_personal_phone into Pattern_phone_generic_label (discovery-only 65), trim Evidence_personal_phone to
+      personal/home-qualified terms so same-span generic labels cannot re-open enforce tiers, align the top-level
+      pattern, and add bare-mobile/cell decoy negatives. Generic telephone/contact/SMS/direct-dial remain discovery-only.
   - version: 1.4.0
     date: '2026-07-17'
     description: 'TP-00171 approved reduced scope: retain concept-class semantics (no digit parser — a separate AU phone identifier SIT is the right home for value extraction). Split the generic telephone number / contact number / SMS number / direct dial alternatives out of Pattern_personal_phone into a new Pattern_phone_generic_label branch wired to a discovery-only 65 tier, so labels without a personal/home/mobile qualifier no longer reach the enforcing tiers via identical same-span evidence. Top-level universal-engine pattern and Evidence_personal_phone unchanged. Clarified phrase-level concept behaviour in the description. Added corporate-switchboard and shared-service-desk decoy negatives.'
