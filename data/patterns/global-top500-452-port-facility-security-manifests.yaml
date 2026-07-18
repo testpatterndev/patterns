@@ -1,26 +1,32 @@
 schema: testpattern/v1
 name: Port facility security manifests
 slug: global-top500-452-port-facility-security-manifests
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to port facility security manifests in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies substantive port-facility security and access manifests. Topic phrases are retained for
+  discovery; enforcement requires vessel, port-call, berth, cargo, crew, visitor, escort, access-zone,
+  gate, or security-level manifest content, and high confidence also requires a populated IMO, port-call,
+  manifest, berth, zone, or ISPS security-level identifier.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_port_facility_security recognises port security/access manifest topics. The topic alone is
+  discovery-only at 65. Vessel, port-call, berth, cargo, crew, visitor, escort, access-zone, gate, or
+  security-level content raises it to 75; populated operational identifiers reach 85. Enforcing tiers
+  reject explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:port\s+facility|security\s+manifest|maritime\s+security|ISPS\s+code|vessel\s+security|port\s+security\s+plan|cargo\s+manifest|berth\s+allocation|facility\s+security\s+officer|maritime\s+transport|port\s+access\s+control)\b
+  (?is)\b(?:port\s+facility\s+security\s+manifest|port\s+security\s+manifest|maritime\s+security\s+manifest|port\s+facility\s+access\s+manifest|port\s+security\s+access\s+manifest)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires populated manifest fields rather than maritime-security discussion. High
+  confidence adds a formal vessel, port-call, berth, zone, manifest, or ISPS identifier.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - port facility security manifests
@@ -34,14 +40,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: port facility
-      description: Primary topic phrase match
-    - value: security manifest
-      description: Case-insensitive topic phrase match
-    - value: maritime security
-      description: Alternative topic phrase match
-    - value: ISPS code
-      description: Additional topic phrase match
+    - value: port facility security manifest
+      description: Low-tier probe - manifest topic without record fields
+    - value: 'Port facility security manifest lists vessel name, berth allocation, cargo description, crew access zone, visitor list, and escort requirement'
+      description: Medium-tier probe - substantive manifest fields without formal identifiers
+    - value: 'Port facility security manifest MF-204: vessel name Southern Star, IMO 9876543, port call ID: PC-771, berth ID: B-04, access zone ID: Z-3, ISPS security level 2'
+      description: High-tier probe - manifest fields with vessel, port-call, berth, zone, and ISPS identifiers
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -49,15 +53,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: maritime route
       description: Generic word pair from old broad template should not match
+    - value: 'The public ISPS guide explains port facility security responsibilities.'
+      description: Public maritime-security guidance without a manifest
+    - value: 'Training example: port facility security manifest MF-204, IMO 9876543, berth B-04, ISPS security level 2'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to port facility security manifests appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: ISPS guidance, port-security plans, cargo documents, and maritime training discuss vessels, berths, access, and security levels without containing a facility security manifest.
+    mitigation: Keep manifest topics discovery-only and require vessel, port-call, berth, cargo, crew, visitor, escort, access-zone, gate, or security-level fields for enforcement.
+  - description: Exercises can include realistic IMO numbers, manifest IDs, port calls, berths, zones, and security levels.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -65,64 +69,58 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_port_facility_security
+      matches:
+        - ref: Evidence_port_manifest_field
+        - ref: Evidence_port_manifest_identifier
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_port_facility_security
       matches:
-        - ref: Pattern_global_top500_452_port_facility_security_manifests_label_context
-        - ref: Keyword_global_top500_452_port_facility_security_manifests_domain_context
+        - ref: Evidence_port_manifest_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_port_facility_security
-      matches:
-        - ref: Keyword_port_facility_security
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_port_facility_security
       pattern: >-
-        (?is)\b(?:port\s+facility|security\s+manifest|maritime\s+security|ISPS\s+code|vessel\s+security|port\s+security\s+plan|cargo\s+manifest|berth\s+allocation|facility\s+security\s+officer|maritime\s+transport|port\s+access\s+control)\b
-    - id: Pattern_global_top500_452_port_facility_security_manifests_label_context
-      pattern: (?i)\b(?:port\s+facility\s+security\s+manifests)\b
+        (?is)\b(?:port\s+facility\s+security\s+manifest|port\s+security\s+manifest|maritime\s+security\s+manifest|port\s+facility\s+access\s+manifest|port\s+security\s+access\s+manifest)\b
+    - id: Evidence_port_manifest_identifier
+      pattern: >-
+        (?i)\b(?:IMO\s*(?:number|no\.?)?\s*[:#]?\s*\d{7}|(?:port\s+call|manifest|berth|access\s+zone)\s*(?:ID|number|no\.?)?\s*[:#-]\s*[A-Z0-9][A-Z0-9._/-]{2,}|ISPS\s+security\s+level\s+[1-3])\b
   keywords:
-    - id: Keyword_port_facility_security
+    - id: Evidence_port_manifest_field
       groups:
         - match_style: word
           terms:
-            - port facility
-            - security manifest
-            - maritime security
-            - ISPS code
-            - vessel security
-            - port security plan
-            - cargo manifest
+            - vessel name
+            - port call
             - berth allocation
-            - ship-to-shore
-            - facility security officer
-            - maritime transport
-            - port access control
-      strength: specific
-    - id: Keyword_global_top500_452_port_facility_security_manifests_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - port facility security manifests
-            - port
-            - facility
-            - security
-            - manifests
+            - cargo description
+            - crew list
+            - visitor list
+            - access zone
+            - escort requirement
+            - security level
+            - gate access
+            - arrival time
+            - departure time
       strength: domain
 risk_description: >-
   This regex flags port facilities, security manifests, maritime security, ISPS codes, vessel security, port plans, cargo manifests, berth allocation, security officers, transport, and access control rather than validating a manifest schema. A real security manifest can expose vessels, cargo, berths, access arrangements, responsible officers, and security measures, enabling theft, smuggling, unauthorized entry, or targeted disruption. The normal unit is one port call or facility and its operators, crews, and cargo owners, while maritime rules, training, and public port guidance can trigger the same vocabulary. Risk 8 and SENSITIVE reflect serious contained physical-security harm; PROTECTED would require critical cargo, protected operations, or actionable plans whose loss could cause significant infrastructure or life-safety damage.
@@ -135,8 +133,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: restrict the primary to port security/access manifests; require vessel, berth, cargo, crew, visitor, escort, zone, gate, or security-level fields at 75 and formal operational identifiers at 85.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1992 without changing detector or package metadata.'

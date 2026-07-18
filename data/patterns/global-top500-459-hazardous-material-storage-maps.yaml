@@ -1,26 +1,33 @@
 schema: testpattern/v1
 name: Hazardous material storage maps
 slug: global-top500-459-hazardous-material-storage-maps
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to hazardous material storage maps in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies substantive hazardous-material, dangerous-goods, and chemical storage maps. Topic phrases
+  are retained for discovery; enforcement requires storage-area, containment-zone, chemical-name,
+  dangerous-goods-class, segregation, spill-containment, or emergency-isolation relationships, and high
+  confidence also requires a populated UN number, tank/store/cabinet/area identifier, or quantity.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_hazmat_storage recognises hazardous-material, hazmat, dangerous-goods, chemical-location, and
+  hazardous-chemical inventory map topics. The topic alone is discovery-only at 65. Actual chemical,
+  storage, containment, segregation, or emergency-isolation relationships raise it to 75; populated UN,
+  location, vessel, or quantity values reach 85. Enforcing tiers reject explicit templates and training.
 pattern: >-
-  (?is)\b(?:hazardous\s+material|hazmat\s+storage|chemical\s+storage|dangerous\s+goods|material\s+safety\s+data\s+sheet|storage\s+location|containment\s+area|safety\s+zone|emergency\s+response|spill\s+containment|critical\s+infrastructure|storage\s+facility)\b
+  (?is)\b(?:hazardous\s+material\s+storage\s+map|hazmat\s+storage\s+map|dangerous\s+goods\s+storage\s+map|chemical\s+storage\s+location\s+map|hazardous\s+chemical\s+inventory\s+map)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires mapped chemical, storage, containment, or segregation relationships. High
+  confidence adds populated chemical, vessel/location, or quantity values.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - location
+  - security
 corroborative_evidence:
   keywords:
     - hazardous material storage maps
@@ -34,14 +41,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: hazardous material
-      description: Primary topic phrase match
-    - value: hazmat storage
-      description: Case-insensitive topic phrase match
-    - value: chemical storage
-      description: Alternative topic phrase match
-    - value: dangerous goods
-      description: Additional topic phrase match
+    - value: hazardous material storage map
+      description: Low-tier probe - map topic without storage relationships
+    - value: 'Hazardous material storage map shows chemical name, dangerous goods class, storage area, containment zone, segregation requirement, spill containment, and emergency isolation'
+      description: Medium-tier probe - substantive storage relationships without populated identifiers or quantities
+    - value: 'Hazardous material storage map: UN 1017 chlorine, 12 tonnes, tank ID: T-04 in storage area ID: A-7, containment zone CZ-2, emergency isolation valve'
+      description: High-tier probe - storage relationships with chemical, quantity, tank, area, and containment detail
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -49,15 +54,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: hazardous material storage
       description: Generic word pair from old broad template should not match
+    - value: 'The safety data sheet explains general storage precautions for chlorine.'
+      description: Product safety guidance without a site storage map
+    - value: 'Training example: hazardous material storage map UN 1017, 12 tonnes, tank T-04, area A-7'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to hazardous material storage maps appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Safety data sheets, dangerous-goods guidance, and emergency procedures discuss chemicals, storage, containment, segregation, and isolation without exposing a site map.
+    mitigation: Keep map topics discovery-only and require storage-area, containment-zone, chemical-name, class, segregation, spill-containment, or emergency-isolation relationships for enforcement.
+  - description: Training maps can include realistic UN numbers, tank and area IDs, quantities, and containment zones.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -65,17 +70,26 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_hazmat_storage
+      matches:
+        - ref: Evidence_hazmat_map_relationship
+        - ref: Evidence_hazmat_populated_value
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_hazmat_storage
       matches:
-        - ref: Pattern_global_top500_459_hazardous_material_storage_maps_label_context
-        - ref: Keyword_global_top500_459_hazardous_material_storage_maps_domain_context
+        - ref: Evidence_hazmat_map_relationship
         - type: any
           min_matches: 0
           max_matches: 0
@@ -84,46 +98,28 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_hazmat_storage
-      matches:
-        - ref: Keyword_hazmat_storage
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_hazmat_storage
       pattern: >-
-        (?is)\b(?:hazardous\s+material|hazmat\s+storage|chemical\s+storage|dangerous\s+goods|material\s+safety\s+data\s+sheet|storage\s+location|containment\s+area|safety\s+zone|emergency\s+response|spill\s+containment|critical\s+infrastructure|storage\s+facility)\b
-    - id: Pattern_global_top500_459_hazardous_material_storage_maps_label_context
-      pattern: (?i)\b(?:hazardous\s+material\s+storage\s+maps)\b
+        (?is)\b(?:hazardous\s+material\s+storage\s+map|hazmat\s+storage\s+map|dangerous\s+goods\s+storage\s+map|chemical\s+storage\s+location\s+map|hazardous\s+chemical\s+inventory\s+map)\b
+    - id: Evidence_hazmat_populated_value
+      pattern: >-
+        (?i)\b(?:UN\s?\d{4}|(?:tank|store|cabinet|area|location)\s*(?:ID|number|no\.?)?\s*[:#-]\s*[A-Z0-9][A-Z0-9._-]{2,}|\d+(?:\.\d+)?\s*(?:kg|L|litres?|tonnes?|m3))\b
   keywords:
-    - id: Keyword_hazmat_storage
+    - id: Evidence_hazmat_map_relationship
       groups:
         - match_style: word
           terms:
-            - hazardous material
-            - hazmat storage
-            - chemical storage
-            - dangerous goods
-            - material safety data sheet
-            - storage location
-            - containment area
-            - safety zone
-            - emergency response
+            - chemical name
+            - dangerous goods class
+            - storage area
+            - containment zone
+            - segregation requirement
             - spill containment
-            - critical infrastructure
-            - storage facility
-      strength: specific
-    - id: Keyword_global_top500_459_hazardous_material_storage_maps_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - hazardous material storage maps
-            - hazardous
-            - material
-            - storage
-            - maps
+            - emergency isolation
+            - tank farm
+            - storage cabinet
+            - exclusion zone
       strength: domain
 risk_description: >-
   The pattern finds hazardous-material, chemical-storage, containment-area, safety-zone, and storage-location concepts with nearby infrastructure context; it does not require coordinates or an actual map. A genuine storage map can reveal chemical type locations, containment arrangements, and emergency zones that support theft, sabotage, unsafe access, or deliberate release. Harm is normally serious for workers, responders, nearby communities, and one facility, while safety procedures and material-handling guidance can match without exposing locations. Risk 8 and SENSITIVE are justified; PROTECTED would require precise inventories and access details at a site where compromise creates a credible mass-casualty or major critical-service scenario.
@@ -136,8 +132,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: restrict the primary to hazardous-material storage maps; require chemical, storage, containment, segregation, or isolation relationships at 75 and populated UN, location, vessel, or quantity values at 85.'
   - version: 1.2.2
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1999 without changing detector or package metadata.'

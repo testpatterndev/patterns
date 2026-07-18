@@ -1,25 +1,34 @@
 schema: testpattern/v1
 name: Emergency restoration prioritization plans
 slug: global-top500-454-emergency-restoration-prioritization-plans
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to emergency restoration prioritization plans in international contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
+  Identifies substantive emergency and critical-service restoration prioritisation plans. Topic phrases
+  are retained for discovery; enforcement requires ranked assets/services, restoration sequence,
+  dependencies, alternate supply, crew assignment, affected sites, service areas, or estimated
+  restoration content, and high confidence also requires a populated priority, asset/site identifier,
+  time, capacity, or customer-impact value.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 8 keywords within 300 characters. Uses additional domain-context
-  evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?i)\b(?:emergency\s+restoration|restoration\s+priority|service\s+restoration)\b
+  Regex_emergency_restoration recognises emergency, service, outage, and critical-service restoration
+  priority-plan topics. The topic alone is discovery-only at 65. Ranked service/asset, sequence,
+  dependency, supply, crew, site, service-area, or estimate content raises it to 75; populated
+  priorities, identifiers, timing, capacity, or customer values reach 85. Enforcing tiers reject
+  explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:emergency\s+restoration\s+prioriti[sz]ation\s+plan|emergency\s+service\s+restoration\s+plan|critical\s+service\s+restoration\s+priority\s+plan|outage\s+restoration\s+prioriti[sz]ation\s+plan)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires actual prioritisation and dependency content. High confidence adds
+  populated operational priorities, identifiers, timing, capacity, or customer-impact values.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - emergency restoration prioritization plans
@@ -33,32 +42,26 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: 'Emergency restoration'
-      description: Topic phrase present
-    - value: 'emergency restoration'
-      description: Topic phrase, lowercase
-    - value: 'this record references the emergency restoration held on file'
-      description: Topic phrase within surrounding text
+    - value: emergency restoration prioritization plan
+      description: Low-tier probe - plan topic without restoration priorities
+    - value: 'Emergency restoration prioritization plan ranks essential services, restoration sequence, dependencies, alternate supply, crew assignment, affected sites, and service areas'
+      description: Medium-tier probe - substantive prioritisation without populated operational values
+    - value: 'Emergency restoration prioritization plan: priority 1 asset ID: SUB-04, feeder ID: F12, estimated restoration time 3 hours, alternate supply 25 MW, 18000 customers affected'
+      description: High-tier probe - prioritisation with asset, feeder, time, capacity, and customer values
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
     - value: placeholder value 12345
       description: Random text should not match phrase marker
-    - value: generic policy prose without anchors
-      description: Should reject generic mentions without structural anchor terms
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: 'The public disaster guide discusses general service restoration principles.'
+      description: Public guidance without a prioritisation plan
+    - value: 'Training example: emergency restoration prioritization plan priority 1 asset SUB-04, restoration time 3 hours'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: >-
-      Common words and phrases related to emergency restoration prioritization plans appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal
-      data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Public resilience guidance and exercises discuss emergency restoration, dependencies, essential services, and priorities without exposing a live restoration order.
+    mitigation: Keep plan topics discovery-only and require ranked services/assets, restoration sequence, dependencies, alternate supply, crew, site, service-area, or estimate content for enforcement.
+  - description: Exercises can include realistic priorities, asset and feeder IDs, restoration times, capacities, and customer counts.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -66,17 +69,17 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 85
       id_match: Regex_emergency_restoration
       matches:
-        - ref: Pattern_global_top500_454_emergency_restoration_prioritization_plans_label_context
-        - ref: Keyword_global_top500_454_emergency_restoration_prioritization_plans_domain_context
+        - ref: Evidence_restoration_priority_content
+        - ref: Evidence_restoration_live_value
         - type: any
           min_matches: 0
           max_matches: 0
@@ -85,7 +88,7 @@ purview:
     - confidence_level: 75
       id_match: Regex_emergency_restoration
       matches:
-        - ref: Keyword_emergency_restoration
+        - ref: Evidence_restoration_priority_content
         - type: any
           min_matches: 0
           max_matches: 0
@@ -102,36 +105,27 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_emergency_restoration
-      pattern: (?i)\b(?:emergency\s+restoration|restoration\s+priority|service\s+restoration)\b
-    - id: Pattern_global_top500_454_emergency_restoration_prioritization_plans_label_context
-      pattern: (?i)\b(?:emergency\s+restoration\s+prioritization\s+plans)\b
+      pattern: >-
+        (?is)\b(?:emergency\s+restoration\s+prioriti[sz]ation\s+plan|emergency\s+service\s+restoration\s+plan|critical\s+service\s+restoration\s+priority\s+plan|outage\s+restoration\s+prioriti[sz]ation\s+plan)\b
+    - id: Evidence_restoration_live_value
+      pattern: >-
+        (?i)\b(?:priority\s*[1-9]\d*|(?:asset|site|substation|feeder|plant|service)\s*(?:ID|code)?\s*[:#-]\s*[A-Z0-9][A-Z0-9._-]{2,}|\d+(?:\.\d+)?\s*(?:minutes?|hours?|MW|customers?))\b
   keywords:
-    - id: Keyword_emergency_restoration
+    - id: Evidence_restoration_priority_content
       groups:
         - match_style: word
           terms:
-            - emergency restoration
-            - restoration priority
-            - service restoration
-            - disaster recovery
-            - business continuity
-            - recovery time objective
-            - critical infrastructure
-            - prioritization plan
-            - outage management
-            - incident response
+            - ranked asset
+            - ranked service
+            - essential service
             - restoration sequence
-            - essential services
-      strength: specific
-    - id: Keyword_global_top500_454_emergency_restoration_prioritization_plans_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - emergency restoration prioritization plans
-            - emergency
-            - restoration
-            - prioritization
-            - plans
+            - dependency
+            - alternate supply
+            - crew assignment
+            - affected site
+            - service area
+            - estimated restoration time
+            - recovery time objective
       strength: domain
 risk_description: >-
   This wide concept pattern recognises emergency restoration, restoration priority, and service restoration language rather than verifying that a complete command plan or outage schedule has been found. A real prioritisation plan can disclose which services, dependencies, sites, and customer groups will be restored first, allowing an adversary to time disruption or prolong harm at lower-priority points. The normal impact is serious for the affected utility or service area but still bounded, while public resilience guidance and exercises can trigger the same terminology. Risk 8 and SENSITIVE are appropriate; PROTECTED would require current multi-service restoration sequencing whose loss could produce significant regional damage, sustained critical-service failure, or life-safety effects.
@@ -144,8 +138,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: restrict the primary to emergency restoration priority plans; require ranked services/assets, sequence, dependencies, supply, crew, site, or estimate content at 75 and populated priorities, identifiers, timing, capacity, or customer values at 85.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1994 without changing detector or package metadata.'
