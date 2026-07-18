@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: CI/CD pipeline configurations
 slug: au-top500-245-ci-cd-pipeline-configurations
-version: 1.4.0
+version: 1.4.1
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -57,6 +57,13 @@ test_cases:
               - uses: actions/checkout@v4
               - run: npm test
       description: Actual pipeline definition with job, runner, steps, action, and command (structure branch)
+    - value: |-
+        jobs:
+          deploy:
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@v4
+      description: Structural key at byte 0 (no preceding newline) must still match the structure branch
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -110,8 +117,8 @@ purview:
         (?is)\b(?:CI\/CD\s+pipeline|pipeline\s+configuration|build\s+pipeline|deployment\s+pipeline|continuous\s+integration|continuous\s+delivery|pipeline\s+definition|build\s+configuration|pipeline\s+stages|pipeline\s+secrets)\b
     - id: Pattern_cicd_structure
       pattern: >-
-        (?i)(?<=\n)(?:jobs:|stages:|steps:|on:|trigger:|pool:|variables:|[ \t]{2,12}runs-on:|[ \t]{2,12}(?:script|run|uses|image|needs):)
-      description: Line-anchored pipeline YAML structural keys (GitHub Actions / Azure Pipelines / GitLab CI shapes); fixed-length lookbehind used instead of the banned line anchor
+        (?i)(?<![^\n])(?:jobs:|stages:|steps:|on:|trigger:|pool:|variables:|[ \t]{2,12}runs-on:|[ \t]{2,12}(?:script|run|uses|image|needs):)
+      description: Line-anchored pipeline YAML structural keys (GitHub Actions / Azure Pipelines / GitLab CI shapes); fixed-length negative lookbehind (not-a-non-newline) stands in for the banned line anchor and also matches at start of input
   keywords:
     - id: Evidence_cicd_pipeline_configs
       groups:
@@ -140,6 +147,9 @@ sensitivity_labels:
 created: '2026-02-08'
 updated: '2026-07-17'
 changelog:
+  - version: 1.4.1
+    date: '2026-07-17'
+    description: 'Codex review recall fix: the (?<=\n) line anchor in Pattern_cicd_structure could not match a structural key at byte 0 (files starting directly with jobs:/on:/trigger:/pool:), a regression vs the original ^-anchored form. Replaced with the fixed-length negative lookbehind (?<![^\n]) — succeeds at start of input or after a newline, same line-anchor semantics, still avoids the Purview-banned ^/$ anchors and variable-length lookbehinds. Added a byte-0 workflow-YAML should_match case.'
   - version: 1.4.0
     date: '2026-07-17'
     description: 'TP-00371 approved reduced scope per QA correction: topic-only enforcement was a verified failure (public CI/CD blog prose reached 85 via same-span evidence), so the former 85/75 topic tiers are removed and the topic branch is held at 65 discovery-only. Pattern_cicd_structure (line-anchored jobs/stages/steps/runs-on/script keys, rewritten with a fixed-length lookbehind because ^ anchors are CI-banned for purview regexes) is added at 75 but flagged discovery-only: per independent review it matches public open-source GitHub Actions/Azure pipeline files, so enforcement is deferred until internal/secrets/deploy context evidence is defined as a referenceable group. Description updated to name actual pipeline definitions. Added a real workflow-YAML positive plus blog-prose, water-pipeline, and inline-tutorial negatives.'
