@@ -1,19 +1,25 @@
 schema: testpattern/v1
 name: Water treatment dosing formulas
 slug: au-top500-446-water-treatment-dosing-formulas
-version: 1.4.2
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to water treatment dosing formulas in Australian contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Identifies substantive water-treatment dosing formulas and control values. Topic phrases are retained
+  for discovery; enforcement requires a populated dose, concentration, feed rate, or process value, and
+  high confidence also requires a treatment-plant asset, process, or control-tag reference.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Keyword
-  lists: infrastructure-water.
-pattern: (?is)\b(?:water\s+treatment|dosing\s+formula|chlorine\s+dosage|treatment\s+plant|critical\s+infrastructure|potable\s+water|water\s+quality|pH\s+setpoint)\b
+  Pattern_water_treatment_dosing recognises water-treatment dosing, chlorine, coagulant, fluoride, and
+  pH-control topics. The topic alone is discovery-only at 65. A numeric dose, concentration, or feed
+  rate raises it to 75; that value plus a treatment-plant asset, process train, dosing pump, or control
+  tag reaches 85. Enforcing tiers reject explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:water\s+treatment\s+dosing\s+formula|dosing\s+formula|chlorine\s+dosage|coagulant\s+dose|fluoride\s+dosing|pH\s+setpoint)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
+confidence_justification: >-
+  Medium confidence requires a populated engineering value rather than a water-treatment topic alone.
+  High confidence adds plant/process context, reducing matches on public guidance and chemistry lessons.
 jurisdictions:
   - global
 regulations:
@@ -28,7 +34,7 @@ frameworks:
   - ISO 27001
   - ISO 27701
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - water treatment dosing formulas
@@ -44,14 +50,12 @@ corroborative_evidence:
     - infrastructure-water
 test_cases:
   should_match:
-    - value: water treatment
-      description: Primary topic phrase match
-    - value: dosing formula
-      description: Case-insensitive topic phrase match
-    - value: chlorine dosage
-      description: Alternative topic phrase match
-    - value: treatment plant
-      description: Additional topic phrase match
+    - value: water treatment dosing formula
+      description: Low-tier probe - dosing topic without populated engineering values
+    - value: 'Chlorine dosage formula: target residual 0.8 mg/L and dose 2.4 mg/L'
+      description: Medium-tier probe - populated treatment values without a plant asset
+    - value: 'North water treatment plant dosing formula: dosing pump DP-04, coagulant dose 18.5 mg/L, SCADA tag AIT-204'
+      description: High-tier probe - populated dose with plant, pump, and control-tag detail
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -59,13 +63,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: water treatment dosing
       description: Generic word pair from old broad template should not match
+    - value: 'The public drinking-water guide explains why utilities disinfect water.'
+      description: Public guidance without a dosing formula or populated plant value
+    - value: 'Training example: water treatment dosing formula for pump DP-04 at 18.5 mg/L'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to water treatment dosing formulas appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Public health guidance and chemistry material discuss chlorine, pH, coagulants, and water treatment without revealing a utility's operating values.
+    mitigation: Keep topic-only matches discovery-only and require a populated dose, concentration, or feed rate for enforcement.
+  - description: Worked examples can contain plausible pump names, control tags, and dosing values.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -73,7 +79,7 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Evidence_template_exclusion
@@ -82,9 +88,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_water_treatment_dosing
       matches:
-        - ref: Evidence_water_treatment_dosing
-          min_count: 2
-          unique_results: true
+        - ref: Evidence_dosing_value
+        - ref: Evidence_water_plant_asset
         - type: any
           min_matches: 0
           max_matches: 0
@@ -93,9 +98,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_water_treatment_dosing
       matches:
-        - ref: Evidence_water_treatment_dosing
-          min_count: 2
-          unique_results: true
+        - ref: Evidence_dosing_value
         - type: any
           min_matches: 0
           max_matches: 0
@@ -104,28 +107,31 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_water_treatment_dosing
-      matches:
-        - ref: Evidence_water_treatment_dosing
   regexes:
     - id: Pattern_water_treatment_dosing
-      pattern: (?is)\b(?:water\s+treatment|dosing\s+formula|chlorine\s+dosage|treatment\s+plant|critical\s+infrastructure|potable\s+water|water\s+quality|pH\s+setpoint)\b
+      pattern: >-
+        (?is)\b(?:water\s+treatment\s+dosing\s+formula|dosing\s+formula|chlorine\s+dosage|coagulant\s+dose|fluoride\s+dosing|pH\s+setpoint)\b
+    - id: Evidence_dosing_value
+      pattern: '(?i)\b\d+(?:\.\d+)?\s*(?:mg/L|ppm|mL/min|L/h|kg/day|percent)\b'
   keywords:
-    - id: Evidence_water_treatment_dosing
+    - id: Evidence_water_plant_asset
       groups:
         - match_style: word
           terms:
-            - water treatment
-            - dosing formula
-            - chlorine dosage
-            - coagulant
-            - disinfection
+            - water treatment plant
             - treatment plant
-            - critical infrastructure
+            - dosing pump
+            - chlorine contact tank
+            - reservoir
+            - process train
+            - plant ID
             - potable water
+            - coagulant
             - fluoridation
-            - water quality
-            - pH setpoint
-            - turbidity
+            - text: SCADA
+              case_sensitive: true
+            - control tag
+      strength: specific
 risk_description: >-
   This concept regex recognises water-treatment, dosing-formula, chlorine-dosage, and treatment-plant language, aiming at a process formula or dosing record rather than a chemical name alone. An unauthorised recipient could use accurate concentrations or adjustment rules to understand treatment tolerances, plan process interference, or undermine confidence in a specific utility, although actual manipulation requires plant access and local engineering knowledge. Public operating guidance and training material remain plausible matches because the rule is medium-confidence and topic-oriented. For the Australian catalogue pattern, the confirmed substantive record is the consequence unit. Authentic plant formulas and adjustment rules expose treatment tolerances and can support contamination or loss of safe water. Significant public-health and essential-service damage is inherent. Risk 10 and PROTECTED InfoTech therefore apply to the confirmed record itself. Require plant/process identity, concentrations, dosing values, adjustment rules or control tags; public chemistry guidance remains excluded. This is confidence and exception handling, not a reason to reduce the consequence of a true positive.
 sensitivity_labels:
@@ -137,8 +143,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-15'
+updated: '2026-07-04'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: make dosing topics discovery-only; require a populated dose, concentration, or feed rate at 75 and treatment-plant asset or control-tag context at 85; add public-guidance and training exclusions.'
   - version: 1.4.2
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1032; detector and package metadata unchanged.'

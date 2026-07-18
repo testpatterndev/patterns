@@ -1,18 +1,25 @@
 schema: testpattern/v1
 name: Distributed control system configurations
 slug: au-top500-443-distributed-control-system-configurations
-version: 1.5.2
+version: 1.6.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to distributed control system configurations in Australian contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters.'
+  Identifies substantive distributed-control-system configuration records. Topic phrases are retained
+  for discovery; enforcement requires controller, module, I/O, tag, alarm, or control-loop configuration
+  content, and high confidence also requires a deployable tag, value, node, rack, or site reference.
+operation: >-
+  Pattern_dcs_configurations recognises DCS, controller-configuration, DeltaV, and Experion topics. The
+  topic alone is discovery-only at 65. Concrete controller/module/I/O/tag/alarm configuration raises it
+  to 75; configuration content plus a tag/value or live node/site reference reaches 85. Enforcing tiers
+  reject explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:distributed\s+control\s+system|control\s+configuration|controller\s+configuration|process\s+control|industrial\s+control|critical\s+infrastructure|control\s+loop|automation\s+system|Emerson\s+DeltaV)\b
+  (?is)\b(?:distributed\s+control\s+system|DCS\s+configuration|controller\s+configuration|Emerson\s+DeltaV|Honeywell\s+Experion|Yokogawa\s+CENTUM)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
+confidence_justification: >-
+  Medium confidence requires configuration objects rather than a product or architecture mention. High
+  confidence adds a deployable tag/value, node, rack, controller, or site reference.
 jurisdictions:
   - global
 regulations:
@@ -27,7 +34,7 @@ frameworks:
   - ISO 27001
   - ISO 27701
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - distributed control system configurations
@@ -41,30 +48,28 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: distributed control system
-      description: Primary topic phrase match
-    - value: control configuration
-      description: Case-insensitive topic phrase match
-    - value: controller configuration
-      description: Alternative topic phrase match
-    - value: process control
-      description: Additional topic phrase match
+    - value: distributed control system configuration
+      description: Low-tier probe - DCS topic without configuration objects
+    - value: 'DeltaV DCS configuration: control module, I/O point list, tag database, and alarm limit settings'
+      description: Medium-tier probe - substantive configuration objects without live node/value detail
+    - value: 'Production DeltaV DCS configuration for controller node DCS-CTRL-07: tag database entry TIC-204 setpoint SP=365, rack 2 slot 4'
+      description: High-tier probe - configuration content with live node, tag, value, and rack detail
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
     - value: distributed control system configuration
-      description: Generic word pair from old broad template should not match
+      description: Bare topic phrase surfaces only in discovery
+    - value: 'Vendor guide for Honeywell Experion distributed control system architecture'
+      description: Vendor architecture prose without configuration objects
+    - value: 'Training example: DeltaV DCS configuration tag TIC-204 SP=365 rack 2 slot 4'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: >-
-      Common words and phrases related to distributed control system configurations appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal
-      data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Vendor manuals, architecture guides, and engineering courses discuss DCS products and controller concepts without exposing a live configuration.
+    mitigation: Require controller, module, I/O, tag, alarm, or control-loop configuration content before enforcement.
+  - description: Labs and training examples can include realistic tags, values, rack/slot locations, and node names.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -72,7 +77,7 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Evidence_template_exclusion
@@ -81,9 +86,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_dcs_configurations
       matches:
-        - ref: Evidence_dcs_configurations
-          min_count: 2
-          unique_results: true
+        - ref: Evidence_dcs_configuration_content
+        - ref: Evidence_dcs_live_detail
         - type: any
           min_matches: 0
           max_matches: 0
@@ -92,9 +96,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_dcs_configurations
       matches:
-        - ref: Evidence_dcs_configurations
-          min_count: 2
-          unique_results: true
+        - ref: Evidence_dcs_configuration_content
         - type: any
           min_matches: 0
           max_matches: 0
@@ -103,30 +105,44 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_dcs_configurations
-      matches:
-        - ref: Evidence_dcs_configurations
   regexes:
     - id: Pattern_dcs_configurations
       pattern: >-
-        (?is)\b(?:distributed\s+control\s+system|control\s+configuration|controller\s+configuration|process\s+control|industrial\s+control|critical\s+infrastructure|control\s+loop|automation\s+system|Emerson\s+DeltaV)\b
+        (?is)\b(?:distributed\s+control\s+system|DCS\s+configuration|controller\s+configuration|Emerson\s+DeltaV|Honeywell\s+Experion|Yokogawa\s+CENTUM)\b
   keywords:
-    - id: Evidence_dcs_configurations
+    - id: Evidence_dcs_configuration_content
       groups:
         - match_style: word
           terms:
-            - distributed control system
-            - text: DCS
-              case_sensitive: true
-            - control configuration
+            - control module
+            - controller module
+            - I/O point
+            - I/O point list
+            - tag database
+            - alarm limit
             - setpoint
-            - controller configuration
-            - process control
-            - industrial control
-            - critical infrastructure
             - control loop
-            - automation system
-            - Honeywell
-            - Emerson DeltaV
+            - interlock
+            - sequence logic
+      strength: domain
+    - id: Evidence_dcs_live_detail
+      groups:
+        - match_style: word
+          terms:
+            - production
+            - controller node
+            - node ID
+            - rack
+            - slot
+            - site
+            - text: SP
+              case_sensitive: true
+            - text: PV
+              case_sensitive: true
+            - text: TIC
+              case_sensitive: true
+            - text: PIC
+              case_sensitive: true
       strength: specific
 risk_description: >-
   The detector finds distributed control system, control configuration, controller configuration, and process control language with eight nearby terms. A genuine configuration can expose controller roles, process parameters, network relationships, alarm handling, and dependencies, helping an attacker disrupt production or defeat safeguards. Public architecture guidance, vendor documentation, and training may also trigger the concept regex without a live plant configuration. For the Australian catalogue pattern, the confirmed substantive record is the consequence unit. A live DCS configuration exposes controller roles, parameters, alarms and dependencies. It can enable system-scale disruption or defeat safeguards, creating significant service or safety damage. Risk 9 and PROTECTED InfoTech therefore apply to the confirmed record itself. Require actual controller/configuration sections, tags, alarm limits, topology or site identifiers; vendor guides remain excluded. This is confidence and exception handling, not a reason to reduce the consequence of a true positive.
@@ -139,8 +155,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-15'
+updated: '2026-07-04'
 changelog:
+  - version: 1.6.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: require controller, module, I/O, tag, alarm, or loop configuration content at 75 and a deployable tag, value, node, rack, or site reference at 85; add vendor-guide and training exclusions.'
   - version: 1.5.2
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1029; detector and package metadata unchanged.'

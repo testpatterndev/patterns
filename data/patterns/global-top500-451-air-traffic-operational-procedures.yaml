@@ -1,26 +1,33 @@
 schema: testpattern/v1
 name: Air traffic operational procedures
 slug: global-top500-451-air-traffic-operational-procedures
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to air traffic operational procedures in international contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
+  Identifies substantive air-traffic operational procedures. Topic phrases are retained for discovery;
+  enforcement requires local runway, sector, waypoint, handoff, clearance, or airspace-procedure detail,
+  and high confidence also requires an operational value such as a runway, flight level, distance, or
+  radio frequency.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_air_traffic_procedures recognises air-traffic procedure, separation, clearance, approach,
+  vectoring, flight-information-region, and terminal-control topics. The topic alone is discovery-only
+  at 65. Local procedure detail raises it to 75; local detail plus an operational runway, flight level,
+  distance, or frequency reaches 85. Enforcing tiers reject explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:air\s+traffic\s+control|operational\s+procedure|separation\s+minima|flight\s+clearance|approach\s+procedure|control\s+tower|airspace\s+management|radar\s+vectoring|flight\s+information\s+region|terminal\s+control)\b
+  (?is)\b(?:air\s+traffic\s+operational\s+procedure|air\s+traffic\s+control\s+procedure|separation\s+minima|flight\s+clearance|approach\s+procedure|radar\s+vectoring|flight\s+information\s+region|terminal\s+control\s+procedure)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires local procedure content rather than a generic aviation-control mention.
+  High confidence adds an operational value, reducing matches on public standards and introductory
+  training.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - air traffic operational procedures
@@ -34,14 +41,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: air traffic control
-      description: Primary topic phrase match
-    - value: operational procedure
-      description: Case-insensitive topic phrase match
-    - value: separation minima
-      description: Alternative topic phrase match
-    - value: flight clearance
-      description: Additional topic phrase match
+    - value: air traffic operational procedure
+      description: Low-tier probe - topic without local procedure detail
+    - value: 'Air traffic operational procedure for the Brisbane terminal sector and waypoint GOMOL handoff'
+      description: Medium-tier probe - local sector and waypoint detail without an operational value
+    - value: 'Separation minima for Brisbane terminal sector: 5 NM near runway 19L; controller frequency 118.700 MHz'
+      description: High-tier probe - local procedure detail with distance, runway, and frequency values
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -49,15 +54,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: air traffic procedure
       description: Generic word pair from old broad template should not match
+    - value: 'The ICAO overview explains the purpose of air traffic control.'
+      description: Public overview without a protected operational procedure
+    - value: 'Training example: separation minima for sector Delta is 5 NM near runway 19L'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to air traffic operational procedures appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Public aviation standards, airport information, and training material discuss separation, approaches, runways, and clearances without exposing a local operating procedure.
+    mitigation: Keep topic-only matches discovery-only and require sector, waypoint, handoff, runway, or comparable local procedure detail for enforcement.
+  - description: Controller training scenarios can include realistic sectors, runways, distances, flight levels, and frequencies.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -65,65 +70,57 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_air_traffic_procedures
+      matches:
+        - ref: Evidence_air_traffic_local_detail
+        - ref: Evidence_air_traffic_operational_value
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_air_traffic_procedures
       matches:
-        - ref: Pattern_global_top500_451_air_traffic_operational_procedures_label_context
-        - ref: Keyword_global_top500_451_air_traffic_operational_procedures_domain_context
+        - ref: Evidence_air_traffic_local_detail
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_air_traffic_procedures
-      matches:
-        - ref: Keyword_air_traffic_procedures
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_air_traffic_procedures
       pattern: >-
-        (?is)\b(?:air\s+traffic\s+control|operational\s+procedure|separation\s+minima|flight\s+clearance|approach\s+procedure|control\s+tower|airspace\s+management|radar\s+vectoring|flight\s+information\s+region|terminal\s+control)\b
-    - id: Pattern_global_top500_451_air_traffic_operational_procedures_label_context
-      pattern: (?i)\b(?:air\s+traffic\s+operational\s+procedures)\b
+        (?is)\b(?:air\s+traffic\s+operational\s+procedure|air\s+traffic\s+control\s+procedure|separation\s+minima|flight\s+clearance|approach\s+procedure|radar\s+vectoring|flight\s+information\s+region|terminal\s+control\s+procedure)\b
+    - id: Evidence_air_traffic_operational_value
+      pattern: '(?i)\b(?:FL\d{2,3}|runway\s+\d{2}[LCR]?|\d+(?:\.\d+)?\s*NM|\d{3}\.\d{3}\s*MHz)\b'
   keywords:
-    - id: Keyword_air_traffic_procedures
+    - id: Evidence_air_traffic_local_detail
       groups:
         - match_style: word
           terms:
-            - air traffic control
-            - text: ATC
+            - runway
+            - sector
+            - waypoint
+            - holding fix
+            - approach fix
+            - handoff point
+            - controller frequency
+            - airspace boundary
+            - text: SID
               case_sensitive: true
-            - operational procedure
-            - separation minima
-            - flight clearance
-            - approach procedure
-            - control tower
-            - airspace management
-            - radar vectoring
-            - NOTAM
-            - flight information region
-            - terminal control
-      strength: specific
-    - id: Keyword_global_top500_451_air_traffic_operational_procedures_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - air traffic operational procedures
-            - air
-            - traffic
-            - operational
-            - procedures
+            - text: STAR
+              case_sensitive: true
       strength: domain
 risk_description: >-
   The concept classifier looks for aviation-control phrases such as separation minima, flight clearances, approach procedures, and radar vectoring with nearby domain context; it does not prove that live controller instructions or system configurations are present. A substantive operational procedure could reveal routing assumptions or control practices that help a knowledgeable actor plan disruption, evade safeguards, or exploit a local weakness. The likely impact is serious but normally confined to an airport, airspace sector, operator, or procedure, and benign training or policy discussion remains a material match source. Risk 8 and SENSITIVE fit that contained operational exposure; PROTECTED would require current exploitable control detail whose compromise could cause broad aviation disruption or major life-safety consequences.
@@ -136,8 +133,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: restrict the primary to operational procedure topics; require local runway, sector, waypoint, handoff, or airspace detail at 75 and an operational value at 85; reject public overview and training text.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1991 without changing detector or package metadata.'

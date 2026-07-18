@@ -1,25 +1,30 @@
 schema: testpattern/v1
 name: Refinery process control setpoints
 slug: global-top500-449-refinery-process-control-setpoints
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to refinery process control setpoints in international contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
+  Identifies substantive refinery process-control setpoint and operating-envelope records. Topic
+  phrases are retained for discovery; enforcement requires an actual process value, and high confidence
+  also requires a control-loop tag or named refinery process asset.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:process\s+control|control\s+loop|PID\s+controller|crude\s+unit|reactor\s+temperature|process\s+variable|control\s+valve|operating\s+parameter|safety\s+limit)\b
+  Regex_refinery_process_control recognises refinery, crude-unit, distillation-unit, reactor, and
+  refinery-loop control topics. The topic alone is discovery-only at 65. A numeric temperature,
+  pressure, flow, percentage, SP/PV/OP, or similar process value raises it to 75; a value plus a
+  control tag or named process asset reaches 85. Enforcing tiers reject explicit templates and training.
+pattern: (?is)\b(?:refinery\s+process\s+control|refinery\s+control\s+loop|crude\s+(?:distillation\s+)?unit|distillation\s+unit|reactor\s+temperature|refinery\s+operating\s+parameter|refinery\s+safety\s+limit)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires a populated process value rather than general control-engineering prose.
+  High confidence adds a refinery asset or loop tag, reducing matches on standards and textbooks.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - refinery process control setpoints
@@ -33,14 +38,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: process control
-      description: Primary topic phrase match
-    - value: control loop
-      description: Case-insensitive topic phrase match
-    - value: PID controller
-      description: Alternative topic phrase match
-    - value: crude unit
-      description: Additional topic phrase match
+    - value: refinery process control setpoints
+      description: Low-tier probe - topic without a populated process value
+    - value: 'Crude distillation unit operating parameter: reactor temperature SP=365 C and pressure 18.5 bar'
+      description: Medium-tier probe - populated refinery process values without a control tag
+    - value: 'Refinery control loop TIC-204 on the crude unit: SP=365 C, high alarm 380 C, valve output 64%'
+      description: High-tier probe - process values with a loop tag and named process asset
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -48,15 +51,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: refinery setpoint
       description: Generic word pair from old broad template should not match
+    - value: 'The chemical-engineering textbook introduces PID process control.'
+      description: Generic educational control theory, not refinery setpoint data
+    - value: 'Worked example: refinery control loop TIC-204 SP=365 C and pressure 18.5 bar'
+      description: Explicit worked example must not enforce
 false_positives:
-  - description: Common words and phrases related to refinery process control setpoints appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Process-control standards, textbooks, and vendor manuals discuss loops, PID control, temperatures, and safety limits without exposing refinery operating data.
+    mitigation: Require a refinery/crude/distillation/reactor topic and a populated process value before enforcement.
+  - description: Worked examples can contain realistic loop tags and engineering values.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and worked-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -64,64 +67,58 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_refinery_process_control
+      matches:
+        - ref: Evidence_process_value
+        - ref: Evidence_refinery_asset_or_tag
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_refinery_process_control
       matches:
-        - ref: Pattern_global_top500_449_refinery_process_control_setpoints_label_context
-        - ref: Keyword_global_top500_449_refinery_process_control_setpoints_domain_context
+        - ref: Evidence_process_value
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_refinery_process_control
-      matches:
-        - ref: Keyword_refinery_process_control
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_refinery_process_control
-      pattern: (?is)\b(?:process\s+control|control\s+loop|PID\s+controller|crude\s+unit|reactor\s+temperature|process\s+variable|control\s+valve|operating\s+parameter|safety\s+limit)\b
-    - id: Pattern_global_top500_449_refinery_process_control_setpoints_label_context
-      pattern: (?i)\b(?:refinery\s+process\s+control\s+setpoints)\b
+      pattern: (?is)\b(?:refinery\s+process\s+control|refinery\s+control\s+loop|crude\s+(?:distillation\s+)?unit|distillation\s+unit|reactor\s+temperature|refinery\s+operating\s+parameter|refinery\s+safety\s+limit)\b
+    - id: Evidence_process_value
+      pattern: '(?i)\b(?:(?:SP|PV|OP)\s*[:=]\s*-?\d+(?:\.\d+)?|-?\d+(?:\.\d+)?\s*(?:C|bar|kPa|MPa|psi|%|rpm|m3/h))\b'
   keywords:
-    - id: Keyword_refinery_process_control
+    - id: Evidence_refinery_asset_or_tag
       groups:
         - match_style: word
           terms:
-            - refinery
-            - process control
-            - setpoint
-            - control loop
-            - PID controller
-            - distillation
-            - crude unit
-            - reactor temperature
-            - process variable
-            - control valve
-            - operating parameter
-            - safety limit
+            - equipment tag
+            - control tag
+            - loop ID
+            - unit ID
+            - column ID
+            - text: TIC
+              case_sensitive: true
+            - text: PIC
+              case_sensitive: true
+            - text: FIC
+              case_sensitive: true
+            - text: LIC
+              case_sensitive: true
       strength: specific
-    - id: Keyword_global_top500_449_refinery_process_control_setpoints_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - refinery process control setpoints
-            - refinery
-            - process
-            - control
-            - setpoints
-      strength: domain
 risk_description: >-
   The detector flags process-control, loop, PID-controller, crude-unit, reactor-temperature, variable, valve, operating-parameter, and safety-limit language rather than extracting verified refinery setpoint values. A genuine control record can reveal temperatures, pressures, loop behavior, and safety boundaries that support process manipulation, equipment damage, production loss, or unsafe operation. The ordinary unit is one refinery unit or control loop and its operators, while control-engineering education, manuals, and generic diagrams can produce benign matches. For the global catalogue analogue, the confirmed substantive record is the consequence unit. Current operating envelopes and alarm behaviour can guide catastrophic process interference, fire, explosion or major environmental release. Significant organisational and life-safety damage is inherent. Risk 10 and PROTECTED InfoTech therefore apply to the confirmed record itself. Require refinery/unit identity plus actual limits, control loops, tags or alarm values; engineering standards remain excluded. This is confidence and exception handling, not a reason to reduce the consequence of a true positive.
 sensitivity_labels:
@@ -133,8 +130,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-15'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: restrict detection to refinery process-control topics; require populated engineering values at 75 and a refinery asset or loop tag at 85; reject textbooks and worked examples.'
   - version: 1.2.2
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1989; detector and package metadata unchanged.'

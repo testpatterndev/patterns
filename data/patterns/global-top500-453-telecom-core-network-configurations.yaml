@@ -1,26 +1,32 @@
 schema: testpattern/v1
 name: Telecom core network configurations
 slug: global-top500-453-telecom-core-network-configurations
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to telecom core network configurations in international contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
+  Identifies substantive telecom core-network configuration records. Topic phrases are retained for
+  discovery, while enforcement requires routing, subscriber, peering, node, or mobile-core
+  configuration content; high confidence also requires evidence of a live network asset or identifier.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Keyword
-  lists: pii-personal. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_telecom_core_network recognises carrier-core and mobile-core configuration topics. The topic
+  alone is discovery-only at 65. Routing, subscriber, peering, or core-service configuration evidence
+  raises it to 75; configuration content plus a PLMN, APN, node, peer, production, or live-network
+  identifier reaches 85. Enforcing tiers reject explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:telecom\s+core\s+network|core\s+network\s+configuration|network\s+topology|subscriber\s+routing|EPC\s+configuration|5G\s+core|IMS\s+platform|signaling\s+gateway|network\s+element|critical\s+infrastructure|backbone\s+network|peering\s+configuration)\b
+  (?is)\b(?:telecom\s+core\s+network|mobile\s+core\s+network|core\s+network\s+configuration|subscriber\s+routing|EPC\s+configuration|5G\s+core|IMS\s+platform|signaling\s+gateway|telecom\s+network\s+element|backbone\s+network|peering\s+configuration)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires configuration content rather than a carrier-architecture phrase alone.
+  High confidence adds a live network, node, subscriber-domain, or production identifier, reducing
+  matches on standards, vendor brochures, and public architecture material.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - telecom core network configurations
@@ -38,14 +44,12 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: telecom core network
-      description: Primary topic phrase match
-    - value: core network configuration
-      description: Case-insensitive topic phrase match
-    - value: network topology
-      description: Alternative topic phrase match
-    - value: subscriber routing
-      description: Additional topic phrase match
+    - value: telecom core network configuration
+      description: Low-tier probe - carrier-core topic without configuration content
+    - value: '5G core configuration: subscriber routing, network slice policy, and Diameter peer settings'
+      description: Medium-tier probe - substantive core configuration without a live asset identifier
+    - value: 'Production 5G core configuration for PLMN 50501: AMF node amf-prd-02, APN enterprise, Diameter peer 10.44.2.8'
+      description: High-tier probe - configuration content with production node and network identifiers
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -53,15 +57,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: telecom ims
       description: Generic word pair from old broad template should not match
+    - value: 'The 3GPP guide describes a generic 5G core architecture for university teaching.'
+      description: Public architecture prose without configuration content
+    - value: 'Training example: production 5G core configuration for PLMN 50501 with APN and Diameter peer'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to telecom core network configurations appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Telecom standards, vendor reference architectures, and university material discuss 5G core, EPC, IMS, and signaling components without exposing an operator configuration.
+    mitigation: Keep topic-only matches discovery-only and require routing, subscriber, peering, or service-configuration content for enforcement.
+  - description: Labs and worked examples can include realistic PLMN, APN, node, and peer values.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -69,65 +73,73 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_telecom_core_network
+      matches:
+        - ref: Evidence_telecom_configuration
+        - ref: Evidence_live_network_asset
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_telecom_core_network
       matches:
-        - ref: Pattern_global_top500_453_telecom_core_network_configurations_label_context
-        - ref: Keyword_global_top500_453_telecom_core_network_configurations_domain_context
+        - ref: Evidence_telecom_configuration
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_telecom_core_network
-      matches:
-        - ref: Keyword_telecom_core_network
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_telecom_core_network
       pattern: >-
-        (?is)\b(?:telecom\s+core\s+network|core\s+network\s+configuration|network\s+topology|subscriber\s+routing|EPC\s+configuration|5G\s+core|IMS\s+platform|signaling\s+gateway|network\s+element|critical\s+infrastructure|backbone\s+network|peering\s+configuration)\b
-    - id: Pattern_global_top500_453_telecom_core_network_configurations_label_context
-      pattern: (?i)\b(?:telecom\s+core\s+network\s+configurations)\b
+        (?is)\b(?:telecom\s+core\s+network|mobile\s+core\s+network|core\s+network\s+configuration|subscriber\s+routing|EPC\s+configuration|5G\s+core|IMS\s+platform|signaling\s+gateway|telecom\s+network\s+element|backbone\s+network|peering\s+configuration)\b
   keywords:
-    - id: Keyword_telecom_core_network
+    - id: Evidence_telecom_configuration
       groups:
         - match_style: word
           terms:
-            - telecom core network
-            - core network configuration
-            - network topology
             - subscriber routing
-            - EPC configuration
-            - 5G core
-            - IMS platform
-            - signaling gateway
-            - network element
-            - critical infrastructure
-            - backbone network
             - peering configuration
-      strength: specific
-    - id: Keyword_global_top500_453_telecom_core_network_configurations_domain_context
+            - routing table
+            - network slice policy
+            - Diameter peer
+            - GTP tunnel
+            - subscriber profile
+            - IMS routing
+            - signaling route
+            - trust relationship
+      strength: domain
+    - id: Evidence_live_network_asset
       groups:
         - match_style: word
           terms:
-            - telecom core network configurations
-            - telecom
-            - core
-            - network
-            - configurations
-      strength: domain
+            - production
+            - live network
+            - text: PLMN
+              case_sensitive: true
+            - text: APN
+              case_sensitive: true
+            - text: MCC
+              case_sensitive: true
+            - text: MNC
+              case_sensitive: true
+            - AMF node
+            - MME node
+            - peer address
+            - node ID
+      strength: specific
 risk_description: >-
   The concept detector recognizes telecom core networks, topology, subscriber routing, EPC, 5G core, IMS, signaling gateways, network elements, backbone networks, peering, and critical infrastructure rather than parsing an actual configuration file. A genuine record can expose trust relationships, routing paths, signaling components, and concentration points that support interception, outage planning, or targeted compromise. The ordinary scope is one carrier core or network segment and its subscribers and operators, while standards, architecture papers, and vendor documentation can match the same terms. For the global catalogue analogue, the confirmed substantive record is the consequence unit. Current routing, switching, trust and subscriber-control configuration can enable intrusion, interception or national communications disruption. Significant service and security damage is inherent. Risk 10 and PROTECTED InfoTech therefore apply to the confirmed record itself. Require carrier/core identity plus live routing, switching, profile or trust configuration; architecture brochures remain excluded. This is confidence and exception handling, not a reason to reduce the consequence of a true positive.
 sensitivity_labels:
@@ -139,8 +151,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-15'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: make carrier-core topics discovery-only; require routing, subscriber, peering, or service configuration at 75 and a live network or node identifier at 85; add standards and training exclusions with exact tier tests.'
   - version: 1.2.2
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1993; detector and package metadata unchanged.'

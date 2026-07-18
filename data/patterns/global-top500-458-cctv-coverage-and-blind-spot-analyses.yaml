@@ -1,26 +1,33 @@
 schema: testpattern/v1
 name: CCTV coverage and blind spot analyses
 slug: global-top500-458-cctv-coverage-and-blind-spot-analyses
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to cctv coverage and blind spot analyses in international contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
+  Identifies substantive CCTV coverage, camera-placement, surveillance-map, and blind-spot analyses.
+  Topic phrases are retained for discovery; enforcement requires site/camera analysis detail, and high
+  confidence requires both a precise site asset and an identified coverage weakness.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 9 keywords within 300 characters. Keyword
-  lists: industry-critical-infrastructure. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_cctv_blind_spot recognises coverage-analysis topics, not generic surveillance references. The
+  topic alone is discovery-only at 65. Camera, zone, floor-plan, perimeter, or site-analysis detail
+  raises it to 75; a precise asset/site reference plus a blind spot, dead zone, occlusion, or no-coverage
+  finding reaches 85. Enforcing tiers reject explicit templates and training examples.
 pattern: >-
-  (?is)\b(?:CCTV\s+coverage|camera\s+coverage|blind\s+spot\s+analysis|surveillance\s+map|camera\s+placement|coverage\s+gap|security\s+camera|video\s+surveillance|monitoring\s+zone|field\s+of\s+view|physical\s+security|critical\s+infrastructure)\b
+  (?is)\b(?:CCTV\s+coverage|camera\s+coverage|blind\s+spot\s+analysis|surveillance\s+map|camera\s+placement|coverage\s+gap|monitoring\s+zone|field\s+of\s+view)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires an analysed camera or site element. High confidence additionally requires
+  an explicit weakness, so procurement brochures and general surveillance policy do not reach the
+  operational tier.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - location
+  - security
 corroborative_evidence:
   keywords:
     - cctv coverage and blind spot analyses
@@ -39,14 +46,12 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: CCTV coverage
-      description: Primary topic phrase match
-    - value: camera coverage
-      description: Case-insensitive topic phrase match
-    - value: blind spot analysis
-      description: Alternative topic phrase match
-    - value: surveillance map
-      description: Additional topic phrase match
+    - value: CCTV coverage analysis
+      description: Low-tier probe - topic without site or camera detail
+    - value: 'Camera placement plan for the loading dock and east entrance, camera CAM-12, field of view 78 degrees'
+      description: Medium-tier probe - precise camera and site analysis without a stated weakness
+    - value: 'Blind spot analysis: CAM-12 at the loading dock leaves a dead zone behind Gate 3 with no coverage'
+      description: High-tier probe - precise asset/site reference and explicit coverage weakness
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -54,15 +59,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: cctv blind spot
       description: Generic word pair from old broad template should not match
+    - value: 'The procurement policy requires security cameras at all new offices.'
+      description: Generic policy requirement, not a coverage analysis
+    - value: 'Training example: CAM-12 loading dock blind spot and no coverage behind Gate 3'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to cctv coverage and blind spot analyses appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Camera brochures, installation guidance, and physical-security policies discuss placement and fields of view without revealing a real site's coverage.
+    mitigation: Require a camera, zone, floor-plan, entrance, perimeter, or other site-analysis element before enforcement.
+  - description: Training maps can include realistic camera IDs, gates, blind spots, and no-coverage findings.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -70,66 +75,83 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_cctv_blind_spot
+      matches:
+        - ref: Evidence_cctv_site_asset
+        - ref: Evidence_cctv_weakness
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_cctv_blind_spot
       matches:
-        - ref: Pattern_global_top500_458_cctv_coverage_and_blind_spot_analyses_label_context
-        - ref: Keyword_global_top500_458_cctv_coverage_and_blind_spot_analyses_domain_context
+        - ref: Evidence_cctv_analysis_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_cctv_blind_spot
-      matches:
-        - ref: Keyword_cctv_blind_spot
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_cctv_blind_spot
       pattern: >-
-        (?is)\b(?:CCTV\s+coverage|camera\s+coverage|blind\s+spot\s+analysis|surveillance\s+map|camera\s+placement|coverage\s+gap|security\s+camera|video\s+surveillance|monitoring\s+zone|field\s+of\s+view|physical\s+security|critical\s+infrastructure)\b
-    - id: Pattern_global_top500_458_cctv_coverage_and_blind_spot_analyses_label_context
-      pattern: (?i)\b(?:cctv\s+coverage\s+and\s+blind\s+spot\s+analyses)\b
+        (?is)\b(?:CCTV\s+coverage|camera\s+coverage|blind\s+spot\s+analysis|surveillance\s+map|camera\s+placement|coverage\s+gap|monitoring\s+zone|field\s+of\s+view)\b
   keywords:
-    - id: Keyword_cctv_blind_spot
+    - id: Evidence_cctv_analysis_context
       groups:
         - match_style: word
           terms:
-            - CCTV coverage
-            - camera coverage
-            - blind spot analysis
-            - surveillance map
-            - camera placement
-            - coverage gap
-            - security camera
-            - video surveillance
-            - monitoring zone
+            - camera ID
+            - camera placement plan
             - field of view
-            - physical security
-            - critical infrastructure
-      strength: specific
-    - id: Keyword_global_top500_458_cctv_coverage_and_blind_spot_analyses_domain_context
+            - floor plan
+            - site plan
+            - entrance
+            - perimeter
+            - loading dock
+            - gate
+            - monitoring zone
+            - coverage gap
+            - blind spot
+      strength: domain
+    - id: Evidence_cctv_site_asset
       groups:
         - match_style: word
           terms:
-            - cctv coverage and blind spot analyses
-            - cctv
-            - coverage
-            - blind
-            - spot
-            - analyses
-      strength: domain
+            - camera ID
+            - floor plan
+            - site plan
+            - entrance
+            - perimeter
+            - loading dock
+            - gate
+            - zone
+            - text: CAM
+              case_sensitive: true
+      strength: specific
+    - id: Evidence_cctv_weakness
+      groups:
+        - match_style: word
+          terms:
+            - blind spot
+            - coverage gap
+            - dead zone
+            - no coverage
+            - not monitored
+            - occluded
+            - obstruction
+      strength: specific
 risk_description: >-
   This concept classifier responds to CCTV coverage, camera placement, surveillance maps, fields of view, and coverage-gap language; it is not proof that a scaled site diagram or live camera configuration is present. A real blind-spot analysis can show where observation fails, allowing trespass, theft, sabotage, or evasion of evidence collection at a particular facility. The affected scale is usually one premises or security operation, with generic physical-security policies and camera procurement documents creating substantial benign traffic. Risk 8 and SENSITIVE fit the serious site-level exposure; PROTECTED would require precise weaknesses at a high-consequence facility that create a credible route to significant damage or life-safety harm.
 sensitivity_labels:
@@ -141,8 +163,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: restrict the primary to coverage analysis; require camera or site analysis detail at 75 and a precise site asset plus an identified coverage weakness at 85; add policy and training rejection tests.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1998 without changing detector or package metadata.'
