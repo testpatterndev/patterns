@@ -1,20 +1,24 @@
 schema: testpattern/v1
 name: Foster care placement records
 slug: global-top500-386-foster-care-placement-records
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to foster care placement records in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies individual foster-care, out-of-home-care, and kinship-care placement records, decisions,
+  and reviews. Topic phrases are retained for discovery; enforcement requires child, address, carer,
+  placement-date, legal-status, contact, safety, caseworker, stability, or review fields, and high
+  confidence also requires a formal child/placement/care-order reference.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 1 keywords within 240 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_foster_care recognises foster, out-of-home, and kinship-care placement records and decisions.
+  The topic alone is discovery-only at 65. Substantive placement and safeguarding fields raise it to
+  75; a formal child, placement, or care-order reference reaches 85. Enforcing tiers reject explicit
+  templates and training examples.
 pattern: >-
-  (?is)\b(?:foster\s+care\s+placement\s+records|foster\s+placement|foster\s+carer|out[\s-]+of[\s-]+home\s+care|placement\s+stability|kinship\s+care|foster\s+family|care\s+arrangement|placement\s+review|child\s+placement|foster\s+parent|residential\s+care)\b
+  (?is)\b(?:foster\s+care\s+placement\s+(?:record|decision|review)|out[\s-]+of[\s-]+home\s+care\s+placement\s+(?:record|decision|review)|kinship\s+care\s+placement\s+(?:record|decision|review)|child\s+placement\s+decision)s?\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: Medium confidence requires substantive placement and safeguarding fields. High confidence adds a formal child, placement, or care-order reference.
 jurisdictions:
   - global
 regulations:
@@ -27,30 +31,24 @@ corroborative_evidence:
   proximity: 240
 test_cases:
   should_match:
-    - value: foster care placement records
-      description: Primary topic phrase match
-    - value: foster placement
-      description: Case-insensitive topic phrase match
-    - value: foster carer
-      description: Alternative topic phrase match
-    - value: out-of-home care
-      description: Additional topic phrase match
+    - value: foster care placement record
+      description: Low-tier probe - placement-record topic without child or safeguarding fields
+    - value: 'Foster care placement record: child identifier, placement address, carer name, placement start date, legal status, contact arrangements, safety plan, caseworker name, placement stability, and review date'
+      description: Medium-tier probe - substantive placement without formal reference
+    - value: 'Foster care placement record, placement reference: FCP-2026-104: child identifier, placement address, carer name, placement start date, legal status, contact arrangements, safety plan, caseworker name, placement stability, review date, and care order number: CO-204'
+      description: High-tier probe - substantive placement with formal placement and care-order references
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: welfare registry
-      description: Generic word pair from old broad template should not match
+    - value: The policy describes foster carers and placement stability.
+      description: Public policy discussion without an individual placement record
+    - value: The hospital records a residential care arrangement.
+      description: Non-foster residential care context
+    - value: 'Training example: foster care placement record FCP-2026-104 with placement address, carer name, safety plan, and care order CO-204'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to foster care placement records appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Foster-care policy and unrelated residential-care records discuss carers, placements, stability, contacts, and reviews without containing a child placement record.
+    mitigation: Require an explicit foster, out-of-home, kinship, or child-placement record or decision before considering placement and safeguarding fields.
+  - description: Training placements can contain realistic child identifiers, addresses, carers, safety plans, references, and care orders.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -58,63 +56,56 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 240
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_foster_care
+      matches:
+        - ref: Evidence_foster_placement
+        - ref: Evidence_foster_formal_record
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_foster_care
       matches:
-        - ref: Pattern_global_top500_386_foster_care_placement_records_label_context
-        - ref: Keyword_global_top500_386_foster_care_placement_records_domain_context
+        - ref: Evidence_foster_placement
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_foster_care
-      matches:
-        - ref: Keyword_foster_care
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_foster_care
       pattern: >-
-        (?is)\b(?:foster\s+care\s+placement\s+records|foster\s+placement|foster\s+carer|out[\s-]+of[\s-]+home\s+care|placement\s+stability|kinship\s+care|foster\s+family|care\s+arrangement|placement\s+review|child\s+placement|foster\s+parent|residential\s+care)\b
-    - id: Pattern_global_top500_386_foster_care_placement_records_label_context
-      pattern: (?i)\b(?:foster\s+care\s+placement\s+records)\b
+        (?is)\b(?:foster\s+care\s+placement\s+(?:record|decision|review)|out[\s-]+of[\s-]+home\s+care\s+placement\s+(?:record|decision|review)|kinship\s+care\s+placement\s+(?:record|decision|review)|child\s+placement\s+decision)s?\b
+    - id: Evidence_foster_formal_record
+      pattern: >-
+        (?i)\b(?:(?:child\s+case|placement|care\s+order)\s+(?:number|no\.?|reference|ref\.?|ID)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{3,}|court\s+order\s+(?:number|no\.?|reference|ref\.?)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{3,})\b
   keywords:
-    - id: Keyword_foster_care
+    - id: Evidence_foster_placement
       groups:
         - match_style: word
           terms:
-            - foster care placement records
-            - foster placement
-            - foster carer
-            - out-of-home care
+            - child identifier
+            - placement address
+            - carer name
+            - placement start date
+            - legal status
+            - contact arrangements
+            - safety plan
+            - caseworker name
             - placement stability
-            - kinship care
-            - foster family
-            - care arrangement
-            - placement review
-            - child placement
-            - foster parent
-            - residential care
-      strength: specific
-    - id: Keyword_global_top500_386_foster_care_placement_records_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - foster care placement records
-            - foster
-            - care
-            - placement
+            - review date
       strength: domain
 risk_description: >-
   The pattern targets foster placement, foster carer, and out-of-home-care records rather than a standalone name or generic welfare reference. A normal placement file can reveal a child's living location, family circumstances, carers, and service history, creating risks of stigma, unwanted contact, or interference with a safe placement. The likely harm is serious for a vulnerable child and their carers, although a single bounded placement record does not automatically create system-wide or irreversible damage. Risk 8 and SENSITIVE fit; PROTECTED would require a current protected address, an active threat to safety, or disclosure across a large care cohort.
@@ -127,8 +118,11 @@ sensitivity_labels:
   nz_gov: CONFIDENTIAL
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: Restrict detection to individual care placements and add independent safeguarding plus formal placement/order evidence at calibrated 65/75/85 confidence.
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1932 without changing detector or package metadata.'
