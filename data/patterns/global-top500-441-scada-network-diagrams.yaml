@@ -1,25 +1,32 @@
 schema: testpattern/v1
 name: SCADA network diagrams
 slug: global-top500-441-scada-network-diagrams
-version: 1.2.3
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to scada network diagrams in international contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Identifies substantive SCADA, ICS, and OT network diagrams and topologies. Topic phrases are retained
+  for discovery; enforcement requires control-zone, DMZ, trust-boundary, remote-site, communications,
+  Purdue-level, field-network, or data-flow relationships, and high confidence also requires populated
+  VLAN, address, HMI, RTU, PLC, DCS, or site detail.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
-  lists: pii-personal, industry-critical-infrastructure. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:network\s+diagram|supervisory\s+control|remote\s+terminal\s+unit|human\s+machine\s+interface|control\s+network|OT\s+network|industrial\s+control|network\s+topology|process\s+network)\b
+  Regex_scada_network_diagrams recognises SCADA/ICS/OT network-diagram and topology topics. The topic
+  alone is discovery-only at 65. Control-zone, trust-boundary, communications, remote-site,
+  Purdue-level, field-network, or data-flow relationships raise it to 75; populated network or control
+  asset details reach 85. Enforcing tiers reject explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:SCADA\s+network\s+(?:diagram|topology)|ICS\s+network\s+(?:diagram|topology)|industrial\s+control\s+network\s+diagram|OT\s+network\s+(?:diagram|topology)|control\s+system\s+network\s+diagram)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires control-network relationships rather than a generic diagram. High
+  confidence adds a populated network or control-asset value.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - scada network diagrams
@@ -31,36 +38,31 @@ corroborative_evidence:
     - systems
   proximity: 300
   keyword_lists:
-    - pii-personal
     - industry-critical-infrastructure
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: network diagram
-      description: Primary topic phrase match
-    - value: supervisory control
-      description: Case-insensitive topic phrase match
-    - value: remote terminal unit
-      description: Alternative topic phrase match
-    - value: human machine interface
-      description: Additional topic phrase match
+    - value: SCADA network diagram
+      description: Low-tier probe - diagram topic without control-network relationships
+    - value: 'SCADA network diagram: control zone, DMZ trust boundary, remote-site communications path, Purdue level 3, and process data flow'
+      description: Medium-tier probe - substantive control-network relationships without populated live values
+    - value: 'SCADA network diagram for production site North Plant: control zone VLAN 120, HMI node HMI-02 at 10.24.8.10, RTU node RTU-07 at 10.24.8.15'
+      description: High-tier probe - topology relationships with populated VLAN, node, site, and address detail
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
     - value: scada network diagram
-      description: Generic word pair from old broad template should not match
+      description: Bare topic phrase surfaces only in discovery
+    - value: 'The vendor guide presents a generic SCADA network architecture.'
+      description: Product overview without a control-network diagram or relationships
+    - value: 'Training example: SCADA network diagram with VLAN 120, HMI-02 at 10.24.8.10, and RTU-07'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to scada network diagrams appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Vendor reference architectures, standards, and OT courses discuss SCADA networks, Purdue levels, DMZs, and remote sites without exposing a live topology.
+    mitigation: Keep diagram topics discovery-only and require control-zone, trust-boundary, communications, remote-site, field-network, or data-flow relationships for enforcement.
+  - description: Training diagrams can contain realistic VLANs, addresses, site names, and HMI/RTU/PLC identifiers.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -68,17 +70,26 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_scada_network_diagrams
+      matches:
+        - ref: Evidence_scada_network_relationship
+        - ref: Evidence_scada_live_network_detail
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_scada_network_diagrams
       matches:
-        - ref: Pattern_global_top500_441_scada_network_diagrams_label_context
-        - ref: Keyword_global_top500_441_scada_network_diagrams_domain_context
+        - ref: Evidence_scada_network_relationship
         - type: any
           min_matches: 0
           max_matches: 0
@@ -87,47 +98,30 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_scada_network_diagrams
-      matches:
-        - ref: Keyword_scada_network_diagrams
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_scada_network_diagrams
       pattern: >-
-        (?is)\b(?:network\s+diagram|supervisory\s+control|remote\s+terminal\s+unit|human\s+machine\s+interface|control\s+network|OT\s+network|industrial\s+control|network\s+topology|process\s+network)\b
-    - id: Pattern_global_top500_441_scada_network_diagrams_label_context
-      pattern: (?i)\b(?:scada\s+network\s+diagrams)\b
+        (?is)\b(?:SCADA\s+network\s+(?:diagram|topology)|ICS\s+network\s+(?:diagram|topology)|industrial\s+control\s+network\s+diagram|OT\s+network\s+(?:diagram|topology)|control\s+system\s+network\s+diagram)\b
+    - id: Evidence_scada_live_network_detail
+      pattern: >-
+        (?i)\b(?:VLAN\s+\d{1,4}|(?:HMI|RTU|PLC|DCS)\s+(?:node|ID|station)\s+[A-Z0-9][A-Z0-9._-]{2,}|(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?)\b
   keywords:
-    - id: Keyword_scada_network_diagrams
+    - id: Evidence_scada_network_relationship
       groups:
         - match_style: word
           terms:
-            - SCADA
-            - network diagram
-            - supervisory control
-            - remote terminal unit
-            - text: RTU
+            - control zone
+            - firewall zone
+            - text: DMZ
               case_sensitive: true
-            - text: HMI
-              case_sensitive: true
-            - human machine interface
-            - control network
-            - OT network
-            - industrial control
-            - network topology
-            - process network
-      strength: specific
-    - id: Keyword_global_top500_441_scada_network_diagrams_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - scada network diagrams
-            - scada
-            - network
-            - diagrams
+            - trust boundary
+            - remote site
+            - communications path
+            - Purdue level
+            - field network
+            - process data flow
+            - control centre
+            - control center
       strength: domain
 risk_description: >-
   The detector identifies network diagrams, supervisory-control material, remote terminal units, and human-machine interfaces with seven critical-infrastructure signals. A genuine diagram can reveal control zones, communications paths, device roles, trust boundaries, and remote connections, helping an attacker plan lateral movement or disruption. The normal bounded diagram creates serious operational risk, but exploitation still requires access, current addressing, vulnerabilities, or credentials and may concern only a non-critical subsystem. For the global catalogue analogue, the confirmed substantive record is the consequence unit. A real topology exposes HMI/RTU/PLC relationships, trust zones, remote links, protocols and management paths. It materially lowers attack cost against an operational control environment and can support significant outage or safety damage. Risk 9 and PROTECTED InfoTech therefore apply to the confirmed record itself. Require asset relationships, addresses/VLANs/protocols and site/system identifiers; training diagrams and standards stay audit-only. This is confidence and exception handling, not a reason to reduce the consequence of a true positive.
@@ -140,8 +134,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-15'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: restrict the primary to SCADA/ICS/OT network diagrams; require control-network relationships at 75 and populated VLAN, address, HMI, RTU, PLC, DCS, or site detail at 85.'
   - version: 1.2.3
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1981; detector and package metadata unchanged.'

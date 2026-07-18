@@ -1,13 +1,27 @@
 schema: testpattern/v1
 name: QLD Building Approval
 slug: au-qld-building-approval
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
-description: Detects QLD building approval documents including QBCC permits and development applications.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+engine: boost_regex
+description: >-
+  Identifies Queensland building approvals, permits, certifications, development applications, and
+  occupancy/compliance records. Topic phrases are retained for discovery; enforcement requires actual
+  decision, condition, assessment, certification, or approved-work content, and high confidence also
+  requires a formal application identifier and Queensland authority context.
+operation: >-
+  Pattern_building_approval recognises building-approval and development-application topics. The topic
+  alone is discovery-only at 65. Decision, condition, assessment, certification, or approved-work
+  content raises it to 75; substantive record content plus a formal application/reference identifier
+  and QBCC or Queensland authority context reaches 85. Enforcing tiers reject explicit templates and
+  training examples.
+pattern: >-
+  (?i)\b(?:Queensland\s+building\s+approval|building\s+(?:approval|permit|certification)|development\s+(?:permit|application)|planning\s+(?:permit|approval)|occupancy\s+certificate|compliance\s+certificate)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence requires substantive approval-record content rather than general guidance. High
+  confidence adds a formal identifier and Queensland authority reference.
 jurisdictions:
   - au
 regulations:
@@ -23,20 +37,26 @@ data_categories:
   - infrastructure
 test_cases:
   should_match:
-    - value: 'QBCC building approval: development application and building permit'
-      description: Test match 1
-    - value: Building certifier compliance certificate and occupancy certificate
-      description: Test match 2
-    - value: QLD building approval for building work per building code requirements
-      description: Test match 3
+    - value: Queensland building approval
+      description: Low-tier probe - approval topic without substantive record content
+    - value: 'Building approval decision notice: conditions of approval, approved works, and assessment manager details'
+      description: Medium-tier probe - substantive approval content without authority and identifier
+    - value: 'QBCC building approval decision notice BA20261234: conditions of approval and approved works certified by the Queensland Building and Construction Commission'
+      description: High-tier probe - substantive record with formal identifier and Queensland authority
   should_not_match:
     - value: Approval to proceed with the project
-      description: Non-match 1
+      description: Generic approval outside building regulation
     - value: Building rapport with the team
-      description: Non-match 2
+      description: Non-construction use of building
+    - value: 'How to apply for a building permit in Queensland'
+      description: Public guidance without an approval decision or record
+    - value: 'Training example: QBCC building approval decision notice BA20261234 with conditions of approval'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Generic approval or building in non-construction contexts.
-    mitigation: Require QBCC or building permit keywords.
+  - description: Public planning guidance and applicant checklists discuss building permits, development applications, certifiers, and approval conditions without containing an issued record.
+    mitigation: Keep topic-only matches discovery-only and require decision, condition, assessment, certification, or approved-work content for enforcement.
+  - description: Training and form examples can include realistic QBCC references, application numbers, and decision language.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - yaml
 scope: narrow
@@ -62,63 +82,64 @@ purview:
     - confidence_level: 85
       id_match: Pattern_building_approval
       matches:
-        - ref: Evidence_building_certification
-        - ref: Evidence_qbcc
+        - ref: Evidence_approval_record_detail
+        - ref: Evidence_formal_application_id
+        - ref: Evidence_qld_building_authority
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_development_permit
+      id_match: Pattern_building_approval
       matches:
-        - ref: Evidence_qld_government
+        - ref: Evidence_approval_record_detail
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_building_approval
   regexes:
     - id: Pattern_building_approval
-      pattern: (?i)\b(?:building\s+(?:approval|permit|certification)|development\s+(?:permit|application)|ba\d{8})\b
-    - id: Pattern_development_permit
-      pattern: (?i)\b(?:da\/\d{4}\/\d{4,5}|development\s+application|planning\s+(?:permit|approval))\b
+      pattern: >-
+        (?i)\b(?:Queensland\s+building\s+approval|building\s+(?:approval|permit|certification)|development\s+(?:permit|application)|planning\s+(?:permit|approval)|occupancy\s+certificate|compliance\s+certificate)\b
+    - id: Evidence_formal_application_id
+      pattern: '(?i)\b(?:BA\d{8}|DA/\d{4}/\d{4,5}|application\s+(?:number|reference)\s*[:#]?\s*[A-Z0-9/-]{5,})\b'
   keywords:
-    - id: Evidence_building_certification
+    - id: Evidence_approval_record_detail
       groups:
         - match_style: word
           terms:
-            - building approval
-            - building permit
-            - building certification
-            - development permit
-            - development application
+            - decision notice
+            - conditions of approval
+            - approved works
+            - assessment manager
             - occupancy permit
+            - occupancy certificate
             - compliance certificate
             - building certifier
-      strength: specific
-    - id: Evidence_qbcc
+            - building classification
+      strength: domain
+    - id: Evidence_qld_building_authority
       groups:
         - match_style: word
           terms:
-            - QBCC
+            - text: QBCC
+              case_sensitive: true
             - Queensland Building and Construction Commission
             - Building Act 1975
-            - Building Code of Australia
-            - text: BCA
-              case_sensitive: true
-            - certifier registration
-            - pool safety certificate
-      strength: specific
-    - id: Evidence_qld_government
-      groups:
-        - match_style: word
-          terms:
             - Queensland Government
             - State of Queensland
-            - QLD Government
-            - qld.gov.au
-            - Information Privacy Act 2009
-            - Queensland Privacy Principles
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-04'
+    description: 'Profile quality hardening: preserve risk 5 OFFICIAL while converting the keyword-list detector to a regex-backed concept; require substantive approval-record content at 75 and a formal identifier plus Queensland authority context at 85.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 575 without changing detector or package metadata.'

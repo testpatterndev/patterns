@@ -1,13 +1,26 @@
 schema: testpattern/v1
 name: Network Infrastructure Document
 slug: au-network-infrastructure-document
-version: 1.2.1
-type: keyword_list
+version: 1.3.0
+type: regex
 pattern_class: concept
-description: Detects network infrastructure documentation revealing topology, VLANs, firewall rules, and attack surface.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+engine: boost_regex
+description: >-
+  Identifies substantive internal network-infrastructure design and topology documents. Topic phrases
+  are retained for discovery; enforcement requires segmentation, trust-boundary, routing, VLAN, DMZ,
+  data-flow, or firewall-design content, and high confidence also requires a populated address, VLAN,
+  port, device, or rule detail.
+operation: >-
+  Regex_network_infrastructure recognises network architecture, topology, design, and diagram document
+  topics. The topic alone is discovery-only at 65. Segmentation, trust-boundary, routing, VLAN, DMZ,
+  data-flow, or firewall-design content raises it to 75; populated network values or device/rule details
+  reach 85. Enforcing tiers reject explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:network\s+(?:architecture|topology|diagram|design)\s+(?:document|specification)?|infrastructure\s+(?:design|architecture|documentation)|(?:logical|physical)\s+network\s+(?:diagram|design))\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence requires internal network-design content rather than a document title alone. High
+  confidence adds deployable addressing, VLAN, port, device, or rule detail.
 jurisdictions:
   - au
 regulations:
@@ -24,20 +37,26 @@ data_categories:
   - security
 test_cases:
   should_match:
-    - value: Network topology diagram with VLAN configuration and firewall rule details
-      description: Test match 1
-    - value: 'Network architecture document: DMZ, air gap, and access control list'
-      description: Test match 2
-    - value: Infrastructure diagram showing network boundary and network segmentation
-      description: Test match 3
+    - value: Network architecture document
+      description: Low-tier probe - document topic without internal design content
+    - value: 'Network topology document showing VLAN segmentation, DMZ trust boundary, data flow, and routing zones'
+      description: Medium-tier probe - substantive network design without populated live values
+    - value: 'Network architecture document: network segment VLAN 120, firewall hostname fw-prd-02, source IP 10.4.0.0/16, destination IP 10.8.2.10, TCP port 443'
+      description: High-tier probe - design content with populated VLAN, device, address, and port details
   should_not_match:
     - value: Social network analysis
       description: Non-match 1
     - value: Network of contacts in the industry
-      description: Non-match 2
+      description: Business relationship, not technical infrastructure
+    - value: 'The vendor brochure presents a network architecture for its product family.'
+      description: Product overview without internal segmentation or addressing
+    - value: 'Training example: network architecture document with VLAN 120 and source IP 10.4.0.0/16'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Social or business network references.
-    mitigation: Require IT infrastructure terms like VLAN, DMZ, or firewall rule.
+  - description: Product brochures, reference architectures, and public design guidance discuss network diagrams and segmentation without exposing an organisation's internal environment.
+    mitigation: Keep topic-only matches discovery-only and require segmentation, routing, trust-boundary, data-flow, or firewall-design content for enforcement.
+  - description: Training labs can include realistic VLANs, addresses, ports, device names, and firewall rules.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - yaml
 scope: narrow
@@ -54,73 +73,68 @@ sensitivity_labels:
   ca_gov: "Confidential"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Regex_network_infrastructure
       matches:
-        - ref: Keyword_network_topology
-        - ref: Keyword_firewall_rules
+        - ref: Evidence_network_design_content
+        - ref: Evidence_network_live_detail
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
       id_match: Regex_network_infrastructure
       matches:
-        - ref: Keyword_it_infrastructure
+        - ref: Evidence_network_design_content
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_network_infrastructure
   regexes:
     - id: Regex_network_infrastructure
       pattern: >-
         (?i)\b(?:network\s+(?:architecture|topology|diagram|design)\s+(?:document|specification)?|infrastructure\s+(?:design|architecture|documentation)|(?:logical|physical)\s+network\s+(?:diagram|design))\b
+    - id: Evidence_network_live_detail
+      pattern: >-
+        (?i)\b(?:VLAN\s+\d{1,4}|(?:source|destination)\s+IP\s*[:=]?\s*(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?|(?:TCP|UDP)\s+port\s+\d{1,5}|(?:firewall|router|switch)\s+(?:hostname|device)\s*[:=]\s*[A-Za-z0-9._-]+)\b
   keywords:
-    - id: Keyword_network_topology
+    - id: Evidence_network_design_content
       groups:
         - match_style: word
           terms:
-            - network topology
-            - network diagram
-            - network architecture
             - VLAN
             - subnet
             - IP range
             - network segment
             - text: DMZ
               case_sensitive: true
-            - perimeter
+            - trust boundary
+            - data flow
+            - routing zone
+            - firewall rule
+            - access control list
+            - network boundary
             - Purdue Model
-            - IEC 62443
             - zone and conduit
             - air gap
-      strength: specific
-    - id: Keyword_firewall_rules
-      groups:
-        - match_style: word
-          terms:
-            - firewall rule
-            - firewall policy
-            - access control list
-            - text: ACL
-              case_sensitive: true
-            - allow rule
-            - deny rule
-            - port
-            - protocol
-            - source IP
-            - destination IP
-      strength: specific
-    - id: Keyword_it_infrastructure
-      groups:
-        - match_style: word
-          terms:
-            - server
-            - database
-            - application
-            - service account
-            - privileged access
-            - backup schedule
-            - retention
-            - configuration
       strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: convert the broad keyword-list detector to a regex-backed concept; require substantive segmentation, routing, trust-boundary, data-flow, or firewall design at 75 and populated VLAN, address, port, device, or rule detail at 85.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 563 without changing detector or package metadata.'

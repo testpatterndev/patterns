@@ -1,17 +1,26 @@
 schema: testpattern/v1
 name: SCADA/ICS System Documentation
 slug: au-scada-ics-documentation
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
+engine: boost_regex
 description: >-
-  Detects SCADA and industrial control system documentation including PLC programming, HMI configurations, and OT
-  protocols.
+  Identifies substantive SCADA and industrial-control-system documentation. Topic phrases are retained
+  for discovery; enforcement requires point, tag, I/O, alarm, HMI, RTU, protocol-map, polling, or
+  control-logic configuration content, and high confidence also requires a populated asset, node,
+  address, register, outstation, or site detail.
 operation: >-
-  Keyword-based detection matching SCADA, PLC, HMI, DCS, and industrial control protocol references. Corroborative
-  evidence: 17 keywords within 300 characters.
+  Regex_scada_ics_documentation recognises SCADA/ICS system, configuration, network, and architecture
+  documentation topics. The topic alone is discovery-only at 65. Concrete point/tag/I/O/alarm/HMI/RTU
+  or protocol configuration content raises it to 75; populated asset, address, register, outstation, or
+  node details reach 85. Enforcing tiers reject explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:SCADA\s+(?:system|configuration|network|architecture)\s+documentation|ICS\s+(?:system|configuration|network|architecture)\s+documentation|industrial\s+control\s+system\s+(?:documentation|configuration\s+manual)|SCADA/ICS\s+(?:documentation|architecture))\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence requires substantive control-system configuration content. High confidence adds a
+  deployable asset, node, address, protocol register, outstation, or site value.
 jurisdictions:
   - au
 regulations:
@@ -26,20 +35,26 @@ data_categories:
   - technology
 test_cases:
   should_match:
-    - value: 'SCADA system documentation: PLC programming for Modbus RTU'
-      description: Test match 1
-    - value: ICS configuration manual with HMI and DCS setup for DNP3 protocol
-      description: Test match 2
-    - value: 'Industrial control system architecture: RTU and OPC UA integration'
-      description: Test match 3
+    - value: SCADA system documentation
+      description: Low-tier probe - document topic without configuration content
+    - value: 'SCADA configuration documentation: tag database, I/O mapping, alarm configuration, HMI screen, and Modbus register map'
+      description: Medium-tier probe - substantive configuration content without populated live values
+    - value: 'SCADA system documentation for production RTU node RTU-07 at 10.24.8.15: protocol register map contains Modbus register 40017, and the tag database maps PUMP_RUN to HMI node HMI-02'
+      description: High-tier probe - configuration content with populated asset, address, register, tag, and node details
   should_not_match:
     - value: Remote control for the television
       description: Non-match 1
     - value: System documentation for the website
-      description: Non-match 2
+      description: Generic IT documentation outside industrial control
+    - value: 'The vendor guide introduces SCADA system architecture.'
+      description: Product overview without a configuration record
+    - value: 'Training example: SCADA system documentation for RTU-07 at 10.24.8.15, Modbus register 40017'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Generic control system or protocol references in IT contexts.
-    mitigation: Require SCADA/ICS-specific terms like PLC, HMI, or Modbus.
+  - description: Vendor manuals, standards, and engineering courses discuss SCADA, PLCs, HMIs, RTUs, and OT protocols without exposing a live system configuration.
+    mitigation: Keep document topics discovery-only and require point, tag, I/O, alarm, HMI, RTU, polling, protocol-map, or control-logic content for enforcement.
+  - description: Training labs can include realistic asset IDs, IP addresses, register numbers, tags, and node names.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - yaml
 scope: narrow
@@ -57,96 +72,63 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_scada_ics
+      id_match: Regex_scada_ics_documentation
       matches:
-        - ref: Keyword_scada
-        - ref: Keyword_control_system
-    - confidence_level: 85
-      id_match: Regex_scada_ics
-      matches:
-        - ref: Keyword_ot_protocols
+        - ref: Evidence_scada_configuration_content
+        - ref: Evidence_scada_live_detail
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Regex_plc_hmi
+      id_match: Regex_scada_ics_documentation
       matches:
-        - ref: Keyword_industrial
+        - ref: Evidence_scada_configuration_content
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_scada_ics_documentation
   regexes:
-    - id: Regex_scada_ics
-      pattern: (?i)\b(?:scada|supervisory\s+control|industrial\s+control\s+system|ics)\b
-    - id: Regex_plc_hmi
-      pattern: (?i)\b(?:plc|programmable\s+logic\s+controller|hmi|human\s+machine\s+interface|dcs|distributed\s+control)\b
+    - id: Regex_scada_ics_documentation
+      pattern: >-
+        (?is)\b(?:SCADA\s+(?:system|configuration|network|architecture)\s+documentation|ICS\s+(?:system|configuration|network|architecture)\s+documentation|industrial\s+control\s+system\s+(?:documentation|configuration\s+manual)|SCADA/ICS\s+(?:documentation|architecture))\b
+    - id: Evidence_scada_live_detail
+      pattern: >-
+        (?i)\b(?:(?:PLC|RTU|HMI|DCS)\s*(?:ID|node|station)?\s*[:#-]\s*[A-Z0-9][A-Z0-9._-]{2,}|(?:Modbus\s+register|DNP3\s+outstation)\s*[:#]?\s*\d+|(?:\d{1,3}\.){3}\d{1,3})\b
   keywords:
-    - id: Keyword_scada
+    - id: Evidence_scada_configuration_content
       groups:
         - match_style: word
           terms:
-            - SCADA
-            - supervisory control
-            - data acquisition
-            - SCADA network
-            - SCADA system
-            - control centre
-            - control center
-      strength: specific
-    - id: Keyword_control_system
-      groups:
-        - match_style: word
-          terms:
-            - text: PLC
-              case_sensitive: true
-            - programmable logic controller
-            - text: DCS
-              case_sensitive: true
-            - distributed control
-            - text: HMI
-              case_sensitive: true
-            - human machine interface
-            - text: RTU
-              case_sensitive: true
-            - remote terminal unit
-            - text: ICS
-              case_sensitive: true
-            - industrial control
-      strength: domain
-    - id: Keyword_ot_protocols
-      groups:
-        - match_style: word
-          terms:
-            - Modbus
-            - Profibus
-            - Profinet
-            - text: OPC
-              case_sensitive: true
-            - OPC UA
-            - DNP3
-            - IEC 60870
-            - EtherNet/IP
-            - HART
-            - 4-20mA
-            - IEC 61850
-            - IEC 60870-5-104
-            - BACnet
-            - OPC-UA
-            - OPC Classic
-            - Modbus TCP
-            - Modbus RTU
-      strength: domain
-    - id: Keyword_industrial
-      groups:
-        - match_style: word
-          terms:
-            - industrial
-            - manufacturing
-            - automation
-            - process control
-            - field device
-            - sensor network
-            - actuator
+            - point list
+            - tag database
+            - I/O mapping
+            - alarm configuration
+            - HMI screen
+            - RTU mapping
+            - polling configuration
+            - protocol register map
+            - control logic
+            - interlock
+            - historian mapping
       strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: convert the broad keyword-list detector to a regex-backed concept; require point, tag, I/O, alarm, HMI, RTU, protocol-map, polling, or logic configuration at 75 and populated asset, address, register, outstation, or node detail at 85.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 594 without changing detector or package metadata.'

@@ -1,15 +1,27 @@
 schema: testpattern/v1
 name: OT Security Assessment
 slug: au-ot-security-assessment
-version: 1.5.1
-type: keyword_list
+version: 1.6.0
+type: regex
 pattern_class: concept
-description: Detects operational technology (OT) security assessment reports for SCADA, ICS, and industrial control systems.
+engine: boost_regex
+description: >-
+  Identifies substantive operational-technology, SCADA, ICS, and industrial-control security
+  assessments. Topic phrases are retained for discovery; enforcement requires findings, affected
+  assets, evidence, remediation, attack paths, firmware, segmentation, credential, or remote-access
+  weaknesses, and high confidence additionally requires a concrete technical indicator and severe
+  exploit consequence.
 operation: >-
-  Keyword-based detection matching OT security, SCADA security, ICS security, and control system vulnerability patterns.
-  Corroborative evidence: 11 keywords within 300 characters.
+  Regex_ot_security_assessment recognises OT/SCADA/ICS/control-system assessment and penetration-test
+  topics. The topic alone is discovery-only at 65. Substantive findings or remediation content raises
+  it to 75; findings plus a CVE, address, or control-asset identifier and severe exploit consequence
+  reach 85. Enforcing tiers reject explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:OT\s+security\s+assessment|SCADA\s+security\s+assessment|ICS\s+security\s+assessment|industrial\s+control\s+security\s+assessment|control\s+system\s+vulnerability\s+assessment|(?:OT|SCADA|ICS)\s+penetration\s+test)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence requires assessment findings rather than a title or methodology reference. High
+  confidence adds a concrete affected asset or vulnerability and severe exploitable consequence.
 jurisdictions:
   - au
 regulations:
@@ -24,20 +36,26 @@ data_categories:
   - infrastructure
 test_cases:
   should_match:
-    - value: 'OT security assessment: SCADA security vulnerability findings'
-      description: Test match 1
-    - value: ICS security audit with industrial control security risk assessment
-      description: Test match 2
-    - value: Control system vulnerability assessment and penetration test results
-      description: Test match 3
+    - value: OT security assessment
+      description: Low-tier probe - assessment topic without findings
+    - value: 'OT security assessment finding: unsupported firmware and a segmentation gap were observed; remediation action is scheduled'
+      description: Medium-tier probe - substantive findings without a concrete asset or severe exploit consequence
+    - value: 'OT security assessment finding for production PLC asset PLC-07 at 10.24.8.15: CVE-2025-12345 enables unauthenticated remote code execution; critical severity and remediation required'
+      description: High-tier probe - finding with live asset, vulnerability, address, and severe exploit consequence
   should_not_match:
     - value: Office security assessment for fire exits
       description: Non-match 1
     - value: IT security awareness training
-      description: Non-match 2
+      description: Generic IT awareness content outside OT assessment
+    - value: 'The public guide explains how to scope an OT security assessment.'
+      description: Public methodology guidance without findings
+    - value: 'Training example: OT security assessment finding for PLC-07, CVE-2025-12345, critical remote code execution'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Generic security assessment in non-OT contexts.
-    mitigation: Require OT/SCADA/ICS-specific keywords alongside assessment terms.
+  - description: Public methodologies, standards, and consulting material discuss OT assessments, vulnerabilities, CVEs, and remediation without containing an assessed organisation's findings.
+    mitigation: Keep assessment topics discovery-only and require finding, affected-asset, evidence, remediation, attack-path, firmware, segmentation, credential, or remote-access content.
+  - description: Training labs can include realistic asset IDs, addresses, CVEs, exploit paths, severities, and remediation actions.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - yaml
 scope: narrow
@@ -61,77 +79,70 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_vulnerability_assessment
+      id_match: Regex_ot_security_assessment
       matches:
-        - ref: Keyword_security_assessment
-        - ref: Keyword_ot_security
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_cve_reference
-      matches:
-        - ref: Keyword_security_assessment
+        - ref: Evidence_ot_assessment_finding
+        - ref: Evidence_ot_assessment_indicator
+        - ref: Evidence_ot_severe_exploit
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Regex_pentest
+      id_match: Regex_ot_security_assessment
       matches:
-        - ref: Keyword_audit
+        - ref: Evidence_ot_assessment_finding
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_ot_security_assessment
   regexes:
-    - id: Regex_vulnerability_assessment
-      pattern: (?i)\b(?:vulnerability\s+(?:assessment|analysis|scan)|security\s+(?:assessment|audit))\b
-    - id: Regex_cve_reference
-      pattern: (?i)\bcve[\s\-]?20\d{2}[\s\-]?\d{4,5}\b
-    - id: Regex_pentest
-      pattern: (?i)\b(?:penetration\s+test(?:ing)?|pentest|security\s+test(?:ing)?)\b
+    - id: Regex_ot_security_assessment
+      pattern: >-
+        (?is)\b(?:OT\s+security\s+assessment|SCADA\s+security\s+assessment|ICS\s+security\s+assessment|industrial\s+control\s+security\s+assessment|control\s+system\s+vulnerability\s+assessment|(?:OT|SCADA|ICS)\s+penetration\s+test)\b
+    - id: Evidence_ot_assessment_indicator
+      pattern: >-
+        (?i)\b(?:CVE-\d{4}-\d{4,7}|(?:PLC|RTU|HMI|DCS)\s*(?:asset|node|ID)?\s*[:#-]\s*[A-Z0-9][A-Z0-9._-]{2,}|(?:\d{1,3}\.){3}\d{1,3})\b
   keywords:
-    - id: Keyword_security_assessment
+    - id: Evidence_ot_assessment_finding
       groups:
         - match_style: word
           terms:
-            - vulnerability assessment
-            - OT security assessment
-            - ICS security assessment
-            - control system security assessment
-            - penetration test
-            - security audit
-            - risk assessment
-            - threat assessment
-      strength: specific
-    - id: Keyword_ot_security
+            - assessment finding
+            - affected asset
+            - evidence
+            - remediation action
+            - attack path
+            - exploit path
+            - segmentation gap
+            - unsupported firmware
+            - default credential
+            - remote access
+      strength: domain
+    - id: Evidence_ot_severe_exploit
       groups:
         - match_style: word
           terms:
-            - SCADA security
-            - ICS security
-            - OT security
-            - industrial control security
-            - control system vulnerability
-      strength: specific
-    - id: Keyword_audit
-      groups:
-        - match_style: word
-          terms:
-            - audit
-            - audit finding
-            - audit report
-            - compliance audit
-            - security audit
+            - unauthenticated remote code execution
+            - remote code execution
+            - safety system bypass
+            - critical severity
+            - exploitable
+            - production
+            - physical process impact
+            - service disruption
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.6.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: convert the broad keyword-list detector to a regex-backed concept; require substantive assessment findings at 75 and concrete technical indicators plus severe exploit consequence at 85.'
   - version: 1.5.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 565 without changing detector or package metadata.'

@@ -1,15 +1,28 @@
 schema: testpattern/v1
 name: SOCI Act Compliance Document
 slug: au-soci-act-compliance
-version: 1.5.1
-type: keyword_list
+version: 1.6.0
+type: regex
 pattern_class: concept
-description: Detects Security of Critical Infrastructure (SOCI) Act compliance documents and resilience assessments.
+engine: boost_regex
+description: >-
+  Identifies substantive Security of Critical Infrastructure Act, CIRMP, and AESCSF compliance
+  assessments. Topic phrases are retained for discovery; enforcement requires obligation status,
+  compliance findings, maturity ratings, control gaps, risk-management-program content, or remediation
+  actions, and high confidence additionally requires a critical-asset/responsible-entity context and an
+  adverse finding.
 operation: >-
-  Keyword-based detection matching SOCI Act, critical infrastructure resilience, AESCSF, and Essential Eight patterns.
-  Corroborative evidence: 12 keywords within 300 characters.
+  Regex_soci_compliance recognises SOCI Act, Security of Critical Infrastructure, CIRMP, and AESCSF
+  assessment/report topics. The topic alone is discovery-only at 65. Substantive obligation, finding,
+  maturity, program, or remediation content raises it to 75; a critical-asset or responsible-entity
+  context plus a non-compliance, material weakness, overdue remediation, critical finding, or high
+  residual-risk result reaches 85. Enforcing tiers reject explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:SOCI\s+Act\s+(?:compliance\s+)?(?:assessment|report|review)|Security\s+of\s+Critical\s+Infrastructure\s+(?:compliance\s+assessment|risk\s+management\s+program|resilience\s+assessment)|CIRMP\s+(?:assessment|review|report)|AESCSF\s+(?:assessment|compliance\s+report))\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence requires substantive compliance results rather than a public legislative or
+  framework reference. High confidence adds asset/entity scope and an adverse result.
 jurisdictions:
   - au
 regulations:
@@ -23,20 +36,26 @@ data_categories:
   - infrastructure
 test_cases:
   should_match:
-    - value: SOCI Act compliance assessment and resilience review per ACSC guidelines
-      description: Test match 1
-    - value: Security of Critical Infrastructure Act risk assessment with Essential Eight maturity
-      description: Test match 2
-    - value: AESCSF compliance report for Australian Energy Sector Cyber Security framework
-      description: Test match 3
+    - value: SOCI Act compliance assessment
+      description: Low-tier probe - compliance topic without assessment results
+    - value: 'SOCI Act compliance assessment: obligation status, maturity rating, risk management program, compliance findings, and remediation actions'
+      description: Medium-tier probe - substantive results without adverse critical-asset context
+    - value: 'SOCI Act compliance assessment for responsible entity NorthGrid and critical asset CA-104: compliance finding is non-compliant, material control gap, residual risk high, remediation overdue'
+      description: High-tier probe - asset/entity context with adverse compliance results
   should_not_match:
     - value: Social media compliance report
       description: Non-match 1
     - value: The society meeting was productive
-      description: Non-match 2
+      description: Unrelated social usage
+    - value: 'The public website summarises the SOCI Act and its obligations.'
+      description: Public legislative overview without an assessment record
+    - value: 'Training example: SOCI Act compliance assessment for critical asset CA-104 with non-compliance and overdue remediation'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Abbreviation SOCI confused with social in non-infrastructure contexts.
-    mitigation: Require specific SOCI Act or critical infrastructure terminology.
+  - description: Public legislation, regulatory guidance, conference material, and framework documentation discuss SOCI, CIRMP, AESCSF, obligations, maturity, and resilience without containing an entity's compliance results.
+    mitigation: Keep topic-only matches discovery-only and require obligation status, findings, maturity ratings, program content, control gaps, or remediation actions for enforcement.
+  - description: Training assessments can contain realistic asset IDs, responsible entities, control gaps, maturity ratings, and non-compliance outcomes.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - yaml
 scope: narrow
@@ -60,92 +79,80 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_soci_act
+      id_match: Regex_soci_compliance
       matches:
-        - ref: Keyword_soci
-        - ref: Keyword_critical_infrastructure
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_aescsf
-      matches:
-        - ref: Keyword_energy_sector
+        - ref: Evidence_soci_assessment_result
+        - ref: Evidence_soci_asset_entity
+        - ref: Evidence_soci_adverse_finding
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Regex_essential_eight
+      id_match: Regex_soci_compliance
       matches:
-        - ref: Keyword_acsc
+        - ref: Evidence_soci_assessment_result
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_soci_compliance
   regexes:
-    - id: Regex_soci_act
-      pattern: (?i)\b(?:soci\s+act|security\s+of\s+critical\s+infrastructure|critical\s+infrastructure\s+(?:act|resilience))\b
-    - id: Regex_aescsf
-      pattern: (?i)\b(?:aescsf|australian\s+energy\s+sector\s+cyber\s+security)\b
-    - id: Regex_essential_eight
-      pattern: (?i)\b(?:essential\s+eight|acsc\s+(?:guidelines|essential))\b
+    - id: Regex_soci_compliance
+      pattern: >-
+        (?is)\b(?:SOCI\s+Act\s+(?:compliance\s+)?(?:assessment|report|review)|Security\s+of\s+Critical\s+Infrastructure\s+(?:compliance\s+assessment|risk\s+management\s+program|resilience\s+assessment)|CIRMP\s+(?:assessment|review|report)|AESCSF\s+(?:assessment|compliance\s+report))\b
   keywords:
-    - id: Keyword_soci
+    - id: Evidence_soci_assessment_result
       groups:
         - match_style: word
           terms:
-            - SOCI obligations
-            - reportable under SOCI
-            - SOCI Act
-            - Security of Critical Infrastructure
-            - resilience assessment
-            - critical infrastructure resilience
-      strength: specific
-    - id: Keyword_critical_infrastructure
-      groups:
-        - match_style: word
-          terms:
-            - critical infrastructure
-            - essential service
-            - power generation
-            - water treatment
-            - electricity network
-            - gas pipeline
-            - telecommunications
-      strength: specific
-    - id: Keyword_energy_sector
-      groups:
-        - match_style: word
-          terms:
-            - energy sector
-            - electricity
-            - power station
-            - transmission network
-            - distribution network
-            - AEMO
-            - text: NEM
-              case_sensitive: true
+            - obligation status
+            - compliance finding
+            - maturity rating
+            - control gap
+            - risk management program
+            - remediation action
+            - resilience finding
+            - control assessment
       strength: domain
-    - id: Keyword_acsc
+    - id: Evidence_soci_asset_entity
       groups:
         - match_style: word
           terms:
-            - ACSC
-            - Australian Cyber Security Centre
-            - Essential Eight
-            - cyber security
-            - text: ISM
+            - critical asset
+            - asset ID
+            - responsible entity
+            - text: CIRMP
               case_sensitive: true
-            - Information Security Manual
+            - operational technology
+            - power station
+            - water treatment plant
+            - transmission substation
+            - pipeline facility
+            - telecommunications network
+      strength: domain
+    - id: Evidence_soci_adverse_finding
+      groups:
+        - match_style: word
+          terms:
+            - non-compliant
+            - material weakness
+            - remediation overdue
+            - critical finding
+            - residual risk high
+            - significant deficiency
+            - reportable incident
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.6.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: convert the broad keyword-list detector to a regex-backed concept; require substantive SOCI/CIRMP/AESCSF assessment results at 75 and critical-asset/entity scope plus an adverse finding at 85.'
   - version: 1.5.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 598 without changing detector or package metadata.'

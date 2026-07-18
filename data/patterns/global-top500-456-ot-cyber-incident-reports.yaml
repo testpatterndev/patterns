@@ -1,26 +1,34 @@
 schema: testpattern/v1
 name: OT cyber incident reports
 slug: global-top500-456-ot-cyber-incident-reports
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to ot cyber incident reports in international contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Identifies substantive operational-technology, ICS, SCADA, and industrial-control cyber incident
+  reports. Topic phrases are retained for discovery; enforcement requires case facts such as affected
+  assets, timelines, initial access, containment, indicators, root cause, recovery, or operational
+  impact, and high confidence also requires a concrete indicator, vulnerability, address, or control
+  asset identifier.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
-  lists: industry-critical-infrastructure. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Regex_ot_cyber_incident recognises OT/ICS/SCADA/industrial-control cyber incident-report topics. The
+  topic alone is discovery-only at 65. Affected-asset, timeline, access, containment, indicator,
+  root-cause, recovery, or operational-impact facts raise it to 75; a concrete CVE, hash, IP, or control
+  asset identifier reaches 85. Enforcing tiers reject explicit templates, training, and public-report
+  framing.
 pattern: >-
-  (?is)\b(?:OT\s+cyber\s+incident|ICS\s+incident|industrial\s+cyber|SCADA\s+compromise|incident\s+report|containment\s+measures|attack\s+timeline|operational\s+technology|industrial\s+control\s+system|critical\s+infrastructure|threat\s+actor|indicators\s+of\s+compromise)\b
+  (?is)\b(?:OT\s+cyber\s+incident\s+report|ICS\s+cyber\s+incident\s+report|SCADA\s+compromise\s+report|industrial\s+control\s+system\s+cyber\s+incident|operational\s+technology\s+security\s+incident\s+report)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence requires incident-specific case facts. High confidence adds a concrete technical
+  indicator or affected control asset, reducing matches on policy and generic threat reporting.
 jurisdictions:
   - global
 regulations:
   - GDPR
 data_categories:
-  - pii
+  - security
 corroborative_evidence:
   keywords:
     - ot cyber incident reports
@@ -33,34 +41,30 @@ corroborative_evidence:
   proximity: 300
   keyword_lists:
     - industry-critical-infrastructure
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: OT cyber incident
-      description: Primary topic phrase match
-    - value: ics incident
-      description: Case-insensitive topic phrase match
-    - value: industrial cyber
-      description: Alternative topic phrase match
-    - value: SCADA compromise
-      description: Additional topic phrase match
+    - value: OT cyber incident report
+      description: Low-tier probe - incident-report topic without case facts
+    - value: 'OT cyber incident report: affected asset, attack timeline, initial access, containment action, root cause, and recovery status'
+      description: Medium-tier probe - substantive case facts without a concrete technical indicator
+    - value: 'OT cyber incident report: affected PLC asset PLC-07, source IP 10.24.8.15, CVE-2025-12345, attack timeline, containment action, and recovery status'
+      description: High-tier probe - case facts with control-asset, address, and vulnerability indicators
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
     - value: ot cyber incident report
-      description: Generic word pair from old broad template should not match
+      description: Bare report title surfaces only in discovery
+    - value: 'The public advisory describes industrial-control malware trends.'
+      description: Public threat overview without an organisation-specific incident report
+    - value: 'Training example: OT cyber incident report for PLC-07 at source IP 10.24.8.15, CVE-2025-12345'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Common words and phrases related to ot cyber incident reports appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Public advisories, vendor threat reports, news, and exercises discuss OT incidents, indicators, containment, and affected technologies without exposing an organisation's case report.
+    mitigation: Require incident-specific case facts and reject explicit public-advisory, vendor-report, news-report, and exercise framing from enforcing tiers.
+  - description: Training scenarios can contain realistic CVEs, IP addresses, hashes, PLC IDs, timelines, and containment actions.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - purview_xml
   - yaml
@@ -68,65 +72,70 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_ot_cyber_incident
+      matches:
+        - ref: Evidence_ot_incident_case_fact
+        - ref: Evidence_ot_incident_indicator
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_public_incident_exclusion
     - confidence_level: 75
       id_match: Regex_ot_cyber_incident
       matches:
-        - ref: Pattern_global_top500_456_ot_cyber_incident_reports_label_context
-        - ref: Keyword_global_top500_456_ot_cyber_incident_reports_domain_context
+        - ref: Evidence_ot_incident_case_fact
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_public_incident_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_ot_cyber_incident
-      matches:
-        - ref: Keyword_ot_cyber_incident
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_ot_cyber_incident
       pattern: >-
-        (?is)\b(?:OT\s+cyber\s+incident|ICS\s+incident|industrial\s+cyber|SCADA\s+compromise|incident\s+report|containment\s+measures|attack\s+timeline|operational\s+technology|industrial\s+control\s+system|critical\s+infrastructure|threat\s+actor|indicators\s+of\s+compromise)\b
-    - id: Pattern_global_top500_456_ot_cyber_incident_reports_label_context
-      pattern: (?i)\b(?:ot\s+cyber\s+incident\s+reports)\b
+        (?is)\b(?:OT\s+cyber\s+incident\s+report|ICS\s+cyber\s+incident\s+report|SCADA\s+compromise\s+report|industrial\s+control\s+system\s+cyber\s+incident|operational\s+technology\s+security\s+incident\s+report)\b
+    - id: Evidence_ot_incident_indicator
+      pattern: >-
+        (?i)\b(?:CVE-\d{4}-\d{4,7}|[a-f0-9]{64}|(?:PLC|RTU|HMI|SCADA)\s*(?:asset|node|station|ID)?\s*[:#-]\s*[A-Z0-9][A-Z0-9._-]{2,}|(?:source|destination)\s+IP\s*[:=]\s*(?:\d{1,3}\.){3}\d{1,3})\b
   keywords:
-    - id: Keyword_ot_cyber_incident
+    - id: Evidence_ot_incident_case_fact
       groups:
         - match_style: word
           terms:
-            - OT cyber incident
-            - ICS incident
-            - industrial cyber
-            - SCADA compromise
-            - incident report
-            - containment measures
+            - affected asset
             - attack timeline
-            - operational technology
-            - industrial control system
-            - critical infrastructure
-            - threat actor
+            - initial access
+            - containment action
+            - containment measures
             - indicators of compromise
-      strength: specific
-    - id: Keyword_global_top500_456_ot_cyber_incident_reports_domain_context
+            - root cause
+            - recovery status
+            - operational impact
+            - outage duration
+            - observed activity
+      strength: domain
+    - id: Evidence_public_incident_exclusion
       groups:
         - match_style: word
           terms:
-            - ot cyber incident reports
-            - cyber
-            - incident
-            - reports
-      strength: domain
+            - public advisory
+            - vendor threat report
+            - news report
+            - published case study
+            - tabletop exercise
+      strength: exclusion
 risk_description: >-
   The regex identifies OT or ICS cyber incidents, industrial compromise, SCADA, containment, attack timelines, operational technology, critical infrastructure, threat actors, and indicators of compromise rather than validating a case report. A genuine report can expose affected control systems, attacker behavior, unremediated weaknesses, response measures, and operational impact, helping an adversary evade containment or repeat the intrusion. The normal unit is one industrial incident and its facility, operators, and customers, while incident-response guidance, exercises, and threat reports may use identical terms. Risk 8 and SENSITIVE reflect serious contained security and operational harm; PROTECTED would require an active critical-infrastructure compromise with a credible path to significant service, safety, or national damage.
 sensitivity_labels:
@@ -138,8 +147,11 @@ sensitivity_labels:
   nz_gov: SECRET
   ca_gov: Confidential
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: restrict the primary to OT/ICS/SCADA incident reports; require case facts at 75 and concrete indicators or control-asset identifiers at 85; reject public-report and training framing.'
   - version: 1.2.2
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1996 without changing detector or package metadata.'

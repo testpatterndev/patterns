@@ -1,17 +1,26 @@
 schema: testpattern/v1
 name: Critical Infrastructure Design
 slug: au-critical-infrastructure-design
-version: 1.4.1
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
+engine: boost_regex
 description: >-
-  Detects critical infrastructure design documents including network topology, VLAN configurations, and industrial
-  control system architectures.
+  Identifies substantive critical-infrastructure and essential-service network or control-system
+  designs. Topic phrases are retained for discovery; enforcement requires segmentation, data-flow,
+  trust-boundary, VLAN, DMZ, firewall, or OT-zone design content, and high confidence also requires a
+  populated address, VLAN, port, device, or rule detail.
 operation: >-
-  Keyword-based detection matching network topology, VLAN configuration, critical infrastructure, and essential service
-  patterns. Corroborative evidence: 13 keywords within 300 characters.
+  Regex_ci_design_topic recognises critical-infrastructure, essential-service, and OT/SCADA/ICS design
+  topics. The topic alone is discovery-only at 65. Concrete segmentation, data-flow, trust-boundary,
+  VLAN, DMZ, firewall, or zone/conduit content raises it to 75; populated network or device details reach
+  85. Enforcing tiers reject explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:critical\s+infrastructure\s+(?:network\s+)?(?:design|architecture|topology|diagram)|essential\s+service\s+(?:network|system)\s+(?:design|architecture|diagram)|(?:SCADA|ICS|OT)\s+(?:network|system)\s+(?:design|architecture|diagram))\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence requires substantive design content in critical-infrastructure, essential-service,
+  or OT scope. High confidence adds deployable network or device values.
 jurisdictions:
   - au
 regulations:
@@ -26,20 +35,26 @@ data_categories:
   - security
 test_cases:
   should_match:
-    - value: Critical infrastructure network topology diagram with VLAN configuration
-      description: Test match 1
-    - value: Power generation essential service network architecture and data flow
-      description: Test match 2
-    - value: Water treatment SCADA network diagram with DMZ segmentation
-      description: Test match 3
+    - value: Critical infrastructure network design
+      description: Low-tier probe - critical-infrastructure design topic without design content
+    - value: 'Critical infrastructure network architecture: VLAN segmentation, DMZ trust boundary, data flow, and zone and conduit model'
+      description: Medium-tier probe - substantive design without populated live values
+    - value: 'Critical infrastructure network design for a water treatment plant: network segment VLAN 120, firewall rule source IP 10.4.0.0/16 to destination IP 10.8.2.10, TCP port 502'
+      description: High-tier probe - essential-service design with populated VLAN, rule, address, and port details
   should_not_match:
     - value: Infrastructure spending on roads
       description: Non-match 1
     - value: The network connection was slow
-      description: Non-match 2
+      description: Generic connectivity statement
+    - value: 'The public guide explains critical infrastructure resilience principles.'
+      description: Public policy guidance without a system design
+    - value: 'Training example: critical infrastructure network design with VLAN 120 and source IP 10.4.0.0/16'
+      description: Explicit training content must not enforce
 false_positives:
-  - description: Generic infrastructure or network references in non-critical contexts.
-    mitigation: Require OT/ICS or essential service keywords alongside network terms.
+  - description: Public resilience guidance and vendor reference architectures discuss critical infrastructure, essential services, and network segmentation without exposing a real design.
+    mitigation: Require a critical/essential/OT design topic plus substantive segmentation, data-flow, trust-boundary, or firewall content.
+  - description: Training labs can contain realistic addresses, VLANs, ports, and firewall-rule examples.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
 exports:
   - yaml
 scope: narrow
@@ -63,80 +78,59 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_network_topology
+      id_match: Regex_ci_design_topic
       matches:
-        - ref: Keyword_critical_infrastructure
-        - ref: Keyword_network_design
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_vlan_config
-      matches:
-        - ref: Keyword_network_design
+        - ref: Evidence_ci_design_content
+        - ref: Evidence_ci_live_detail
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Regex_ip_range_internal
+      id_match: Regex_ci_design_topic
       matches:
-        - ref: Keyword_network_architecture
+        - ref: Evidence_ci_design_content
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_ci_design_topic
   regexes:
-    - id: Regex_network_topology
-      pattern: (?i)\b(?:network\s+(?:topology|architecture|diagram)|data\s+flow\s+diagram)\b
-    - id: Regex_vlan_config
-      pattern: (?i)\b(?:vlan\s+(?:id|configuration|tag)|network\s+segment(?:ation)?|dmz|air[\s\-]?gap)\b
-    - id: Regex_ip_range_internal
-      pattern: (?i)\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b
+    - id: Regex_ci_design_topic
+      pattern: >-
+        (?is)\b(?:critical\s+infrastructure\s+(?:network\s+)?(?:design|architecture|topology|diagram)|essential\s+service\s+(?:network|system)\s+(?:design|architecture|diagram)|(?:SCADA|ICS|OT)\s+(?:network|system)\s+(?:design|architecture|diagram))\b
+    - id: Evidence_ci_live_detail
+      pattern: >-
+        (?i)\b(?:VLAN\s+\d{1,4}|(?:source|destination)\s+IP\s*[:=]?\s*(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?|(?:TCP|UDP)\s+port\s+\d{1,5}|(?:firewall|router|switch|PLC|RTU|HMI)\s+(?:hostname|device|node|ID)\s*[:=]\s*[A-Za-z0-9._-]+)\b
   keywords:
-    - id: Keyword_critical_infrastructure
-      groups:
-        - match_style: word
-          terms:
-            - critical infrastructure
-            - essential service
-            - power generation
-            - water treatment
-            - electricity network
-            - gas pipeline
-            - telecommunications
-      strength: specific
-    - id: Keyword_network_design
-      groups:
-        - match_style: word
-          terms:
-            - network topology
-            - network architecture
-            - network diagram
-            - data flow
-            - system diagram
-            - infrastructure diagram
-      strength: specific
-    - id: Keyword_network_architecture
+    - id: Evidence_ci_design_content
       groups:
         - match_style: word
           terms:
             - VLAN
             - network segment
+            - network segmentation
             - text: DMZ
               case_sensitive: true
-            - air gap
+            - trust boundary
+            - data flow
             - firewall rule
             - access control list
             - network boundary
-      strength: specific
+            - zone and conduit
+            - air gap
+            - remote site
+      strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-04'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-04'
+    description: 'CI profile hardening: require essential-service or OT design content at 75 and populated network or control-device values at 85; retain critical-infrastructure scope and reject public guidance and training examples.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 534 without changing detector or package metadata.'
