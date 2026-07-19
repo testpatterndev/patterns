@@ -1,22 +1,28 @@
 schema: testpattern/v1
-name: Australian Birth Date Indicator
+name: Date of Birth
 slug: au-birth-date-indicator
-version: 2.3.0
+version: 2.3.1
 type: regex
 pattern_class: identifier
 engine: boost_regex
 description: >-
-  Identifies date-of-birth references in Australian documents using multiple structural date regex patterns (numeric slash, numeric dot, written month, ISO format) combined with birth-record and
-  personal-information keywords.
+  Detects date-of-birth references across common date formats (numeric slash/dot/hyphen, written month, ISO) when
+  birth-record labels or personal-record context are present. Covers Australian and global document styles; business
+  dates (invoice, due, expiry) and template samples are suppressed.
 operation: >-
-  Multi-format date regex matching: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, DD Month YYYY, and YYYY-MM-DD (ISO). Corroborative evidence: 3 tiers with birth-record labels plus personal-record context and
-  exclusion logic (high), explicit birth-record labels (medium), and standalone date match (low) within 300 characters.
+  Multi-format date regex matching: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, DD Month YYYY, and YYYY-MM-DD (ISO).
+  Corroborative evidence: 3 tiers with birth-record labels plus personal-record context and exclusion logic (high),
+  explicit birth-record labels (medium), and standalone date match (low) within 300 characters. Consolidated coverage
+  (merge qg-7): also covers the former global-top500-003-date-of-birth detector scope.
 pattern: >-
   \b(?:(?:0?[1-9]|[12][0-9]|3[01])[\/\-\.](?:0?[1-9]|1[012])[\/\-\.](?:19|20)\d{2}|(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:19|20)\d{2}|(?:19|20)\d{2}[\-\/](?:0[1-9]|1[012])[\-\/](?:0[1-9]|[12]\d|3[01]))\b
 confidence: medium
-confidence_justification: 'Medium confidence: date formats are common in many contexts. Birth-record keywords are essential to distinguish DOB from invoice dates, event dates, and other temporal references.'
+confidence_justification: >-
+  Medium confidence: date formats are common in many contexts. Birth-record keywords are essential to distinguish DOB
+  from invoice dates, event dates, and other temporal references.
 jurisdictions:
   - au
+  - global
 regulations:
   - AML/CTF Act (Cth)
   - IPA 2009 (Qld)
@@ -43,7 +49,7 @@ corroborative_evidence:
     - birth-record-context
 test_cases:
   should_match:
-    - value: '15/03/1990'
+    - value: 15/03/1990
       description: Exact 65 discovery probe - structured date without personal or birth-record context
     - value: 'DOB: 15/03/1990'
       description: Exact 75 probe - explicit birth-date label without broader personal-record context
@@ -72,6 +78,12 @@ test_cases:
       description: Sibling identity-document date is suppressed by the expiry-date filter
     - value: 'Published event date: 15/03/1990'
       description: Public event date has no personal or birth context and remains discovery-only
+    - value: reference 12345
+      description: Not a date (merged from companion SIT)
+    - value: see page 42
+      description: Not a date (merged from companion SIT)
+    - value: not a date here
+      description: Plain prose (merged from companion SIT)
 false_positives:
   - description: Non-DOB dates such as invoice dates, event dates, and document timestamps.
     mitigation: Require birth-record keywords in proximity. Personal-information context provides lower tier.
@@ -82,7 +94,8 @@ exports:
 scope: wide
 risk_rating: 3
 risk_description: >-
-  The pattern finds a date presented as a birth-date indicator rather than a complete identity record. A date of birth can help correlate or verify a person only when combined with a name and other identifiers. The normal isolated value is shared by many people and creates low, reversible disclosure harm. Risk 3 OFFICIAL aligns the analogue family; SENSITIVE would require an identified person plus a usable identity or account context.
+  A birth date alone is low-harm correlating PII and is shared by many people. Risk 3 OFFICIAL remains correct;
+  elevation requires a fuller identity profile or linked sensitive domain.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -198,15 +211,28 @@ purview:
 created: '2026-02-08'
 updated: '2026-07-19'
 changelog:
+  - version: 2.3.1
+    date: '2026-07-19'
+    description: >-
+      Merge global-top500-003-date-of-birth: expanded name/description/risk for combined coverage; absorbed unique test
+      cases; companion SIT deprecated.
   - version: 2.3.0
     date: '2026-07-19'
-    description: 'Targeted blocker remediation: add a bare-date 65 discovery tier, require an explicit birth-record label at 75 and both that label plus personal-record context at 85, apply template suppression across all tiers, and add exact-tier plus business/sibling/public/template probes.'
+    description: >-
+      Targeted blocker remediation: add a bare-date 65 discovery tier, require an explicit birth-record label at 75 and
+      both that label plus personal-record context at 85, apply template suppression across all tiers, and add
+      exact-tier plus business/sibling/public/template probes.
   - version: 2.2.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 520 without changing detector or package metadata.'
+    description: >-
+      v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 520 without changing
+      detector or package metadata.
   - version: 2.2.0
     date: '2026-07-09'
-    description: 'C1 verdict-model: add pattern_class: identifier — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
+    description: >-
+      C1 verdict-model: add pattern_class: identifier — classification-harness verdict class (concept patterns are
+      scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged);
+      derived by scripts/derive-pattern-class.mjs + spot review
   - version: 2.1.0
     date: '2026-07-04'
     description: case/evidence metadata update

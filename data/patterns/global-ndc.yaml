@@ -1,29 +1,30 @@
 schema: testpattern/v1
 name: US NDC Drug Code
 slug: global-ndc
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: boost_regex
 description: >-
-  Detects US National Drug Codes (NDC) used to identify drug products. Common labeler formats are
-  4-4-2, 5-3-2 and 5-4-2 (dashed) and the HIPAA 11-digit zero-padded form without separators.
+  Detects US National Drug Codes (NDC) identifying drug products, including common dashed labeler formats (4-4-2, 5-3-2,
+  5-4-2) and HIPAA 11-digit zero-padded forms. Structural NDC candidates used in pharmacy, claims, and clinical product
+  coding.
 operation: >-
-  Structural NDC label and 11-digit forms. Does not validate against the FDA NDC directory.
-  Corroborative evidence: NDC/drug/Rx keywords within 300 characters. Keyword lists: healthcare-codes,
-  healthcare-clinical.
-pattern: '\b(?:\d{5}-\d{4}-\d{2}|\d{4}-\d{4}-\d{2}|\d{5}-\d{3}-\d{2}|\d{11})\b'
+  Structural NDC label and 11-digit forms. Does not validate against the FDA NDC directory. Corroborative evidence:
+  NDC/drug/Rx keywords within 300 characters. Keyword lists: healthcare-codes, healthcare-clinical. Consolidated
+  coverage (merge qg-14): also covers the former global-ndc-code detector scope.
+pattern: \b(?:\d{5}-\d{4}-\d{2}|\d{4}-\d{4}-\d{2}|\d{5}-\d{3}-\d{2}|\d{11})\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence: digit groupings can match other catalog codes; drug/NDC keywords
-  are required for reliable detection.
+  Medium confidence: digit groupings can match other catalog codes; drug/NDC keywords are required for reliable
+  detection.
 jurisdictions:
   - us
   - global
 regulations:
   - HIPAA
-  - "FD&C Act"
-  - "CCPA/CPRA"
+  - FD&C Act
+  - CCPA/CPRA
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -42,24 +43,32 @@ corroborative_evidence:
     - healthcare-clinical
 test_cases:
   should_match:
-    - value: '0777-3105-02'
+    - value: 0777-3105-02
       description: 5-4-2 package format
-    - value: '0002-7597-01'
+    - value: 0002-7597-01
       description: Alternate 4-4-2 style padded labeler
     - value: '00002759701'
       description: 11-digit HIPAA form
   should_not_match:
-    - value: '0777-3105-0'
+    - value: 0777-3105-0
       description: Trailing group only 1 digit
     - value: '0777310502'
       description: 10 digits continuous (not 11)
-    - value: '0777-3105-021'
+    - value: 0777-3105-021
       description: Trailing group 3 digits
+    - value: 12345-678
+      description: Only 2 groups instead of 3 (missing package segment) (merged from companion SIT)
+    - value: 123-4567-01
+      description: Wrong digit count in first group (3 instead of 4 or 5) (merged from companion SIT)
+    - value: 12345-67890-1
+      description: Too many digits in second group (merged from companion SIT)
+    - value: template example placeholder record identifier
+      description: Template/sample context should be excluded even when anchor words are present (merged from companion SIT)
+    - value: Warehouse SKU 0002-3227-01
+      description: Valid-shaped inventory value must remain discovery-only (merged from companion SIT)
 false_positives:
-  - description: >-
-      SKU/catalog numbers with similar dash groups on non-drug products.
-    mitigation: >-
-      Require NDC/drug/Rx/pharmaceutical keywords.
+  - description: SKU/catalog numbers with similar dash groups on non-drug products.
+    mitigation: Require NDC/drug/Rx/pharmaceutical keywords.
 exports:
   - purview_xml
   - yaml
@@ -96,7 +105,7 @@ purview:
       id_match: Regex_global_ndc
   regexes:
     - id: Regex_global_ndc
-      pattern: '\b(?:\d{5}-\d{4}-\d{2}|\d{4}-\d{4}-\d{2}|\d{5}-\d{3}-\d{2}|\d{11})\b'
+      pattern: \b(?:\d{5}-\d{4}-\d{2}|\d{4}-\d{4}-\d{2}|\d{5}-\d{3}-\d{2}|\d{11})\b
   keywords:
     - id: Keyword_global_ndc_specific
       groups:
@@ -124,29 +133,41 @@ purview:
       strength: specific
 risk_rating: 3
 risk_description: >-
-  This regex recognises a U.S. National Drug Code in common dashed labeler formats or the eleven-digit HIPAA form, making the match a public product identifier rather than evidence that a patient received the medicine. A code can identify a drug product and package and assist inventory or billing correlation, but personal or clinical harm requires a patient, prescription, dispense event, or diagnosis context. SKU and catalogue numbers can share the same shapes, and the rule does not validate against the FDA directory. Risk 3 and OFFICIAL fit the public vocabulary value; SENSITIVE would require the NDC to be linked to an identifiable person's treatment, claim, or medication record.
+  An NDC identifies a product, not a patient. Risk 3 OFFICIAL remains correct unless combined with an identified person
+  and therapy context.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
   qgiscf_dlm: OFFICIAL
-  us_gov: "CUI Specified"
+  us_gov: CUI Specified
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
-  ca_gov: "Protected B"
+  ca_gov: Protected B
 references:
   - url: https://www.fda.gov/drugs/drug-approvals-and-databases/national-drug-code-directory
     title: FDA National Drug Code Directory
 created: '2026-07-09'
 updated: '2026-07-14'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: >-
+      Merge global-ndc-code: expanded name/description/risk for combined coverage; absorbed unique test cases; companion
+      SIT deprecated.
   - version: 1.1.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2171 without changing detector or package metadata.'
+    description: >-
+      v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2171 without changing
+      detector or package metadata.
   - version: 1.1.0
     date: '2026-07-09'
-    description: 'Quality-gate fix (Phase-1 fast-follow): short acronym NDC in the specific keyword group converted to case-sensitive per catalog convention.'
+    description: >-
+      Quality-gate fix (Phase-1 fast-follow): short acronym NDC in the specific keyword group converted to
+      case-sensitive per catalog convention.
   - version: 1.0.0
     date: '2026-07-09'
-    description: 'Initial mature identifier SIT — Phase-1 coverage backlog (Purview-safe regex, full label/risk metadata for pack workbooks)'
+    description: >-
+      Initial mature identifier SIT — Phase-1 coverage backlog (Purview-safe regex, full label/risk metadata for pack
+      workbooks)
 author: testpattern-community
 license: MIT
