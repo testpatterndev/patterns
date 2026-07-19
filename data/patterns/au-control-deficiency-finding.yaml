@@ -1,11 +1,16 @@
 schema: testpattern/v1
 name: Control Deficiency Finding
 slug: au-control-deficiency-finding
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
 description: Detects control deficiency findings from internal audits and compliance assessments.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+operation: >-
+  A material weakness, significant deficiency, control deficiency, ICFR weakness, or internal-control
+  issue is discovery-only at 65. Control-testing, key-control, ITGC, segregation-of-duties, access-control,
+  or application-control evidence raises it to 75. The 85 tier additionally requires remediation,
+  corrective action, an owner, target date, follow-up, or closure evidence. Enforcing tiers reject
+  templates and examples.
 confidence: medium
 confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
 jurisdictions:
@@ -23,17 +28,21 @@ data_categories:
   - audit
 test_cases:
   should_match:
-    - value: 'Control deficiency finding: material weakness in access control effectiveness'
-      description: Test match 1
-    - value: Significant deficiency audit finding with remediation and management response
-      description: Test match 2
-    - value: 'Control gap assessment: finding severity high, compensating control required'
-      description: Test match 3
+    - value: 'Control deficiency'
+      description: Low-tier probe - deficiency phrase without control-testing detail
+    - value: 'Control deficiency: test of controls found an access-control and segregation-of-duties failure.'
+      description: Medium-tier probe - control-testing evidence without remediation tracking
+    - value: 'Significant deficiency: control testing found an ITGC access-control failure; corrective action owner and target date assigned.'
+      description: High-tier probe - tested control failure plus remediation tracking
   should_not_match:
     - value: Quality control procedures
-      description: Non-match 1
+      description: Quality-control sibling
     - value: Remote control battery replacement
-      description: Non-match 2
+      description: Consumer-device sibling
+    - value: 'The public accounting guide defines a significant deficiency.'
+      description: Public guidance contains only the deficiency phrase
+    - value: 'Template example: significant deficiency from control testing with an ITGC failure, corrective action owner, and target date.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Generic control in non-audit contexts.
     mitigation: Require audit-specific terms like deficiency, material weakness, or finding severity.
@@ -72,12 +81,15 @@ purview:
     - confidence_level: 75
       id_match: Regex_control_deficiency
       matches:
-        - ref: Keyword_audit_general
+        - ref: Keyword_control_testing
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_control_deficiency
   regexes:
     - id: Regex_control_deficiency
       pattern: >-
@@ -130,8 +142,11 @@ purview:
             - IPPF
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; add deficiency discovery, control-testing medium, and remediation-tracking high tiers; add public/template adversarial probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 533 without changing detector or package metadata.'

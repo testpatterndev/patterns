@@ -1,8 +1,8 @@
 schema: testpattern/v1
 name: QLD Government Tender Document
 slug: au-qld-government-tender
-version: 1.4.1
-type: keyword_list
+version: 1.4.2
+type: keyword_proximity
 pattern_class: concept
 description: Detects QLD Government tender documents including procurement evaluations, pricing schedules, and evaluation criteria.
 operation: 'Keyword-based detection. Corroborative evidence: 14 keywords within 300 characters.'
@@ -26,8 +26,14 @@ data_categories:
   - financial
 test_cases:
   should_match:
+    - value: Tender invitation issued
+      description: Exact 65 discovery probe with a procurement document phrase and no response details
+    - value: 'Tender invitation: evaluation criteria attached'
+      description: Exact 75 probe with tender-process evidence
+    - value: 'Queensland Government tender invitation: evaluation criteria attached'
+      description: Exact 85 probe with tender-process and QLD Government context
     - value: 'QLD Government request for tender: evaluation criteria and value for money'
-      description: Test match 1
+      description: QLD Government request for tender with evaluation details
     - value: QTender procurement tender submission with selection criteria
       description: Test match 2
     - value: Tender evaluation report and standing offer arrangement details
@@ -37,6 +43,8 @@ test_cases:
       description: Non-match 1
     - value: Legal tender accepted
       description: Non-match 2
+    - value: Tender invitation software demo
+      description: Product-demo wording must remain discovery-only
 false_positives:
   - description: Metaphorical or currency use of tender.
     mitigation: Require procurement or RFT keywords alongside tender.
@@ -63,24 +71,50 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_tender_document
+      id_match:
+        type: any
+        ids:
+          - Pattern_tender_document
+          - Pattern_rfq_rft
       matches:
-        - ref: Evidence_procurement
+        - ref: Evidence_tender_process_context
         - ref: Evidence_qld_government
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_rfq_rft
+      id_match:
+        type: any
+        ids:
+          - Pattern_tender_document
+          - Pattern_rfq_rft
       matches:
-        - ref: Evidence_qld_government
+        - ref: Evidence_tender_process_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Pattern_tender_document
+          - Pattern_rfq_rft
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
   regexes:
     - id: Pattern_tender_document
-      pattern: (?i)\b(?:request\s+for\s+(?:tender|quotation)|rft\/\d{4}\/\d{4,5}|tender\s+(?:invitation|document))\b
+      pattern: (?i)\b(?:request\s+for\s+(?:tender|quotation)|rft\/\d{4}\/\d{4,5}|tender\s+(?:invitation|document|evaluation\s+report))\b
     - id: Pattern_rfq_rft
-      pattern: (?i)\b(?:rfq|rft|procurement\s+(?:id|reference)|queensland\s+government\s+procurement)\b
+      pattern: (?i)\b(?:rfq|rft|qtender|procurement\s+(?:id|reference)|queensland\s+government\s+procurement)\b
   keywords:
     - id: Evidence_procurement
       groups:
@@ -106,13 +140,31 @@ purview:
             - Queensland Government
             - State of Queensland
             - QLD Government
+            - QTender
             - qld.gov.au
             - Information Privacy Act 2009
             - Queensland Privacy Principles
       strength: specific
+    - id: Evidence_tender_process_context
+      groups:
+        - match_style: word
+          terms:
+            - evaluation criteria
+            - selection criteria
+            - tender submission
+            - tender response
+            - submission deadline
+            - value for money
+            - supplier
+            - contract terms
+            - standing offer arrangement
+      strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: align the evidence-gated detector to keyword_proximity, keep tender/RFT document phrases at 65 discovery, require independent evaluation or submission evidence at 75 and QLD procurement provenance at 85, broaden QTender/evaluation-report coverage, and add exact-tier plus demo probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 577 without changing detector or package metadata.'

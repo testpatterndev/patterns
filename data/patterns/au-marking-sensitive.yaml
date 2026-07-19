@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Marking - SENSITIVE
 slug: au-marking-sensitive
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -11,8 +11,12 @@ description: >-
   Legislative-Secrecy) and the Queensland (QGISCF) standalone SENSITIVE marking. Regex logic ported
   from Microsoft's canonical PSPF SIT guidance; matched case-sensitively.
 operation: >-
-  Tier 90 matches the OFFICIAL: Sensitive stem (sweeping all IMM/caveat variants). Tier 75 matches
-  the Queensland standalone SENSITIVE marking, gated by Australian-government corroborative context.
+  An uppercase SENSITIVE or OFFICIAL: Sensitive candidate is discovery-only at 65. A formal SEC,
+  classification, security-classification, protective-marking, or marking field raises it to 75;
+  explicit Australian or Queensland protective-security context can also corroborate a standalone
+  banner at 75. The 85 tier requires a complete X-Protective-Marking header with VER, NS=gov.au,
+  and a sensitive SEC field. Commercial/market-sensitive prose, public guides, training, templates,
+  and examples do not enforce.
 pattern: '\bOFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive\b'
 confidence: high
 confidence_justification: >-
@@ -38,14 +42,16 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: "Report [SEC=OFFICIAL:Sensitive]"
-      description: Email subject marking
-    - value: "This page is OFFICIAL: Sensitive"
-      description: Document banner
-    - value: "[SEC=OFFICIAL:Sensitive, ACCESS=Legal-Privilege]"
-      description: IMM variant swept into the SENSITIVE bucket
-    - value: "Queensland record marked SENSITIVE under QGISCF"
-      description: QLD standalone SENSITIVE with context
+    - value: "Document footer candidate SENSITIVE"
+      description: Low-tier probe - uppercase candidate without a formal marking field
+    - value: "Classification: OFFICIAL: Sensitive"
+      description: Medium-tier probe - formal classification field without a complete header
+    - value: "Subject [SEC=OFFICIAL:Sensitive]"
+      description: Operational email subject marking reaches the balanced tier
+    - value: "Queensland Government QGISCF briefing\nSENSITIVE"
+      description: Medium-tier probe - standalone Queensland banner with explicit government marking context
+    - value: "X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=OFFICIAL:Sensitive"
+      description: High-tier probe - complete Australian protective-marking header
   should_not_match:
     - value: "this is a sensitive topic for discussion"
       description: lowercase English word (case-sensitive exclusion)
@@ -57,6 +63,10 @@ test_cases:
       description: commercial-sensitivity collocation excluded from the QLD tier by the commercial-sensitive NOT group
     - value: "OFFICIAL: Sensitively drafted policy note avoids naming individuals"
       description: "Sensitively (adverb) must not match the OFFICIAL: Sensitive stem after the trailing \\b fix"
+    - value: "Public marking guide: Classification: OFFICIAL: Sensitive"
+      description: Public guidance quotes a formal sensitive marking
+    - value: "Template example: X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=OFFICIAL:Sensitive"
+      description: Template contains a complete formal header
 false_positives:
   - description: Uppercase SENSITIVE in non-marking headings (e.g. "COMMERCIALLY SENSITIVE").
     mitigation: QLD tier requires Australian-government corroborative evidence within 300 characters, and a dedicated NOT group excludes commercial-sensitivity collocations.
@@ -79,22 +89,36 @@ sensitivity_labels:
   ca_gov: "Protected B"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 90
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 90
-      id_match: Regex_au_sensitive_official
+    - confidence_level: 85
+      id_match: Regex_au_sensitive_complete_header
       matches:
+        - ref: Keyword_complete_marking_header
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_commercial_sensitive_exclusion
+            - Keyword_public_marking_context
     - confidence_level: 75
-      id_match: Regex_au_sensitive_qld
+      id_match: Regex_au_sensitive_formal_label
+      matches:
+        - ref: Keyword_formal_marking_label
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_commercial_sensitive_exclusion
+            - Keyword_public_marking_context
+    - confidence_level: 75
+      id_match: Regex_au_sensitive_candidate
       matches:
         - ref: Keyword_au_gov_context
         - type: any
@@ -102,28 +126,36 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_commercial_sensitive_exclusion
+            - Keyword_public_marking_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_sensitive_candidate
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_commercial_sensitive_exclusion
   regexes:
-    - id: Regex_au_sensitive_official
-      pattern: '\bOFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive\b'
-    - id: Regex_au_sensitive_qld
-      pattern: '\bSENSITIVE\b'
+    - id: Regex_au_sensitive_complete_header
+      pattern: '\bX-Protective-Marking:\s*VER=[0-9]{4}\.[0-9]+,\s*NS=gov\.au,\s*SEC=OFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive\b'
+    - id: Regex_au_sensitive_formal_label
+      pattern: '\b(?:SEC(?:URITY CLASSIFICATION)?|Security Classification|CLASSIFICATION|Classification|PROTECTIVE MARKING|Protective Marking|MARKING|Marking)\s*[:=]\s*(?:OFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive|SENSITIVE)\b'
+    - id: Regex_au_sensitive_candidate
+      pattern: '\b(?:OFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive|SENSITIVE)\b'
   keywords:
     - id: Keyword_au_gov_context
       groups:
         - match_style: word
           terms:
-            - Queensland
+            - Queensland Government
             - QGISCF
             - Australian Government
             - Commonwealth
             - PSPF
-            - department
-            - agency
+            - Protective Security Policy Framework
+      strength: specific
     - id: Keyword_commercial_sensitive_exclusion
       groups:
         - match_style: word
@@ -136,9 +168,38 @@ purview:
               case_sensitive: true
             - text: MARKET SENSITIVE
               case_sensitive: true
+    - id: Keyword_complete_marking_header
+      groups:
+        - match_style: word
+          terms:
+            - X-Protective-Marking
+            - NS=gov.au
+            - VER=
+      strength: specific
+    - id: Keyword_formal_marking_label
+      groups:
+        - match_style: word
+          terms:
+            - Classification
+            - Security Classification
+            - Protective Marking
+            - SEC=
+      strength: specific
+    - id: Keyword_public_marking_context
+      groups:
+        - match_style: word
+          terms:
+            - public marking guide
+            - marking guide
+            - style guide
+            - training material
+      strength: exclusion
 created: '2026-06-29'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Profile quality: retain bare banners as 65 discovery, enforce formal labels or explicitly government-corroborated banners at the recommended 75 tier, reserve 85 for complete headers, retain commercial exclusions, and add public/template adversarial probes.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2075 without changing detector or package metadata.'

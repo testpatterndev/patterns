@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Patent Prosecution Strategy Pre-Filing
 slug: patent-prosecution-strategy-pre-filing
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -39,6 +39,12 @@ corroborative_evidence:
     - corporate-legal
 test_cases:
   should_match:
+    - value: 'Patent strategy discussion agenda.'
+      description: Exact 65 discovery probe - patent-strategy topic without pre-filing state or analysis
+    - value: 'Patent application strategy for a pre-filing meeting before lodgement.'
+      description: Exact 75 probe - confirmed pre-filing state without claim analysis or privilege marking
+    - value: 'PRIVILEGED Patent Pre-Filing Strategy: draft claim 1 avoids Jones prior art; novelty confirmed before provisional application.'
+      description: Exact 85 probe - pre-filing state, substantive claim analysis, and privilege marking
     - value: |-
         CONFIDENTIAL — LEGAL PROFESSIONAL PRIVILEGE
         Patent Prosecution Strategy — Pre-Filing
@@ -86,24 +92,43 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
   pattern_tiers:
     - tier: high
-      confidence_level: 75
+      confidence_level: 85
       id_match: primary
       matches:
-        - ref: corroborative
+        - ref: Evidence_patent_prefiling_state
+        - ref: Evidence_patent_strategy_analysis
+        - ref: Evidence_patent_privilege_marking
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - exclusion
-      description: Patent phrase plus corroborative pre-filing/strategy evidence, gated by the authored exclusion vocabulary and granted/PCT filters
-    - tier: high
+      description: Pre-filing patent matter with substantive claim/prior-art analysis and a privilege or confidentiality marking
+    - tier: medium
+      confidence_level: 75
+      id_match: primary
+      matches:
+        - ref: Evidence_patent_prefiling_state
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - exclusion
+      description: Patent strategy or application phrase with independent pre-filing-state evidence, gated by public-patent exclusions
+    - tier: low
       confidence_level: 65
       id_match: primary
       discovery_only: true
-      description: Patent + pre-filing + prior art assessment + PROTECTED/privilege
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - exclusion
+      description: Patent strategy/application terminology for discovery inventory only
   regexes:
     - pattern: (?i)\bpatent\s+(?:prosecution|application|strategy)\b
       description: Patent prosecution terminology
@@ -112,38 +137,65 @@ purview:
     - pattern: (?i)\bprior\s+art\b
       description: Prior art reference
   keywords:
-    - group: primary
-      values:
-        - patent prosecution
-        - patent application
-        - patent strategy
-        - patent
+    - id: primary
+      groups:
+        - match_style: word
+          terms:
+            - patent prosecution
+            - patent application
+            - patent strategy
+            - patent
       strength: domain
-    - group: corroborative
-      values:
-        - pre-filing
-        - draft claims
-        - prior art
-        - freedom to operate
-        - FTO
-        - novelty
-        - privilege
-        - PROTECTED
-        - CONFIDENTIAL
-        - patentability
-        - inventive step
-        - provisional application
+    - id: Evidence_patent_prefiling_state
+      groups:
+        - match_style: word
+          terms:
+            - pre-filing
+            - before filing
+            - before lodgement
+            - filing deadline
+            - provisional application
+            - unpublished invention
       strength: domain
-    - group: exclusion
-      values:
-        - granted
-        - Patent No.
-        - published specification
-        - PCT Publication
-        - WO/
-        - PatentScope
-        - textbook
-        - examination report
+    - id: Evidence_patent_strategy_analysis
+      groups:
+        - match_style: word
+          terms:
+            - draft claims
+            - prior art
+            - freedom to operate
+            - text: FTO
+              case_sensitive: true
+            - novelty
+            - patentability
+            - inventive step
+            - design-around
+            - blocking patent
+      strength: domain
+    - id: Evidence_patent_privilege_marking
+      groups:
+        - match_style: word
+          terms:
+            - privilege
+            - privileged
+            - legal professional privilege
+            - PROTECTED
+            - CONFIDENTIAL
+            - confidential legal advice
+      strength: domain
+    - id: exclusion
+      groups:
+        - match_style: word
+          terms:
+            - granted
+            - Patent No.
+            - published specification
+            - PCT Publication
+            - text: WO/
+              case_sensitive: true
+            - PatentScope
+            - textbook
+            - examination report
       strength: domain
   filters:
     - type: exclude_pattern
@@ -161,8 +213,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Legal
 references: []
 created: '2026-02-20'
-updated: '2026-07-17'
+updated: '2026-07-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: complete the deferred evidence split into canonical pre-filing-state, substantive-strategy, and privilege/marking references; make FTO and WO/ case-sensitive; add distinct 65/75/85 tiers and exact probes while retaining granted, PCT, public, and textbook exclusions.'
   - version: 1.4.0
     date: '2026-07-17'
     description: 'TP-01537 approved reduced scope: add a policy-capable 75 tier wiring the existing primary keyword group to the existing corroborative group, NOT-gated by the existing exclusion group; the existing granted-patent-number and PCT-publication exclude_pattern filters continue to apply (all references pre-existing; no new detection structure). The 65 tier remains discovery-only. Deferred per QA/independent review: the proposed 85 tier, pending a split of the flat corroborative group into separate pre-filing-state, strategy-analysis, and privilege/marking references. The trainable-classifier recommendation for prose-heavy cases stands. Added a privileged pre-filing positive and patented-mention/textbook negatives.'

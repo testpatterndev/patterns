@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Racial or Ethnic Origin
 slug: global-racial-ethnic-origin
-version: 1.0.0
+version: 1.1.0
 type: keyword_list
 pattern_class: concept
 engine: universal
@@ -46,6 +46,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'Ethnic origin disclosure topic pending review.'
+      description: Exact 65 discovery probe - protected-attribute topic without a data-subject record
+    - value: 'Data subject profile includes an ethnic origin field.'
+      description: Exact 75 probe - data-subject record context without a populated value
+    - value: 'Patient intake record: ethnic origin value recorded as Maori; selected option confirmed.'
+      description: Exact 85 probe - data-subject record plus populated origin attribution
     - value: 'The diversity survey asks employees to record ethnic origin voluntarily.'
       description: Ethnic origin phrase present
     - value: 'Profile field captures racial identity alongside other equity data.'
@@ -59,6 +65,12 @@ test_cases:
       description: Unrelated root-word near-miss ("original" vs "origin")
     - value: 'The restaurant offers a variety of ethnic cuisines.'
       description: Topical mention ("ethnic" alone), no personal disclosure phrase
+    - value: 'Public aggregate report on population ancestry statistics by region.'
+      description: Public aggregate material is not a person-linked racial/ethnic disclosure
+    - value: 'Sample template: patient intake record, ancestry category recorded as Example Category.'
+      description: Adjacent template language is not a populated protected-attribute record
+    - value: 'Data subject profile records nationality as Canadian.'
+      description: Sibling nationality attribute does not satisfy the racial/ethnic-origin primary
 false_positives:
   - description: >-
       The bare word "origin" appears in unrelated contexts (country of origin on
@@ -73,6 +85,84 @@ exports:
   - yaml
   - regex_copy
 scope: broad
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_global_racial_ethnic_origin
+      matches:
+        - ref: Evidence_origin_record_context
+        - ref: Evidence_origin_value_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_origin_public_context
+    - confidence_level: 75
+      id_match: Pattern_global_racial_ethnic_origin
+      matches:
+        - ref: Evidence_origin_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_origin_public_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_global_racial_ethnic_origin
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_origin_public_context
+  regexes:
+    - id: Pattern_global_racial_ethnic_origin
+      pattern: '(?i)\b(?:racial\s+origin|ethnic\s+origin|race\s+and\s+ethnicity|ethnic\s+background|ethnicity\s+demographic\s+field|racial\s+identity|ethnic\s+identity|race\/ethnicity\s+data\s+field)\b'
+  keywords:
+    - id: Evidence_origin_record_context
+      groups:
+        - match_style: word
+          terms:
+            - data subject profile
+            - patient intake
+            - census response
+            - application record
+            - demographic profile
+            - case file
+      strength: domain
+    - id: Evidence_origin_value_assignment
+      groups:
+        - match_style: word
+          terms:
+            - value recorded
+            - recorded as
+            - selected option
+            - self-identifies
+            - response code
+            - category assigned
+            - stated ancestry
+      strength: specific
+    - id: Evidence_origin_public_context
+      groups:
+        - match_style: word
+          terms:
+            - public dataset
+            - public aggregate
+            - aggregate report
+            - census methodology
+            - academic paper
+            - policy document
+            - blank form
+      strength: exclusion
 risk_rating: 7
 risk_description: >-
   Racial or ethnic origin is a GDPR Article 9 special category; disclosure can lead to
@@ -86,8 +176,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-07-12'
-updated: '2026-07-12'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add a 65 topic-discovery tier, a 75 data-subject-record tier, and an 85 populated origin-attribution tier, with exact-tier and sibling/public/template probes.'
   - version: 1.0.0
     date: '2026-07-12'
     description: 'New pattern: replaces the deprecated au/global-top500-017-ethnicity-or-race attribute-value patterns (needs-EDM/ML) with an honest topic-classifier concept, modeled on global-political-opinion. Fills the D-wave coverage gap logged in c3-deprecation-report.md.'

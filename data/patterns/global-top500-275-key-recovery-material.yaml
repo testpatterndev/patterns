@@ -1,14 +1,21 @@
 schema: testpattern/v1
 name: Key recovery material
 slug: global-top500-275-key-recovery-material
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies key recovery material patterns in security and access control contexts. Detects potential exposure of sensitive security information in international systems.
+description: >-
+  Identifies key-recovery and escrow references, while reserving enforcement for
+  records that contain a structured recovery value. A phrase alone is
+  discovery-only; system identity and custody/escrow fields distinguish a
+  high-confidence recovery-material record.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 6 keywords within 240 characters. Uses additional domain-context
-  evidence and explicit exclusion logic for template/sample/test text.
+  Regex_key_recovery_phrase finds key recovery, recovery key, escrow key, or
+  break-glass. The 65 phrase tier is discovery-only. The 75 tier requires a
+  non-placeholder eight-group BitLocker-style recovery value. The 85 tier also
+  requires a named recovery system and independent custody/escrow record context.
+  Enforcing tiers reject explicit template material.
 pattern: (?is)\b(?:key\s+recovery|recovery\s+key|escrow\s+key|break-glass)\b
 confidence: medium
 confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker. Added context gating and exclusion rules improve precision and reduce incidental matches.
@@ -30,12 +37,14 @@ corroborative_evidence:
   proximity: 240
 test_cases:
   should_match:
-    - value: Break-glass recovery key escrow procedure for HSM cluster
-      description: Recovery material phrase with security context
-    - value: Key recovery request approved for KMS tenant
-      description: Key recovery anchor phrase
-    - value: Escrow key material rotated for the production KMS during the disaster recovery drill.
-      description: Escrow key anchor phrase in security operations context
+    - value: Key recovery procedure is under review
+      description: Low-tier probe - recovery phrase without a recovery value
+    - value: 'BitLocker recovery key: 103482-275911-364820-451739-528604-617395-704286-893157'
+      description: Medium-tier probe - structured recovery value without custody record
+    - value: 'BitLocker recovery key: 103482-275911-364820-451739-528604-617395-704286-893157; device ID 4f9c2; escrowed to Entra ID; custodian: endpoint-ops'
+      description: High-tier probe - structured value with system and custody metadata
+    - value: 'Break-glass recovery key 219403-308214-497125-586036-674947-763858-852769-941670'
+      description: Medium-tier probe - structured break-glass recovery value
   should_not_match:
     - value: General key performance indicators for project recovery timeline
       description: Unrelated use of key/recovery words
@@ -43,6 +52,14 @@ test_cases:
       description: No structural security anchors
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Recovery key: 103482-275911-364820-451739-528604-617395-704286'
+      description: Malformed recovery value has only seven groups
+    - value: 'BitLocker recovery key: 000000-000000-000000-000000-000000-000000-000000-000000; escrowed to Entra ID'
+      description: Repeated placeholder recovery value must not enforce
+    - value: 'Documentation example: BitLocker recovery key 103482-275911-364820-451739-528604-617395-704286-893157; escrowed to Entra ID'
+      description: Documentation quoting a complete recovery record must not enforce
+    - value: 'API key rotation completed for the production application'
+      description: Sibling secret-management activity is not key-recovery material
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -62,19 +79,20 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_key_recovery_material
+      id_match: Regex_key_recovery_phrase
       matches:
-        - ref: Pattern_global_top500_275_key_recovery_material_label_context
-        - ref: Keyword_global_top500_275_key_recovery_material_domain_context
+        - ref: Evidence_recovery_value
+        - ref: Evidence_recovery_system
+        - ref: Evidence_recovery_custody
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_key_recovery_material
+    - confidence_level: 75
+      id_match: Regex_key_recovery_phrase
       matches:
-        - ref: Keyword_key_recovery_material
+        - ref: Evidence_recovery_value
         - type: any
           min_matches: 0
           max_matches: 0
@@ -82,45 +100,36 @@ purview:
             - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_key_recovery_material
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+      id_match: Regex_key_recovery_phrase
   regexes:
-    - id: Regex_key_recovery_material
+    - id: Regex_key_recovery_phrase
       pattern: (?is)\b(?:key\s+recovery|recovery\s+key|escrow\s+key|break-glass)\b
-    - id: Pattern_global_top500_275_key_recovery_material_label_context
-      pattern: (?i)\b(?:key\s+recovery\s+material)\b
+    - id: Evidence_recovery_value
+      pattern: '(?<!\d)(?!([0-9]{6})(?:-\1){7})(?:[0-9]{6}-){7}[0-9]{6}(?!\d)'
   keywords:
-    - id: Keyword_key_recovery_material
+    - id: Evidence_recovery_system
       groups:
         - match_style: word
           terms:
-            - key recovery
-            - recovery key
-            - escrow key
-            - break-glass
-            - hsm
-            - kms
-            - disaster recovery
-            - key escrow
-            - bitlocker recovery
-            - filevault recovery
-            - master key
-            - backup key
+            - BitLocker
+            - FileVault
+            - Entra ID
+            - Active Directory
+            - HSM cluster
+            - key management service
       strength: specific
-    - id: Keyword_global_top500_275_key_recovery_material_domain_context
+    - id: Evidence_recovery_custody
       groups:
         - match_style: word
           terms:
-            - key recovery material
-            - key
-            - recovery
-            - material
-      strength: domain
+            - escrowed to
+            - custodian
+            - device ID
+            - key ID
+            - recovery record
+            - stored in escrow
+            - recovery owner
+      strength: specific
 risk_description: >-
   The pattern recognises break-glass, recovery key, key escrow, KMS, or emergency-recovery language, indicating key-recovery material or procedure without validating an actual key value. A genuine record can reveal escrow locations, recovery workflows, authorised roles, and dependencies that help an attacker target emergency access or cryptographic restoration. Continuity plans, vendor guidance, and policy discussions can match, and one record may contain process metadata rather than usable secret material. Risk 8 SENSITIVE reflects serious contained harm from substantive recovery information; PROTECTED would require actual master-key material, broad privileged access, or significant damage established by the content.
 sensitivity_labels:
@@ -132,8 +141,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: make phrase matches discovery-only, require a non-placeholder structured recovery value at 75, and require system plus custody metadata at 85; add exact-tier and malformed, placeholder, documentation, and sibling-secret negatives.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1828 without changing detector or package metadata.'

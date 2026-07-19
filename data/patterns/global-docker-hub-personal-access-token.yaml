@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Docker Hub Personal Access Token
 slug: global-docker-hub-personal-access-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -39,16 +39,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: dckr_pat_ABCDEFGHIJ1234567890abcdefgh
-      description: Docker Hub PAT, dckr_pat_ prefix + body
+      description: Exact 65 probe - Docker PAT structure without independent registry context
     - value: 'docker login -u user -p dckr_pat_zZyYxXwWvVuU0123456789-_abcdef'
-      description: Docker Hub PAT passed to docker login
-    - value: dckr_pat_aB3dE6gH9jK2mN5pQ8sTuVwXyZ012345
-      description: Mixed-case Docker Hub PAT
+      description: Exact 75 probe - token in a Docker login command
+    - value: 'Docker Hub registry secret DOCKERHUB_TOKEN=dckr_pat_aB3dE6gH9jK2mN5pQ8sTuVwXyZ012345'
+      description: Exact 85 probe - Docker Hub context plus canonical PAT assignment
   should_not_match:
     - value: dckr_pat_short
       description: Too short to be a Docker Hub PAT
     - value: ghp_ABCDEFGHIJ1234567890abcdefgh
       description: GitHub token prefix, not Docker Hub
+    - value: 'GITLAB_TOKEN=dckr_pat_ABCDEFGHIJ1234567890abcdefgh'
+      description: Sibling registry provider label does not corroborate a Docker Hub PAT
+    - value: 'Documentation example: Docker Hub registry DOCKERHUB_TOKEN=dckr_pat_ABCDEFGHIJ1234567890abcdefgh'
+      description: Documentation example containing a valid-shaped PAT is excluded
     - value: store your docker hub personal access token in CI secrets
       description: Prose mention without a token value
 false_positives:
@@ -70,9 +74,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_docker_hub_pat
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_docker_hub_pat
+      matches:
+        - ref: Keyword_docker_hub_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_docker_hub_pat
+      matches:
+        - ref: Keyword_docker_hub_context
+        - ref: Pattern_docker_hub_token_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_docker_hub_pat
+      pattern: (?<![A-Za-z0-9_-])dckr_pat_[A-Za-z0-9_-]{20,40}(?![A-Za-z0-9_-])
+    - id: Pattern_docker_hub_token_assignment
+      pattern: (?i)\b(?:DOCKERHUB_TOKEN|DOCKER_HUB_TOKEN|DOCKER_PAT)\s*[=:]
+  keywords:
+    - id: Keyword_docker_hub_context
+      groups:
+        - match_style: string
+          terms:
+            - Docker Hub registry
+            - docker login
+            - hub.docker.com
+            - Docker image push
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 Docker-registry / 85 canonical-assignment Purview contract with exact-tier, sibling-token, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1534 without changing detector or package metadata.'

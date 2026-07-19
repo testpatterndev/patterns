@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Sexual Orientation
 slug: global-sexual-orientation
-version: 1.0.1
+version: 1.1.0
 type: keyword_list
 pattern_class: concept
 engine: universal
@@ -49,6 +49,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'Sexual orientation disclosure topic pending review.'
+      description: Exact 65 discovery probe - orientation topic without a data-subject record
+    - value: 'Data subject profile includes a sexual orientation field.'
+      description: Exact 75 probe - person-record context without a populated response
+    - value: 'Patient intake record: sexual orientation recorded value bisexual; response code confirmed.'
+      description: Exact 85 probe - person record plus populated orientation attribution
     - value: "HR file notes the employee's sexual orientation as part of the diversity survey."
       description: Sexual orientation phrase present
     - value: 'The profile lists LGBTQ+ status alongside other demographic fields.'
@@ -64,6 +70,12 @@ test_cases:
       description: Unrelated "orientation" (architectural), no disclosure vocabulary
     - value: 'The team celebrated Pride month with a company-wide event.'
       description: Topical mention ("Pride"), no personal disclosure phrase
+    - value: 'Public policy document reports aggregate LGBTQ community demographics.'
+      description: Public aggregate material is not a person-linked orientation disclosure
+    - value: 'Sample template: patient intake record with optional demographic response Example Value.'
+      description: Adjacent template language is not a populated orientation record
+    - value: 'Patient intake record lists preferred pronouns as they and them.'
+      description: Sibling gender-expression data is excluded from the orientation-only Purview primary
 false_positives:
   - description: >-
       The bare word "orientation" appears in unrelated contexts (employee orientation,
@@ -84,6 +96,82 @@ exports:
   - yaml
   - regex_copy
 scope: broad
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_global_sexual_orientation
+      matches:
+        - ref: Evidence_orientation_record_context
+        - ref: Evidence_orientation_attribution
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_orientation_public_context
+    - confidence_level: 75
+      id_match: Pattern_global_sexual_orientation
+      matches:
+        - ref: Evidence_orientation_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_orientation_public_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_global_sexual_orientation
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_orientation_public_context
+  regexes:
+    - id: Pattern_global_sexual_orientation
+      pattern: '(?i)\b(?:sexual\s+orientation|LGBTQ\+?\s+status|identif(?:y|ies)\s+as\s+(?:gay|lesbian|bisexual|queer)|same-sex\s+(?:partner|spouse)|coming\s+out\s+as\s+(?:gay|lesbian|bisexual|queer))\b'
+  keywords:
+    - id: Evidence_orientation_record_context
+      groups:
+        - match_style: word
+          terms:
+            - data subject profile
+            - patient intake
+            - case record
+            - survey response
+            - member profile
+            - relationship record
+      strength: domain
+    - id: Evidence_orientation_attribution
+      groups:
+        - match_style: word
+          terms:
+            - self-identifies as
+            - recorded value
+            - 'status:'
+            - disclosed orientation
+            - partner name
+            - response code
+      strength: specific
+    - id: Evidence_orientation_public_context
+      groups:
+        - match_style: word
+          terms:
+            - public policy document
+            - public dataset
+            - aggregate statistics
+            - awareness campaign
+            - blank questionnaire
+            - training course
+      strength: exclusion
 risk_rating: 7
 risk_description: >-
   Sexual orientation is a GDPR Article 9 special category; disclosure can lead to
@@ -98,8 +186,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-07-12'
-updated: '2026-07-12'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add an orientation-only 65 topic-discovery tier, a 75 data-subject-record tier, and an 85 populated orientation-attribution tier, with exact-tier and sibling/public/template probes.'
   - version: 1.0.1
     date: '2026-07-12'
     description: 'Final-review finding: document the "coming out as" false-positive vector (non-disclosure prose like album/report release timing) in false_positives, matching the precedent files'' practice of documenting each broad alternation''s FP risk.'

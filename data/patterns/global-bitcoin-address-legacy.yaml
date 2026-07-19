@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Bitcoin Address (Legacy)
 slug: global-bitcoin-address-legacy
-version: 1.5.0
+version: 1.5.1
 type: regex
 pattern_class: identifier
 engine: universal
@@ -40,11 +40,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
-      description: Bitcoin legacy address starting with 1
+      description: Exact 65 discovery probe with a bare Base58-shaped candidate
     - value: 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy
       description: Bitcoin P2SH address starting with 3
     - value: 1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2
       description: Standard Bitcoin address
+    - value: Bitcoin address 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+      description: Exact 75 probe with explicit Bitcoin address context
+    - value: Bitcoin withdrawal address 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+      description: Exact 85 probe with chain-specific and transfer-destination context
   should_not_match:
     - value: 2A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
       description: Invalid first character (2 instead of 1 or 3)
@@ -58,6 +62,8 @@ test_cases:
       description: Bech32 addresses must not route through the legacy SIT — the misrouted bech32 tier was removed
     - value: Tutorial wallet 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy
       description: Tutorial exclusion suppresses even the discovery-only candidate
+    - value: Database key 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+      description: Valid-shaped non-wallet key must remain discovery-only
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -70,18 +76,35 @@ exports:
 scope: narrow
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_btc_legacy
+      matches:
+        - ref: Keyword_bitcoin_context
+        - ref: Keyword_transfer_destination_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_btc_legacy
+      matches:
+        - ref: Keyword_bitcoin_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_btc_legacy
       matches:
-        - ref: Pattern_global_bitcoin_address_legacy_label_context
-        - ref: Keyword_global_bitcoin_address_legacy_domain_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -117,6 +140,28 @@ purview:
             - address
             - legacy
       strength: domain
+    - id: Keyword_bitcoin_context
+      groups:
+        - match_style: word
+          terms:
+            - bitcoin
+            - bitcoin address
+            - bitcoin wallet
+            - text: BTC
+              case_sensitive: true
+            - legacy address
+      strength: domain
+    - id: Keyword_transfer_destination_context
+      groups:
+        - match_style: word
+          terms:
+            - withdrawal address
+            - deposit address
+            - destination wallet
+            - recipient address
+            - pay to
+            - transfer to
+      strength: specific
 risk_description: >-
   The detector recognises a legacy Bitcoin address, a pseudonymous destination published on the blockchain. Anyone can inspect transfers involving the address, but attributing those transactions to a person or organisation requires external identity evidence. The string provides no private key and cannot authorise spending from the associated wallet. Risk 4 OFFICIAL reflects low correlation and profiling harm; SENSITIVE requires reliable attribution or linked confidential transaction records.
 sensitivity_labels:
@@ -128,8 +173,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-17'
+updated: '2026-07-19'
 changelog:
+  - version: 1.5.1
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: retain checksum-unverified legacy shapes at 65 discovery, require explicit Bitcoin context at 75 and additional transfer-destination evidence at 85, with exact-tier and database-key probes.'
   - version: 1.5.0
     date: '2026-07-17'
     description: 'SIT alignment wave1 (TP-00807, reduced scope): removed the misrouted Bech32 tier and Regex_btc_bech32 from this Legacy SIT (Bech32 belongs to the dedicated global-bitcoin-address-bech32 SIT); the remaining context-gated legacy tier demoted 85→65 discovery_only (shape+context cannot prove Base58Check; Purview offers no checksum function) and recommended_confidence 85→65; description/operation reworded to a context-gated Base58-shaped P2PKH/P2SH candidate with the Base58Check validation claim removed; adversarial tests added. Deliberately NOT implemented: any Base58Check validator (not approved and not available in the export path) and checksum-mutation negatives (undeliverable by a shape-only regex); Keyword_cryptocurrency retained as unreferenced inventory.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Mongodb
 slug: global-mongodb-connection-string
-version: 1.3.1
+version: 1.3.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -43,11 +43,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: mongodb://user:pass@localhost
-      description: MongoDB connection string
-    - value: mongodb+srv://admin:secret@cluster.mongodb.net
-      description: MongoDB Atlas SRV connection
-    - value: mongodb://app:password@db.example.com
-      description: Remote MongoDB connection
+      description: Exact 65 probe - complete credential URI without independent config labeling
+    - value: 'MONGODB_URI=mongodb://app:S3cretValue@db.internal'
+      description: Exact 75 probe - credential URI in a MongoDB-specific config field
+    - value: 'MongoDB Atlas production MONGODB_URI=mongodb+srv://admin:S3cretValue@cluster.mongodb.net/prod?retryWrites=true'
+      description: Exact 85 probe - provider config label plus Atlas/topology evidence
   should_not_match:
     - value: mongodb://localhost/mydb
       description: Missing credentials (no user:pass@ section)
@@ -55,6 +55,12 @@ test_cases:
       description: Wrong scheme (mongo instead of mongodb)
     - value: mongodb://user@localhost
       description: Missing password in credentials
+    - value: 'POSTGRES_URL=mongodb://user:pass@localhost'
+      description: Sibling database config label does not corroborate a MongoDB URI
+    - value: 'mongodb://:pass@localhost'
+      description: Malformed MongoDB URI is missing the username
+    - value: 'Documentation example: MongoDB Atlas MONGODB_URI=mongodb+srv://admin:changeme@cluster.mongodb.net/example?retryWrites=true'
+      description: Documentation placeholder with Atlas topology is excluded
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -85,11 +91,19 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
+    - confidence_level: 65
+      discovery_only: true
       id_match: Regex_mongodb_connection
       matches:
-        - ref: Pattern_global_mongodb_connection_string_label_context
-        - ref: Keyword_global_mongodb_connection_string_domain_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_mongodb_connection
+      matches:
+        - ref: Pattern_mongodb_config_label
         - type: any
           min_matches: 0
           max_matches: 0
@@ -98,7 +112,8 @@ purview:
     - confidence_level: 85
       id_match: Regex_mongodb_connection
       matches:
-        - ref: Keyword_mongodb
+        - ref: Pattern_mongodb_config_label
+        - ref: Pattern_mongodb_topology
         - type: any
           min_matches: 0
           max_matches: 0
@@ -107,35 +122,16 @@ purview:
   regexes:
     - id: Regex_mongodb_connection
       pattern: mongodb(\+srv)?://[^:]+:[^@]+@[^/]+
-    - id: Pattern_global_mongodb_connection_string_label_context
-      pattern: (?i)\b(?:mongodb|connection|string)\b
-  keywords:
-    - id: Keyword_mongodb
-      groups:
-        - match_style: word
-          terms:
-            - mongodb
-            - mongo
-            - connection string
-            - database
-            - cluster
-            - replica set
-            - atlas
-            - credentials
-            - password
-            - authentication
-      strength: domain
-    - id: Keyword_global_mongodb_connection_string_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - mongodb
-            - connection
-            - string
-      strength: domain
+    - id: Pattern_mongodb_config_label
+      pattern: (?i)\b(?:MONGODB_URI|MONGODB_URL|MONGO_URL)\s*[=:]
+    - id: Pattern_mongodb_topology
+      pattern: (?i)(?:mongodb\.net|[?&](?:replicaSet|authSource|tls|retryWrites)=)
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Replace duplicated high tiers with an individual 65 URI discovery / 75 MongoDB-config / 85 Atlas-or-topology contract and exact-tier, sibling-provider, malformed, and documentation probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1254 without changing detector or package metadata.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Encoded Biometric Template
 slug: global-biometric-template
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -49,6 +49,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'Biometric template field pending capture.'
+      description: Exact 65 discovery probe - biometric-template label without an encoded artifact
+    - value: 'fingerprint template: TUZSAGVuY29kZWRiaW9tZXRyaWN0ZW1wbGF0ZWJsb2JkYXRh1234=='
+      description: Exact 75 probe - labelled base64 template blob without standards-format context
+    - value: "FMR\0\x01\x00\x00 ISO 19794 minutiae record enrollment export"
+      description: Exact 85 probe - standards magic marker plus explicit biometric-format context
     - value: "FMR\0\x01\x00\x00 minutiae record exported from the enrollment device"
       description: ISO 19794-2 / ANSI 378 finger minutiae magic marker FMR\0
     - value: "Header bytes FAC\0 begin the ISO 19794-5 face record."
@@ -64,6 +70,12 @@ test_cases:
       description: Near-miss ("FMRI" word) with no NUL byte and no template blob
     - value: 'The design template was approved by the marketing team yesterday.'
       description: Generic "template" with no biometric label and no base64 blob
+    - value: "Documentation example: FMR\0 ISO 19794 minutiae record enrollment export"
+      description: Documentation example contains high-tier evidence but is vetoed by the shared exclusion
+    - value: "Published specification excerpt: FAC\0 ISO 19794 face record"
+      description: Public specification excerpt is vetoed from enforcement
+    - value: 'Portrait image file attached to the customer profile.'
+      description: Sibling face image has no biometric-template label, blob, or magic marker
 false_positives:
   - description: >-
       Documentation that quotes the FMR/FIR/FAC/IIR magic markers, or a biometric-template label that
@@ -76,6 +88,87 @@ exports:
   - yaml
   - regex_copy
 scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_biometric_magic
+      matches:
+        - ref: Evidence_biometric_format_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_biometric_fixture_context
+            - Evidence_biometric_public_spec
+    - confidence_level: 75
+      id_match: Pattern_biometric_labelled_blob
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_biometric_fixture_context
+            - Evidence_biometric_public_spec
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Pattern_biometric_template_label
+          - Pattern_biometric_magic
+          - Pattern_biometric_labelled_blob
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_biometric_fixture_context
+            - Evidence_biometric_public_spec
+  regexes:
+    - id: Pattern_biometric_template_label
+      pattern: '(?i)\b(?:biometric|fingerprint|finger\s+minutiae|iris|face|facial|palm)[\s_-]?template\b'
+    - id: Pattern_biometric_magic
+      pattern: '(?<![A-Za-z0-9])(?:FMR|FIR|FAC|IIR)\x00'
+    - id: Pattern_biometric_labelled_blob
+      pattern: '(?<![A-Za-z0-9])(?:biometric|fingerprint|finger\s+minutiae|iris|face|facial|palm)[\s_-]?template[\s\S]{0,40}?[A-Za-z0-9+/]{40,}={0,2}'
+  keywords:
+    - id: Evidence_biometric_fixture_context
+      groups:
+        - match_style: word
+          terms:
+            - sample template
+            - documentation example
+            - placeholder value
+            - dummy record
+            - training example
+            - test data
+            - worked example
+      strength: exclusion
+    - id: Evidence_biometric_format_context
+      groups:
+        - match_style: word
+          terms:
+            - ISO 19794
+            - ANSI 378
+            - minutiae record
+            - finger image record
+            - face record
+            - iris record
+            - enrollment export
+            - biometric enrollment device
+      strength: domain
+    - id: Evidence_biometric_public_spec
+      groups:
+        - match_style: word
+          terms:
+            - public standard example
+            - published specification
+            - documentation extract
+            - test vector
+            - vendor manual
+      strength: exclusion
 risk_rating: 9
 risk_description: >-
   This high-confidence detector targets encoded biometric artifacts: ISO modality magic markers or substantial base64 blobs explicitly labelled as fingerprint, face, iris, or biometric templates. A genuine template can be copied, replayed, or analysed to attack biometric matching, exposing the enrolled person to durable identity harm because the underlying trait cannot be reissued like a password. The normal true positive is an encoded reusable biometric artifact. Copying or replay can compromise biometric authentication permanently because the underlying trait cannot be reset. Once corroborated as an actual Encoded Biometric Template record, risk 9 and PROTECTED Personal-Privacy are proportionate to the significant damage disclosure can cause.
@@ -88,8 +181,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-06-13'
-updated: '2026-07-15'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add a 65 biometric-label/artifact discovery tier, a 75 labelled-base64 enforcement tier, and an 85 standards-magic-plus-format-context tier, with exact-tier and sibling/public/template probes.'
   - version: 1.2.2
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1526; detector and package metadata unchanged.'

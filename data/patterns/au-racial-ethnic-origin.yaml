@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Racial or Ethnic Origin (Australia)
 slug: au-racial-ethnic-origin
-version: 1.1.0
+version: 1.2.0
 type: keyword_list
 pattern_class: concept
 engine: universal
@@ -16,9 +16,9 @@ operation: >-
   ethnic origin, race and ethnicity, ethnic background, ethnicity demographic field, racial
   identity, ethnic identity, race/ethnicity data field). Detects the presence of racial/ethnic
   subject matter in a disclosure/record context; not a structured-token detector. Pair with
-  corroborative keywords to raise precision. The Purview export is a single 65 discovery_only
-  tier built from this phrase regex verbatim — inventory only, no enforcement;
-  attributed/populated-field 75/85 enforcement awaits a separately reviewed EDM/ML design.
+  corroborative keywords to raise precision. Purview keeps the topic phrase at 65 discovery,
+  requires an Australian workforce/intake record context at 75, and requires a populated
+  attribution statement as well at 85.
 pattern: '(?i)\b(?:racial\s+origin|ethnic\s+origin|race\s+and\s+ethnicity|ethnic\s+background|ethnicity\s+demographic\s+field|racial\s+identity|ethnic\s+identity|race\/ethnicity\s+data\s+field)\b'
 confidence: low
 confidence_justification: >-
@@ -50,6 +50,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'Racial origin disclosure topic pending review.'
+      description: Exact 65 discovery probe - protected-attribute topic without a person-record context
+    - value: 'Employee diversity survey includes an ethnic origin field.'
+      description: Exact 75 probe - Australian workforce-record context without a populated response
+    - value: 'Employee diversity survey response: ethnic origin recorded as Torres Strait Islander for the employee.'
+      description: Exact 85 probe - person-record context plus a populated attribution statement
     - value: 'The diversity survey asks employees to record ethnic origin voluntarily.'
       description: Ethnic origin phrase present
     - value: 'Profile field captures racial identity alongside other equity data.'
@@ -63,6 +69,12 @@ test_cases:
       description: Unrelated root-word near-miss ("original" vs "origin")
     - value: 'The restaurant offers a variety of ethnic cuisines.'
       description: Topical mention ("ethnic" alone), no personal disclosure phrase
+    - value: 'Public aggregate report on population ancestry statistics by region.'
+      description: Public aggregate material is not a person-linked racial/ethnic disclosure
+    - value: 'Sample template: employee diversity response, ancestry category recorded as Example Category.'
+      description: Adjacent template language is not a populated protected-attribute record
+    - value: 'Nationality recorded as Australian in the employee file.'
+      description: Sibling nationality attribute does not satisfy the racial/ethnic-origin primary
 false_positives:
   - description: >-
       The bare word "origin" appears in unrelated contexts (country of origin on
@@ -79,14 +91,81 @@ exports:
 scope: broad
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_racial_ethnic_origin_topic
+      matches:
+        - ref: Evidence_au_racial_record_context
+        - ref: Evidence_au_racial_attribution
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_au_racial_public_context
+    - confidence_level: 75
+      id_match: Pattern_racial_ethnic_origin_topic
+      matches:
+        - ref: Evidence_au_racial_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_au_racial_public_context
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_racial_ethnic_origin_topic
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_au_racial_public_context
   regexes:
     - id: Pattern_racial_ethnic_origin_topic
       pattern: '(?i)\b(?:racial\s+origin|ethnic\s+origin|race\s+and\s+ethnicity|ethnic\s+background|ethnicity\s+demographic\s+field|racial\s+identity|ethnic\s+identity|race\/ethnicity\s+data\s+field)\b'
+  keywords:
+    - id: Evidence_au_racial_record_context
+      groups:
+        - match_style: word
+          terms:
+            - employee diversity survey
+            - workforce profile
+            - client intake
+            - demographic record
+            - respondent record
+            - employee record
+      strength: domain
+    - id: Evidence_au_racial_attribution
+      groups:
+        - match_style: word
+          terms:
+            - recorded as
+            - self-described
+            - selected category
+            - declared
+            - 'response:'
+            - employee response
+            - client response
+      strength: specific
+    - id: Evidence_au_racial_public_context
+      groups:
+        - match_style: word
+          terms:
+            - public aggregate
+            - aggregate statistics
+            - policy guidance
+            - census methodology
+            - academic study
+            - blank questionnaire
+      strength: exclusion
 risk_rating: 7
 risk_description: >-
   Race is a protected attribute under the Racial Discrimination Act 1975 (Cth); disclosure can
@@ -100,8 +179,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-07-12'
-updated: '2026-07-17'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: retain topic phrases as 65 discovery, require an Australian workforce/intake record at 75 and a populated racial/ethnic attribution at 85; add exact-tier and sibling/public/template probes.'
   - version: 1.1.0
     date: '2026-07-17'
     description: >-

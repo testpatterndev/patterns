@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Religious or Philosophical Beliefs (Australia)
 slug: au-religious-beliefs
-version: 1.1.0
+version: 1.2.0
 type: keyword_list
 pattern_class: concept
 engine: universal
@@ -17,9 +17,9 @@ operation: >-
   tradition, religious observance, place of worship, religious denomination, religious
   conversion record). Detects the presence of religious/belief subject matter in a
   disclosure/record context; not a structured-token detector. Pair with corroborative
-  keywords to raise precision. The Purview export is a single 65 discovery_only tier built
-  from this phrase regex verbatim — inventory only, no enforcement; person-linked 75/85
-  enforcement awaits concrete attribution evidence and educational/template exclusions.
+  keywords to raise precision. Purview keeps the topic phrase at 65 discovery, requires a
+  person-linked workplace, intake, census, or chaplaincy record at 75, and requires a populated
+  belief, denomination, observance, or accommodation statement as well at 85.
 pattern: '(?i)\b(?:religious\s+beliefs?|religious\s+affiliations?|philosophical\s+beliefs?|belief\s+systems?|faith\s+traditions?|religious\s+observance|place\s+of\s+worship|religious\s+denominations?|religious\s+conversion\s+record)\b'
 confidence: low
 confidence_justification: >-
@@ -53,6 +53,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'Religious affiliation disclosure topic pending review.'
+      description: Exact 65 discovery probe - belief topic without a person-record context
+    - value: 'Patient intake record includes a religious affiliation field.'
+      description: Exact 75 probe - person-record context without a populated belief response
+    - value: 'Employee file: religious affiliation recorded; denomination: Sikh; religious accommodation approved.'
+      description: Exact 85 probe - person record plus populated denomination/accommodation evidence
     - value: 'The intake form records religious affiliation under section 4.'
       description: Religious affiliation phrase present
     - value: 'Profile notes his faith tradition and place of worship.'
@@ -68,6 +74,12 @@ test_cases:
       description: Topical/educational mention, no personal disclosure phrase
     - value: 'Religious studies 101 is a required elective this semester.'
       description: Academic course listing, no disclosure phrase
+    - value: 'Public policy guidance explains how to collect congregation demographics.'
+      description: Public guidance is not a person-linked belief disclosure
+    - value: 'Sample template: employee file, faith response recorded as Example Faith.'
+      description: Adjacent template language is not a populated belief record
+    - value: 'Employee file records a dietary preference for the staff lunch.'
+      description: Sibling preference record does not satisfy the religious-belief primary
 false_positives:
   - description: >-
       Generic corporate or educational use of "believe"/"religion"/"religious" (values
@@ -84,14 +96,80 @@ exports:
 scope: broad
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_religious_belief_topic
+      matches:
+        - ref: Evidence_au_belief_record_context
+        - ref: Evidence_au_belief_attribution
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_au_belief_public_context
+    - confidence_level: 75
+      id_match: Pattern_religious_belief_topic
+      matches:
+        - ref: Evidence_au_belief_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_au_belief_public_context
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_religious_belief_topic
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_au_belief_public_context
   regexes:
     - id: Pattern_religious_belief_topic
       pattern: '(?i)\b(?:religious\s+beliefs?|religious\s+affiliations?|philosophical\s+beliefs?|belief\s+systems?|faith\s+traditions?|religious\s+observance|place\s+of\s+worship|religious\s+denominations?|religious\s+conversion\s+record)\b'
+  keywords:
+    - id: Evidence_au_belief_record_context
+      groups:
+        - match_style: word
+          terms:
+            - HR adjustment request
+            - employee file
+            - patient intake
+            - chaplaincy referral
+            - census response
+            - personnel record
+      strength: domain
+    - id: Evidence_au_belief_attribution
+      groups:
+        - match_style: word
+          terms:
+            - faith recorded as
+            - 'denomination:'
+            - declared belief
+            - observance requested
+            - religious accommodation approved
+            - converted to
+      strength: specific
+    - id: Evidence_au_belief_public_context
+      groups:
+        - match_style: word
+          terms:
+            - public policy guidance
+            - aggregate statistics
+            - museum catalogue
+            - academic course
+            - blank questionnaire
+            - comparative religion
+      strength: exclusion
 risk_rating: 7
 risk_description: >-
   Religion is a protected attribute under s.351 of the Fair Work Act 2009 (Cth); disclosure
@@ -105,8 +183,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-07-12'
-updated: '2026-07-17'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: retain belief topics as 65 discovery, require a person-linked workplace/intake record at 75 and a populated belief or accommodation statement at 85; add exact-tier and sibling/public/template probes.'
   - version: 1.1.0
     date: '2026-07-17'
     description: >-

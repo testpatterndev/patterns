@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: GitLab Runner Authentication Token
 slug: global-gitlab-runner-authentication-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -38,16 +38,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: glrt-ABCDEFGHIJ1234567890
-      description: GitLab runner authentication token, glrt- prefix + 20 chars
-    - value: 'CI_SERVER_TOKEN=glrt-zZyYxXwWvVuU01234567'
-      description: Labelled runner authentication token in env var
-    - value: glrt-aB3dE6gH9jK2mN5pQ8sT
-      description: Mixed-case runner authentication token
+      description: Exact 65 probe - runner-token structure without independent GitLab context
+    - value: 'GitLab runner registration credential glrt-aB3dE6gH9jK2mN5pQ8sT'
+      description: Exact 75 probe - token with GitLab runner context
+    - value: 'GitLab CI runner secret CI_SERVER_TOKEN=glrt-zZyYxXwWvVuU01234567'
+      description: Exact 85 probe - runner context plus canonical authentication assignment
   should_not_match:
     - value: glrt-tooShort
       description: Too short to be a runner authentication token
     - value: glpat-ABCDEFGHIJ1234567890
       description: GitLab PAT prefix, not a runner token
+    - value: gldt-ABCDEFGHIJ1234567890
+      description: GitLab deploy token is a sibling family, not a runner token
+    - value: 'Documentation example: GitLab CI runner CI_SERVER_TOKEN=glrt-ABCDEFGHIJ1234567890'
+      description: Documentation example containing a valid-shaped runner token is excluded
     - value: register the gitlab runner with a fresh authentication token
       description: Prose mention without a token value
 false_positives:
@@ -69,9 +73,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_gitlab_runner_authentication_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_gitlab_runner_authentication_token
+      matches:
+        - ref: Keyword_gitlab_runner_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_gitlab_runner_authentication_token
+      matches:
+        - ref: Keyword_gitlab_runner_context
+        - ref: Pattern_gitlab_runner_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_gitlab_runner_authentication_token
+      pattern: (?<![A-Za-z0-9_-])glrt-[A-Za-z0-9_-]{20}(?![A-Za-z0-9_-])
+    - id: Pattern_gitlab_runner_assignment
+      pattern: (?i)\b(?:CI_SERVER_TOKEN|GITLAB_RUNNER_TOKEN|RUNNER_AUTHENTICATION_TOKEN)\s*[=:]
+  keywords:
+    - id: Keyword_gitlab_runner_context
+      groups:
+        - match_style: string
+          terms:
+            - GitLab runner
+            - GitLab CI runner
+            - GitLab runner registration
+            - GitLab runner authentication
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 GitLab-runner / 85 authentication-assignment Purview contract with exact-tier, sibling-token, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1539 without changing detector or package metadata.'

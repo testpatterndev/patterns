@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Bitcoin Address (Bech32)
 slug: global-bitcoin-address-bech32
-version: 1.4.0
+version: 1.4.1
 type: regex
 pattern_class: identifier
 engine: universal
@@ -40,13 +40,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4
-      description: Bech32 Bitcoin address
+      description: Exact 65 discovery probe with a bare Bech32-shaped candidate
     - value: bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq
       description: Standard Bech32 address
     - value: bc1q0000000000000000000000000000000000
       description: Bech32-shaped synthetic candidate (shape only — checksum is not validated, so this discovers but proves nothing)
     - value: Bitcoin payment address bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4
-      description: Address in Bitcoin context surfaces at 65 discovery_only — enforcement withheld without checksum validation
+      description: Exact 75 probe with explicit Bitcoin address context
+    - value: Bitcoin withdrawal address bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4
+      description: Exact 85 probe with chain-specific and transfer-destination context
   should_not_match:
     - value: bc2qw508d6qejxtdg4y5r3zarvary0c5xw7k
       description: Wrong prefix (bc2 instead of bc1)
@@ -60,6 +62,8 @@ test_cases:
       description: Mixed case is invalid Bech32 — the lowercase-only shape regex rejects it
     - value: 'Documentation example: bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4'
       description: Documentation/example exclusion suppresses even the discovery-only candidate
+    - value: Database key bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4
+      description: Valid-shaped non-wallet key must remain discovery-only
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -72,12 +76,31 @@ exports:
 scope: narrow
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_bitcoin_address_bech32
+      matches:
+        - ref: Keyword_bitcoin_context
+        - ref: Keyword_transfer_destination_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_bitcoin_address_bech32
+      matches:
+        - ref: Keyword_bitcoin_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_bitcoin_address_bech32
@@ -118,6 +141,28 @@ purview:
             - address
             - bech32
       strength: domain
+    - id: Keyword_bitcoin_context
+      groups:
+        - match_style: word
+          terms:
+            - bitcoin
+            - bitcoin address
+            - bitcoin wallet
+            - text: BTC
+              case_sensitive: true
+            - bech32 address
+      strength: domain
+    - id: Keyword_transfer_destination_context
+      groups:
+        - match_style: word
+          terms:
+            - withdrawal address
+            - deposit address
+            - destination wallet
+            - recipient address
+            - pay to
+            - transfer to
+      strength: specific
 risk_description: >-
   The detector recognises a Bech32-shaped Bitcoin address candidate (prefix, charset, and length only — no BIP-173 checksum validation) with nearby financial-transaction context, so it finds a likely public blockchain destination identifier rather than a private key or wallet credential. Disclosure can link a pseudonymous address to a person or organisation and make public transaction history easier to trace, profile, or target for fraud. The address alone cannot authorise a transfer and often appears legitimately in invoices, published reports, or payment instructions. Risk 5 OFFICIAL reflects bounded linkage and targeting harm that needs external context; SENSITIVE would require a confidential identity mapping, sensitive transaction record, or other directly harmful association.
 sensitivity_labels:
@@ -129,8 +174,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-17'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.1
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: retain checksum-unverified Bech32 shapes at 65 discovery, allow context-gated 75 enforcement for explicit Bitcoin addresses and 85 only with additional transfer-destination evidence, with exact-tier and database-key probes.'
   - version: 1.4.0
     date: '2026-07-17'
     description: 'SIT alignment wave1 (TP-00806, reduced scope): the SIT is demoted to a candidate-shape prefilter — both 85 enforcing tiers removed (shape+context cannot prove a checksum; Purview offers no Bech32 checksum function), leaving the 65 discovery_only tier; recommended_confidence 85→65; shape regex tightened to lowercase-only (mixed case is invalid Bech32) with pattern-level case_sensitive: true; description/operation/risk text reworded to Bech32-shaped candidate and the BIP-173 validation claim removed; adversarial tests added. Invalid-checksum negatives were NOT added (a shape-only regex cannot deliver them); the display name field was left unchanged.'

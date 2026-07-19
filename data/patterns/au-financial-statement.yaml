@@ -1,8 +1,8 @@
 schema: testpattern/v1
 name: Financial Statement
 slug: au-financial-statement
-version: 1.4.1
-type: keyword_list
+version: 1.4.2
+type: keyword_proximity
 pattern_class: concept
 description: Detects financial statements including profit and loss, balance sheets, and income statements.
 operation: >-
@@ -25,10 +25,16 @@ data_categories:
   - business
 test_cases:
   should_match:
+    - value: Financial statements prepared
+      description: Exact 65 discovery probe with a statement phrase and no figures
+    - value: Financial statements show net profit of $1.2M
+      description: Exact 75 probe with a financial metric
+    - value: Audited financial statements show net profit of $1.2M
+      description: Exact 85 probe with a financial metric and audit provenance
     - value: Profit and loss statement for FY2025 showing net profit of $1.2M
-      description: Test match 1
-    - value: Balance sheet as at 30 June 2025 - statement of financial position
-      description: Test match 2
+      description: Profit and loss statement with reporting-period metric
+    - value: Balance sheet as at 30 June 2025 - total assets and liabilities
+      description: Balance sheet with statement values
     - value: 'Annual report financial results: EBITDA increased by 15%'
       description: Test match 3
   should_not_match:
@@ -36,6 +42,8 @@ test_cases:
       description: Non-match 1
     - value: Annual general meeting minutes
       description: Non-match 2
+    - value: Financial statements software schema
+      description: Product/schema phrase must remain discovery-only
 false_positives:
   - description: Generic financial terms in non-statement contexts.
     mitigation: Require specific financial statement terms like profit and loss or balance sheet.
@@ -64,14 +72,14 @@ purview:
     - confidence_level: 85
       id_match: Regex_financial_statement
       matches:
-        - ref: Keyword_financial_statement
+        - ref: Keyword_profit_loss
         - ref: Keyword_asic_audit
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
+    - confidence_level: 75
       id_match: Regex_financial_statement
       matches:
         - ref: Keyword_profit_loss
@@ -80,10 +88,10 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_financial_year
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_financial_statement
       matches:
-        - ref: Keyword_financial_statement
         - type: any
           min_matches: 0
           max_matches: 0
@@ -91,7 +99,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_financial_statement
-      pattern: (?i)\b(?:profit\s+and\s+loss|income\s+statement|balance\s+sheet|statement\s+of\s+financial\s+position)\b
+      pattern: (?i)\b(?:profit\s+and\s+loss(?:\s+statement)?|income\s+statement|balance\s+sheet|statement\s+of\s+financial\s+position|financial\s+statements?|annual\s+report\s+financial\s+results)\b
     - id: Regex_financial_year
       pattern: (?i)\b(?:fy\s*20\d{2}|financial\s+year\s+ended|year\s+ended\s+30\s+june)\b
   keywords:
@@ -116,6 +124,7 @@ purview:
             - audit report
             - auditor's report
             - independent audit
+            - audited financial statements
             - directors report
             - Australian Auditing Standards
       strength: specific
@@ -131,10 +140,17 @@ purview:
             - EBITDA
             - cost of goods sold
             - depreciation
+            - total assets
+            - total liabilities
+            - shareholders' equity
+            - cash flows
       strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: align the evidence-gated detector to keyword_proximity, make statement headings 65 discovery, require financial values at 75 and audit provenance at 85, broaden genuine statement heading coverage, and add exact-tier plus software-schema probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 542 without changing detector or package metadata.'

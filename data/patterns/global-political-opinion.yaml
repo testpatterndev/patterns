@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Political Opinion & Affiliation
 slug: global-political-opinion
-version: 1.2.1
+version: 1.3.0
 type: keyword_list
 pattern_class: concept
 engine: universal
@@ -46,6 +46,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'Political affiliation disclosure topic pending review.'
+      description: Exact 65 discovery probe - political attribute topic without a person-linked record
+    - value: 'Constituent profile includes a political affiliation field.'
+      description: Exact 75 probe - political record context without a populated affiliation detail
+    - value: 'Donor record: political donation amount AUD 250; contribution date 12 July; party code GRN.'
+      description: Exact 85 probe - person-linked political record with populated donation/party details
     - value: 'CRM note records the donor as a registered Democrat in the swing district.'
       description: Registered Democrat term present
     - value: 'The file lists each campaign contribution made during the election cycle.'
@@ -61,6 +67,12 @@ test_cases:
       description: Near-miss prose ("registered" but not a party), no political opinion
     - value: 'The team selected the winning design after a quick internal poll.'
       description: Unrelated prose, "poll" without political affiliation vocabulary
+    - value: 'Published election result includes aggregate party-support statistics.'
+      description: Public aggregate political material is not a person-linked opinion record
+    - value: 'Sample template: campaign donor record, amount AUD 100, contribution date 1 July.'
+      description: Adjacent template language is not a populated political-opinion record
+    - value: 'Membership file records appointment to the company board.'
+      description: Sibling organisational membership does not satisfy the political primary
 false_positives:
   - description: >-
       Phrases like "voted for" or "registered" appear in non-political contexts (board elections,
@@ -73,6 +85,82 @@ exports:
   - yaml
   - regex_copy
 scope: broad
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_political_opinion_topic
+      matches:
+        - ref: Evidence_political_record_context
+        - ref: Evidence_political_attribution
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_political_public_context
+    - confidence_level: 75
+      id_match: Pattern_political_opinion_topic
+      matches:
+        - ref: Evidence_political_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_political_public_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_political_opinion_topic
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_political_public_context
+  regexes:
+    - id: Pattern_political_opinion_topic
+      pattern: '(?i)\b(?:political\s+affiliations?|political\s+opinions?|party\s+membership|party\s+affiliations?|voted\s+for|registered\s+(?:Democrat|Republican|Green|Libertarian|to\s+vote\s+as)|political\s+donations?|campaign\s+contributions?|political\s+party\s+member|partisan\s+affiliations?|voter\s+registration\s+party)\b'
+  keywords:
+    - id: Evidence_political_record_context
+      groups:
+        - match_style: word
+          terms:
+            - voter record
+            - donor record
+            - CRM note
+            - constituent profile
+            - membership file
+            - campaign database
+      strength: domain
+    - id: Evidence_political_attribution
+      groups:
+        - match_style: word
+          terms:
+            - donation amount
+            - contribution date
+            - party code
+            - member number
+            - registration status
+            - ballot choice recorded
+      strength: specific
+    - id: Evidence_political_public_context
+      groups:
+        - match_style: word
+          terms:
+            - published election result
+            - public campaign website
+            - aggregate polling
+            - news article
+            - academic analysis
+            - blank form
+      strength: exclusion
 risk_rating: 7
 risk_description: >-
   The Political Opinion and Affiliation keyword pattern detects statements about party membership, registered-party status, political donations, campaign contributions, or recorded political affiliation. Its normal positive cases can contain a person-linked CRM or donor fact rather than only a blank category label, so disclosure may expose an individual's beliefs and enable discrimination, pressure, profiling, or targeted campaigning. Low confidence leaves room for political commentary that is not attributable to a person, but the corroborated true positive concerns one person's sensitive viewpoint or association. Risk 7 and SENSITIVE Personal-Privacy reflect credible direct personal harm, while PROTECTED would require a high-consequence bulk register, coercive targeting context, or severe safety impact.
@@ -85,8 +173,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add a 65 political-topic discovery tier, a 75 voter/donor/constituent-record tier, and an 85 populated affiliation/donation-detail tier, with exact-tier and sibling/public/template probes.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1558 without changing detector or package metadata.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Payment Card Magnetic Stripe Track 1
 slug: global-payment-card-track1
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -47,10 +47,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: '%B4111111111111111^DOE/JOHN^'
+      description: Exact 65 discovery probe with an incomplete but distinctive Track 1 prefix
     - value: '%B4111111111111111^DOE/JOHN^25051010000000000000000?'
-      description: Track 1 format-B with 16-digit fake Visa PAN, name, expiry 2505, service 101
+      description: Exact 75 probe with complete Track 1 framing
     - value: 'TRACK1=%B5500005555555559^SMITH/JANE Q^26129990000?'
-      description: Labelled Track 1 with fake Mastercard PAN and full sentinels
+      description: Exact 85 probe with complete framing and explicit Track 1 context
     - value: '%B340000000000009^CARDHOLDER/TEST^271010100?'
       description: Track 1 with 15-digit fake Amex PAN
   should_not_match:
@@ -60,6 +62,8 @@ test_cases:
       description: Bare PAN and fields without the Track 1 sentinel framing
     - value: Track 1 magnetic stripe data must never be stored after authorization
       description: Prose describing track data, no actual encoded track
+    - value: 'Parser fragment %B4111111111111111^DOE/JOHN^ without expiry fields'
+      description: Incomplete parser fragment must remain discovery-only
 false_positives:
   - description: Test or sample magnetic-stripe strings embedded in QA fixtures or payment-terminal documentation.
     mitigation: Require corroborative keywords and treat known test PANs (e.g. 4111 1111 1111 1111) as samples; confirm with surrounding transaction context.
@@ -79,9 +83,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_track1_complete
+      matches:
+        - ref: Keyword_track1_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_track1_complete
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_track1_fragment
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_track1_complete
+      pattern: '%B\d{13,19}\^[A-Za-z][^\^]{1,25}\^\d{4}\d{3}[A-Za-z0-9]{0,40}\?'
+    - id: Regex_track1_fragment
+      pattern: '%B\d{13,19}\^[A-Za-z][^\^]{1,25}\^'
+  keywords:
+    - id: Keyword_track1_context
+      groups:
+        - match_style: word
+          terms:
+            - text: TRACK1
+              case_sensitive: true
+            - Track 1 data
+            - magnetic stripe capture
+            - magstripe dump
+            - card reader export
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: use an incomplete Track 1 prefix only for 65 discovery, require complete ISO/IEC 7813 framing at 75, and require explicit track/capture context at 85, with exact-tier and parser-fragment probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1555 without changing detector or package metadata.'

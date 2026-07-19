@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: GitHub Fine-Grained PAT
 slug: global-github-pat-fine-grained
-version: 1.2.1
+version: 1.2.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -47,16 +47,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: github_pat_ABCDEFGHIJKLMNOPQRSTUV_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456
-      description: Fine-grained GitHub PAT
-    - value: github_pat_1234567890ABCDEFGHIJKL_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456
-      description: Alternate fine-grained PAT
-    - value: github_pat_00000000000000000000AB_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0000000
-      description: Another fine-grained PAT format
+      description: Exact 65 probe - segmented PAT structure without independent GitHub context
+    - value: 'GitHub fine-grained personal access credential github_pat_1234567890ABCDEFGHIJKL_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456'
+      description: Exact 75 probe - PAT with fine-grained GitHub context
+    - value: 'GitHub repository administration GH_FINE_GRAINED_PAT=github_pat_00000000000000000000AB_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0000000'
+      description: Exact 85 probe - repository context plus canonical fine-grained PAT assignment
   should_not_match:
     - value: github_pat_ABCDEFGHIJKLMNOPQRSTU_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456
       description: Too few characters in first segment (21 instead of 22)
     - value: github_tok_ABCDEFGHIJKLMNOPQRSTUV_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456
       description: Wrong prefix (github_tok instead of github_pat)
+    - value: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+      description: Classic GitHub PAT is a sibling token family, not fine-grained
+    - value: 'Documentation example: GitHub repository administration GH_FINE_GRAINED_PAT=github_pat_ABCDEFGHIJKLMNOPQRSTUV_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456'
+      description: Documentation example containing a valid-shaped PAT is excluded
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -88,16 +92,6 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Regex_github_fgpat
-      matches:
-        - ref: Pattern_global_github_pat_fine_grained_label_context
-        - ref: Keyword_global_github_pat_fine_grained_domain_context
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_github_fgpat
@@ -107,25 +101,46 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_github_fgpat
+      matches:
+        - ref: Keyword_github_fine_grained_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_github_fgpat
+      matches:
+        - ref: Keyword_github_fine_grained_context
+        - ref: Pattern_github_fine_grained_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_github_fgpat
       pattern: \bgithub_pat_[A-Za-z0-9]{22}_[A-Za-z0-9\s]{59,63}\b
-    - id: Pattern_global_github_pat_fine_grained_label_context
-      pattern: (?i)\b(?:github\s+fine\-grained\s+pat|github|fine|grained|pat)\b
+    - id: Pattern_github_fine_grained_assignment
+      pattern: (?i)\b(?:GH_FINE_GRAINED_PAT|GITHUB_FINE_GRAINED_PAT|GITHUB_PAT)\s*[=:]
   keywords:
-    - id: Keyword_global_github_pat_fine_grained_domain_context
+    - id: Keyword_github_fine_grained_context
       groups:
-        - match_style: word
+        - match_style: string
           terms:
-            - github fine-grained pat
-            - github
-            - fine
-            - grained
-            - pat
-      strength: domain
+            - GitHub fine-grained personal access
+            - GitHub repository administration
+            - GitHub organisation access
+            - GitHub fine-grained PAT
+      strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.2
+    date: '2026-07-19'
+    description: 'Add the missing balanced tier and replace generic high evidence with an individual 65 discovery / 75 fine-grained-context / 85 canonical-assignment contract plus exact-tier and adversarial probes.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1235 without changing detector or package metadata.'

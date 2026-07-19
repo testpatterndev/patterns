@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: CircleCI Personal Access Token
 slug: global-circleci-personal-access-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -41,16 +41,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: CCIPAT_ULUhR6rJLxYbyzyrP19iMZ_8fb1e3510325f7f09361de22b9420346c53ca2cb
-      description: CircleCI PAT, CCIPAT_ prefix + base58 + hex
-    - value: 'CIRCLE_TOKEN=CCIPAT_ABCDEFGHIJ1234567890ab_0123456789abcdef0123456789abcdef01234567'
-      description: Labelled CircleCI PAT in CIRCLE_TOKEN env var
-    - value: CCIPAT_zZyYxXwWvVuU0123456789_deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
-      description: CircleCI PAT with hex body
+      description: Exact 65 probe - segmented PAT without independent CircleCI context
+    - value: 'CircleCI pipeline credential CCIPAT_zZyYxXwWvVuU0123456789_deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+      description: Exact 75 probe - PAT with CircleCI pipeline context
+    - value: 'CircleCI API secret CIRCLE_TOKEN=CCIPAT_ABCDEFGHIJ1234567890ab_0123456789abcdef0123456789abcdef01234567'
+      description: Exact 85 probe - API context plus canonical CircleCI token assignment
   should_not_match:
     - value: CCIPAT_short_0123456789abcdef
       description: Hex segment too short to be a CircleCI PAT
     - value: CCIPRJ_ULUhR6rJLxYbyzyrP19iMZ_8fb1e3510325f7f09361de22b9420346c53ca2cb
       description: Project token prefix (CCIPRJ_), not a personal access token
+    - value: 'GITHUB_TOKEN=CCIPAT_ULUhR6rJLxYbyzyrP19iMZ_8fb1e3510325f7f09361de22b9420346c53ca2cb'
+      description: Sibling CI provider label does not corroborate a CircleCI PAT
+    - value: 'Documentation example: CircleCI API CIRCLE_TOKEN=CCIPAT_ULUhR6rJLxYbyzyrP19iMZ_8fb1e3510325f7f09361de22b9420346c53ca2cb'
+      description: Documentation example containing a valid-shaped PAT is excluded
     - value: generate a circleci personal access token in user settings
       description: Prose mention without a token value
 false_positives:
@@ -72,9 +76,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_circleci_personal_access_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_circleci_personal_access_token
+      matches:
+        - ref: Keyword_circleci_pat_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_circleci_personal_access_token
+      matches:
+        - ref: Keyword_circleci_pat_context
+        - ref: Pattern_circleci_token_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_circleci_personal_access_token
+      pattern: (?<![A-Za-z0-9_])CCIPAT_[A-Za-z0-9]{20,24}_[0-9a-f]{40}(?![A-Za-z0-9])
+    - id: Pattern_circleci_token_assignment
+      pattern: (?i)\b(?:CIRCLE_TOKEN|CIRCLECI_TOKEN)\s*[=:]
+  keywords:
+    - id: Keyword_circleci_pat_context
+      groups:
+        - match_style: string
+          terms:
+            - CircleCI API
+            - CircleCI pipeline
+            - CircleCI context
+            - CircleCI project
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 CircleCI-pipeline / 85 canonical-assignment Purview contract with exact-tier, sibling-token, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1529 without changing detector or package metadata.'

@@ -1,14 +1,17 @@
 schema: testpattern/v1
 name: ICCID
 slug: global-iccid
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects ICCID patterns.
 operation: >-
-  Validation: Luhn algorithm. Reference: https://onomondo.com/blog/iccid-number-explained/ Corroborative evidence: 4
-  keywords within 300 characters. Keyword lists: phone-international.
+  A 19- or 20-digit 89-prefixed candidate with Luhn validation is discovery-only at 65. An explicit
+  ICCID, SIM serial-number, UICC-ID, or integrated-circuit-card label raises it to 75. The 85 tier
+  additionally requires a subscriber account, carrier inventory, SIM assignment, activated service,
+  phone-number association, or mobile-service record. Enforcing tiers reject public documentation,
+  carrier guides, templates, and examples.
 pattern: \b89\d{17,18}\b
 confidence: high
 confidence_justification: 'High confidence: validated with Luhn algorithm and supported by corroborative keyword evidence.'
@@ -35,12 +38,12 @@ corroborative_evidence:
     - phone-international
 test_cases:
   should_match:
-    - value: '8961234567890123456'
-      description: Standard 19-digit ICCID
-    - value: '89610000000000000000'
-      description: ICCID with 20 digits
-    - value: '8901000000000000001'
-      description: Alternate ICCID format
+    - value: '8961234567890123459'
+      description: Exact 65 probe - Luhn-valid ICCID candidate without a label
+    - value: 'ICCID: 89610000000000000000'
+      description: Exact 75 probe - Luhn-valid labelled ICCID without a subscriber record
+    - value: 'Subscriber account SIM assignment - ICCID: 8901000000000000001; activated service and phone-number association confirmed.'
+      description: Exact 85 probe - Luhn-valid ICCID plus subscriber-service record
   should_not_match:
     - value: 8861234567890123456
       description: Wrong prefix (88 instead of 89)
@@ -48,6 +51,12 @@ test_cases:
       description: Too few digits (18 instead of minimum 19)
     - value: 896123456789012345678
       description: Too many digits (21 instead of maximum 20)
+    - value: '8961234567890123456'
+      description: Adversarial 19-digit candidate with an invalid Luhn check digit
+    - value: 'Public carrier guide - ICCID: 8961234567890123459'
+      description: Public guide contains a complete labelled candidate
+    - value: 'Template example: subscriber account SIM assignment ICCID 89610000000000000000 with activated service.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: >-
       Technical identifiers appearing in public documentation, network configuration guides, or example configurations
@@ -84,11 +93,23 @@ purview:
       id_match: Regex_iccid
       matches:
         - ref: Keyword_iccid
+        - ref: Keyword_iccid_subscriber_record
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_iccid_context
+    - confidence_level: 75
+      id_match: Regex_iccid
+      matches:
+        - ref: Keyword_iccid
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_public_iccid_context
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_iccid
@@ -103,21 +124,38 @@ purview:
         - match_style: word
           terms:
             - ICCID
-            - SIM card
-            - SIM number
-            - subscriber identity
-            - integrated circuit card
-            - mobile subscriber
-            - UICC
-            - telecom
-            - device
-            - identifier
-            - serial number
-            - hardware
+            - ICCID number
+            - SIM serial number
+            - UICC ID
+            - integrated circuit card identifier
+      strength: specific
+    - id: Keyword_iccid_subscriber_record
+      groups:
+        - match_style: word
+          terms:
+            - subscriber account
+            - carrier inventory
+            - SIM assignment
+            - activated service
+            - phone-number association
+            - mobile service record
+            - customer account
       strength: domain
+    - id: Keyword_public_iccid_context
+      groups:
+        - match_style: word
+          terms:
+            - public carrier guide
+            - public documentation
+            - manufacturer guide
+            - documentation example
+      strength: exclusion
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: add validated-candidate discovery, explicit-ICCID-label medium, and subscriber-record high tiers; use independently verified Luhn-valid exact-tier probes and retain an invalid-checksum negative; reject public guides/templates.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1240 without changing detector or package metadata.'

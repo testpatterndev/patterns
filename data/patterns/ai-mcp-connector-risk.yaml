@@ -1,17 +1,18 @@
 schema: testpattern/v1
 name: AI MCP / Connector Risk
 slug: ai-mcp-connector-risk
-version: 0.4.1
-type: keyword_list
+version: 0.5.0
+type: regex
 pattern_class: concept
 description: >-
   Detects risky MCP / plugin / connector descriptors: tool manifests requesting over-broad or unexplained
   scopes, or encouraging autonomous action that bypasses user approval (OWASP LLM06 / Agentic Top 10).
   Phrase detection is corroborated by AI-context markers.
 operation: >-
-  One phrase regex (Pattern_mcp_broad_scope) matching scope/permission language adjacent to wildcard/full/admin
-  grants, or approval-bypass framings, corroborated by AI-context markers. Single low tier (65 phrase only);
-  developer prototypes, sandbox tools and public sample manifests are the named FP traps.
+  Pattern_mcp_broad_scope inventories broad grants and approval-bypass clauses at 65. A connector or
+  tool-manifest signal raises the match to 75, while 85 requires that context plus both a privileged
+  scope grant and an explicit approval bypass. Enforcing tiers reject templates, demonstrations,
+  security guidance, and explicitly approved configurations.
 pattern: '(?i)(?:\b(?:scopes?|permissions?|access)\b[^.\n]{0,30}\b(?:\*|all|full|read[- ]?write\s+everything|admin)\b|\bwithout\s+(?:user\s+)?(?:approval|confirmation|consent)\b)'
 confidence: low
 confidence_justification: >-
@@ -32,11 +33,65 @@ corroborative_evidence:
   keyword_lists: [ai-context-markers]
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
   regexes:
     - id: Pattern_mcp_broad_scope
       pattern: '(?i)(?:\b(?:scopes?|permissions?|access)\b[^.\n]{0,30}\b(?:\*|all|full|read[- ]?write\s+everything|admin)\b|\bwithout\s+(?:user\s+)?(?:approval|confirmation|consent)\b)'
+    - id: Evidence_privileged_scope
+      pattern: '(?i)\b(?:scopes?|permissions?|access)\b[^.\n]{0,30}\b(?:\*|all|full|read[- ]?write\s+everything|admin)\b'
+    - id: Evidence_approval_bypass
+      pattern: '(?i)\bwithout\s+(?:user\s+)?(?:approval|confirmation|consent|authorisation|authorization)\b'
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  keywords:
+    - id: Evidence_connector_manifest
+      groups:
+        - match_style: word
+          terms:
+            - MCP server
+            - MCP tool
+            - connector manifest
+            - plugin manifest
+            - tool manifest
+            - tool definition
+            - connector configuration
+      strength: domain
+    - id: Evidence_benign_connector_context
+      groups:
+        - match_style: word
+          terms:
+            - security guidance
+            - risk guidance
+            - approved exception
+            - user approved
+            - approval required
+            - requires approval
+      strength: exclusion
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_mcp_broad_scope
+      matches:
+        - ref: Evidence_connector_manifest
+        - ref: Evidence_privileged_scope
+        - ref: Evidence_approval_bypass
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_benign_connector_context
+    - confidence_level: 75
+      id_match: Pattern_mcp_broad_scope
+      matches:
+        - ref: Evidence_connector_manifest
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_benign_connector_context
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_mcp_broad_scope
@@ -51,25 +106,32 @@ sensitivity_labels:
   uk_gov: 'OFFICIAL-SENSITIVE'
 test_cases:
   should_match:
-    - value: 'This MCP tool requests full admin access and runs actions without user approval.'
-      description: Over-broad scope + approval bypass in a tool manifest
-    - value: 'The plugin manifest grants all scopes and executes commands without confirmation.'
-      description: Wildcard scope grant plus confirmation bypass
-    - value: 'Connector requests read-write everything and acts without consent from the user.'
-      description: Over-broad read-write grant plus consent bypass
+    - value: 'Permissions requested: full access.'
+      description: Low-tier probe - broad grant without connector-manifest context
+    - value: 'MCP tool manifest requests access: full admin for calendar operations.'
+      description: Medium-tier probe - privileged grant in a connector manifest without approval bypass
+    - value: 'Connector manifest requests access: read-write everything and executes without user approval.'
+      description: High-tier probe - manifest context, privileged grant, and explicit approval bypass
   should_not_match:
     - value: 'The connector requests read-only access to the calendar.'
       description: Narrow, scoped permission (FP trap)
     - value: 'This plugin reads a single document only after the user clicks Approve.'
-      description: Scoped, approval-gated tool — no over-broad grant or bypass language
+      description: Scoped, approval-gated sibling connector
+    - value: 'Public security guidance: an MCP tool manifest must not request access: full admin without user approval.'
+      description: Public risk guidance quotes the complete risky shape
+    - value: 'Template example: connector manifest requests access: full admin without user approval.'
+      description: Explicit template containing otherwise high-tier evidence
 false_positives:
   - description: Developer prototypes, sandbox tools, and public sample manifests that legitimately request broad scopes or describe autonomous action for demonstration purposes.
     mitigation: Require AI-context corroborative markers within the proximity window and treat single phrase hits as low confidence; exclude known sample/template manifests.
   - description: Documentation and security guidance that quotes broad-scope or approval-bypass language when explaining the risk rather than configuring a real connector.
     mitigation: Layer with manifest/scope analysis and confirm the language appears in an actual tool definition, not prose about tool definitions.
 created: '2026-06-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 0.5.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; add manifest-gated medium and privileged-scope-plus-approval-bypass high tiers; exclude guidance/templates and add exact-tier adversarial probes.'
   - version: 0.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1514 without changing detector or package metadata.'

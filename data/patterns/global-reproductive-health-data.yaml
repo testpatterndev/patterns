@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Reproductive & Sexual Health Data
 slug: global-reproductive-health-data
-version: 1.3.1
+version: 1.3.2
 type: keyword_list
 pattern_class: concept
 engine: universal
@@ -46,10 +46,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'The policy covers reproductive health services.'
+      description: Exact 65 discovery probe with reproductive-health subject matter but no clinical or person context
     - value: 'Patient record notes the prescription of mifepristone for the procedure.'
-      description: Mifepristone term present in a clinical context
+      description: Exact 85 probe with clinical and person-record context
     - value: 'The clinic confirmed the pregnancy and scheduled prenatal care follow-up.'
-      description: Pregnancy / prenatal care terms present
+      description: Exact 75 probe with clinical context but no person record
     - value: 'Referral for gender-affirming care was added to the patient chart.'
       description: Gender-affirming care term present
     - value: 'Lab result shows HIV status pending confirmation from the provider.'
@@ -61,6 +63,10 @@ test_cases:
       description: Near-miss prose ("plan" but not "Plan B"), no reproductive terms
     - value: 'The engineering team merged the new feature branch this morning.'
       description: Unrelated prose with no reproductive-health vocabulary
+    - value: 'Plan B remains our fallback for the product launch.'
+      description: Colloquial Plan B reference may surface in discovery but must not enforce
+    - value: 'The theatre review described a pregnant pause before the final scene.'
+      description: Figurative pregnant wording may surface in discovery but must not enforce
 false_positives:
   - description: >-
       Generic terms like "Plan B", "fertility" or "sexual health" appear in colloquial, agricultural,
@@ -84,9 +90,76 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_reproductive_health_topic
+      matches:
+        - ref: Keyword_clinical_context
+        - ref: Keyword_person_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_reproductive_health_topic
+      matches:
+        - ref: Keyword_clinical_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_reproductive_health_topic
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_reproductive_health_topic
+      pattern: '(?i)\b(?:abortion|pregnan(?:cy|t)|miscarriage|contracepti(?:on|ve|ves)|fertility\s+treatments?|in\s+vitro\s+fertili[sz]ation|IVF|menstrual\s+cycle|mifepristone|misoprostol|Plan\s+B|emergency\s+contraception|gender[\s-]+affirming\s+care|gender\s+reassignment|hormone\s+(?:replacement\s+)?therapy|STI\s+status|STD\s+status|HIV\s+status|reproductive\s+health|sexual\s+health|prenatal\s+care|postpartum)\b'
+  keywords:
+    - id: Keyword_clinical_context
+      groups:
+        - match_style: word
+          terms:
+            - clinic
+            - diagnosis
+            - prescription
+            - provider
+            - appointment
+            - lab result
+            - treatment
+            - referral
+      strength: domain
+    - id: Keyword_person_record_context
+      groups:
+        - match_style: word
+          terms:
+            - patient
+            - patient record
+            - medical record
+            - patient chart
+            - case notes
+            - date of birth
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: add a topic-only 65 discovery tier, require independent clinical context at 75 and person-record linkage at 85, with exact-tier and colloquial/agricultural adversarial probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1561 without changing detector or package metadata.'

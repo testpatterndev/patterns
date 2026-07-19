@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Hugging Face Access Token
 slug: global-huggingface-access-token
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,7 +9,11 @@ description: >-
   Detects Hugging Face user access tokens (hf_ prefix), used to authenticate to the
   Hugging Face Hub API. A leaked token grants access to private models, datasets and
   Spaces, and can incur inference billing.
-operation: 'Prefixed token format hf_ followed by 34 alphanumeric characters. Corroborative evidence: keywords within 300 characters.'
+operation: >-
+  The complete hf_ token shape is discovery-only at 65. An explicit Hugging Face credential label
+  raises it to 75, while 85 additionally requires production, deployment, environment-variable,
+  private-repository, or live-inference context. Enforcing tiers reject documentation, samples,
+  placeholders, and templates.
 pattern: (?<![A-Za-z0-9_])hf_[A-Za-z0-9]{34}(?![A-Za-z0-9])
 confidence: high
 confidence_justification: >-
@@ -37,14 +41,81 @@ corroborative_evidence:
     - transformers
     - inference api
   proximity: 300
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_huggingface_token
+      matches:
+        - ref: Evidence_huggingface_label
+        - ref: Evidence_live_hub_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_documentation_context
+    - confidence_level: 75
+      id_match: Regex_huggingface_token
+      matches:
+        - ref: Evidence_huggingface_label
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_documentation_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_huggingface_token
+  regexes:
+    - id: Regex_huggingface_token
+      pattern: (?<![A-Za-z0-9_])hf_[A-Za-z0-9]{34}(?![A-Za-z0-9])
+  keywords:
+    - id: Evidence_huggingface_label
+      groups:
+        - match_style: word
+          terms:
+            - Hugging Face access token
+            - Hugging Face API token
+            - HuggingFace token
+            - HF_TOKEN
+            - HUGGING_FACE_HUB_TOKEN
+      strength: specific
+    - id: Evidence_live_hub_context
+      groups:
+        - match_style: word
+          terms:
+            - production deployment
+            - production inference
+            - live inference
+            - environment variable
+            - deployment secret
+            - private model repository
+            - private dataset
+      strength: specific
+    - id: Evidence_documentation_context
+      groups:
+        - match_style: word
+          terms:
+            - public documentation
+            - documentation example
+            - sample configuration
+            - placeholder token
+      strength: exclusion
 test_cases:
   should_match:
     - value: hf_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh
-      description: Hugging Face access token, hf_ prefix + 34 chars
-    - value: 'HF_TOKEN=hf_zyxwvutsrqponmlkjihgfedcba01234567'
-      description: Labelled Hugging Face token in an env assignment
-    - value: hf_aB3dE6gH9jK2mN5pQ8sT1uV4wX7yZ0pLkJ
-      description: Mixed-case Hugging Face token
+      description: Low-tier probe - complete token without provider or deployment context
+    - value: 'Hugging Face access token: hf_aB3dE6gH9jK2mN5pQ8sT1uV4wX7yZ0pLkJ'
+      description: Medium-tier probe - provider-labelled token without live deployment context
+    - value: 'Production inference deployment secret HF_TOKEN=hf_zyxwvutsrqponmlkjihgfedcba01234567'
+      description: High-tier probe - provider label plus live inference context
   should_not_match:
     - value: hf_ABCDEFGHIJKLMNOP
       description: Too short to be a valid Hugging Face token
@@ -52,6 +123,10 @@ test_cases:
       description: Wrong prefix (hg_ instead of hf_)
     - value: load the model with your hugging face access token set as HF_TOKEN
       description: Prose mention without a token value
+    - value: 'Public documentation example: production deployment HF_TOKEN=hf_zyxwvutsrqponmlkjihgfedcba01234567'
+      description: Public example containing a structurally complete token
+    - value: 'Template placeholder token: Hugging Face access token hf_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh for production inference'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Documentation or examples showing placeholder hf_ strings.
     mitigation: Require corroborative keywords and check for placeholder markers (example, xxxx).
@@ -72,8 +147,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Profile quality: add bare-token discovery, provider-labelled medium, and live-Hub high tiers; reject documentation/templates and add exact-tier adversarial probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1544 without changing detector or package metadata.'

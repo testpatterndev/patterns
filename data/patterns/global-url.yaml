@@ -1,12 +1,17 @@
 schema: testpattern/v1
 name: URL
 slug: global-url
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects URL patterns.
-operation: 'Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-personal. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.'
+operation: >-
+  Any HTTP(S) URL is discovery-only at 65. An explicit callback URL, webhook URL, redirect URI, API
+  endpoint, service endpoint, or endpoint-URL label raises it to 75. The 85 tier additionally requires
+  production, internal/private, authentication, admin, signed-link, token-parameter, or webhook-secret
+  context. Enforcing tiers reject public documentation, tutorials, sample configurations, templates,
+  and examples.
 pattern: \bhttps?://[^\s<>"{}|\^`\[\]]+\b
 confidence: medium
 confidence_justification: >-
@@ -37,11 +42,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: https://example.com/path
-      description: HTTPS URL
-    - value: http://api.example.com/v1/data
-      description: HTTP API URL
-    - value: https://sub.domain.co.uk/page?q=1
-      description: URL with query parameters
+      description: Low-tier probe - ordinary URL without an operational label
+    - value: 'Webhook URL: https://hooks.example.net/events'
+      description: Medium-tier probe - operational URL label without sensitive endpoint context
+    - value: 'Production endpoint - webhook URL: https://hooks.corp.local/admin?signature=abc123'
+      description: High-tier probe - operational label plus production, internal, admin, and signed-link context
   should_not_match:
     - value: ftp://files.example.com/doc
       description: FTP scheme instead of HTTP/HTTPS
@@ -51,6 +56,10 @@ test_cases:
       description: Missing scheme name before ://
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Public documentation: webhook URL https://docs.example.com/hooks'
+      description: Public documentation contains a complete operationally labelled URL
+    - value: 'Template example: production endpoint webhook URL https://hooks.corp.local/admin?signature=abc123'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Common words and phrases related to url appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -67,22 +76,23 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 85
       id_match: Regex_url
       matches:
-        - ref: Pattern_global_url_label_context
+        - ref: Keyword_url
         - ref: Keyword_global_url_domain_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_url_context
     - confidence_level: 75
       id_match: Regex_url
       matches:
@@ -92,15 +102,10 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_url_context
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_url
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_url
       pattern: \bhttps?://[^\s<>"{}|\^`\[\]]+\b
@@ -111,25 +116,35 @@ purview:
       groups:
         - match_style: word
           terms:
-            - text: URL
-              case_sensitive: true
-            - website
-            - link
-            - endpoint
-            - href
-            - redirect
-            - callback
-            - webhook
-            - text: API
-              case_sensitive: true
-            - domain
+            - callback URL
+            - webhook URL
+            - redirect URI
+            - API endpoint
+            - service endpoint
+            - endpoint URL
       strength: domain
     - id: Keyword_global_url_domain_context
       groups:
         - match_style: word
           terms:
-            - url
+            - production endpoint
+            - internal API
+            - private endpoint
+            - authentication callback
+            - admin portal
+            - signed URL
+            - access token parameter
+            - webhook secret
       strength: domain
+    - id: Keyword_public_url_context
+      groups:
+        - match_style: word
+          terms:
+            - public documentation
+            - tutorial
+            - sample configuration
+            - documentation example
+      strength: exclusion
 risk_description: >-
   This broad identifier detector recognises one HTTP or HTTPS URL, not the content, owner, or trustworthiness of the destination. A non-public URL can disclose an internal host, document path, or application route, and a query string may carry more sensitive values, but ordinary public links are harmless. The normal match therefore causes bounded harm and usually needs surrounding access, token, or system context before misuse is credible. Risk 5 and OFFICIAL are appropriate; signed links, embedded credentials, or protected internal endpoints would raise the enclosing record.
 sensitivity_labels:
@@ -141,8 +156,11 @@ sensitivity_labels:
   nz_gov: UNCLASSIFIED
   ca_gov: Unclassified
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: replace duplicate medium paths with URL discovery, operational-label medium, and sensitive-endpoint high tiers; reject public samples/templates and add exact-tier probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1272 without changing detector or package metadata.'

@@ -1,14 +1,21 @@
 schema: testpattern/v1
 name: PKCS#8 Private Key Header
 slug: global-pkcs8-private
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects PKCS#8 private key PEM headers in source code, configuration files, and documents. Private keys should never appear in plaintext.
+description: >-
+  Detects unencrypted PKCS#8 private-key armor. The generic BEGIN PRIVATE KEY
+  marker is discovery-only; a DER algorithm prelude supports medium confidence,
+  and near-header wrapped body data or an exact compact-key prelude reaches high.
 operation: >-
-  Reference: https://www.rfc-editor.org/rfc/rfc7468 Corroborative evidence: 7 keywords within 300 characters. Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion
-  logic for template/sample/test text.
+  Regex_pkcs8_private matches the PKCS#8 BEGIN marker. The 75 tier requires an
+  adjacent DER Base64 prelude used by PKCS#8. The 85 tier additionally requires
+  two consecutive 64-character body lines, or the exact PKCS#8 AlgorithmIdentifier
+  prelude used by compact Ed25519, X25519, Ed448, and X448 keys. All enforcing
+  evidence is within 300 characters of the header; 65 inventories header-only
+  candidates.
 pattern: '-----BEGIN PRIVATE KEY-----'
 confidence: high
 confidence_justification: >-
@@ -44,22 +51,51 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: '-----BEGIN PRIVATE KEY-----'
-      description: PKCS#8 private key PEM header
+      description: Low-tier probe - generic PKCS#8 armor header only
     - value: |-
         -----BEGIN PRIVATE KEY-----
-        MIIE...
-      description: PKCS#8 key with data following header
+        MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCaPO2QBzKYKwDi
+        QQ==
+      description: Medium-tier probe - realistic first PKCS#8 DER armor line
     - value: |-
         -----BEGIN PRIVATE KEY-----
-        Proc-Type:
-      description: Encrypted PKCS#8 private key header
+        MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCaPO2QBzKYKwDi
+        k8qK+5bw7VyHxKzg8V+Pw3+QsewdCZi2ueNFTlIMOo0s2ZX/b1QLzu4lu08pMD1x
+        ioxlDQbNb1tOxNoLnGBz1eLzKyraT6AMjuQhLCPHYJTq6Mv9e8GBQ0yljRZuUt04
+        pXObu8jeQB7Hq+h3gqXsrlEFxc4CIxjzj+WNWhG1XsOLztFPW71Y8lI3EbWp1ERs
+        ALFXSqS3Wp67KJUQqspdXP+tNkgyd3Ch48Xu64zI0zP/t7LB9Qmty1eU2S/iPC/l
+        2bvvlwQwXDsjjTp5JzVjtxGNyYY6gWwud1A557OgC3bk++TtOdoBsdfYf9yZOLmi
+        -----END PRIVATE KEY-----
+      description: High-tier probe - realistically long PKCS#8 body with footer beyond proximity
+    - value: |-
+        -----BEGIN PRIVATE KEY-----
+        MC4CAQAwBQYDK2VwBCIEIG85OP50XkCl35ewCA8uIVxShBRJnyyYxGgT51XmyVA=
+        -----END PRIVATE KEY-----
+      description: High-tier compact-key probe - one-line Ed25519 PKCS#8 body
   should_not_match:
     - value: '-----BEGIN PUBLIC KEY-----'
       description: Public key, not private
     - value: '-----BEGIN CERTIFICATE-----'
       description: Certificate, not private key
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: |-
+        -----BEGIN PRIVATE KEY-----
+        QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ
+        AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      description: Adversarial wrapped Base64 lacks a PKCS#8 DER prelude
+    - value: |-
+        -----BEGIN PRIVATE KEY-----
+        PLACEHOLDER
+        -----END PRIVATE KEY-----
+      description: Placeholder body lacks DER structure
+    - value: |-
+        Documentation example:
+        -----BEGIN PRIVATE KEY-----
+        MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCaPO2QBzKYKwDi
+        k8qK+5bw7VyHxKzg8V+Pw3+QsewdCZi2ueNFTlIMOo0s2ZX/b1QLzu4lu08pMD1x
+        -----END PRIVATE KEY-----
+      description: Documentation quoting realistic wrapped PKCS#8 data must not enforce
+    - value: '-----BEGIN ENCRYPTED PRIVATE KEY-----'
+      description: Sibling encrypted PKCS#8 container has a different armor label
 false_positives:
   - description: PEM-encoded certificates or public keys that use similar header formats
     mitigation: The pattern specifically matches the private key header text, but verify the full PEM block contains actual key material.
@@ -89,61 +125,44 @@ purview:
     - confidence_level: 85
       id_match: Regex_pkcs8_private
       matches:
-        - ref: Pattern_global_pkcs8_private_label_context
-        - ref: Keyword_global_pkcs8_private_domain_context
+        - ref: Evidence_pkcs8_der_prelude
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_pkcs8_multiline_body
+            - Evidence_pkcs8_compact_algorithm
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
+    - confidence_level: 75
       id_match: Regex_pkcs8_private
       matches:
-        - ref: Keyword_pkcs8_private
+        - ref: Evidence_pkcs8_der_prelude
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_pkcs8_private
   regexes:
     - id: Regex_pkcs8_private
       pattern: '-----BEGIN PRIVATE KEY-----'
-    - id: Pattern_global_pkcs8_private_label_context
-      pattern: (?i)\b(?:pkcs\#8\s+private\s+key\s+header|pkcs|private|key|header|pkcs8)\b
-  keywords:
-    - id: Keyword_pkcs8_private
-      groups:
-        - match_style: word
-          terms:
-            - private key
-            - PKCS
-            - key file
-            - text: PEM
-              case_sensitive: true
-            - certificate
-            - cryptographic
-            - encryption
-            - text: TLS
-              case_sensitive: true
-            - text: SSL
-              case_sensitive: true
-            - x509
-            - key pair
-      strength: domain
-    - id: Keyword_global_pkcs8_private_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - pkcs#8 private key header
-            - pkcs
-            - private
-            - key
-            - header
-            - pkcs8
-      strength: domain
+    - id: Evidence_pkcs8_der_prelude
+      pattern: '(?:\r?\n)(?:(?:MII|MIG)[A-Za-z0-9+/]{45,61}|M(?:C4|Ec|EY)CAQAwBQYDK2V[uvwx][A-Za-z0-9+/]{40,48})={0,2}(?:\r?\n)'
+    - id: Evidence_pkcs8_multiline_body
+      pattern: '(?:\r?\n)(?:[A-Za-z0-9+/]{64}\r?\n){2}'
+    - id: Evidence_pkcs8_compact_algorithm
+      pattern: '(?:\r?\n)M(?:C4|Ec|EY)CAQAwBQYDK2V[uvwx][A-Za-z0-9+/]{40,48}={0,2}(?:\r?\n)'
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Independent-review blocker remediation: keep generic-header discovery at 65, require a PKCS#8 DER prelude at 75, and require near-header wrapped body lines or an exact compact Ed/X algorithm prelude at 85. Long RSA and compact Ed25519 positives prove both normal forms enforce without a distant footer; adversarial wrapped-Base64, placeholder, documentation, and sibling-container negatives protect rejection.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1261 without changing detector or package metadata.'

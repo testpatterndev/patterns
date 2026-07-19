@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Cloudflare API Token
 slug: global-cloudflare-api-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -40,17 +40,21 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: 'CLOUDFLARE_API_TOKEN=v1A2b3C4d5E6f7G8h9I0jK1lM2nO3pQ4rS5tU6v7'
-      description: Cloudflare API token in labelled env var (context + 40 chars)
-    - value: 'cloudflare: aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcd'
-      description: 40-char Cloudflare token with cloudflare label
     - value: 'cf_api_token = zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIhHgG'
-      description: cf_api_token label followed by 40-char token
+      description: Exact 65 probe - structurally valid labelled token without independent account context
+    - value: 'Cloudflare zone credential cloudflare: aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcd'
+      description: Exact 75 probe - token plus a Cloudflare resource context
+    - value: 'Cloudflare account API endpoint api.cloudflare.com/client/v4; CLOUDFLARE_API_TOKEN=v1A2b3C4d5E6f7G8h9I0jK1lM2nO3pQ4rS5tU6v7'
+      description: Exact 85 probe - account context, canonical assignment, and Cloudflare API endpoint
   should_not_match:
     - value: 'cloudflare: shorttoken123'
       description: Token too short even with Cloudflare context
     - value: aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcd
       description: 40-char string with no Cloudflare context (too generic)
+    - value: 'github_token=aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcd'
+      description: Sibling provider assignment with the same generic value length
+    - value: 'Documentation example: Cloudflare account api.cloudflare.com/client/v4 CLOUDFLARE_API_TOKEN=v1A2b3C4d5E6f7G8h9I0jK1lM2nO3pQ4rS5tU6v7'
+      description: Instructional example containing a syntactically valid token is excluded
     - value: rotate the cloudflare api token in the dashboard
       description: Prose mention without a token value
 false_positives:
@@ -72,9 +76,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_cloudflare_api_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_cloudflare_api_token
+      matches:
+        - ref: Keyword_cloudflare_resource_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_cloudflare_api_token
+      matches:
+        - ref: Keyword_cloudflare_resource_context
+        - ref: Pattern_cloudflare_api_endpoint
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_cloudflare_api_token
+      pattern: (?i)(?:cloudflare|cf[_-]?api[_-]?token|cf[_-]?token)(?:[_-]?api[_-]?token)?["'\s:=]{1,5}(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{40}(?![A-Za-z0-9_-])
+    - id: Pattern_cloudflare_api_endpoint
+      pattern: (?i)api\.cloudflare\.com/client/v4
+  keywords:
+    - id: Keyword_cloudflare_resource_context
+      groups:
+        - match_style: string
+          terms:
+            - Cloudflare account
+            - Cloudflare zone
+            - Cloudflare Worker
+            - Cloudflare DNS
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 resource-context / 85 API-endpoint Purview contract with exact-tier and adversarial token probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1530 without changing detector or package metadata.'

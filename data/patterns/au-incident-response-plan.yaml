@@ -1,11 +1,15 @@
 schema: testpattern/v1
 name: Incident Response Plan
 slug: au-incident-response-plan
-version: 1.2.1
-type: keyword_list
+version: 1.3.0
+type: regex
 pattern_class: concept
 description: Detects incident response plans containing containment procedures and escalation matrices.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+operation: >-
+  An incident-response plan, playbook, procedure, or IRP title is discovery-only at 65. Containment,
+  eradication, forensic, IOC, or lessons-learned content raises it to 75. The 85 tier additionally
+  requires escalation, on-call, severity, or priority-routing evidence. Enforcing tiers reject explicit
+  templates and examples.
 confidence: medium
 confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
 jurisdictions:
@@ -24,17 +28,21 @@ data_categories:
   - technology
 test_cases:
   should_match:
-    - value: 'Incident response plan: containment and eradication procedures by incident commander'
-      description: Test match 1
-    - value: IRP with incident classification, severity level, and incident timeline
-      description: Test match 2
-    - value: 'Post-incident review: lessons learned and recovery procedure documentation'
-      description: Test match 3
+    - value: 'Incident response plan'
+      description: Low-tier probe - plan title without response procedures
+    - value: 'Incident response plan: containment, eradication, and forensic analysis.'
+      description: Medium-tier probe - substantive response lifecycle without escalation routing
+    - value: 'Security incident response plan: containment and forensic investigation with severity level and on-call escalation path.'
+      description: High-tier probe - response lifecycle plus severity and escalation evidence
   should_not_match:
     - value: Incident report for workplace injury
-      description: Non-match 1
+      description: Workplace-safety sibling
     - value: Traffic incident on the highway
-      description: Non-match 2
+      description: Traffic-incident prose
+    - value: 'The public cyber guide links to an incident response plan.'
+      description: Public guidance mentions only the document title
+    - value: 'Template example: incident response plan with containment, forensic analysis, severity level, and escalation path.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Generic incident references in non-cyber contexts.
     mitigation: Require cyber-specific terms like IRP, containment, or incident commander.
@@ -55,16 +63,33 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Regex_incident_response_plan
       matches:
         - ref: Keyword_incident_response
         - ref: Keyword_escalation
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_incident_response_plan
       matches:
-        - ref: Keyword_it_operations
+        - ref: Keyword_incident_response
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_incident_response_plan
   regexes:
     - id: Regex_incident_response_plan
       pattern: >-
@@ -74,11 +99,8 @@ purview:
       groups:
         - match_style: word
           terms:
-            - incident response
-            - incident handling
             - containment
             - eradication
-            - recovery
             - lessons learned
             - forensic analysis
             - forensic investigation
@@ -113,8 +135,11 @@ purview:
             - ITIL
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; add title discovery, response-lifecycle medium, and escalation-corroborated high tiers; add public/template adversarial probes.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 547 without changing detector or package metadata.'

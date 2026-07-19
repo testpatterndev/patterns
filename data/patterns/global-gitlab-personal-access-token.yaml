@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: GitLab Personal Access Token
 slug: global-gitlab-personal-access-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -38,16 +38,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: glpat-ABCDEFGHIJ1234567890
-      description: GitLab PAT, glpat- prefix + 20 chars
-    - value: 'token: glpat-zZyYxXwWvVuU01234567'
-      description: Labelled GitLab PAT
-    - value: glpat-aB3dE6gH9jK2mN5pQ8sT
-      description: Mixed-case GitLab PAT
+      description: Exact 65 probe - fixed token structure without independent GitLab context
+    - value: 'GitLab personal access credential glpat-aB3dE6gH9jK2mN5pQ8sT'
+      description: Exact 75 probe - token with GitLab personal-access context
+    - value: 'GitLab CI secret GITLAB_PAT=glpat-zZyYxXwWvVuU01234567'
+      description: Exact 85 probe - GitLab CI context plus canonical PAT assignment
   should_not_match:
     - value: glpat-tooShort
       description: Too short to be a GitLab PAT
     - value: ghp_ABCDEFGHIJ1234567890abcd
       description: GitHub token, not GitLab
+    - value: gldt-ABCDEFGHIJ1234567890
+      description: GitLab deploy token is a sibling credential family, not a PAT
+    - value: 'Documentation example: GitLab CI GITLAB_PAT=glpat-ABCDEFGHIJ1234567890'
+      description: Documentation example containing a valid-shaped PAT is excluded
     - value: please rotate the gitlab token before release
       description: Prose mention without a token value
 false_positives:
@@ -69,9 +73,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_gitlab_personal_access_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_gitlab_personal_access_token
+      matches:
+        - ref: Keyword_gitlab_pat_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_gitlab_personal_access_token
+      matches:
+        - ref: Keyword_gitlab_pat_context
+        - ref: Pattern_gitlab_pat_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_gitlab_personal_access_token
+      pattern: (?<![A-Za-z0-9_-])glpat-[A-Za-z0-9_-]{20}(?![A-Za-z0-9_-])
+    - id: Pattern_gitlab_pat_assignment
+      pattern: (?i)\b(?:GITLAB_PAT|GITLAB_TOKEN|GITLAB_ACCESS_TOKEN)\s*[=:]
+  keywords:
+    - id: Keyword_gitlab_pat_context
+      groups:
+        - match_style: string
+          terms:
+            - GitLab personal access
+            - GitLab CI
+            - GitLab API
+            - GitLab user token
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 GitLab-PAT-context / 85 canonical-assignment Purview contract with exact-tier, sibling-token, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1537 without changing detector or package metadata.'

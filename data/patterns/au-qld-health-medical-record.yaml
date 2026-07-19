@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: QLD Health Medical Record
 slug: au-qld-health-medical-record
-version: 1.3.1
+version: 1.3.2
 type: keyword_list
 pattern_class: concept
 description: Detects QLD Health medical record references including MRN/URN identifiers and clinical documentation.
@@ -26,8 +26,14 @@ data_categories:
   - government
 test_cases:
   should_match:
+    - value: Medical record archive index
+      description: Exact 65 discovery probe with a record phrase and no clinical contents
+    - value: Medical record with discharge summary
+      description: Exact 75 probe with clinical-record context
+    - value: Queensland Health medical record with discharge summary
+      description: Exact 85 probe with clinical-record and QLD Health context
     - value: 'Medical record number (MRN): 12345678 clinical documentation'
-      description: Test match 1
+      description: Medical record number with clinical documentation
     - value: QLD Health patient record with URN and discharge summary
       description: Test match 2
     - value: Health record patient chart and medical history review
@@ -37,6 +43,8 @@ test_cases:
       description: Non-match 1
     - value: World record broken
       description: Non-match 2
+    - value: Unit record archive software release notes
+      description: Product documentation phrase must remain discovery-only
 false_positives:
   - description: Generic record references in non-medical contexts.
     mitigation: Require medical record identifiers like MRN, URN, or clinical documentation.
@@ -63,22 +71,48 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_medical_record
+      id_match:
+        type: any
+        ids:
+          - Pattern_medical_record
+          - Pattern_patient_record
       matches:
-        - ref: Evidence_mrn_urn
-        - ref: Evidence_hhs
+        - ref: Evidence_clinical_record_context
+        - ref: Evidence_qld_health_forms
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_patient_record
+      id_match:
+        type: any
+        ids:
+          - Pattern_medical_record
+          - Pattern_patient_record
       matches:
-        - ref: Evidence_qld_health_forms
+        - ref: Evidence_clinical_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Pattern_medical_record
+          - Pattern_patient_record
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
   regexes:
     - id: Pattern_medical_record
-      pattern: (?i)\b(?:medical\s+record|patient\s+(?:file|record)|unit\s+record|clinical\s+record)\b
+      pattern: (?i)\b(?:medical\s+record|patient\s+(?:file|record)|unit\s+record|clinical\s+record|health\s+record)\b
     - id: Pattern_patient_record
       pattern: (?i)\b(?:mrn|urn|medical\s+record\s+number|unit\s+record\s+number)\b
   keywords:
@@ -126,9 +160,24 @@ purview:
             - Pathology Queensland
             - Clinical Excellence Queensland
       strength: specific
+    - id: Evidence_clinical_record_context
+      groups:
+        - match_style: word
+          terms:
+            - clinical documentation
+            - discharge summary
+            - medical history
+            - treatment notes
+            - diagnosis
+            - medications
+            - patient chart
+      strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: make medical-record phrases 65 discovery, require independent clinical-record contents at 75 and QLD Health provenance at 85, expand the primary to health-record wording, and add exact-tier plus software probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 579 without changing detector or package metadata.'

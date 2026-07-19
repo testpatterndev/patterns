@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Loan Agreement
 slug: au-loan-agreement
-version: 1.3.1
+version: 1.3.2
 type: keyword_list
 pattern_class: concept
 description: Detects loan agreement documents containing borrower details, interest rates, and repayment terms.
@@ -29,8 +29,12 @@ data_categories:
   - pii
 test_cases:
   should_match:
+    - value: Loan agreement executed
+      description: Exact 65 discovery probe with an instrument phrase and no financial terms
+    - value: 'Loan agreement: principal amount $500,000'
+      description: Exact 75 probe with financial terms but no party obligations
     - value: 'Loan agreement between borrower and lender: principal amount $500,000'
-      description: Test match 1
+      description: Exact 85 probe with financial terms and contracting parties
     - value: Secured loan facility with interest rate 5.5% and repayment schedule
       description: Test match 2
     - value: Financial covenants and default provisions in loan agreement
@@ -40,6 +44,8 @@ test_cases:
       description: Non-match 1
     - value: Student loan information session
       description: Non-match 2
+    - value: Personal loan contract template example
+      description: Template wording must be excluded from enforcement
 false_positives:
   - description: Casual references to loan or borrowing in non-agreement contexts.
     mitigation: Require legal agreement keywords like borrower, lender, or repayment schedule.
@@ -68,8 +74,8 @@ purview:
     - confidence_level: 85
       id_match: Regex_loan_agreement
       matches:
-        - ref: Keyword_nccp_credit
         - ref: Keyword_loan_terms
+        - ref: Keyword_loan_parties
         - type: any
           min_matches: 0
           max_matches: 0
@@ -78,7 +84,16 @@ purview:
     - confidence_level: 75
       id_match: Regex_loan_agreement
       matches:
-        - ref: Keyword_legal_general
+        - ref: Keyword_loan_terms
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_loan_agreement
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -87,7 +102,7 @@ purview:
   regexes:
     - id: Regex_loan_agreement
       pattern: >-
-        (?i)\b(?:(?:personal|business|commercial|consumer)\s+loan\s+(?:agreement|contract|deed)|credit\s+contract|loan\s+(?:facility|deed)|line\s+of\s+credit\s+agreement)\b
+        (?i)\b(?:(?:(?:personal|business|commercial|consumer)\s+)?loan\s+(?:agreement|contract|deed)|credit\s+contract|loan\s+facility|line\s+of\s+credit\s+agreement)\b
   keywords:
     - id: Keyword_nccp_credit
       groups:
@@ -107,6 +122,7 @@ purview:
         - match_style: word
           terms:
             - loan amount
+            - principal amount
             - principal sum
             - interest rate
             - annual percentage rate
@@ -118,6 +134,20 @@ purview:
             - prepayment
             - drawdown
             - facility limit
+            - financial covenants
+            - default provisions
+      strength: specific
+    - id: Keyword_loan_parties
+      groups:
+        - match_style: word
+          terms:
+            - borrower
+            - lender
+            - credit provider
+            - debtor
+            - principal debtor
+            - obligations of the borrower
+            - promises to pay
       strength: specific
     - id: Keyword_legal_general
       groups:
@@ -135,8 +165,11 @@ purview:
             - entire agreement
       strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: retain bare loan instruments at 65 discovery, require substantive financial terms at 75 and named borrower/lender obligations at 85, broaden the primary to ordinary loan-agreement wording, and add exact-tier plus template probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 553 without changing detector or package metadata.'

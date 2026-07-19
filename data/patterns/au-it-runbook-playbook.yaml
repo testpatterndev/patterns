@@ -1,11 +1,15 @@
 schema: testpattern/v1
 name: IT Runbook/Playbook
 slug: au-it-runbook-playbook
-version: 1.4.1
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
 description: Detects IT runbooks and operational playbooks containing procedures, credentials, and escalation paths.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+operation: >-
+  A runbook, playbook, SOP, or work-instruction title is discovery-only at 65. Procedure sections such
+  as prerequisites, verification, troubleshooting, escalation, or rollback raise it to 75. The 85 tier
+  additionally requires an IT infrastructure, privileged-access, backup, or configuration subject.
+  Enforcing tiers reject explicit templates and examples.
 confidence: medium
 confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
 jurisdictions:
@@ -24,17 +28,21 @@ data_categories:
   - security
 test_cases:
   should_match:
-    - value: 'IT runbook: standard operating procedure with escalation path and on-call'
-      description: Test match 1
-    - value: 'Operational playbook: incident procedure and troubleshooting guide'
-      description: Test match 2
-    - value: Runbook automation SOP with escalation matrix and operational procedure
-      description: Test match 3
+    - value: 'Operational runbook'
+      description: Low-tier probe - title without substantive procedure content
+    - value: 'Operational runbook: prerequisites, procedure steps, and verification steps.'
+      description: Medium-tier probe - substantive procedure sections without an IT asset subject
+    - value: 'IT runbook: database service account prerequisites, procedure steps, and rollback procedure.'
+      description: High-tier probe - procedure sections plus infrastructure and privileged-access context
   should_not_match:
     - value: Sports playbook strategy
-      description: Non-match 1
+      description: Sports-domain sibling
     - value: Run the book club meeting
-      description: Non-match 2
+      description: Lexical near-match without a runbook title
+    - value: 'The public catalogue lists an operational runbook available for download.'
+      description: Public listing contains only a title and must remain discovery-only
+    - value: 'Template example: IT runbook for a database service account with prerequisites, procedure steps, and rollback procedure.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Sports playbook or book club references.
     mitigation: Require IT-specific terms like SOP, escalation, or incident procedure.
@@ -54,7 +62,7 @@ sensitivity_labels:
   ca_gov: "Protected B"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -73,12 +81,15 @@ purview:
     - confidence_level: 75
       id_match: Regex_runbook_playbook
       matches:
-        - ref: Keyword_it_operations
+        - ref: Keyword_runbook_sections
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_runbook_playbook
   regexes:
     - id: Regex_runbook_playbook
       pattern: >-
@@ -123,8 +134,11 @@ purview:
             - ITIL
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; add title discovery, procedure-section medium, and infrastructure-corroborated high tiers; add public/template adversarial probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 552 without changing detector or package metadata.'

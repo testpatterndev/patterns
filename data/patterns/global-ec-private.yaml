@@ -1,14 +1,20 @@
 schema: testpattern/v1
 name: EC Private Key Header
 slug: global-ec-private
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects EC private key PEM headers in source code, configuration files, and documents. Private keys should never appear in plaintext.
+description: >-
+  Detects SEC1 elliptic-curve private-key armor. The BEGIN marker is
+  discovery-only, a SEC1-like Base64 body supports medium confidence, and a
+  complete container with curve or signing context reaches high confidence.
 operation: >-
-  Reference: https://www.rfc-editor.org/rfc/rfc7468 Corroborative evidence: 7 keywords within 300 characters. Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion
-  logic for template/sample/test text.
+  Regex_ec_private matches the EC PRIVATE KEY header. The 75 tier requires a
+  SEC1-style body whose DER armor begins with an MH...CAQEE sequence. The 85 tier
+  additionally requires the matching footer and EC-specific curve/signing context
+  such as ECDSA, prime256v1, secp256r1, or EC PARAMETERS. Header-only candidates
+  remain discovery-only at 65.
 pattern: '-----BEGIN EC PRIVATE KEY-----'
 confidence: high
 confidence_justification: >-
@@ -44,22 +50,39 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: '-----BEGIN EC PRIVATE KEY-----'
-      description: EC private key PEM header
+      description: Low-tier probe - EC armor header without SEC1 body
     - value: |-
         -----BEGIN EC PRIVATE KEY-----
-        MIIE...
-      description: EC key with data following header
+        MHcCAQEEIF6Yx7K2mN9pQ4sT8vW3yZ6aB1cD5eF7gH8jK2mN
+      description: Medium-tier probe - SEC1-like EC body without closing armor
     - value: |-
+        ECDSA signing key curve secp256r1
         -----BEGIN EC PRIVATE KEY-----
-        Proc-Type:
-      description: Encrypted EC private key header
+        MHcCAQEEIF6Yx7K2mN9pQ4sT8vW3yZ6aB1cD5eF7gH8jK2mN
+        -----END EC PRIVATE KEY-----
+      description: High-tier probe - complete SEC1 container with curve context
   should_not_match:
     - value: '-----BEGIN PUBLIC KEY-----'
       description: Public key, not private
     - value: '-----BEGIN CERTIFICATE-----'
       description: Certificate, not private key
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: |-
+        -----BEGIN EC PRIVATE KEY-----
+        MIIE-not-sec1
+      description: Malformed body lacks a SEC1 EC private-key prefix
+    - value: |-
+        -----BEGIN EC PRIVATE KEY-----
+        PLACEHOLDER
+        -----END EC PRIVATE KEY-----
+      description: Placeholder body must not enforce
+    - value: |-
+        Documentation example: ECDSA signing key curve secp256r1
+        -----BEGIN EC PRIVATE KEY-----
+        MHcCAQEEIF6Yx7K2mN9pQ4sT8vW3yZ6aB1cD5eF7gH8jK2mN
+        -----END EC PRIVATE KEY-----
+      description: Documentation quoting a complete EC key must not enforce
+    - value: '-----BEGIN RSA PRIVATE KEY-----'
+      description: Sibling PKCS#1 RSA private-key armor is not SEC1 EC
 false_positives:
   - description: PEM-encoded certificates or public keys that use similar header formats
     mitigation: The pattern specifically matches the private key header text, but verify the full PEM block contains actual key material.
@@ -89,17 +112,18 @@ purview:
     - confidence_level: 85
       id_match: Regex_ec_private
       matches:
-        - ref: Pattern_global_ec_private_label_context
-        - ref: Keyword_global_ec_private_domain_context
+        - ref: Evidence_ec_sec1_body
+        - ref: Evidence_ec_footer
+        - ref: Evidence_ec_curve_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
+    - confidence_level: 75
       id_match: Regex_ec_private
       matches:
-        - ref: Keyword_ec_private
+        - ref: Evidence_ec_sec1_body
         - type: any
           min_matches: 0
           max_matches: 0
@@ -108,47 +132,21 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_ec_private
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_ec_private
       pattern: '-----BEGIN EC PRIVATE KEY-----'
-    - id: Pattern_global_ec_private_label_context
-      pattern: (?i)\b(?:ec\s+private\s+key\s+header|private|key|header)\b
-  keywords:
-    - id: Keyword_ec_private
-      groups:
-        - match_style: word
-          terms:
-            - private key
-            - secret key
-            - key file
-            - text: PEM
-              case_sensitive: true
-            - certificate
-            - elliptic curve
-            - ECDSA
-            - EC key
-            - cryptographic
-            - key pair
-            - signing key
-      strength: specific
-    - id: Keyword_global_ec_private_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - ec private key header
-            - private
-            - key
-            - header
-      strength: domain
+    - id: Evidence_ec_sec1_body
+      pattern: '(?:\r?\n)MH[A-Za-z0-9+/]{0,12}CAQEE[A-Za-z0-9+/=]{20,256}'
+    - id: Evidence_ec_footer
+      pattern: '-----END EC PRIVATE KEY-----'
+    - id: Evidence_ec_curve_context
+      pattern: '(?i)\b(?:ECDSA|prime256v1|secp256r1|secp384r1|secp521r1|EC\s+PARAMETERS|elliptic\s+curve)\b'
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: separate EC header discovery, SEC1 body evidence, and complete curve-bound key containers; add exact-tier and malformed, placeholder, documentation, and sibling-key negatives.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1225 without changing detector or package metadata.'

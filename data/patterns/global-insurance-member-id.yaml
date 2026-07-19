@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Health Insurance Member / Subscriber ID (Labelled)
 slug: global-insurance-member-id
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -49,11 +49,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 'Member ID: ABC123456789'
-      description: Member ID label with alphanumeric value containing digits
+      description: Exact 65 discovery probe with a labelled value but no health-insurance context
     - value: 'subscriber number = XYZ7654321'
       description: Subscriber number label, value contains digits, lowercase label
     - value: 'Policy No. H12-3456-78'
       description: Policy number with hyphenated value containing digits
+    - value: 'Health plan Member ID: ABC123456789'
+      description: Exact 75 probe with health-insurance context
+    - value: 'Patient claim for Health plan Member ID: ABC123456789'
+      description: Exact 85 probe with health-insurance and person-linked care context
   should_not_match:
     - value: 'Member ID: ABCDEFGH'
       description: Value has no digit, likely a word not an identifier
@@ -61,6 +65,8 @@ test_cases:
       description: Prose using the words group/number with no identifier value
     - value: 'Policy No. 12'
       description: Value too short (under 6 characters)
+    - value: 'Club Member ID: ABC123456789'
+      description: Valid non-health membership identifier must remain discovery-only
 false_positives:
   - description: Order numbers, membership IDs for non-health clubs, or group codes that share the member/policy/group labelling.
     mitigation: Require corroborative health-insurance keywords (health plan, EOB, payer) within proximity to confirm a health context.
@@ -80,9 +86,77 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_insurance_member_id
+      matches:
+        - ref: Keyword_health_insurance_context
+        - ref: Keyword_person_coverage_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_insurance_member_id
+      matches:
+        - ref: Keyword_health_insurance_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_insurance_member_id
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_insurance_member_id
+      pattern: '(?<![A-Za-z])(?:member|subscriber|policy|group|enrollee|insured)\s+(?:id|identifier|number|no\.?)[\s:#=-]{0,8}(?=[A-Z0-9-]{6,15}(?![A-Z0-9-]))(?:[A-Z-]*\d[A-Z0-9-]*)(?![A-Z0-9-])'
+  keywords:
+    - id: Keyword_health_insurance_context
+      groups:
+        - match_style: word
+          terms:
+            - health insurance
+            - health plan
+            - medical insurance
+            - payer
+            - insurer
+            - explanation of benefits
+            - insurance claim
+            - coverage
+      strength: domain
+    - id: Keyword_person_coverage_context
+      groups:
+        - match_style: word
+          terms:
+            - patient
+            - beneficiary
+            - dependent
+            - member name
+            - date of birth
+            - treating provider
+            - clinic
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: add a 65 discovery tier for labelled member-like values, require health-insurance context at 75 and additional person linkage at 85, with exact-tier and club-membership adversarial probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1545 without changing detector or package metadata.'

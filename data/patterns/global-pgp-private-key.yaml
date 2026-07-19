@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: PGP Private Key Block
 slug: global-pgp-private-key
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,11 +9,15 @@ description: >-
   Detects the ASCII-armored header of an OpenPGP (PGP/GnuPG) private key block, as defined in RFC 4880 / RFC 9580.
   A leaked PGP private key allows an attacker to decrypt the holder's encrypted mail and files and to forge
   signatures in their name. The registry already covers RSA, EC, OpenSSH and PKCS#8 private keys; this adds the
-  OpenPGP armor format.
+  OpenPGP armor format. Header-only hits are discovery-only; armored packet data
+  near the header provides the enforcement tiers.
 operation: >-
-  Matches the BEGIN armor header line for a PGP private key block. Note: in Boost.RegEx the '.' metacharacter does
-  not cross newlines, so the pattern matches the single BEGIN header line rather than the whole key body.
-  Corroborative evidence: keywords within 300 characters.
+  Regex_pgp_private_header matches the BEGIN line. The 75 tier requires the armor
+  separator, optional Version/Comment fields, and a 64-character Base64 line whose
+  prefix encodes an old- or new-format secret-key packet. The 85 tier additionally
+  requires three consecutive 64-character body lines near the header. The 65 tier
+  is discovery-only; enforcing tiers reject templates and do not depend on a CRC
+  or END marker at the far end of a normal export.
 pattern: -----BEGIN PGP PRIVATE KEY BLOCK-----
 confidence: high
 confidence_justification: >-
@@ -46,14 +50,25 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: '-----BEGIN PGP PRIVATE KEY BLOCK-----'
-      description: OpenPGP private key armor header
+      description: Low-tier probe - OpenPGP private-key armor header only
     - value: |-
         -----BEGIN PGP PRIVATE KEY BLOCK-----
 
-        lQOYBGABCDEFAKEKEYMATERIALxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-      description: PGP private key header with following armored body
-    - value: 'Key file contents: -----BEGIN PGP PRIVATE KEY BLOCK----- Version: GnuPG v2'
-      description: PGP private key header inline with GnuPG version line
+        lQIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCaPO2QBzKYKwDi
+        QQ==
+      description: Medium-tier probe - realistic secret-key packet prelude without trailing armor
+    - value: |-
+        -----BEGIN PGP PRIVATE KEY BLOCK-----
+
+        lQIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCaPO2QBzKYKwDi
+        k8qK+5bw7VyHxKzg8V+Pw3+QsewdCZi2ueNFTlIMOo0s2ZX/b1QLzu4lu08pMD1x
+        ioxlDQbNb1tOxNoLnGBz1eLzKyraT6AMjuQhLCPHYJTq6Mv9e8GBQ0yljRZuUt04
+        pXObu8jeQB7Hq+h3gqXsrlEFxc4CIxjzj+WNWhG1XsOLztFPW71Y8lI3EbWp1ERs
+        ALFXSqS3Wp67KJUQqspdXP+tNkgyd3Ch48Xu64zI0zP/t7LB9Qmty1eU2S/iPC/l
+        2bvvlwQwXDsjjTp5JzVjtxGNyYY6gWwud1A557OgC3bk++TtOdoBsdfYf9yZOLmi
+        =Ab9X
+        -----END PGP PRIVATE KEY BLOCK-----
+      description: High-tier probe - long secret-key packet body with checksum/footer beyond proximity
   should_not_match:
     - value: '-----BEGIN PGP PUBLIC KEY BLOCK-----'
       description: Public key block, not a private key
@@ -61,6 +76,28 @@ test_cases:
       description: Encrypted PGP message, not a private key
     - value: please export your PGP private key block before rotating the GPG keypair
       description: Prose mention of a PGP private key without the actual armor header
+    - value: |-
+        -----BEGIN PGP PRIVATE KEY BLOCK-----
+
+        mQIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCaPO2QBzKYKwDi
+        k8qK+5bw7VyHxKzg8V+Pw3+QsewdCZi2ueNFTlIMOo0s2ZX/b1QLzu4lu08pMD1x
+        ioxlDQbNb1tOxNoLnGBz1eLzKyraT6AMjuQhLCPHYJTq6Mv9e8GBQ0yljRZuUt04
+      description: Adversarial public-key packet prelude inside private-key armor
+    - value: |-
+        -----BEGIN PGP PRIVATE KEY BLOCK-----
+
+        PLACEHOLDER
+        -----END PGP PRIVATE KEY BLOCK-----
+      description: Placeholder packet body must not enforce
+    - value: |-
+        Documentation example:
+        -----BEGIN PGP PRIVATE KEY BLOCK-----
+
+        lQIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCaPO2QBzKYKwDi
+        k8qK+5bw7VyHxKzg8V+Pw3+QsewdCZi2ueNFTlIMOo0s2ZX/b1QLzu4lu08pMD1x
+        ioxlDQbNb1tOxNoLnGBz1eLzKyraT6AMjuQhLCPHYJTq6Mv9e8GBQ0yljRZuUt04
+        -----END PGP PRIVATE KEY BLOCK-----
+      description: Documentation quoting realistic wrapped OpenPGP data must not enforce
 false_positives:
   - description: Documentation, RFCs or training material that quotes the armor header without real key material.
     mitigation: Require corroborative keywords and confirm armored base64 key material follows the header line.
@@ -80,9 +117,49 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_pgp_private_header
+      matches:
+        - ref: Evidence_pgp_secret_packet
+        - ref: Evidence_pgp_multiline_body
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Regex_pgp_private_header
+      matches:
+        - ref: Evidence_pgp_secret_packet
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_pgp_private_header
+  regexes:
+    - id: Regex_pgp_private_header
+      pattern: '-----BEGIN PGP PRIVATE KEY BLOCK-----'
+    - id: Evidence_pgp_secret_packet
+      pattern: '(?:\r?\n)(?:(?:Version|Comment):[^\r\n]{1,80}\r?\n){0,3}\r?\n(?:lQ|xQ)[A-Za-z0-9+/]{62}(?:\r?\n)'
+    - id: Evidence_pgp_multiline_body
+      pattern: '(?:\r?\n)(?:[A-Za-z0-9+/]{64}\r?\n){3}'
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Independent-review blocker remediation: keep armor-header discovery at 65, require an old/new-format OpenPGP secret-key packet prelude at 75, and require three near-header 64-character body lines at 85. A long export fixture proves enforcement while CRC/footer evidence is beyond Purview proximity; adversarial public-packet, placeholder, documentation, and sibling-armor negatives protect rejection.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1557 without changing detector or package metadata.'

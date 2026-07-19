@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: DigitalOcean Personal Access Token
 slug: global-digitalocean-personal-access-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -39,16 +39,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: dop_v1_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-      description: DigitalOcean PAT, dop_v1_ prefix + 64 hex
-    - value: 'DIGITALOCEAN_TOKEN=dop_v1_deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
-      description: Labelled DigitalOcean PAT in env var
-    - value: dop_v1_abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
-      description: DigitalOcean PAT with hex body
+      description: Exact 65 probe - distinctive token structure without provider context
+    - value: 'DigitalOcean droplet API credential dop_v1_abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789'
+      description: Exact 75 probe - token corroborated by a DigitalOcean resource context
+    - value: 'DigitalOcean API credential DIGITALOCEAN_TOKEN=dop_v1_deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+      description: Exact 85 probe - provider context plus canonical secret assignment
   should_not_match:
     - value: dop_v1_0123456789abcdef
       description: Too short to be a DigitalOcean PAT
     - value: doo_v1_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       description: OAuth token prefix (doo_v1_), not a personal access token
+    - value: 'GITHUB_TOKEN=dop_v1_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+      description: Sibling provider label does not corroborate a DigitalOcean token
+    - value: 'Documentation example: DigitalOcean API DIGITALOCEAN_TOKEN=dop_v1_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+      description: Documentation example with a valid-shaped token is excluded
     - value: create a digitalocean personal access token in the API settings
       description: Prose mention without a token value
 false_positives:
@@ -70,9 +74,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_digitalocean_pat
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_digitalocean_pat
+      matches:
+        - ref: Keyword_digitalocean_platform_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_digitalocean_pat
+      matches:
+        - ref: Keyword_digitalocean_platform_context
+        - ref: Pattern_digitalocean_token_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_digitalocean_pat
+      pattern: (?<![A-Za-z0-9_])dop_v1_[a-f0-9]{64}(?![A-Za-z0-9])
+    - id: Pattern_digitalocean_token_assignment
+      pattern: (?i)\b(?:DIGITALOCEAN_TOKEN|DIGITALOCEAN_ACCESS_TOKEN|DO_API_TOKEN)\s*[=:]
+  keywords:
+    - id: Keyword_digitalocean_platform_context
+      groups:
+        - match_style: string
+          terms:
+            - DigitalOcean API
+            - DigitalOcean account
+            - DigitalOcean droplet
+            - DigitalOcean project
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 DigitalOcean-platform / 85 canonical-assignment Purview contract and adversarial PAT probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1533 without changing detector or package metadata.'

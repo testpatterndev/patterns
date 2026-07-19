@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: RubyGems API Key
 slug: global-rubygems-api-key
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -39,16 +39,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: rubygems_abcdef0123456789abcdef0123456789abcdef0123456789
-      description: RubyGems API key, rubygems_ prefix + 48 hex chars
-    - value: 'RUBYGEMS_API_KEY=rubygems_0123456789abcdef0123456789abcdef0123456789abcdef'
-      description: Labelled RubyGems key in an env assignment
-    - value: rubygems_fedcba9876543210fedcba9876543210fedcba9876543210
-      description: Another RubyGems key body
+      description: Exact 65 probe - prefixed hexadecimal key without independent gem context
+    - value: 'gem push credential rubygems_fedcba9876543210fedcba9876543210fedcba9876543210'
+      description: Exact 75 probe - key with RubyGems publish context
+    - value: 'RubyGems.org package publish secret RUBYGEMS_API_KEY=rubygems_0123456789abcdef0123456789abcdef0123456789abcdef'
+      description: Exact 85 probe - RubyGems.org context plus canonical key assignment
   should_not_match:
     - value: rubygems_abcdef0123456789abcdef
       description: Too short to be a valid RubyGems key
     - value: rubygems_ghijkl0123456789abcdef0123456789abcdef0123456789
       description: Non-hex characters in body (g-l are not hex)
+    - value: 'NPM_TOKEN=rubygems_abcdef0123456789abcdef0123456789abcdef0123456789'
+      description: Sibling package-registry label does not corroborate a RubyGems key
+    - value: 'Documentation example: RubyGems.org package RUBYGEMS_API_KEY=rubygems_abcdef0123456789abcdef0123456789abcdef0123456789'
+      description: Documentation example containing a valid-shaped key is excluded
     - value: run gem push after setting your rubygems.org api key
       description: Prose mention without a token value
 false_positives:
@@ -70,9 +74,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_rubygems_api_key
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_rubygems_api_key
+      matches:
+        - ref: Keyword_rubygems_publish_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_rubygems_api_key
+      matches:
+        - ref: Keyword_rubygems_publish_context
+        - ref: Pattern_rubygems_key_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_rubygems_api_key
+      pattern: (?<![A-Za-z0-9_])rubygems_[a-f0-9]{48}(?![A-Za-z0-9])
+    - id: Pattern_rubygems_key_assignment
+      pattern: (?i)\b(?:RUBYGEMS_API_KEY|GEM_HOST_API_KEY)\s*[=:]
+  keywords:
+    - id: Keyword_rubygems_publish_context
+      groups:
+        - match_style: string
+          terms:
+            - RubyGems.org package
+            - gem push
+            - Ruby gem publish
+            - RubyGems release
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 RubyGems-publish / 85 canonical-assignment Purview contract with exact-tier, sibling-registry, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1562 without changing detector or package metadata.'

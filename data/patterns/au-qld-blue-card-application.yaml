@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: QLD Blue Card Application
 slug: au-qld-blue-card-application
-version: 1.3.1
+version: 1.4.0
 type: keyword_list
 pattern_class: concept
 description: Detects QLD Blue Card working with children check applications and screening documents.
@@ -27,6 +27,12 @@ data_categories:
   - children
 test_cases:
   should_match:
+    - value: 'Blue Card application information session.'
+      description: Exact 65 discovery probe - application topic without a populated applicant record
+    - value: 'Blue Card application - applicant name, date of birth, application number, and employer recorded.'
+      description: Exact 75 probe - populated application fields without authority evidence
+    - value: 'Blue Card application - Blue Card Services; applicant name, date of birth, application number, and suitability outcome recorded.'
+      description: Exact 85 probe - populated application plus Queensland issuing-authority evidence
     - value: Blue Card application for child-related work with police check
       description: Test match 1
     - value: 'Working with children check: Blue Card Services suitability notice'
@@ -38,6 +44,12 @@ test_cases:
       description: Non-match 1
     - value: Card game at the club
       description: Non-match 2
+    - value: 'Sample template for child-work screening fields: applicant name, birth date, reference number, suitability outcome.'
+      description: Adjacent template language is not a populated Blue Card record
+    - value: 'The public website explains the child-work screening process.'
+      description: Public guidance has no Blue Card primary or populated applicant fields
+    - value: 'Blue debit card application with rewards points.'
+      description: Sibling payment-card language does not satisfy the child-screening primary
 false_positives:
   - description: Blue card references in non-child-safety contexts.
     mitigation: Require Blue Card Services or working with children keywords.
@@ -66,17 +78,31 @@ purview:
     - confidence_level: 85
       id_match: Pattern_blue_card
       matches:
-        - ref: Evidence_blue_card
-        - ref: Evidence_wwc_screening
+        - ref: Evidence_blue_card_application_fields
+        - ref: Evidence_blue_card_authority
         - type: any
           min_matches: 0
           max_matches: 0
           children:
             - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_wwc
+      id_match: Pattern_blue_card
       matches:
-        - ref: Evidence_qld_government
+        - ref: Evidence_blue_card_application_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_blue_card
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
   regexes:
     - id: Pattern_blue_card
       pattern: (?i)\b(?:blue\s+card\s+(?:application|renewal)|working\s+with\s+children\s+(?:check|application)|positive\s+notice)\b
@@ -118,9 +144,36 @@ purview:
             - Information Privacy Act 2009
             - Queensland Privacy Principles
       strength: specific
+    - id: Evidence_blue_card_application_fields
+      groups:
+        - match_style: word
+          terms:
+            - applicant name
+            - date of birth
+            - application number
+            - employer
+            - volunteer organisation
+            - issued date
+            - suitability outcome
+            - screening result
+      strength: domain
+    - id: Evidence_blue_card_authority
+      groups:
+        - match_style: word
+          terms:
+            - Blue Card Services
+            - Department of Justice and Attorney-General
+            - Working with Children (Risk Management and Screening) Act
+            - Queensland Government
+            - positive notice
+            - negative notice
+      strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add a 65 discovery application tier, require populated screening-application fields at 75 and Queensland issuing-authority evidence at 85, plus exact-tier and sibling/public/template probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 573 without changing detector or package metadata.'

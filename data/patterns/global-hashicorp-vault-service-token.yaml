@@ -1,16 +1,20 @@
 schema: testpattern/v1
 name: HashiCorp Vault Service / Batch Token
 slug: global-hashicorp-vault-service-token
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
   Detects HashiCorp Vault service tokens (hvs. prefix) and batch tokens (hvb. prefix). These
-  tokens authenticate to a Vault server and can read secrets, keys and credentials; a leak is a critical exposure.
+  tokens authenticate to a Vault server and can read secrets, keys and credentials.
+  A bare prefixed candidate is discovery-only; binding fields and Vault auth-response
+  metadata provide balanced and high-confidence enforcement.
 operation: >-
-  Prefixed token format hvs. or hvb. followed by ~90 base62 characters (period and hyphen permitted in the body).
-  Corroborative evidence: keywords within 300 characters.
+  Regex_vault_service_token matches hvs./hvb. plus a 60-120 character body. The
+  75 tier requires a Vault-specific binding such as VAULT_TOKEN, X-Vault-Token, or
+  client_token. The 85 tier additionally requires auth-response metadata such as
+  policies, lease_duration, or renewable. Bare candidates remain discovery-only.
 pattern: (?<![A-Za-z0-9._-])hv[sb]\.[A-Za-z0-9._-]{60,120}(?![A-Za-z0-9._-])
 confidence: high
 confidence_justification: >-
@@ -41,11 +45,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: hvs.CAESIABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG
-      description: Vault service token, hvs. prefix + long body
+      description: Low-tier probe - bare hvs token candidate
     - value: 'VAULT_TOKEN=hvb.0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcde'
-      description: Labelled Vault batch token (hvb.) in env var
-    - value: hvs.aB3dE6gH9jK2mN5pQ8sTuVwXyZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx
-      description: Mixed-case Vault service token
+      description: Medium-tier probe - batch token bound to the Vault environment variable
+    - value: '{"auth":{"client_token":"hvs.aB3dE6gH9jK2mN5pQ8sTuVwXyZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx","policies":["prod-read"],"lease_duration":3600,"renewable":true}}'
+      description: High-tier probe - client_token in a structured Vault auth response
   should_not_match:
     - value: hvs.tooShort
       description: Too short to be a Vault token body
@@ -53,6 +57,12 @@ test_cases:
       description: Wrong middle letter (not s or b) - not a service/batch token
     - value: rotate the hashicorp vault service token before the audit
       description: Prose mention without a token value
+    - value: 'VAULT_TOKEN=hvs.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+      description: Placeholder repeated-X token must not enforce
+    - value: 'Documentation example: X-Vault-Token: hvs.CAESIABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG'
+      description: Documentation quoting a Vault header must not enforce
+    - value: hvr.CAESIABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG
+      description: Sibling hvr prefix is not a service or batch token
 false_positives:
   - description: Long dotted identifiers that coincidentally begin with hvs. or hvb. in documentation.
     mitigation: Require corroborative Vault keywords and exclude placeholder markers (example, xxxx).
@@ -72,9 +82,60 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_vault_service_token
+      matches:
+        - ref: Evidence_vault_token_binding
+        - ref: Evidence_vault_auth_metadata
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_vault_placeholder
+    - confidence_level: 75
+      id_match: Regex_vault_service_token
+      matches:
+        - ref: Evidence_vault_token_binding
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_vault_placeholder
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_vault_service_token
+  regexes:
+    - id: Regex_vault_service_token
+      pattern: (?<![A-Za-z0-9._-])hv[sb]\.[A-Za-z0-9._-]{60,120}(?![A-Za-z0-9._-])
+    - id: Evidence_vault_token_binding
+      pattern: '(?i)\b(?:VAULT_TOKEN|X-Vault-Token|client_token)\b"?\s*[:=]\s*"?hv[sb]\.'
+    - id: Evidence_vault_auth_metadata
+      pattern: '(?i)"(?:policies|lease_duration|renewable|token_policies|entity_id)"\s*:'
+  keywords:
+    - id: Evidence_vault_placeholder
+      groups:
+        - match_style: string
+          terms:
+            - XXXXXXXXXXXX
+            - REDACTED
+            - PLACEHOLDER
+            - your-vault-token
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: separate prefixed-token discovery, Vault binding fields, and structured auth-response metadata; add exact-tier and malformed, placeholder, documentation, and sibling-prefix negatives.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1542 without changing detector or package metadata.'

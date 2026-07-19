@@ -1,11 +1,15 @@
 schema: testpattern/v1
 name: Management Action Plan
 slug: au-management-action-plan
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
 description: Detects management action plans documenting remediation timelines for audit findings and vulnerabilities.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+operation: >-
+  A management, corrective, remediation, or audit action-plan title is discovery-only at 65.
+  Remediation actions, owners, due dates, implementation, follow-up, or closure evidence raises it
+  to 75. The 85 tier additionally requires a classified audit finding, exception, observation,
+  non-compliance, or required action. Enforcing tiers reject templates and examples.
 confidence: medium
 confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
 jurisdictions:
@@ -23,17 +27,21 @@ data_categories:
   - governance
 test_cases:
   should_match:
-    - value: 'Management action plan: remediation plan with due date and responsible officer'
-      description: Test match 1
-    - value: 'MAP implementation status: corrective action and target completion dates'
-      description: Test match 2
-    - value: Management response to audit finding with risk treatment and finding closure
-      description: Test match 3
+    - value: 'Management action plan'
+      description: Low-tier probe - action-plan title without remediation detail
+    - value: 'Management action plan: corrective action owner and target date for closure.'
+      description: Medium-tier probe - remediation tracking without a classified audit finding
+    - value: 'Management action plan: high risk finding, required action, responsible owner, due date, and closure status.'
+      description: High-tier probe - classified finding plus remediation tracking
   should_not_match:
     - value: Action plan for the marketing campaign
-      description: Non-match 1
+      description: Marketing-plan sibling
     - value: Management meeting agenda
-      description: Non-match 2
+      description: Management prose without an action plan
+    - value: 'The public governance page links to a management action plan.'
+      description: Public link mentions only the document title
+    - value: 'Template example: management action plan for a high risk finding with required action, owner, due date, and closure.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Generic action plan in non-audit contexts.
     mitigation: Require audit-specific terms like remediation, finding closure, or management response.
@@ -53,7 +61,7 @@ sensitivity_labels:
   ca_gov: "Protected A"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -72,12 +80,15 @@ purview:
     - confidence_level: 75
       id_match: Regex_management_action_plan
       matches:
-        - ref: Keyword_audit_general
+        - ref: Keyword_remediation
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_management_action_plan
   regexes:
     - id: Regex_management_action_plan
       pattern: >-
@@ -107,7 +118,6 @@ purview:
             - remediation
             - remediate
             - corrective action
-            - action plan
             - implementation plan
             - due date
             - target date
@@ -132,8 +142,11 @@ purview:
             - IPPF
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; add title discovery, remediation-tracking medium, and classified-finding high tiers; add public/template adversarial probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 554 without changing detector or package metadata.'

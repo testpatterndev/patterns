@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: npm Access Token
 slug: global-npm-access-token
-version: 1.3.0
+version: 1.3.1
 type: regex
 pattern_class: identifier
 engine: universal
@@ -40,30 +40,28 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: '//registry.npmjs.org/:_authToken=npm_Qw3rTy9zXcV8bNm2LkJ4hGf6DsA1pOiU7yTr'
-      description: npmrc _authToken line form (Snaffler KeepShellRcFilesByName)
     - value: npm_ABCDEFGHIJ1234567890abcdefghij123456
-      description: npm access token, npm_ prefix + 36 chars
-    - value: '//registry.npmjs.org/:_authToken=npm_zZyYxXwWvVuU0123456789abcdefghij0123'
-      description: npm token in .npmrc authToken form
-    - value: npm_aB3dE6gH9jK2mN5pQ8sTuVwXyZ0123456789
-      description: Mixed-case npm access token
-    - value: 'CI secret NPM_TOKEN=npm_aB3dE6gH9jK2mN5pQ8sTuVwXyZ0123456789'
-      description: Bounded token in a CI variable assignment now fires the bare-token 75 tier
-    - value: npm_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
-      description: Bare bounded token enforces without tautological npm keyword context
+      description: Exact 65 probe - fixed npm token structure without independent registry context
+    - value: 'npm package publish credential npm_aB3dE6gH9jK2mN5pQ8sTuVwXyZ0123456789'
+      description: Exact 75 probe - token with npm package-publish context
+    - value: 'npm registry publish //registry.npmjs.org/:_authToken=npm_Qw3rTy9zXcV8bNm2LkJ4hGf6DsA1pOiU7yTr'
+      description: Exact 85 probe - npm registry context plus canonical npmrc assignment
+    - value: '.npmrc credential //registry.npmjs.org/:_authToken=legacyRegistryTokenValue123456'
+      description: Legacy npmrc authToken structure remains context-gated
   should_not_match:
     - value: npm_tooShort1234
       description: Too short to be an npm access token
     - value: ghp_ABCDEFGHIJ1234567890abcdefghij12345678
       description: GitHub token prefix, not npm
+    - value: 'PYPI_TOKEN=npm_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+      description: Sibling package-registry label does not corroborate an npm token
     - value: install the package and set your npm token in CI
       description: Prose mention without a token value
     - value: 'NPM_TOKEN=npm_aB3dE6gH9jK2mN5pQ8sTuVwXyZ012345678'
       description: 35-character body is one short of the fixed token length
     - value: xnpm_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789z
       description: Alphanumeric characters touch both boundaries, so the lookarounds reject the embedded substring
-    - value: 'Training example: "NPM_TOKEN=npm_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"'
+    - value: 'Documentation example: npm registry NPM_TOKEN=npm_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
       description: Shared template-exclusion terms veto quoted instructional token material at the tier level
 false_positives:
   - description: Documentation or examples showing placeholder npm_ strings.
@@ -86,15 +84,34 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_npm_access_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_snaffler_npmrc_authtoken
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_npm_access_token
       matches:
+        - ref: Keyword_npm_registry_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -109,23 +126,50 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_npm_access_token
+      matches:
+        - ref: Keyword_npm_registry_context
+        - ref: Pattern_npm_token_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snaffler_npmrc_authtoken
+      matches:
+        - ref: Keyword_npm_registry_context
+        - ref: Pattern_npm_token_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_npm_access_token
       pattern: (?<![A-Za-z0-9_])npm_[A-Za-z0-9]{36}(?![A-Za-z0-9])
     - id: Regex_snaffler_npmrc_authtoken
       pattern: //[^\s]{1,255}/:_authToken=[A-Za-z0-9+/=_.-]{16,}
+    - id: Pattern_npm_token_assignment
+      pattern: (?i)(?:\bNPM_TOKEN\s*=|registry\.npmjs\.org/:_authToken=)
   keywords:
     - id: Keyword_npm_registry_context
       groups:
         - match_style: string
           terms:
             - registry.npmjs.org
-            - //:_authToken
             - .npmrc
-            - npmrc
+            - npm package publish
+            - npm registry publish
+            - npm access credential
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-16'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.1
+    date: '2026-07-19'
+    description: 'Replace enforcing bare-token tiers with an individual 65 discovery / 75 npm-publish / 85 npmrc-or-env-assignment contract and exact-tier, sibling-registry, malformed, and documentation probes.'
   - version: 1.3.0
     date: '2026-07-16'
     description: >-

@@ -1,13 +1,16 @@
 schema: testpattern/v1
 name: Patent/IP Reference
 slug: au-patent-ip-reference
-version: 1.4.1
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
 description: Detects references to patents, intellectual property registrations, and IP Australia filings.
 operation: >-
-  Keyword-based detection matching patent application, IP Australia, trademark, and patent claim patterns. Corroborative
-  evidence: 14 keywords within 300 characters.
+  Patent, trade-mark, and design-registration references are discovery-only at 65. Patentability,
+  claim-analysis, filing-strategy, prosecution, inventor-disclosure, specification, or application
+  work-product raises a match to 75. The 85 tier additionally requires a formal filing or ownership
+  field such as application number, filing date, priority date, applicant, owner, or examiner report.
+  Enforcing tiers reject public-register, published-patent, guide, template, and example context.
 confidence: medium
 confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
 jurisdictions:
@@ -24,17 +27,21 @@ data_categories:
   - intellectual-property
 test_cases:
   should_match:
-    - value: 'Patent application filed with IP Australia: patent pending'
-      description: Test match 1
-    - value: Patent claim analysis for prior art review and patentability assessment
-      description: Test match 2
-    - value: Intellectual property portfolio including trademark and design registration
-      description: Test match 3
+    - value: 'Patent application'
+      description: Low-tier probe - IP reference without work-product content
+    - value: 'Patent application: claim analysis and filing strategy.'
+      description: Medium-tier probe - substantive IP work product without a formal record field
+    - value: 'Patent application: claim analysis and filing strategy; application number AU2026123456, filing date 19 July 2026.'
+      description: High-tier probe - work product plus formal filing fields
   should_not_match:
     - value: Patent leather shoes on sale
-      description: Non-match 1
+      description: Product-description sibling
     - value: The patently obvious solution
-      description: Non-match 2
+      description: Lexical near-match
+    - value: 'The public patent register lists patent application number AU2026123456 and its filing date.'
+      description: Public register contains formal patent fields but no private work product
+    - value: 'Template example: patent application claim analysis and filing strategy, application number AU2026123456, filing date 19 July 2026.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Use of patent as adjective in non-IP contexts.
     mitigation: Require IP-specific keywords like patent application, patent claim, or IP Australia.
@@ -66,22 +73,39 @@ purview:
         ids:
           - Regex_patent_au
           - Regex_patent_general
+          - Regex_trademark
       matches:
-        - ref: Keyword_patent
+        - ref: Keyword_ip_work_product
+        - ref: Keyword_formal_ip_record
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_ip_context
     - confidence_level: 75
-      id_match: Regex_trademark
+      id_match:
+        type: any
+        ids:
+          - Regex_patent_au
+          - Regex_patent_general
+          - Regex_trademark
       matches:
-        - ref: Keyword_ip
+        - ref: Keyword_ip_work_product
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_ip_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_patent_au
+          - Regex_patent_general
+          - Regex_trademark
   regexes:
     - id: Regex_patent_au
       pattern: (?i)\b(?:au\s*\d{6,9}|australian\s+patent|ip\s+australia)\b
@@ -117,9 +141,49 @@ purview:
             - design registration
             - copyright
       strength: domain
+    - id: Keyword_ip_work_product
+      groups:
+        - match_style: word
+          terms:
+            - claim analysis
+            - patentability assessment
+            - filing strategy
+            - prosecution strategy
+            - inventor disclosure
+            - draft specification
+            - examination response
+            - trade mark application
+            - design application
+      strength: domain
+    - id: Keyword_formal_ip_record
+      groups:
+        - match_style: word
+          terms:
+            - application number
+            - filing date
+            - priority date
+            - applicant
+            - registered owner
+            - examiner report
+            - IP Australia reference
+            - renewal date
+      strength: specific
+    - id: Keyword_public_ip_context
+      groups:
+        - match_style: word
+          terms:
+            - public patent register
+            - published patent
+            - public guide
+            - patent search portal
+            - granted patent publication
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; add IP-reference discovery, work-product medium, and formal-record high tiers; reject public-register/templates and add exact-tier adversarial probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 567 without changing detector or package metadata.'

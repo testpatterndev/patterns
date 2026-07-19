@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Snowflake Token
 slug: global-snowflake-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -42,16 +42,22 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 'ver:1-hint:836412345'
-      description: 'Snowflake OAuth access token, ver:1-hint: prefix'
-    - value: 'token=ver:2-hint:8001830917-did:1014-ETMsDgAAAYclXmkuAxABCDEFGHpsGXxUdaJKZlySzA=='
-      description: Snowflake OAuth refresh token in a connection string
-    - value: 'ver:1-hint:8364123456789'
-      description: Long hint segment access token
+      description: Exact 65 probe - service-specific hint structure without independent Snowflake context
+    - value: 'Snowflake OAuth access credential ver:1-hint:8364123456789'
+      description: Exact 75 probe - structured token with Snowflake OAuth context
+    - value: 'Snowflake OAuth refresh credential SNOWFLAKE_TOKEN=ver:2-hint:8001830917-did:1014-ETMsDgAAAYclXmkuAxABCDEFGHpsGXxUdaJKZlySzA=='
+      description: Exact 85 probe - refresh structure, provider context, and canonical assignment
   should_not_match:
     - value: 'ver:3-hint:836412345'
       description: Wrong version (only 1 or 2 are valid Snowflake token versions)
     - value: 'ver:1-hint:1234'
       description: Hint segment too short to be a valid Snowflake token
+    - value: 'OIDC_TOKEN=eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.signaturevalue'
+      description: Sibling OAuth token structure is not a Snowflake hint token
+    - value: 'ver:2-hint:8001830917-did:-ETshort'
+      description: Malformed refresh token has empty device id and a short ET body
+    - value: 'Documentation example: Snowflake OAuth refresh SNOWFLAKE_TOKEN=ver:2-hint:8001830917-did:1014-ETMsDgAAAYclXmkuAxABCDEFGHpsGXxUdaJKZlySzA=='
+      description: Documentation example containing a complete refresh-token shape is excluded
     - value: see the snowflake oauth token documentation for the connection string format
       description: Prose mention without a token value
 false_positives:
@@ -73,9 +79,66 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_snowflake_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_snowflake_token
+      matches:
+        - ref: Keyword_snowflake_oauth_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_snowflake_token
+      matches:
+        - ref: Keyword_snowflake_oauth_context
+        - ref: Pattern_snowflake_token_assignment
+        - ref: Pattern_snowflake_refresh_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_snowflake_token
+      pattern: (?<![A-Za-z0-9])ver:[12]-hint:[0-9]{6,}(?:-did:[0-9]{1,6})?(?:-ET[A-Za-z0-9+/_-]{16,}={0,2})?
+    - id: Pattern_snowflake_token_assignment
+      pattern: (?i)\b(?:SNOWFLAKE_TOKEN|SNOWFLAKE_OAUTH_TOKEN|SNOWFLAKE_REFRESH_TOKEN)\s*[=:]
+    - id: Pattern_snowflake_refresh_structure
+      pattern: (?<![A-Za-z0-9])ver:2-hint:[0-9]{6,}-did:[0-9]{1,6}-ET[A-Za-z0-9+/_-]{16,}={0,2}
+  keywords:
+    - id: Keyword_snowflake_oauth_context
+      groups:
+        - match_style: string
+          terms:
+            - Snowflake OAuth
+            - Snowflake REST API
+            - Snowflake refresh
+            - Snowflake access token
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 Snowflake-OAuth / 85 assigned-refresh-token Purview contract with exact-tier, sibling-token, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1565 without changing detector or package metadata.'

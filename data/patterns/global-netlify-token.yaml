@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Netlify Access Token
 slug: global-netlify-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -60,18 +60,22 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: nfp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
-      description: Netlify personal access token (nfp_ + 36-char body)
-    - value: 'NETLIFY_AUTH_TOKEN=nfp_abcdefghijklmnopqrstuvwxyz0123456789'
-      description: Labelled Netlify PAT in the canonical NETLIFY_AUTH_TOKEN env var
-    - value: nfc_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345
-      description: Netlify CLI token (nfc_ prefix, vendor-announced family)
+      description: Exact 65 probe - current prefixed token without independent platform context
+    - value: 'Netlify deploy credential nfc_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345'
+      description: Exact 75 probe - vendor-prefixed CLI token with deployment context
+    - value: 'Netlify deploy secret NETLIFY_AUTH_TOKEN=nfp_abcdefghijklmnopqrstuvwxyz0123456789'
+      description: Exact 85 probe - deployment context plus canonical token assignment
     - value: 'netlify api token: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq'
-      description: Legacy unprefixed Netlify token (43 chars) with a Netlify label within the proximity gap
+      description: Legacy context-gated token retained as a discovery candidate
   should_not_match:
     - value: nfx_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
       description: Invalid prefix character (nfx_ is not a Netlify token family)
     - value: nfp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345678
       description: nfp_ body too short (35 chars, not 36)
+    - value: 'Vercel deployment VERCEL_TOKEN=nfp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+      description: Sibling deployment provider context does not corroborate a Netlify token
+    - value: 'Documentation example: Netlify deploy NETLIFY_AUTH_TOKEN=nfp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+      description: Documentation example containing a valid-shaped token is excluded
     - value: regenerate the netlify access token in user settings
       description: Prose mention without a token value
     - value: template example placeholder record identifier
@@ -101,24 +105,34 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 65
+      discovery_only: true
       id_match: Regex_netlify_token
       matches:
-        - ref: Keyword_netlify_token
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_netlify_legacy_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
       id_match: Regex_netlify_token
       matches:
+        - ref: Keyword_netlify_platform_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -127,7 +141,27 @@ purview:
     - confidence_level: 75
       id_match: Regex_netlify_legacy_token
       matches:
-        - ref: Keyword_netlify_token
+        - ref: Keyword_netlify_platform_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_netlify_token
+      matches:
+        - ref: Keyword_netlify_platform_context
+        - ref: Pattern_netlify_token_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_netlify_legacy_token
+      matches:
+        - ref: Keyword_netlify_platform_context
+        - ref: Pattern_netlify_token_assignment
         - type: any
           min_matches: 0
           max_matches: 0
@@ -138,22 +172,25 @@ purview:
       pattern: (?<![A-Za-z0-9_])(?:nfp_[A-Za-z0-9_]{36}|nf[bcou]_[A-Za-z0-9_]{20,36})(?![A-Za-z0-9_])
     - id: Regex_netlify_legacy_token
       pattern: (?i)netlify[\s\S]{0,40}?[=:][\s"']{0,4}(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{43,45}(?![A-Za-z0-9_-])
+    - id: Pattern_netlify_token_assignment
+      pattern: (?i)\b(?:NETLIFY_AUTH_TOKEN|NETLIFY_TOKEN)\s*[=:]
   keywords:
-    - id: Keyword_netlify_token
+    - id: Keyword_netlify_platform_context
       groups:
-        - match_style: word
+        - match_style: string
           terms:
-            - netlify
+            - Netlify deploy
+            - Netlify site
+            - Netlify CLI
+            - Netlify team
             - app.netlify.com
-            - NETLIFY_AUTH_TOKEN
-            - netlify api
-            - personal access token
-            - access token
-            - api key
       strength: specific
 created: '2026-07-06'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Separate current and legacy Netlify credentials into an individual 65 discovery / 75 platform-context / 85 canonical-assignment contract with exact-tier and adversarial probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2120 without changing detector or package metadata.'

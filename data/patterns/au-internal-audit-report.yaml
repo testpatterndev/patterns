@@ -1,11 +1,16 @@
 schema: testpattern/v1
 name: Internal Audit Report
 slug: au-internal-audit-report
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
 description: Detects internal audit reports containing control assessments and organisational vulnerability findings.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+operation: >-
+  An internal-audit report, finding summary, management letter, or audit conclusion title is
+  discovery-only at 65. Audit scope, objective, opinion, conclusion, recommendation, IIA, or IPPF
+  content raises it to 75. The 85 tier additionally requires both a classified finding/exception and
+  a management response, owner, corrective action, or completion date. Enforcing tiers reject
+  templates and examples.
 confidence: medium
 confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
 jurisdictions:
@@ -23,17 +28,21 @@ data_categories:
   - governance
 test_cases:
   should_match:
-    - value: 'Internal audit report: audit finding and recommendation with management letter'
-      description: Test match 1
-    - value: Audit report with control assessment and risk assessment within audit scope
-      description: Test match 2
-    - value: Internal audit plan follow-up audit and audit opinion summary
-      description: Test match 3
+    - value: 'Internal audit report'
+      description: Low-tier probe - report title without substantive audit content
+    - value: 'Internal audit report: audit scope, audit objective, and audit opinion.'
+      description: Medium-tier probe - substantive audit sections without a classified finding response
+    - value: 'Internal audit report: high risk finding and audit exception; management response, corrective action, and target completion date.'
+      description: High-tier probe - classified finding plus management response
   should_not_match:
     - value: Tax audit by the ATO
-      description: Non-match 1
+      description: External tax-audit sibling
     - value: Audit the financial statements
-      description: Non-match 2
+      description: Financial-audit instruction
+    - value: 'The public annual report links to an internal audit report.'
+      description: Public link mentions only the report title
+    - value: 'Template example: internal audit report with high risk finding, audit exception, management response, and target completion date.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: External audit or financial audit references.
     mitigation: Require internal audit specific terms like internal audit plan or management letter.
@@ -78,6 +87,9 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_internal_audit_report
   regexes:
     - id: Regex_internal_audit_report
       pattern: >-
@@ -119,9 +131,6 @@ purview:
       groups:
         - match_style: word
           terms:
-            - internal audit
-            - audit report
-            - audit findings
             - audit opinion
             - audit scope
             - audit objective
@@ -131,8 +140,11 @@ purview:
             - IPPF
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; add report-title discovery, substantive-audit medium, and finding-plus-response high tiers; add public/template adversarial probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 551 without changing detector or package metadata.'

@@ -1,18 +1,22 @@
 schema: testpattern/v1
 name: PuTTY Private Key (PPK)
 slug: global-putty-private-key
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
   Detects the header line of a PuTTY private key file (.ppk), as produced by PuTTYgen. The header begins with
   'PuTTY-User-Key-File-' followed by the format version (2 or 3) and the SSH key algorithm. A leaked .ppk grants
-  SSH access to whatever hosts trust the corresponding public key.
+  SSH access to whatever hosts trust the corresponding public key. Header-only
+  candidates are discovery-only; ordered PPK metadata and the first public-blob
+  line support enforcement.
 operation: >-
-  Reference: https://tartarus.org/~simon/putty-snapshots/htmldoc/AppendixC.html
-  Matches the 'PuTTY-User-Key-File-N:' header line (N = 2 or 3) optionally followed by the SSH algorithm name.
-  Corroborative evidence: keywords within 300 characters.
+  The 65 tier matches a version 2/3 PPK marker. The 75 tier requires a supported
+  SSH algorithm followed by the normal Encryption, Comment, and non-zero
+  Public-Lines fields. The 85 tier additionally requires the first Base64 public
+  blob line. These fields occur at the start of normal PPK files, so enforcement
+  does not depend on Private-Lines or Private-MAC after a long public section.
 pattern: 'PuTTY-User-Key-File-[23]:\s*(?:ssh-(?:rsa|dss|ed25519|ed448)|ecdsa-sha2-nistp\d{3})?'
 confidence: high
 confidence_justification: >-
@@ -44,15 +48,29 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: 'PuTTY-User-Key-File-2: ssh-rsa'
-      description: PPK v2 header with ssh-rsa algorithm
-    - value: 'PuTTY-User-Key-File-3: ssh-ed25519'
-      description: PPK v3 header with ssh-ed25519 algorithm
+    - value: 'PuTTY-User-Key-File-3:'
+      description: Low-tier probe - version marker without algorithm or PPK fields
     - value: |-
-        PuTTY-User-Key-File-3: ecdsa-sha2-nistp256
+        PuTTY-User-Key-File-2: ssh-rsa
         Encryption: none
-        Comment: imported-openssh-key
-      description: PPK v3 header with ECDSA algorithm and following metadata lines
+        Comment: staging-bastion
+        Public-Lines: 6
+      description: Medium-tier probe - ordered PPK header metadata
+    - value: |-
+        PuTTY-User-Key-File-3: ssh-rsa
+        Encryption: none
+        Comment: production-bastion
+        Public-Lines: 6
+        AAAAB3NzaC1yc2EAAAADAQABAAABAQCaPO2QBzKYKwDik8qK5bw7VyHxKzg8V+Pw
+        3+QsewdCZi2ueNFTlIMOo0s2ZX/b1QLzu4lu08pMD1xioxlDQbNb1tOxNoLnGBz
+        1eLzKyraT6AMjuQhLCPHYJTq6Mv9e8GBQ0yljRZuUt04pXObu8jeQB7Hq+h3gqX
+        srlEFxc4CIxjzj+WNWhG1XsOLztFPW71Y8lI3EbWp1ERsALFXSqS3Wp67KJUQqs
+        pdXP+tNkgyd3Ch48Xu64zI0zP/t7LB9Qmty1eU2S/iPC/l2bvvlwQwXDsjjTp5
+        JzVjtxGNyYY6gWwud1A557OgC3bk++TtOdoBsdfYf9yZOLmi7ZQGXTzRAgMBAAE
+        Private-Lines: 14
+        AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+        Private-MAC: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      description: High-tier probe - long PPK public body with private fields beyond proximity
   should_not_match:
     - value: 'PuTTY-User-Key-File-1: ssh-rsa'
       description: Version 1 is not a real PPK format version
@@ -60,6 +78,34 @@ test_cases:
       description: OpenSSH private key, not a PuTTY .ppk file
     - value: convert the OpenSSH key to a PuTTY user key file before connecting
       description: Prose mention of a PuTTY key file without the actual header
+    - value: |-
+        PuTTY-User-Key-File-3: ssh-ed25519
+        Encryption: none
+        Comment: empty-export
+        Public-Lines: 0
+        Private-Lines: 0
+      description: Adversarial zero-line PPK declarations are not populated metadata
+    - value: |-
+        PuTTY-User-Key-File-3: ssh-ed25519
+        Encryption: none
+        Comment: placeholder
+        Public-Lines: 1
+        PLACEHOLDER
+        Private-Lines: 1
+        PLACEHOLDER
+        Private-MAC: REDACTED
+      description: Placeholder PPK body and MAC must not enforce
+    - value: |-
+        Documentation example:
+        PuTTY-User-Key-File-3: ssh-ed25519
+        Encryption: none
+        Comment: docs-only
+        Public-Lines: 1
+        AAAAC3NzaC1lZDI1NTE5AAAAIMockPublicKeyMaterialForDocumentationOnly
+        Private-Lines: 1
+        AAAAC3NzaC1lZDI1NTE5AAAAIMockPrivateKeyMaterial
+        Private-MAC: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      description: Documentation quoting a populated PPK must not enforce
 false_positives:
   - description: Documentation or tutorials that quote the PPK header line without real key material.
     mitigation: Require corroborative keywords and confirm the Public-Lines / Private-Lines base64 body follows.
@@ -79,9 +125,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_putty_ppk_header
+      matches:
+        - ref: Evidence_putty_algorithm
+        - ref: Evidence_putty_metadata
+        - ref: Evidence_putty_public_blob
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_putty_placeholder
+    - confidence_level: 75
+      id_match: Regex_putty_ppk_header
+      matches:
+        - ref: Evidence_putty_algorithm
+        - ref: Evidence_putty_metadata
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_putty_placeholder
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_putty_ppk_header
+  regexes:
+    - id: Regex_putty_ppk_header
+      pattern: 'PuTTY-User-Key-File-[23]:'
+    - id: Evidence_putty_algorithm
+      pattern: 'PuTTY-User-Key-File-[23]:\s*(?:ssh-(?:rsa|dss|ed25519|ed448)|ecdsa-sha2-nistp\d{3})'
+    - id: Evidence_putty_metadata
+      pattern: '(?:\r?\n)Encryption:\s*(?:none|aes256-cbc)(?:\r?\n)Comment:[^\r\n]{0,120}(?:\r?\n)Public-Lines:\s*[1-9]\d*\b'
+    - id: Evidence_putty_public_blob
+      pattern: '(?:\r?\n)Public-Lines:\s*[1-9]\d*(?:\r?\n)[A-Za-z0-9+/]{32,64}={0,2}(?:\r?\n)'
+  keywords:
+    - id: Evidence_putty_placeholder
+      groups:
+        - match_style: string
+          terms:
+            - PLACEHOLDER
+            - REDACTED
+            - your-private-key
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Independent-review blocker remediation: keep the PPK version marker at discovery-only 65, require ordered algorithm/Encryption/Comment/Public-Lines metadata at 75, and require the first near-header public-blob line at 85. A long RSA PPK fixture proves enforcement while Private-Lines and Private-MAC are beyond Purview proximity; zero-line, placeholder, documentation, version, and sibling-key negatives protect rejection.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1559 without changing detector or package metadata.'

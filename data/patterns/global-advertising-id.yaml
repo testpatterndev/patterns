@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Mobile Advertising ID (IDFA / GAID / AAID)
 slug: global-advertising-id
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -11,9 +11,10 @@ description: >-
   form. Although resettable, advertising IDs are persistent cross-app device identifiers treated as personal data
   under GDPR and CCPA/CPRA, and their disclosure enables cross-context tracking and re-identification.
 operation: >-
-  Reference: https://en.wikipedia.org/wiki/Identifier_for_Advertisers
-  Matches an advertising-ID label (idfa / gaid / aaid / advertising id / ad id) followed within a few characters by a
-  UUID in 8-4-4-4-12 hex form. Requiring the label keeps the otherwise-generic UUID format specific.
+  A labelled IDFA, GAID, AAID, advertising-ID, or ad-ID UUID candidate is discovery-only at 65.
+  Explicit iOS, Android, Apple-IDFA, Google-Advertising-ID, or mobile-ad-SDK context raises it to 75.
+  The 85 tier additionally requires an attribution, consent, campaign-event, device-profile, install,
+  or audience-segment record. Enforcing tiers reject public documentation, templates, and examples.
 pattern: (?:idfa|gaid|aaid|advertising[\s_-]*id|ad[\s_-]*id)[\s:#=_-]{0,8}[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![0-9a-f-])
 confidence: medium
 confidence_justification: >-
@@ -42,14 +43,85 @@ corroborative_evidence:
     - ad tracking
     - mobile identifier
   proximity: 300
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_advertising_id
+      matches:
+        - ref: Keyword_mobile_ad_platform
+        - ref: Keyword_advertising_record
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_public_ad_context
+    - confidence_level: 75
+      id_match: Regex_advertising_id
+      matches:
+        - ref: Keyword_mobile_ad_platform
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_public_ad_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_advertising_id
+  regexes:
+    - id: Regex_advertising_id
+      pattern: (?:idfa|gaid|aaid|advertising[\s_-]*id|ad[\s_-]*id)[\s:#=_-]{0,8}[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![0-9a-f-])
+  keywords:
+    - id: Keyword_mobile_ad_platform
+      groups:
+        - match_style: word
+          terms:
+            - iOS device
+            - Android device
+            - Apple IDFA
+            - Google Advertising ID
+            - mobile advertising SDK
+            - ad tracking SDK
+      strength: domain
+    - id: Keyword_advertising_record
+      groups:
+        - match_style: word
+          terms:
+            - mobile attribution record
+            - install attribution
+            - ad campaign event
+            - consent record
+            - device profile
+            - audience segment
+            - conversion event
+      strength: specific
+    - id: Keyword_public_ad_context
+      groups:
+        - match_style: word
+          terms:
+            - public documentation
+            - developer tutorial
+            - sample payload
+            - documentation example
+      strength: exclusion
+  filters:
+    - id: Guard_advertising_id_same_digits
+      type: AllDigitsSameFilter
 test_cases:
   should_match:
-    - value: 'idfa: 6d92078a-8246-4ba4-ae5b-76104861e7dc'
-      description: Labelled Apple IDFA in canonical UUID form
-    - value: gaid=97987bca-ae59-4c7d-94ba-ee4f19ab8c21
-      description: Labelled Google Advertising ID (GAID)
-    - value: 'advertising_id: 12345678-90ab-cdef-1234-567890abcdef'
-      description: Labelled advertising_id with hyphenated UUID
+    - value: 'ad id: 6d92078a-8246-4ba4-ae5b-76104861e7dc'
+      description: Low-tier probe - labelled candidate without platform context
+    - value: 'iOS device IDFA: 97987bca-ae59-4c7d-94ba-ee4f19ab8c21'
+      description: Medium-tier probe - labelled identifier plus mobile-platform context
+    - value: 'Mobile attribution record for iOS device - IDFA: 12345678-90ab-cdef-1234-567890abcdef; install attribution captured.'
+      description: High-tier probe - platform context plus attribution record
   should_not_match:
     - value: 6d92078a-8246-4ba4-ae5b-76104861e7dc
       description: Bare UUID with no advertising-ID label
@@ -57,6 +129,10 @@ test_cases:
       description: Truncated/non-UUID value behind an unrelated label
     - value: reset your advertising identifier in the device privacy settings
       description: Prose mention of an advertising identifier with no value
+    - value: 'Public documentation sample payload for an iOS device IDFA: 6d92078a-8246-4ba4-ae5b-76104861e7dc with install attribution.'
+      description: Public sample contains otherwise high-tier evidence
+    - value: 'Template example: mobile attribution record for iOS device IDFA 97987bca-ae59-4c7d-94ba-ee4f19ab8c21.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Other UUIDs (session tokens, request IDs, correlation IDs) that happen to sit next to the word 'ad' or 'id'.
     mitigation: The pattern requires a specific advertising-ID label; tighten the label list further if generic 'ad id' collides in your corpus.
@@ -76,8 +152,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Profile quality: add labelled-candidate discovery, mobile-platform medium, and attribution-record high tiers; reject public samples/templates and add exact-tier adversarial probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1523 without changing detector or package metadata.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: QLD Notifiable Condition Report
 slug: au-qld-notifiable-condition-report
-version: 1.4.1
+version: 1.4.2
 type: keyword_list
 pattern_class: concept
 description: Detects QLD notifiable condition reports for public health surveillance and disease notifications.
@@ -26,10 +26,16 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: 'Notifiable condition report: communicable disease notification to public health unit'
-      description: Test match 1
-    - value: QLD Health notification with contact tracing and surveillance data
-      description: Test match 2
+    - value: Notifiable condition report issued
+      description: Exact 65 discovery probe with a report phrase and no case detail
+    - value: Notifiable condition report with contact tracing
+      description: Exact 75 probe with public-health case response context
+    - value: Notifiable condition report under Public Health Act 2005 with contact tracing
+      description: Exact 85 probe with case response and statutory context
+    - value: 'Notifiable condition report: communicable disease notification with contact tracing to public health unit'
+      description: Communicable disease notification to a public health unit
+    - value: QLD Health notifiable condition notification with contact tracing and surveillance data
+      description: QLD Health case notification with surveillance details
     - value: Public health notification for outbreak notification and case notification
       description: Test match 3
   should_not_match:
@@ -37,6 +43,8 @@ test_cases:
       description: Non-match 1
     - value: Disease prevention tips
       description: Non-match 2
+    - value: Reportable disease dashboard redesign
+      description: Product dashboard phrase must remain discovery-only
 false_positives:
   - description: Generic notification or disease in non-surveillance contexts.
     mitigation: Require notifiable condition or public health notification specific terms.
@@ -63,19 +71,45 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_notifiable_condition
+      id_match:
+        type: any
+        ids:
+          - Pattern_notifiable_condition
+          - Pattern_disease_report
       matches:
-        - ref: Evidence_notifiable_disease
+        - ref: Evidence_case_response_context
         - ref: Evidence_public_health_act
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_disease_report
+      id_match:
+        type: any
+        ids:
+          - Pattern_notifiable_condition
+          - Pattern_disease_report
       matches:
-        - ref: Evidence_qld_health_forms
+        - ref: Evidence_case_response_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Pattern_notifiable_condition
+          - Pattern_disease_report
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
   regexes:
     - id: Pattern_notifiable_condition
       pattern: (?i)\b(?:notifiable\s+(?:condition|disease)\s+(?:report|notification)|communicable\s+disease\s+report|public\s+health\s+notification)\b
@@ -118,9 +152,24 @@ purview:
             - Pathology Queensland
             - Clinical Excellence Queensland
       strength: specific
+    - id: Evidence_case_response_context
+      groups:
+        - match_style: word
+          terms:
+            - contact tracing
+            - case investigation
+            - laboratory confirmation
+            - outbreak
+            - patient
+            - specimen
+            - surveillance data
+      strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: keep report phrases at 65 discovery, require independent case-response evidence at 75 and Public Health Act context at 85, with exact-tier and notification-software probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 586 without changing detector or package metadata.'

@@ -1,14 +1,17 @@
 schema: testpattern/v1
 name: IMEI
 slug: global-imei
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects IMEI patterns.
 operation: >-
-  Validation: Luhn algorithm. Reference: https://en.wikipedia.org/wiki/International_Mobile_Equipment_Identity
-  Corroborative evidence: 4 keywords within 300 characters. Keyword lists: phone-international.
+  A 15-digit candidate with Luhn validation is discovery-only at 65. An explicit IMEI, international
+  mobile equipment identity, equipment-identity, or TAC label raises it to 75. The 85 tier additionally
+  requires a subscriber account, handset inventory, device assignment, carrier record, warranty record,
+  blacklist status, or mobile-service association. Enforcing tiers reject public documentation,
+  manufacturer guides, templates, and examples.
 pattern: \b\d{15}\b
 confidence: medium
 confidence_justification: 'Medium confidence: validated with Luhn algorithm and supported by corroborative keyword evidence.'
@@ -35,12 +38,12 @@ corroborative_evidence:
     - phone-international
 test_cases:
   should_match:
-    - value: '353456789012345'
-      description: Standard 15-digit IMEI
-    - value: '490154203237518'
-      description: Samsung IMEI format
-    - value: '860000000000000'
-      description: Chinese manufacturer IMEI prefix
+    - value: '353456789012348'
+      description: Exact 65 probe - Luhn-valid IMEI candidate without a label
+    - value: 'IMEI: 490154203237518'
+      description: Exact 75 probe - Luhn-valid labelled IMEI without a device record
+    - value: 'Handset inventory device assignment - IMEI: 860000000000009; subscriber account and blacklist status recorded.'
+      description: Exact 85 probe - Luhn-valid IMEI plus handset and subscriber record
   should_not_match:
     - value: 35345678901234
       description: Only 14 digits instead of 15
@@ -48,6 +51,12 @@ test_cases:
       description: 16 digits instead of 15
     - value: 35345678901234A
       description: Contains a letter instead of all digits
+    - value: '353456789012345'
+      description: Adversarial 15-digit candidate with an invalid Luhn check digit
+    - value: 'Public manufacturer guide - IMEI: 353456789012348'
+      description: Public guide contains a complete labelled candidate
+    - value: 'Template example: handset inventory device assignment IMEI 490154203237518 with subscriber account and blacklist status.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: >-
       Technical identifiers appearing in public documentation, network configuration guides, or example configurations
@@ -84,11 +93,23 @@ purview:
       id_match: Regex_imei
       matches:
         - ref: Keyword_imei
+        - ref: Keyword_imei_device_record
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_imei_context
+    - confidence_level: 75
+      id_match: Regex_imei
+      matches:
+        - ref: Keyword_imei
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_public_imei_context
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_imei
@@ -107,21 +128,39 @@ purview:
           terms:
             - IMEI
             - international mobile equipment identity
-            - device identifier
-            - mobile device
-            - handset
-            - serial number
-            - phone number
             - IMEI number
             - equipment identity
             - text: TAC
               case_sensitive: true
             - type allocation code
-            - mobile equipment
       strength: specific
+    - id: Keyword_imei_device_record
+      groups:
+        - match_style: word
+          terms:
+            - subscriber account
+            - handset inventory
+            - device assignment
+            - carrier record
+            - warranty record
+            - blacklist status
+            - mobile service association
+      strength: domain
+    - id: Keyword_public_imei_context
+      groups:
+        - match_style: word
+          terms:
+            - public manufacturer guide
+            - public documentation
+            - device manual
+            - documentation example
+      strength: exclusion
 created: '2026-02-08'
-updated: '2026-07-18'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: add validated-candidate discovery, explicit-IMEI-label medium, and handset/subscriber-record high tiers; use independently verified Luhn-valid exact-tier probes and retain an invalid-checksum negative; reject public guides/templates.'
   - version: 1.3.2
     date: '2026-07-18'
     description: >-

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Vercel Access Token
 slug: global-vercel-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -61,12 +61,12 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: 'VERCEL_TOKEN=vcp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567'
-      description: Vercel personal access token, current vcp_ format, in the canonical env var
     - value: vca_zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA9876
-      description: Vercel app access token (vca_ + 56-char body, the length shown in Vercel's own docs example)
-    - value: vck_0123456789ABCDEFGHIJ0123456789abcdefghij
-      description: Vercel API key (vck_ prefix, 40-char body at the bounded floor)
+      description: Exact 65 probe - current app token without independent deployment context
+    - value: 'Vercel deployment credential vck_0123456789ABCDEFGHIJ0123456789abcdefghij'
+      description: Exact 75 probe - API-key structure with deployment context
+    - value: 'Vercel project deploy secret VERCEL_TOKEN=vcp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567'
+      description: Exact 85 probe - project context plus canonical token assignment
     - value: 'BLOB_READ_WRITE_TOKEN=vercel_blob_rw_abc123_ABCDEFGHIJKLMNOPQRSTUVWXYZ'
       description: Vercel Blob read-write token (vercel_blob_rw_ + store id + secret)
     - value: vercel_blob_rw_store01_zyxwvutsrqponmlkjihgfedcba0123456789
@@ -74,7 +74,7 @@ test_cases:
     - value: 'VERCEL_TOKEN=ABCDEFGHIJKLMNOPQRSTUVWX'
       description: Legacy unprefixed Vercel token (24 chars) in a labelled assignment
     - value: 'vercel api token: zyxwvutsrqponmlkjihgfedc'
-      description: Legacy Vercel token with a label and colon separator within the proximity gap
+      description: Legacy context-gated token retained as a discovery candidate
   should_not_match:
     - value: vercel_deploy_id_ABCDEFGHIJKLMNOPQRSTUVWX_env_more
       description: 24-char run glued inside a longer identifier (boundary regression case from review)
@@ -86,6 +86,10 @@ test_cases:
       description: Bare 24-char alphanumeric value with no Vercel label anywhere (could be any ID or hash)
     - value: vercel_blob_rw_abc_Zz9
       description: Blob token secret segment far too short (3 chars, below the 10-char floor)
+    - value: 'Netlify deploy NETLIFY_AUTH_TOKEN=vcp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567'
+      description: Sibling deployment provider context does not corroborate a Vercel token
+    - value: 'Documentation example: Vercel project VERCEL_TOKEN=vcp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567'
+      description: Documentation example containing a valid-shaped token is excluded
     - value: rotate the vercel token in account settings
       description: Prose mention without a token value
     - value: template example placeholder record identifier
@@ -115,24 +119,34 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 65
+      discovery_only: true
       id_match: Regex_vercel_token
       matches:
-        - ref: Keyword_vercel_token
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_vercel_api_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
       id_match: Regex_vercel_token
       matches:
+        - ref: Keyword_vercel_platform_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -141,7 +155,27 @@ purview:
     - confidence_level: 75
       id_match: Regex_vercel_api_token
       matches:
-        - ref: Keyword_vercel_token
+        - ref: Keyword_vercel_platform_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_vercel_token
+      matches:
+        - ref: Keyword_vercel_platform_context
+        - ref: Pattern_vercel_token_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_vercel_api_token
+      matches:
+        - ref: Keyword_vercel_platform_context
+        - ref: Pattern_vercel_token_assignment
         - type: any
           min_matches: 0
           max_matches: 0
@@ -152,23 +186,25 @@ purview:
       pattern: (?<![A-Za-z0-9_])(?:vc[aikpr]_[A-Za-z0-9]{40,80}|vercel_blob_rw_[A-Za-z0-9]{5,40}_[A-Za-z0-9]{10,60})(?![A-Za-z0-9_])
     - id: Regex_vercel_api_token
       pattern: (?i)vercel[\s\S]{0,40}?[=:][\s"']{0,4}(?<![A-Za-z0-9_])[A-Za-z0-9]{24}(?![A-Za-z0-9_])
+    - id: Pattern_vercel_token_assignment
+      pattern: (?i)\b(?:VERCEL_TOKEN|VERCEL_ACCESS_TOKEN|BLOB_READ_WRITE_TOKEN)\s*[=:]
   keywords:
-    - id: Keyword_vercel_token
+    - id: Keyword_vercel_platform_context
       groups:
-        - match_style: word
+        - match_style: string
           terms:
-            - vercel
-            - vercel.com
-            - VERCEL_TOKEN
-            - vercel api
-            - vercel_blob_rw
-            - deployment token
-            - access token
-            - api key
+            - Vercel project
+            - Vercel deployment
+            - Vercel team
+            - Vercel Blob store
+            - vercel.com dashboard
       strength: specific
 created: '2026-07-06'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Separate current, Blob, and legacy Vercel credentials into an individual 65 discovery / 75 platform-context / 85 canonical-assignment contract with exact-tier and adversarial probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2134 without changing detector or package metadata.'

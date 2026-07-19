@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: High-Value Session Cookie Token
 slug: global-session-cookie-token
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,13 +9,16 @@ description: >-
   Detects high-value session cookies by name-plus-value: framework and SSO session
   cookies (ESTSAUTH / ESTSAUTHPERSISTENT, JSESSIONID, PHPSESSID, connect.sid,
   _session_id, sessionid) assigned a long token value. A captured session cookie lets
-  an attacker resume an authenticated session and bypass MFA entirely.
+  an attacker resume an authenticated session and bypass MFA entirely. Bare
+  assignments are discovery-only; HTTP cookie framing and response attributes
+  provide the enforcement tiers.
 operation: >-
   A known session-cookie name, an = or : assignment, then a 16+ character token value
   drawn from the cookie value charset (letters, digits, percent, dot, underscore,
-  hyphen). The name list targets cookies that carry live authenticated sessions and
-  are prime session-hijacking targets. Corroborative evidence: keywords within 300
-  characters.
+  hyphen). The 65 tier inventories that assignment. A Cookie or Set-Cookie header
+  raises it to 75, while a Set-Cookie response carrying Path/Domain plus Secure or
+  HttpOnly attributes reaches 85. Enforcing tiers reject template and placeholder
+  values.
 pattern: '(?<![A-Za-z0-9_])(?:ESTSAUTHPERSISTENT|ESTSAUTH|JSESSIONID|PHPSESSID|connect\.sid|_session_id|sessionid|SSESS[a-f0-9]{8,})\s*[=:]\s*[A-Za-z0-9%._-]{16,}'
 confidence: high
 confidence_justification: >-
@@ -48,11 +51,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 'JSESSIONID=A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4'
-      description: Java servlet session cookie with 32-char fake value
-    - value: 'set-cookie: PHPSESSID=0123456789abcdef0123456789abcdef'
-      description: PHP session cookie in a Set-Cookie header, fake value
-    - value: 'ESTSAUTHPERSISTENT: AQABAAEAAAD-fakeMicrosoftEntraSessionTokenValue123'
-      description: Microsoft Entra persistent auth cookie with fake token value
+      description: Low-tier probe - recognized cookie assignment without HTTP framing
+    - value: 'Cookie: PHPSESSID=0123456789abcdef0123456789abcdef'
+      description: Medium-tier probe - recognized session token in a request Cookie header
+    - value: 'Set-Cookie: ESTSAUTHPERSISTENT=AQABAAEAAAD-x7K2mN9pQ4sT8vW3yZ6; Path=/; Secure; HttpOnly'
+      description: High-tier probe - response cookie with path and security attributes
   should_not_match:
     - value: 'JSESSIONID=short'
       description: Token value too short (under 16 chars)
@@ -60,6 +63,12 @@ test_cases:
       description: Unknown cookie name, not a tracked session cookie
     - value: The JSESSIONID cookie identifies the user session on the server
       description: Prose naming the cookie with no assigned token value
+    - value: 'Cookie: JSESSIONID=REDACTED_SESSION_VALUE'
+      description: Placeholder session value in an otherwise valid Cookie header
+    - value: 'Documentation example: Set-Cookie: PHPSESSID=0123456789abcdef0123456789abcdef; Path=/; Secure; HttpOnly'
+      description: Documentation quoting a complete response cookie must not enforce
+    - value: 'Set-Cookie: csrftoken=0123456789abcdef0123456789abcdef; Secure; HttpOnly'
+      description: Sibling CSRF cookie is not a tracked authenticated-session cookie
 false_positives:
   - description: Example or expired cookie values in API documentation, HAR captures used for debugging, or test fixtures.
     mitigation: Require corroborative session/cookie-theft keywords and treat obvious placeholders (all zeros, "example") as non-sensitive.
@@ -79,9 +88,66 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_session_cookie_assignment
+      matches:
+        - ref: Evidence_set_cookie_header
+        - ref: Evidence_cookie_scope_attribute
+        - ref: Evidence_cookie_security_attribute
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_placeholder_cookie
+    - confidence_level: 75
+      id_match: Regex_session_cookie_assignment
+      matches:
+        - ref: Evidence_cookie_header
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_placeholder_cookie
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_session_cookie_assignment
+  regexes:
+    - id: Regex_session_cookie_assignment
+      pattern: '(?<![A-Za-z0-9_])(?:ESTSAUTHPERSISTENT|ESTSAUTH|JSESSIONID|PHPSESSID|connect\.sid|_session_id|sessionid|SSESS[a-f0-9]{8,})\s*[=:]\s*[A-Za-z0-9%._-]{16,}'
+    - id: Evidence_cookie_header
+      pattern: '(?i)\b(?:Cookie|Set-Cookie)\s*:'
+    - id: Evidence_set_cookie_header
+      pattern: '(?i)\bSet-Cookie\s*:'
+    - id: Evidence_cookie_scope_attribute
+      pattern: '(?i);\s*(?:Path|Domain)\s*='
+    - id: Evidence_cookie_security_attribute
+      pattern: '(?i);\s*(?:Secure|HttpOnly)\b'
+  keywords:
+    - id: Evidence_placeholder_cookie
+      groups:
+        - match_style: string
+          terms:
+            - REDACTED
+            - PLACEHOLDER
+            - SESSION_VALUE
+            - your-cookie-here
+            - CHANGEME
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add discovery-only assignments, Cookie-header medium enforcement, and scoped secure Set-Cookie high confidence; add exact-tier and malformed, placeholder, documentation, and sibling-cookie negatives.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1564 without changing detector or package metadata.'

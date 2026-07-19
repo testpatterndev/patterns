@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Sexual Orientation (Australia)
 slug: au-sexual-orientation
-version: 1.1.0
+version: 1.2.0
 type: keyword_list
 pattern_class: concept
 engine: universal
@@ -18,11 +18,9 @@ operation: >-
   partner/spouse, gender identity disclosure, coming out as). Detects the presence of
   sexual-orientation subject matter in a disclosure/record context; not a structured-token
   detector. Pair with corroborative keywords to raise precision. Gender identity is a
-  distinct protected attribute, not a synonym for sexual orientation: the Purview export is a
-  single 65 discovery_only tier built from a corrected orientation-only phrase branch that
-  omits the transgender/gender-identity alternations and bounds "coming out as" to
-  orientation terms — inventory only, no enforcement; attributed 75/85 enforcement awaits a
-  separately validated design.
+  distinct protected attribute, not a synonym for sexual orientation: Purview uses the corrected
+  orientation-only phrase branch at 65 discovery, requires a person-linked HR/intake record at
+  75, and requires a populated disclosure or recorded response as well at 85.
 pattern: '(?i)\b(?:sexual\s+orientations?|LGBTQ\+?\s+status|identifies\s+as\s+(?:gay|lesbian|bisexual|transgender)|same-sex\s+(?:partner|spouse)|gender\s+identity\s+disclosure|coming\s+out\s+as)\b'
 confidence: low
 confidence_justification: >-
@@ -55,6 +53,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'Sexual orientation disclosure topic pending review.'
+      description: Exact 65 discovery probe - orientation topic without a person-record context
+    - value: 'HR diversity survey includes a sexual orientation field.'
+      description: Exact 75 probe - person-record context without a populated response
+    - value: 'HR file: sexual orientation recorded as bisexual; employee response selected voluntarily.'
+      description: Exact 85 probe - person record plus populated orientation attribution
     - value: "HR file notes the employee's sexual orientation as part of the diversity survey."
       description: Sexual orientation phrase present
     - value: 'The profile lists LGBTQ+ status alongside other demographic fields.'
@@ -70,6 +74,12 @@ test_cases:
       description: Unrelated "orientation" (architectural), no disclosure vocabulary
     - value: 'The team celebrated Pride month with a company-wide event.'
       description: Topical mention ("Pride"), no personal disclosure phrase
+    - value: 'Public policy guidance reports aggregate workforce demographics for LGBTQ communities.'
+      description: Public aggregate material is not a person-linked orientation disclosure
+    - value: 'Sample template: HR file with optional demographic response recorded as Example Value.'
+      description: Adjacent template language is not a populated orientation record
+    - value: 'HR file records the employee''s preferred pronouns.'
+      description: Sibling gender-expression data does not satisfy the orientation-only Purview primary
 false_positives:
   - description: >-
       The bare word "orientation" appears in unrelated contexts (employee orientation,
@@ -92,14 +102,80 @@ exports:
 scope: broad
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_sexual_orientation_disclosure
+      matches:
+        - ref: Evidence_au_orientation_record_context
+        - ref: Evidence_au_orientation_attribution
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_au_orientation_public_context
+    - confidence_level: 75
+      id_match: Pattern_sexual_orientation_disclosure
+      matches:
+        - ref: Evidence_au_orientation_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_au_orientation_public_context
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_sexual_orientation_disclosure
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_au_orientation_public_context
   regexes:
     - id: Pattern_sexual_orientation_disclosure
       pattern: '(?i)\b(?:sexual\s+orientation|LGBTQ\+?\s+status|identif(?:y|ies)\s+as\s+(?:gay|lesbian|bisexual|queer)|same-sex\s+(?:partner|spouse)|coming\s+out\s+as\s+(?:gay|lesbian|bisexual|queer))\b'
+  keywords:
+    - id: Evidence_au_orientation_record_context
+      groups:
+        - match_style: word
+          terms:
+            - HR file
+            - HR diversity survey
+            - intake form
+            - employee profile
+            - client record
+            - case note
+      strength: domain
+    - id: Evidence_au_orientation_attribution
+      groups:
+        - match_style: word
+          terms:
+            - recorded as
+            - self-identified as
+            - disclosed to
+            - 'status:'
+            - response selected
+            - partner named
+      strength: specific
+    - id: Evidence_au_orientation_public_context
+      groups:
+        - match_style: word
+          terms:
+            - public policy guidance
+            - aggregate statistics
+            - awareness campaign
+            - blank questionnaire
+            - training course
+            - public report
+      strength: exclusion
 risk_rating: 7
 risk_description: >-
   Sexual orientation is a protected attribute under the Sex Discrimination Act 1984 (Cth);
@@ -114,8 +190,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-07-12'
-updated: '2026-07-17'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: retain orientation topics as 65 discovery, require a person-linked HR/intake record at 75 and a populated orientation attribution at 85; add exact-tier and sibling/public/template probes while preserving the orientation-only scope.'
   - version: 1.1.0
     date: '2026-07-17'
     description: >-

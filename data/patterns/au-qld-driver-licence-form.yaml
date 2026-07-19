@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: QLD Driver Licence Form
 slug: au-qld-driver-licence-form
-version: 1.3.1
+version: 1.4.0
 type: keyword_list
 pattern_class: concept
 description: Detects QLD Transport and Main Roads driver licence application and renewal forms.
@@ -23,6 +23,12 @@ data_categories:
   - government
 test_cases:
   should_match:
+    - value: 'Driver licence application information session.'
+      description: Exact 65 discovery probe - application phrase without populated applicant fields
+    - value: 'Driver licence application - applicant name, residential address, and signature recorded.'
+      description: Exact 75 probe - populated application fields without a TMR authority marker
+    - value: 'TMR driver licence application - applicant name, Customer Reference Number, licence class, and signature recorded.'
+      description: Exact 85 probe - populated application fields plus TMR authority evidence
     - value: 'TMR driver licence application: learner licence identity verification'
       description: Test match 1
     - value: Queensland driver licence renewal form with photo ID and licence class
@@ -34,6 +40,12 @@ test_cases:
       description: Non-match 1
     - value: Licence to thrill movie
       description: Non-match 2
+    - value: 'Sample template for road-authority applicant fields: name, customer reference, class, signature.'
+      description: Adjacent template language is not a populated driver-licence form
+    - value: 'The public website explains how residents apply for permission to drive.'
+      description: Public guidance has no form primary or populated applicant fields
+    - value: 'Queensland software end-user agreement for a government workstation.'
+      description: Sibling software-licensing language does not satisfy the driver-licence primary
 false_positives:
   - description: Software or entertainment licence references.
     mitigation: Require TMR or Queensland driver keywords.
@@ -62,17 +74,31 @@ purview:
     - confidence_level: 85
       id_match: Pattern_tmr_licence
       matches:
-        - ref: Evidence_driver_licence
         - ref: Evidence_tmr_forms
+        - ref: Evidence_driver_application_fields
         - type: any
           min_matches: 0
           max_matches: 0
           children:
             - ref: Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_tmr_form
+      id_match: Pattern_tmr_licence
       matches:
-        - ref: Evidence_qld_government
+        - ref: Evidence_driver_application_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_tmr_licence
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
   regexes:
     - id: Pattern_tmr_licence
       pattern: (?i)\b(?:driver\s+licen[cs]e\s+(?:application|renewal|replacement)|learner\s+(?:licen[cs]e|permit)|f3000)\b
@@ -123,9 +149,25 @@ purview:
             - Information Privacy Act 2009
             - Queensland Privacy Principles
       strength: specific
+    - id: Evidence_driver_application_fields
+      groups:
+        - match_style: word
+          terms:
+            - applicant name
+            - date of birth
+            - residential address
+            - Customer Reference Number
+            - application number
+            - licence class
+            - photo identification
+            - signature
+      strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add a 65 discovery application tier, make 75 require populated applicant fields and 85 additionally require TMR authority evidence, with exact-tier and sibling/public/template probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 576 without changing detector or package metadata.'

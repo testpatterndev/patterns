@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: XRP Ledger Address
 slug: global-xrp-address
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -49,11 +49,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 'rDTXLQ7ZKZVKz33zJbHjgVShjsBnqMBhmN'
-      description: Classic address from the xrpl.org base58 encoding example (34 chars)
+      description: Exact 65 discovery probe using a documented bare XRP Ledger address
     - value: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
       description: Genesis account address (documented, 34 chars)
     - value: 'rrrrrrrrrrrrrrrrrrrrrhoLvTp'
       description: ACCOUNT_ZERO special address (documented, 27 chars — near lower bound)
+    - value: 'XRP address rDTXLQ7ZKZVKz33zJbHjgVShjsBnqMBhmN'
+      description: Exact 75 probe with explicit XRP Ledger context
+    - value: 'XRP withdrawal address rDTXLQ7ZKZVKz33zJbHjgVShjsBnqMBhmN'
+      description: Exact 85 probe with chain-specific and transfer-destination context
   should_not_match:
     - value: 'zDTXLQ7ZKZVKz33zJbHjgVShjsBnqMBhmN'
       description: Wrong prefix (does not start with r)
@@ -65,6 +69,8 @@ test_cases:
       description: Hyphen breaks the run so no contiguous 25-35 char body exists — rejected
     - value: 'xrp wallet address example placeholder'
       description: Template/placeholder context should be excluded even when domain anchor words are present
+    - value: 'Database key rDTXLQ7ZKZVKz33zJbHjgVShjsBnqMBhmN'
+      description: Valid-shaped non-wallet key must remain discovery-only
 false_positives:
   - description: >-
       A single leading "r" followed by a base58 run collides with other "r..."-prefixed base58 tokens
@@ -94,7 +100,7 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: crypto-wallet-context
       as: Keyword_cryptocurrency
@@ -103,10 +109,29 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_xrp_address
+      matches:
+        - ref: Keyword_xrp_context
+        - ref: Keyword_transfer_destination_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_xrp_address
       matches:
-        - ref: Keyword_cryptocurrency
+        - ref: Keyword_xrp_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_xrp_address
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -115,9 +140,34 @@ purview:
   regexes:
     - id: Regex_xrp_address
       pattern: '\br[1-9A-HJ-NP-Za-km-z]{24,34}\b'
+  keywords:
+    - id: Keyword_xrp_context
+      groups:
+        - match_style: word
+          terms:
+            - text: XRP
+              case_sensitive: true
+            - XRP address
+            - XRP Ledger
+            - XRPL wallet
+      strength: domain
+    - id: Keyword_transfer_destination_context
+      groups:
+        - match_style: word
+          terms:
+            - withdrawal address
+            - deposit address
+            - destination wallet
+            - recipient address
+            - pay to
+            - transfer to
+      strength: specific
 created: '2026-07-07'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: keep bare XRP-shaped values at 65 discovery, require explicit ledger context at 75 and additional transfer-destination evidence at 85, with exact-tier and database-key probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2136 without changing detector or package metadata.'

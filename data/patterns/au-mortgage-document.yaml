@@ -1,8 +1,8 @@
 schema: testpattern/v1
 name: Australian Mortgage Document
 slug: au-mortgage-document
-version: 1.4.1
-type: keyword_list
+version: 1.4.2
+type: keyword_proximity
 pattern_class: concept
 description: Detects mortgage documents containing property security details, LVR ratios, and borrower financial information.
 operation: >-
@@ -29,8 +29,14 @@ data_categories:
   - pii
 test_cases:
   should_match:
+    - value: Residential mortgage document
+      description: Exact 65 discovery probe with a mortgage instrument phrase and no substantive details
+    - value: 'Residential mortgage: mortgagor details'
+      description: Exact 75 probe with mortgage-party context
+    - value: 'Residential mortgage: mortgagor details and title number 12345'
+      description: Exact 85 probe with mortgage-party and property-security context
     - value: 'Mortgage deed: mortgagor grants first mortgage over property security'
-      description: Test match 1
+      description: Mortgage deed with party and property-security details
     - value: Loan to value ratio (LVR) of 80% on title deed registered mortgage
       description: Test match 2
     - value: Discharge of mortgage application for mortgagee consent
@@ -40,6 +46,8 @@ test_cases:
       description: Non-match 1
     - value: He mortgaged his future for the project
       description: Non-match 2
+    - value: Residential mortgage seminar agenda
+      description: Seminar wording must remain discovery-only
 false_positives:
   - description: Mortgage rate comparisons or metaphorical use.
     mitigation: Require legal mortgage terms like mortgagor, mortgagee, or mortgage deed.
@@ -78,7 +86,16 @@ purview:
     - confidence_level: 75
       id_match: Regex_mortgage
       matches:
-        - ref: Keyword_legal_general
+        - ref: Keyword_mortgage_terms
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_mortgage
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -87,13 +104,14 @@ purview:
   regexes:
     - id: Regex_mortgage
       pattern: >-
-        (?i)\b(?:mortgage\s+(?:deed|agreement|contract)|home\s+loan\s+(?:agreement|contract)|secured\s+loan\s+(?:agreement|deed)|residential\s+mortgage)\b
+        (?i)\b(?:mortgage\s+(?:deed|agreement|contract)|home\s+loan\s+(?:agreement|contract)|secured\s+loan\s+(?:agreement|deed)|residential\s+mortgage|registered\s+mortgage|discharge\s+of\s+mortgage)\b
   keywords:
     - id: Keyword_property_security
       groups:
         - match_style: word
           terms:
             - security interest
+            - property security
             - charged property
             - registered mortgage
             - land title
@@ -136,8 +154,11 @@ purview:
             - entire agreement
       strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: align the evidence-gated detector to keyword_proximity, keep mortgage-instrument phrases at 65 discovery, require mortgage-party/term evidence at 75 and additional title/security evidence at 85, broaden registered/discharge coverage, and add exact-tier plus seminar probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 559 without changing detector or package metadata.'

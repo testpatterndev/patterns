@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Birth Date Indicator
 slug: au-birth-date-indicator
-version: 2.2.1
+version: 2.3.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -9,8 +9,8 @@ description: >-
   Identifies date-of-birth references in Australian documents using multiple structural date regex patterns (numeric slash, numeric dot, written month, ISO format) combined with birth-record and
   personal-information keywords.
 operation: >-
-  Multi-format date regex matching: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, DD Month YYYY, and YYYY-MM-DD (ISO). Corroborative evidence: 3 tiers with birth-record-specific keywords and exclusion logic
-  (high), personal-information keywords (medium), and standalone date match (low) within 300 characters.
+  Multi-format date regex matching: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, DD Month YYYY, and YYYY-MM-DD (ISO). Corroborative evidence: 3 tiers with birth-record labels plus personal-record context and
+  exclusion logic (high), explicit birth-record labels (medium), and standalone date match (low) within 300 characters.
 pattern: >-
   \b(?:(?:0?[1-9]|[12][0-9]|3[01])[\/\-\.](?:0?[1-9]|1[012])[\/\-\.](?:19|20)\d{2}|(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:19|20)\d{2}|(?:19|20)\d{2}[\-\/](?:0[1-9]|1[012])[\-\/](?:0[1-9]|[12]\d|3[01]))\b
 confidence: medium
@@ -43,6 +43,12 @@ corroborative_evidence:
     - birth-record-context
 test_cases:
   should_match:
+    - value: '15/03/1990'
+      description: Exact 65 discovery probe - structured date without personal or birth-record context
+    - value: 'DOB: 15/03/1990'
+      description: Exact 75 probe - explicit birth-date label without broader personal-record context
+    - value: 'Personal details recorded on file - DOB: 15/03/1990'
+      description: Exact 85 probe - explicit birth-date label plus personal-record context
     - value: 'DOB: 15/03/1990'
       description: Numeric slash format with DOB label
     - value: Born on 1st January 1985
@@ -58,6 +64,14 @@ test_cases:
       description: Payment due date phrasing with no structured date value
     - value: unrelated generic text
       description: No date pattern present
+    - value: 'Invoice date: 15/03/1990'
+      description: Structured business date is suppressed by the business-date document filter
+    - value: 'Sample template personal details: 15/03/1990'
+      description: Template text would satisfy personal context but is vetoed by the shared exclusion
+    - value: 'Passport expiry date: 15/03/2030'
+      description: Sibling identity-document date is suppressed by the expiry-date filter
+    - value: 'Published event date: 15/03/1990'
+      description: Public event date has no personal or birth context and remains discovery-only
 false_positives:
   - description: Non-DOB dates such as invoice dates, event dates, and document timestamps.
     mitigation: Require birth-record keywords in proximity. Personal-information context provides lower tier.
@@ -79,7 +93,7 @@ sensitivity_labels:
   ca_gov: Protected A
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Evidence_template_exclusion
@@ -89,6 +103,7 @@ purview:
       id_match: Pattern_date_all
       matches:
         - ref: Evidence_birth_record
+        - ref: Evidence_personal_information
         - type: any
           min_matches: 0
           max_matches: 0
@@ -97,7 +112,21 @@ purview:
     - confidence_level: 75
       id_match: Pattern_date_all
       matches:
-        - ref: Evidence_personal_information
+        - ref: Evidence_birth_record
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_date_all
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
   filters:
     - id: Guard_birth_date_exclude_business
       type: TextMatchFilter
@@ -167,8 +196,11 @@ purview:
             - employee details
       strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 2.3.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add a bare-date 65 discovery tier, require an explicit birth-record label at 75 and both that label plus personal-record context at 85, apply template suppression across all tiers, and add exact-tier plus business/sibling/public/template probes.'
   - version: 2.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 520 without changing detector or package metadata.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: HL7 Health Message
 slug: global-hl7-message
-version: 1.4.1
+version: 1.4.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -55,11 +55,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: MSH|^~\&|SendingApp
-      description: HL7 message header segment
+      description: Exact 65 discovery probe with an isolated HL7 message header
     - value: MSH|^~\&|HIS|Hospital|LAB|Lab
       description: HL7 header with sending and receiving applications
     - value: MSH|^~\&|ADT|MCM
       description: HL7 ADT message header
+    - value: "MSH|^~\\&|HIS|Hospital\rPID|1||12345"
+      description: Exact 75 probe with a header and one clinical message segment
+    - value: "MSH|^~\\&|HIS|Hospital\rPID|1||12345\rOBX|1|TX|RESULT||Patient laboratory result"
+      description: Exact 85 probe with HL7 segment structure and clinical content
   should_not_match:
     - value: MSA|AA|12345
       description: MSA segment header instead of MSH
@@ -101,17 +105,28 @@ purview:
     - confidence_level: 85
       id_match: Regex_hl7_header
       matches:
-        - ref: Pattern_global_hl7_message_label_context
-        - ref: Keyword_global_hl7_message_domain_context
+        - ref: Regex_hl7_segment_context
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_hl7_clinical_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_hl7_adt
+    - confidence_level: 75
+      id_match: Regex_hl7_header
       matches:
-        - ref: Keyword_hl7
+        - ref: Regex_hl7_segment_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_hl7_header
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -124,6 +139,8 @@ purview:
       pattern: \bADT\^A0[1-4]\b
     - id: Pattern_global_hl7_message_label_context
       pattern: (?i)\b(?:hl7\s+health\s+message|hl7|health|message)\b
+    - id: Regex_hl7_segment_context
+      pattern: (?:\r\n|\n|\r)(?:PID|PV1|ORC|OBR|OBX)\|
   keywords:
     - id: Keyword_hl7
       groups:
@@ -151,9 +168,23 @@ purview:
             - health
             - message
       strength: domain
+    - id: Keyword_hl7_clinical_context
+      groups:
+        - match_style: word
+          terms:
+            - patient
+            - laboratory result
+            - admission diagnosis
+            - discharge
+            - medication order
+            - clinical observation
+      strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: treat an isolated MSH header as 65 discovery, require explicitly delimited additional HL7 clinical segments at 75, require multiple segment types plus clinical content at 85, avoid Purview-unsupported line anchors, and add exact-tier message probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1238 without changing detector or package metadata.'

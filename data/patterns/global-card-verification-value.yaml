@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Card Verification Value (Labelled)
 slug: global-card-verification-value
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -48,11 +48,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 'CVV: 123'
-      description: CVV label with colon separator and 3-digit value
+      description: Exact 65 discovery probe with a labelled value and no card context
     - value: 'cvv2=4567'
       description: CVV2 label, 4-digit Amex-style code, lowercase
     - value: 'Card Verification Value 321'
       description: Spelled-out label followed by 3-digit value
+    - value: 'Cardholder CVV: 847'
+      description: Exact 75 probe with payment-card context
+    - value: 'Checkout payment for cardholder CVV: 847'
+      description: Exact 85 probe with card and transaction context
   should_not_match:
     - value: 'CVV: 12'
       description: Only 2 digits, too short for a CVV
@@ -60,6 +64,8 @@ test_cases:
       description: Bare number with no CVV-family label
     - value: The CVV is the three-digit code printed on the signature panel
       description: Prose explaining what a CVV is, no value present
+    - value: 'UI field CVV: 847 in the component screenshot'
+      description: Labelled UI example must remain discovery-only
 false_positives:
   - description: Web forms, test fixtures or documentation that show a CVV label next to a placeholder 3-4 digit number.
     mitigation: Require corroborative cardholder/PAN context within proximity and exclude obvious placeholders (000, 123, 999, xxx).
@@ -79,9 +85,77 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_card_verification_value
+      matches:
+        - ref: Keyword_payment_card_context
+        - ref: Keyword_transaction_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_card_verification_value
+      matches:
+        - ref: Keyword_payment_card_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_card_verification_value
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_card_verification_value
+      pattern: '(?<![A-Za-z])(?:CVV2?|CVC2?|CID|CSC|CVD|card\s+verification\s+(?:value|code)|card\s+security\s+code|security\s+code)[\s:#=]{0,8}\d{3,4}(?![0-9])'
+  keywords:
+    - id: Keyword_payment_card_context
+      groups:
+        - match_style: word
+          terms:
+            - cardholder
+            - card number
+            - payment card
+            - expiry date
+            - card account
+            - Visa
+            - Mastercard
+            - American Express
+      strength: domain
+    - id: Keyword_transaction_context
+      groups:
+        - match_style: word
+          terms:
+            - checkout
+            - payment
+            - authorization
+            - merchant
+            - transaction
+            - billing
+            - card-not-present
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: add a 65 discovery tier for labelled short codes, require payment-card context at 75 and additional transaction context at 85, with exact-tier and UI-field adversarial probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1528 without changing detector or package metadata.'

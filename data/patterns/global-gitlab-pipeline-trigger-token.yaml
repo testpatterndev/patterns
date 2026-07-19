@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: GitLab Pipeline Trigger Token
 slug: global-gitlab-pipeline-trigger-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -38,16 +38,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: glptt-0123456789abcdef0123456789abcdef01234567
-      description: GitLab pipeline trigger token, glptt- prefix + 40 hex
-    - value: 'TRIGGER_TOKEN=glptt-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-      description: Labelled pipeline trigger token in env var
-    - value: glptt-deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
-      description: Pipeline trigger token with hex body
+      description: Exact 65 probe - fixed hexadecimal token without independent GitLab context
+    - value: 'GitLab pipeline trigger credential glptt-deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+      description: Exact 75 probe - token with GitLab pipeline-trigger context
+    - value: 'GitLab CI pipeline secret GITLAB_TRIGGER_TOKEN=glptt-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      description: Exact 85 probe - CI pipeline context plus canonical trigger assignment
   should_not_match:
     - value: glptt-0123456789abcdef
       description: Too short to be a pipeline trigger token
     - value: glpat-ABCDEFGHIJ1234567890
       description: GitLab PAT prefix, not a pipeline trigger token
+    - value: glrt-ABCDEFGHIJ1234567890
+      description: GitLab runner token is a sibling family, not a trigger token
+    - value: 'Documentation example: GitLab CI pipeline GITLAB_TRIGGER_TOKEN=glptt-0123456789abcdef0123456789abcdef01234567'
+      description: Documentation example containing a valid-shaped trigger token is excluded
     - value: regenerate the gitlab pipeline trigger token in settings
       description: Prose mention without a token value
 false_positives:
@@ -69,9 +73,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_gitlab_pipeline_trigger_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_gitlab_pipeline_trigger_token
+      matches:
+        - ref: Keyword_gitlab_pipeline_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_gitlab_pipeline_trigger_token
+      matches:
+        - ref: Keyword_gitlab_pipeline_context
+        - ref: Pattern_gitlab_trigger_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_gitlab_pipeline_trigger_token
+      pattern: (?<![A-Za-z0-9_-])glptt-[0-9a-f]{40}(?![A-Za-z0-9_-])
+    - id: Pattern_gitlab_trigger_assignment
+      pattern: (?i)\b(?:GITLAB_TRIGGER_TOKEN|CI_JOB_TRIGGER_TOKEN|TRIGGER_TOKEN)\s*[=:]
+  keywords:
+    - id: Keyword_gitlab_pipeline_context
+      groups:
+        - match_style: string
+          terms:
+            - GitLab pipeline trigger
+            - GitLab CI pipeline
+            - GitLab trigger API
+            - GitLab project pipeline
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 GitLab-pipeline / 85 trigger-assignment Purview contract with exact-tier, sibling-token, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1538 without changing detector or package metadata.'

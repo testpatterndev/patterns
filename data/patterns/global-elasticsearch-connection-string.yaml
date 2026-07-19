@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Elasticsearch URI with Credentials
 slug: global-elasticsearch-connection-string
-version: 1.3.1
+version: 1.3.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -42,17 +42,23 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: https://admin:secret@elasticsearch.example.com:9200
-      description: Elasticsearch URI with credentials
-    - value: http://user:p4ssw0rd@elastic-prod.internal:9200
-      description: Elasticsearch with basic auth
-    - value: https://elastic:changeme@localhost:9243/elastic-index
-      description: Local Elasticsearch with path
+    - value: https://admin:secret@elasticsearch.internal:9200
+      description: Exact 65 probe - complete credential URI without independent config labeling
+    - value: 'ELASTICSEARCH_URL=http://user:p4ssw0rd@elastic-prod.internal'
+      description: Exact 75 probe - credential URI in a provider-specific config field
+    - value: 'Elastic Cloud cluster ELASTIC_CLOUD_URL=https://elastic:S3cretValue@deployment.es.australia-southeast1.gcp.elastic-cloud.com:9243'
+      description: Exact 85 probe - provider config label plus managed-cluster topology
   should_not_match:
     - value: https://elastic.example.com/search
       description: Missing credentials (no user:pass@ section)
     - value: elastic://user:pass@localhost:9200
       description: Wrong scheme (elastic:// instead of http/https)
+    - value: 'OPENSEARCH_URL=https://admin:secret@search.example.internal:9200'
+      description: Sibling search provider connection does not match Elasticsearch host structure
+    - value: 'https://admin@elasticsearch.internal:9200'
+      description: Malformed URI is missing the password separator
+    - value: 'Documentation example: Elastic Cloud cluster ELASTIC_CLOUD_URL=https://elastic:changeme@deployment.es.example.elastic-cloud.com:9243'
+      description: Documentation placeholder with managed topology is excluded
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -83,11 +89,19 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
+    - confidence_level: 65
+      discovery_only: true
       id_match: Regex_elasticsearch_connection
       matches:
-        - ref: Pattern_global_elasticsearch_connection_string_label_context
-        - ref: Keyword_global_elasticsearch_connection_string_domain_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_elasticsearch_connection
+      matches:
+        - ref: Pattern_elasticsearch_config_label
         - type: any
           min_matches: 0
           max_matches: 0
@@ -96,7 +110,8 @@ purview:
     - confidence_level: 85
       id_match: Regex_elasticsearch_connection
       matches:
-        - ref: Keyword_elasticsearch_connection
+        - ref: Pattern_elasticsearch_config_label
+        - ref: Pattern_elasticsearch_managed_topology
         - type: any
           min_matches: 0
           max_matches: 0
@@ -105,39 +120,16 @@ purview:
   regexes:
     - id: Regex_elasticsearch_connection
       pattern: https?://[^:]+:[^@]+@[^\s'"]*elastic[^\s'"]*
-    - id: Pattern_global_elasticsearch_connection_string_label_context
-      pattern: (?i)\b(?:elasticsearch\s+uri\s+with\s+credentials|elasticsearch|uri|credentials|connection|string)\b
-  keywords:
-    - id: Keyword_elasticsearch_connection
-      groups:
-        - match_style: word
-          terms:
-            - elasticsearch
-            - elastic search
-            - connection string
-            - database url
-            - database uri
-            - db connection
-            - cluster url
-            - kibana
-            - elastic cloud
-            - search cluster
-            - index endpoint
-      strength: specific
-    - id: Keyword_global_elasticsearch_connection_string_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - elasticsearch uri with credentials
-            - elasticsearch
-            - uri
-            - credentials
-            - connection
-            - string
-      strength: domain
+    - id: Pattern_elasticsearch_config_label
+      pattern: (?i)\b(?:ELASTICSEARCH_URL|ELASTIC_CLOUD_URL)\s*[=:]
+    - id: Pattern_elasticsearch_managed_topology
+      pattern: (?i)(?:\.es\.[A-Za-z0-9.-]+|\.elastic-cloud\.com|:9243\b)
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Replace duplicated high tiers with an individual 65 URI discovery / 75 Elasticsearch-config / 85 managed-topology contract and exact-tier, sibling-provider, malformed, and documentation probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1226 without changing detector or package metadata.'

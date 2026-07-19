@@ -1,8 +1,8 @@
 schema: testpattern/v1
 name: Residential Tenancy Agreement
 slug: au-residential-tenancy-agreement
-version: 1.4.1
-type: keyword_list
+version: 1.4.2
+type: keyword_proximity
 pattern_class: concept
 description: Detects residential tenancy agreements containing tenant PII, rental terms, and bond details.
 operation: >-
@@ -29,8 +29,14 @@ data_categories:
   - financial
 test_cases:
   should_match:
+    - value: Form 18A issued
+      description: Exact 65 discovery probe with a tenancy-form marker and no populated details
+    - value: 'Form 18A: tenant details'
+      description: Exact 75 probe with a tenancy party detail
+    - value: 'Form 18A: tenant details and weekly rent $450'
+      description: Exact 85 probe with party and rent details
     - value: 'Residential tenancy agreement: tenant bond lodgement with RTA'
-      description: Test match 1
+      description: Tenancy agreement with tenant and bond details
     - value: Tenancy agreement rental amount $450/week with condition report
       description: Test match 2
     - value: Residential Tenancies Authority breach notice and entry notice
@@ -40,6 +46,8 @@ test_cases:
       description: Non-match 1
     - value: Tenancy of the land was disputed historically
       description: Non-match 2
+    - value: Form 18A software demo
+      description: Product-demo wording must remain discovery-only
 false_positives:
   - description: Historical or metaphorical use of tenancy.
     mitigation: Require residential tenancy-specific terms like RTA, bond lodgement, or condition report.
@@ -68,8 +76,8 @@ purview:
     - confidence_level: 85
       id_match: Regex_residential_tenancy
       matches:
-        - ref: Keyword_tenancy_terms
-        - ref: Keyword_bond_rent
+        - ref: Keyword_tenancy_obligations
+        - ref: Keyword_rent_financial_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -78,7 +86,16 @@ purview:
     - confidence_level: 75
       id_match: Regex_residential_tenancy
       matches:
-        - ref: Keyword_legal_general
+        - ref: Keyword_tenancy_obligations
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_residential_tenancy
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -87,7 +104,7 @@ purview:
   regexes:
     - id: Regex_residential_tenancy
       pattern: >-
-        (?i)\b(?:residential\s+tenancy\s+(?:agreement|act)|tenancy\s+agreement|form\s+18a|standard\s+(?:tenancy|rental)\s+agreement|lease\s+agreement)\b
+        (?i)\b(?:residential\s+tenancy\s+(?:agreement|act)|residential\s+tenancies\s+authority|tenancy\s+agreement|form\s+18a|standard\s+(?:tenancy|rental)\s+agreement|lease\s+agreement)\b
   keywords:
     - id: Keyword_tenancy_terms
       groups:
@@ -136,9 +153,40 @@ purview:
             - termination
             - entire agreement
       strength: domain
+    - id: Keyword_tenancy_obligations
+      groups:
+        - match_style: word
+          terms:
+            - tenant details
+            - tenant obligations
+            - landlord
+            - lessor
+            - lessee
+            - premises
+            - condition report
+            - entry condition report
+            - breach notice
+            - entry notice
+      strength: specific
+    - id: Keyword_rent_financial_context
+      groups:
+        - match_style: word
+          terms:
+            - bond
+            - security deposit
+            - bond lodgement
+            - weekly rent
+            - fortnightly rent
+            - monthly rent
+            - rental amount
+            - rent in advance
+      strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: align the evidence-gated detector to keyword_proximity, keep tenancy-form/instrument markers at 65 discovery, require populated party or obligation details at 75 and additional bond/rent details at 85, extend authority-notice coverage, and add exact-tier plus demo probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 592 without changing detector or package metadata.'

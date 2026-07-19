@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Geographic Coordinates (DMS / MGRS)
 slug: global-gps-coordinates-dms
-version: 1.2.0
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -46,6 +46,10 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'MGRS grid reference: 4QFJ 12345 67890'
+      description: Exact 75 probe - coordinate-system label without an operational location record
+    - value: 'Asset location survey point; MGRS grid reference: 4QFJ 12345 67890'
+      description: Exact 85 probe - coordinate label plus operational asset/survey context
     - value: 40° 26' 46" N
       description: DMS latitude with degree/minute/second marks and N hemisphere
     - value: '151° 12′ 33.4″ E'
@@ -73,6 +77,10 @@ test_cases:
       description: Latitude above 90 degrees is invalid
     - value: Surveyors recorded weather conditions before beginning fieldwork.
       description: Ordinary survey notes contain neither a bounded DMS coordinate nor an MGRS grid reference
+    - value: 'Public map MGRS grid reference: 4QFJ 12345 67890'
+      description: Published mapping coordinate is vetoed from enforcement by public-map context
+    - value: 'Sample template: asset location survey point; MGRS grid reference 4QFJ 12345 67890'
+      description: Template text contains high-tier evidence but is vetoed by the shared exclusion
 false_positives:
   - description: MGRS-like tokens (zone digits + two letters + digit runs) appearing in part numbers or codes.
     mitigation: Require corroborative location keywords (coordinates, latitude, grid reference, MGRS) within 300 characters.
@@ -95,16 +103,65 @@ sensitivity_labels:
   ca_gov: Protected A
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match:
+        type: any
+        ids:
+          - Pattern_gps_dms
+          - Pattern_gps_mgrs
+      matches:
+        - ref: Evidence_coordinate_notation
+        - ref: Evidence_operational_location
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_public_mapping_context
+      description: Bounded DMS or MGRS coordinate with notation label and operational location-record context
+    - confidence_level: 75
+      id_match:
+        type: any
+        ids:
+          - Pattern_gps_dms
+          - Pattern_gps_mgrs
+      matches:
+        - ref: Evidence_coordinate_notation
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_public_mapping_context
+      description: Bounded DMS or MGRS coordinate with an explicit coordinate-system label
     - confidence_level: 65
       id_match: Pattern_gps_dms
       discovery_only: true
-      description: Bounded DMS coordinate (discovery inventory only — no enforcement tiers authored yet)
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_public_mapping_context
+      description: Bounded DMS coordinate for discovery inventory only
     - confidence_level: 65
       id_match: Pattern_gps_mgrs
       discovery_only: true
-      description: MGRS grid reference as authored (discovery inventory only — MGRS hardening deferred)
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_public_mapping_context
+      description: MGRS grid reference for discovery inventory only
   regexes:
     - id: Pattern_gps_dms
       pattern: \b(?:90\s?[°º]\s?0{1,2}\s?['′]\s?0{1,2}(?:\.0+)?\s?["″]?\s?[NSns]\b|[0-8]?\d\s?[°º]\s?[0-5]?\d\s?['′]\s?[0-5]?\d(?:\.\d+)?\s?["″]?\s?[NSns]\b|180\s?[°º]\s?0{1,2}\s?['′]\s?0{1,2}(?:\.0+)?\s?["″]?\s?[EWew]\b|(?:1[0-7]\d|\d{1,2})\s?[°º]\s?[0-5]?\d\s?['′]\s?[0-5]?\d(?:\.\d+)?\s?["″]?\s?[EWew]\b)
@@ -112,9 +169,47 @@ purview:
     - id: Pattern_gps_mgrs
       pattern: (?<![A-Za-z0-9])\d{1,2}[C-HJ-NP-Xc-hj-np-x][A-HJ-NP-Za-hj-np-z][A-HJ-NP-Va-hj-np-v]\s?\d{2,5}\s?\d{2,5}(?![A-Za-z0-9])
       description: MGRS grid reference as originally authored (zone/precision hardening deferred pending test coverage)
+  keywords:
+    - id: Evidence_coordinate_notation
+      groups:
+        - match_style: word
+          terms:
+            - DMS coordinate
+            - degrees minutes seconds
+            - MGRS
+            - grid reference
+            - latitude
+            - longitude
+            - coordinate
+      strength: domain
+    - id: Evidence_operational_location
+      groups:
+        - match_style: word
+          terms:
+            - asset location
+            - incident location
+            - survey point
+            - field waypoint
+            - site location
+            - device position
+            - geofence vertex
+      strength: specific
+    - id: Evidence_public_mapping_context
+      groups:
+        - match_style: word
+          terms:
+            - public map
+            - published map
+            - open data map
+            - tourist map
+            - public gazetteer
+      strength: exclusion
 created: '2026-06-13'
-updated: '2026-07-17'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: preserve bounded DMS/MGRS shapes as discovery-only 65 tiers, add a 75 notation-labelled tier and an 85 notation-plus-operational-location tier, and add exact-tier plus public/template negatives without changing the deferred MGRS regex.'
   - version: 1.2.0
     date: '2026-07-17'
     description: 'TP-00843 approved reduced scope: harden the DMS branch only — split into hemisphere-bounded latitude (0-90, N/S) and longitude (0-180, E/W) alternatives, constrain minutes/seconds to 0-59, and require zero minutes/seconds at the 90/180 endpoints; documented the bounds in the operation text. The MGRS branch is deliberately unchanged: per QA/independent review the proposed MGRS rewrite is not approval-ready (no valid equal-precision MGRS positive and no zone 00/60/61 boundary tests supplied). Added a minimal purview block with discovery-only 65 tiers derived from the authored regex (Pattern_gps_dms + Pattern_gps_mgrs) so pattern_tiers exist for export; no enforcement tiers authored. Added endpoint positives and out-of-range negatives (60 minutes, 999 degrees, endpoint-plus-one-second, 91 degrees latitude).'

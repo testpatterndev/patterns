@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Marking - OFFICIAL
 slug: au-marking-official
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -12,9 +12,12 @@ description: >-
   logic ported from Microsoft's canonical PSPF SIT guidance; matched case-sensitively so the
   lowercase English word "official" does not trigger.
 operation: >-
-  Case-sensitive match of OFFICIAL as a protective marking. Tier 95 requires the structured
-  SEC=OFFICIAL form; tier 85 matches the OFFICIAL banner. A negative lookahead drops
-  OFFICIAL: Sensitive to au-marking-sensitive.
+  A standalone uppercase OFFICIAL candidate, excluding OFFICIAL Sensitive variants, is discovery-only
+  at 65. A formal SEC, classification, security-classification, protective-marking, or marking field
+  raises it to 75; an explicit Australian or Queensland protective-security context can also corroborate
+  a standalone banner at 75. The 85 tier requires a complete X-Protective-Marking header with VER,
+  NS=gov.au, and SEC=OFFICIAL fields. Enforcing tiers reject public marking guides, training, templates,
+  and examples.
 pattern: '\bOFFICIAL\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive)'
 confidence: high
 confidence_justification: >-
@@ -39,12 +42,16 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: "Quarterly briefing [SEC=OFFICIAL]"
-      description: Email subject marking
+    - value: "Document footer candidate OFFICIAL"
+      description: Low-tier probe - uppercase candidate without a formal marking field
+    - value: "Classification: OFFICIAL"
+      description: Medium-tier probe - formal classification field without a complete header
+    - value: "Subject [SEC=OFFICIAL]"
+      description: Operational email subject marking reaches the balanced tier
+    - value: "Queensland Government QGISCF briefing\nOFFICIAL"
+      description: Medium-tier probe - standalone banner corroborated by explicit government marking context
     - value: "X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=OFFICIAL"
-      description: x-header form
-    - value: "This document is classified OFFICIAL by the department"
-      description: Document banner
+      description: High-tier probe - complete Australian protective-marking header
   should_not_match:
     - value: "visit our official website for more information"
       description: lowercase English word (case-sensitive exclusion)
@@ -54,11 +61,17 @@ test_cases:
       description: UNOFFICIAL must not match OFFICIAL
     - value: "Doc marked OFFICIAL // Sensitive"
       description: the // form of OFFICIAL Sensitive belongs to au-marking-sensitive
+    - value: "OFFICIAL WEBSITE - PUBLIC INFORMATION"
+      description: Incidental uppercase prose must not enforce
+    - value: "Public marking guide: Classification: OFFICIAL"
+      description: Public guidance quotes a formal marking field
+    - value: "Template example: X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=OFFICIAL"
+      description: Template contains a complete formal header
 false_positives:
   - description: Uppercase use of OFFICIAL in non-marking contexts (e.g. "OFFICIAL OPENING").
-    mitigation: Corroborative PSPF/government evidence and the structured SEC= tier raise confidence; banner tier stays at 85.
+    mitigation: Explicit PSPF/QGISCF government context or a structured marking field is required above discovery; the complete header remains the strict 85 path.
   - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare OFFICIAL banner relies on — any all-caps rendering of the word can fire with no protective-marking intent.
-    mitigation: Treat banner-tier-only hits as lower confidence when the surrounding text is itself all-caps; the structured SEC=OFFICIAL tier (95) remains the reliable signal.
+    mitigation: Treat discovery-only banner hits as inventory; the structured field and government-corroborated paths at 75 are the balanced enforcement signals.
 exports:
   - purview_xml
   - yaml
@@ -76,36 +89,95 @@ sensitivity_labels:
   qgiscf_dlm: OFFICIAL
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 95
-      id_match: Regex_au_official_struct
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 85
-      id_match: Regex_au_official_banner
+      id_match: Regex_au_official_complete_header
       matches:
+        - ref: Keyword_complete_marking_header
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_marking_context
+    - confidence_level: 75
+      id_match: Regex_au_official_formal_label
+      matches:
+        - ref: Keyword_formal_marking_label
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_public_marking_context
+    - confidence_level: 75
+      id_match: Regex_au_official_candidate
+      matches:
+        - ref: Keyword_au_gov_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_public_marking_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_official_candidate
   regexes:
-    - id: Regex_au_official_struct
-      pattern: '\bSEC=OFFICIAL\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive)'
-    - id: Regex_au_official_banner
+    - id: Regex_au_official_complete_header
+      pattern: '\bX-Protective-Marking:\s*VER=[0-9]{4}\.[0-9]+,\s*NS=gov\.au,\s*SEC=OFFICIAL\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive)'
+    - id: Regex_au_official_formal_label
+      pattern: '\b(?:SEC(?:URITY CLASSIFICATION)?|Security Classification|CLASSIFICATION|Classification|PROTECTIVE MARKING|Protective Marking|MARKING|Marking)\s*[:=]\s*OFFICIAL\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive)'
+    - id: Regex_au_official_candidate
       pattern: '\bOFFICIAL\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive)'
+  keywords:
+    - id: Keyword_au_gov_context
+      groups:
+        - match_style: word
+          terms:
+            - Australian Government
+            - Queensland Government
+            - QGISCF
+            - PSPF
+            - Protective Security Policy Framework
+      strength: specific
+    - id: Keyword_complete_marking_header
+      groups:
+        - match_style: word
+          terms:
+            - X-Protective-Marking
+            - NS=gov.au
+            - VER=
+      strength: specific
+    - id: Keyword_formal_marking_label
+      groups:
+        - match_style: word
+          terms:
+            - Classification
+            - Security Classification
+            - Protective Marking
+            - SEC=
+      strength: specific
+    - id: Keyword_public_marking_context
+      groups:
+        - match_style: word
+          terms:
+            - public marking guide
+            - marking guide
+            - style guide
+            - training material
+      strength: exclusion
 created: '2026-06-29'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Profile quality: retain bare banners as 65 discovery, enforce formal labels or explicitly government-corroborated banners at the recommended 75 tier, reserve 85 for complete headers, reject public guides/templates, and add exact-tier adversarial probes.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2072 without changing detector or package metadata.'

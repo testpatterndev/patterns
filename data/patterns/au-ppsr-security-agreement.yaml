@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: PPSR Security Agreement
 slug: au-ppsr-security-agreement
-version: 1.3.1
+version: 1.3.2
 type: keyword_list
 pattern_class: concept
 description: Detects Personal Property Securities Register (PPSR) security agreements and related collateral documentation.
@@ -28,8 +28,14 @@ data_categories:
   - financial
 test_cases:
   should_match:
+    - value: PPSR notice received
+      description: Exact 65 discovery probe with a PPSR phrase and no security details
+    - value: 'PPSR security agreement: secured party and grantor'
+      description: Exact 75 probe with parties to the security interest
+    - value: 'PPSR security agreement: secured party, collateral and financing statement'
+      description: Exact 85 probe with security context and registration/perfection evidence
     - value: 'PPSR security interest registration: financing statement for collateral'
-      description: Test match 1
+      description: PPSR financing statement identifying collateral
     - value: 'Personal Property Securities Act: secured party and grantor agreement'
       description: Test match 2
     - value: PMSI registration on PPSR with perfected security interest and priority
@@ -39,6 +45,8 @@ test_cases:
       description: Non-match 1
     - value: Security guard at the property entrance
       description: Non-match 2
+    - value: General security agreement workshop agenda
+      description: Educational instrument wording must remain discovery-only
 false_positives:
   - description: Generic property or security references in non-PPSR contexts.
     mitigation: Require PPSR-specific terms like PPSA, financing statement, or security interest.
@@ -67,8 +75,8 @@ purview:
     - confidence_level: 85
       id_match: Regex_ppsr_security
       matches:
-        - ref: Keyword_ppsr
-        - ref: Keyword_collateral
+        - ref: Keyword_security_agreement_context
+        - ref: Keyword_priority_perfection_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -77,7 +85,16 @@ purview:
     - confidence_level: 75
       id_match: Regex_ppsr_security
       matches:
-        - ref: Keyword_legal_general
+        - ref: Keyword_security_agreement_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_ppsr_security
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -132,9 +149,39 @@ purview:
             - termination
             - entire agreement
       strength: domain
+    - id: Keyword_security_agreement_context
+      groups:
+        - match_style: word
+          terms:
+            - security interest
+            - secured party
+            - grantor
+            - collateral
+            - all assets
+            - plant and equipment
+            - inventory
+            - receivables
+            - proceeds
+      strength: specific
+    - id: Keyword_priority_perfection_context
+      groups:
+        - match_style: word
+          terms:
+            - financing statement
+            - registration number
+            - perfected security interest
+            - perfection
+            - priority
+            - purchase money security interest
+            - text: PMSI
+              case_sensitive: true
+      strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: retain PPSR/security-agreement phrases at 65 discovery, require parties or collateral at 75 and additional registration/perfection evidence at 85, with exact-tier and workshop probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 570 without changing detector or package metadata.'

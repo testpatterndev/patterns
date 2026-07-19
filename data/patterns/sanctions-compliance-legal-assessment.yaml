@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Sanctions Compliance Legal Assessment
 slug: sanctions-compliance-legal-assessment
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -38,6 +38,12 @@ corroborative_evidence:
     - corporate-legal
 test_cases:
   should_match:
+    - value: 'Sanctions compliance working note.'
+      description: Exact 65 discovery probe - sanctions topic without legal assessment or a concrete finding
+    - value: 'Sanctions compliance legal assessment for DFAT screening controls.'
+      description: Exact 75 probe - internal legal-assessment context without a populated exposure finding or marking
+    - value: 'PRIVILEGED DFAT sanctions legal assessment: screening gaps permit Vendor X payment, creating breach exposure and requiring remediation.'
+      description: Exact 85 probe - legal assessment, concrete finding, and privilege marking
     - value: |-
         PROTECTED — LEGAL PROFESSIONAL PRIVILEGE
         Sanctions Compliance Legal Assessment
@@ -83,61 +89,108 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
   pattern_tiers:
     - tier: high
-      confidence_level: 75
+      confidence_level: 85
       id_match: primary
       matches:
-        - ref: corroborative
+        - ref: Evidence_sanctions_legal_assessment
+        - ref: Evidence_sanctions_finding
+        - ref: Evidence_sanctions_marking
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - exclusion
-      description: Sanctions/regime phrase plus corroborative legal-assessment/gap/remediation evidence, gated by the authored public-source exclusions
-    - tier: high
+      description: Sanctions matter with legal-assessment context, a concrete exposure/control finding, and a privilege or confidentiality marking
+    - tier: medium
+      confidence_level: 75
+      id_match: primary
+      matches:
+        - ref: Evidence_sanctions_legal_assessment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - exclusion
+      description: Sanctions/regime phrase plus independent legal-assessment context, gated by public-source exclusions
+    - tier: low
       confidence_level: 65
       id_match: primary
       discovery_only: true
-      description: Sanctions + legal/compliance assessment + PROTECTED + compliance gap
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - exclusion
+      description: Sanctions/regime terminology for discovery inventory only
   regexes:
     - pattern: (?i)\b(?:DFAT|OFAC)\b
       description: Sanctions authority abbreviation
     - pattern: (?i)\bsanctions?\s+(?:compliance|assessment|screening)\b
       description: Sanctions compliance phrase
   keywords:
-    - group: primary
-      values:
-        - sanctions
-        - DFAT
-        - OFAC
-        - sanctions list
-        - sanctioned entity
-        - sanctions compliance
+    - id: primary
+      groups:
+        - match_style: word
+          terms:
+            - sanctions
+            - DFAT
+            - OFAC
+            - sanctions list
+            - sanctioned entity
+            - sanctions compliance
       strength: domain
-    - group: corroborative
-      values:
-        - legal assessment
-        - compliance assessment
-        - legal opinion
-        - risk assessment
-        - privilege
-        - PROTECTED
-        - compliance gap
-        - remediation
-        - designated person
-        - consolidated list
-        - screening
+    - id: Evidence_sanctions_legal_assessment
+      groups:
+        - match_style: word
+          terms:
+            - legal assessment
+            - compliance assessment
+            - legal opinion
+            - risk assessment
+            - internal counsel advice
+            - legal review
       strength: domain
-    - group: exclusion
-      values:
-        - publicly available
-        - DFAT website
-        - OFAC website
-        - academic
-        - fined
-        - enforcement action published
+    - id: Evidence_sanctions_finding
+      groups:
+        - match_style: word
+          terms:
+            - compliance gap
+            - compliance gaps
+            - screening gap
+            - screening gaps
+            - material deficiency
+            - material deficiencies
+            - breach exposure
+            - control failure
+            - remediation required
+            - counterparties requiring
+            - permits Vendor
+      strength: domain
+    - id: Evidence_sanctions_marking
+      groups:
+        - match_style: word
+          terms:
+            - privilege
+            - privileged
+            - legal professional privilege
+            - PROTECTED
+            - CONFIDENTIAL
+            - prepared for counsel
+      strength: domain
+    - id: exclusion
+      groups:
+        - match_style: word
+          terms:
+            - publicly available
+            - DFAT website
+            - OFAC website
+            - academic
+            - fined
+            - enforcement action published
       strength: domain
   filters:
     - type: exclude_keyword
@@ -155,8 +208,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Legal
 references: []
 created: '2026-02-20'
-updated: '2026-07-17'
+updated: '2026-07-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: split legal-assessment, concrete exposure/finding, and privilege/marking evidence into canonical keyword references; add distinct 65 discovery, 75 legal-context, and 85 populated privileged-assessment tiers with exact probes while preserving public-list, academic, enforcement, and sports negatives.'
   - version: 1.4.0
     date: '2026-07-17'
     description: 'TP-01579 approved reduced scope: add a policy-capable 75 tier wiring the existing primary keyword group to the existing corroborative group, NOT-gated by the existing exclusion group; the existing public-sanctions exclude_keyword filter continues to apply (all references pre-existing; no new detection structure). The 65 tier remains discovery-only. Deferred per QA/independent review: the proposed 85 tier, pending a split of legal-assessment, concrete-exposure/finding, remediation, and privilege/marking evidence into separate references. Added an internal gap/remediation positive plus public-list and sports-sanctions negatives.'

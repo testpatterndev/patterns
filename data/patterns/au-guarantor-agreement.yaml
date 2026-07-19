@@ -1,8 +1,8 @@
 schema: testpattern/v1
 name: Guarantor Agreement
 slug: au-guarantor-agreement
-version: 1.4.1
-type: keyword_list
+version: 1.4.2
+type: keyword_proximity
 pattern_class: concept
 description: Detects guarantor agreements and personal guarantee documents with indemnity obligations.
 operation: >-
@@ -29,8 +29,14 @@ data_categories:
   - pii
 test_cases:
   should_match:
+    - value: Corporate guarantee document
+      description: Exact 65 discovery probe with a guarantee instrument phrase and no obligation details
+    - value: Corporate guarantee with indemnity obligations
+      description: Exact 75 probe with substantive guarantee obligations
+    - value: Corporate guarantee with indemnity for a loan amount of $250,000
+      description: Exact 85 probe with guarantee obligations and underlying loan terms
     - value: 'Guarantor agreement: personal guarantee and indemnity for loan facility'
-      description: Test match 1
+      description: Guarantor agreement tied to a loan facility
     - value: Deed of guarantee with joint and several guarantor liability
       description: Test match 2
     - value: Continuing guarantee with unlimited guarantee and indemnity obligations
@@ -40,6 +46,8 @@ test_cases:
       description: Non-match 1
     - value: We guarantee quality service
       description: Non-match 2
+    - value: Corporate guarantee marketing brochure
+      description: Instrument-like wording without obligations must remain discovery-only
 false_positives:
   - description: Product guarantees or warranty language.
     mitigation: Require legal guarantee terms like guarantor, indemnity, or deed of guarantee.
@@ -68,7 +76,7 @@ purview:
     - confidence_level: 85
       id_match: Regex_guarantee
       matches:
-        - ref: Keyword_guarantee_terms
+        - ref: Keyword_guarantee_obligations
         - ref: Keyword_loan_terms
         - type: any
           min_matches: 0
@@ -78,7 +86,16 @@ purview:
     - confidence_level: 75
       id_match: Regex_guarantee
       matches:
-        - ref: Keyword_legal_general
+        - ref: Keyword_guarantee_obligations
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_guarantee
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -87,7 +104,7 @@ purview:
   regexes:
     - id: Regex_guarantee
       pattern: >-
-        (?i)\b(?:(?:personal|corporate|unlimited|limited)\s+guarantee|guarantee\s+(?:agreement|deed)|guarantor\s+(?:agreement|undertaking))\b
+        (?i)\b(?:(?:personal|corporate|unlimited|limited|continuing)\s+guarantee|guarantee\s+(?:agreement|deed)|deed\s+of\s+guarantee|guarantor\s+(?:agreement|undertaking))\b
   keywords:
     - id: Keyword_guarantee_terms
       groups:
@@ -121,6 +138,20 @@ purview:
             - prepayment
             - drawdown
             - facility limit
+            - loan facility
+      strength: specific
+    - id: Keyword_guarantee_obligations
+      groups:
+        - match_style: word
+          terms:
+            - indemnity
+            - joint and several
+            - guarantor liability
+            - secured obligations
+            - principal debtor
+            - payment on demand
+            - continuing security
+            - unconditional guarantee
       strength: specific
     - id: Keyword_legal_general
       groups:
@@ -138,8 +169,11 @@ purview:
             - entire agreement
       strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: align the evidence-gated detector to keyword_proximity, make guarantee-instrument phrases 65 discovery, require substantive indemnity/liability terms at 75 and underlying loan terms at 85, broaden deed/continuing-guarantee coverage, and add exact-tier plus brochure probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 545 without changing detector or package metadata.'

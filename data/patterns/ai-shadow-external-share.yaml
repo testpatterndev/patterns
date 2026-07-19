@@ -1,8 +1,8 @@
 schema: testpattern/v1
 name: AI Shadow / External AI Data Share
 slug: ai-shadow-external-share
-version: 0.3.1
-type: keyword_list
+version: 0.4.0
+type: regex
 pattern_class: concept
 description: >-
   Marks the context of data being submitted to external / unapproved AI services (shadow AI destination
@@ -10,10 +10,10 @@ description: >-
   delegated to those SITs via the ai-threat-classifiers collection; this pattern supplies the external-AI
   destination context signal.
 operation: >-
-  One phrase regex (Pattern_external_ai_destination) matching known external consumer-AI service domains,
-  corroborated by AI-context markers. Single low tier (65 phrase only). This is a context marker only: the
-  regulated-data detection is delegated to existing PII/secret SITs in the ai-threat-classifiers collection.
-  Approved vendor AI tools and internal AI gateways are the named FP traps.
+  A known consumer-AI destination is inventoried at 65. A transfer action such as paste, upload, share,
+  submit, or send raises the destination to 75; 85 additionally requires a sensitive business, personal,
+  credential, or source-code asset. Enforcing tiers reject approved-vendor, internal-tenant, guidance,
+  and template/example context.
 pattern: '(?i)\b(?:chatgpt\.com|chat\.openai\.com|claude\.ai|gemini\.google\.com|perplexity\.ai|copilot\.microsoft\.com)\b'
 confidence: low
 confidence_justification: >-
@@ -35,11 +35,64 @@ corroborative_evidence:
   keyword_lists: [ai-context-markers]
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
   regexes:
     - id: Pattern_external_ai_destination
       pattern: '(?i)\b(?:chatgpt\.com|chat\.openai\.com|claude\.ai|gemini\.google\.com|perplexity\.ai|copilot\.microsoft\.com)\b'
+    - id: Evidence_transfer_action
+      pattern: '(?i)\b(?:paste(?:d|s|ing)?|upload(?:ed|s|ing)?|share(?:d|s|ing)?|submit(?:ted|s|ting)?|send(?:ing|s)?|sent|forward(?:ed|s|ing)?)\b'
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  keywords:
+    - id: Evidence_sensitive_asset
+      groups:
+        - match_style: word
+          terms:
+            - customer list
+            - payroll file
+            - employee records
+            - personal data
+            - source code
+            - API credentials
+            - database export
+            - confidential contract
+            - incident report
+      strength: specific
+    - id: Evidence_approved_ai_context
+      groups:
+        - match_style: word
+          terms:
+            - approved vendor
+            - approved AI service
+            - approved workload
+            - internal tenant
+            - tenant boundary
+            - security guidance
+      strength: exclusion
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_external_ai_destination
+      matches:
+        - ref: Evidence_transfer_action
+        - ref: Evidence_sensitive_asset
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_approved_ai_context
+    - confidence_level: 75
+      id_match: Pattern_external_ai_destination
+      matches:
+        - ref: Evidence_transfer_action
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_approved_ai_context
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_external_ai_destination
@@ -54,12 +107,12 @@ sensitivity_labels:
   uk_gov: 'OFFICIAL-SENSITIVE'
 test_cases:
   should_match:
+    - value: 'The browser history contains chatgpt.com.'
+      description: Low-tier probe - consumer-AI destination without a transfer action
+    - value: 'Uploaded a draft to claude.ai for review.'
+      description: Medium-tier probe - transfer action without a named sensitive asset
     - value: 'Pasted the customer list into chatgpt.com to summarise it.'
-      description: Sensitive data shared with an external AI service
-    - value: 'Uploaded the contract to claude.ai for review.'
-      description: External consumer-AI destination domain (claude.ai)
-    - value: 'Shared the spreadsheet via chat.openai.com last week.'
-      description: External consumer-AI destination domain (chat.openai.com)
+      description: High-tier probe - transfer action plus a sensitive business asset
   should_not_match:
     - value: 'We use the internal AI gateway for all approved workloads.'
       description: Approved internal AI tool (FP trap)
@@ -67,14 +120,23 @@ test_cases:
       description: Approved vendor AI tool, no external consumer-AI domain (FP trap)
     - value: 'Our team reviewed the data on the corporate intranet portal.'
       description: Internal portal, no external AI destination domain
+    - value: 'A public article lists chatgpt.com and claude.ai as consumer AI websites.'
+      description: Public directory prose without a transfer action
+    - value: 'Approved vendor workflow: uploaded a confidential contract to claude.ai inside our tenant boundary.'
+      description: Explicitly approved tenant-bounded service
+    - value: 'Template example: pasted the customer list into chatgpt.com.'
+      description: Explicit template contains otherwise high-tier evidence
 false_positives:
   - description: The external-AI destination domain allow-list diverges per tenant; approved vendor AI tools and sanctioned internal AI gateways are legitimate and should not be flagged when referenced in policy or onboarding documents.
     mitigation: Maintain a tenant-specific allow-list and treat this domain match as context only; delegate the sensitive-data verdict to the existing PII/secret SITs re-scoped via the ai-threat-classifiers collection.
   - description: Security awareness training, acceptable-use policies, and incident write-ups frequently mention consumer-AI domains (e.g. "do not paste data into chatgpt.com") as warnings rather than actual data egress.
     mitigation: Require co-occurrence with a regulated-data SIT match plus an action marker (paste, upload, share, submit) within the proximity window before raising a verdict.
 created: '2026-06-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 0.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; add transfer-action medium and sensitive-asset high tiers; reject approved/internal/template context and add exact-tier adversarial probes.'
   - version: 0.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1519 without changing detector or package metadata.'

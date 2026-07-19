@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Passport Machine-Readable Zone (MRZ, ICAO 9303)
 slug: global-passport-mrz
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -55,6 +55,11 @@ test_cases:
       description: TD3 line 2 with FRA nationality, sex M, optional field filler and check digits
     - value: P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<
       description: TD3 line 1, document type P, issuing state UTO, surname/given-name with filler
+    - value: |-
+        Passport MRZ
+        P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<
+        L898902C36UTO7408122F1204159ZE184226B<<<<<10
+      description: Exact 85 probe - paired TD3 lines with explicit passport/MRZ context
   should_not_match:
     - value: P<
       description: Bare document-type marker without the full MRZ line structure
@@ -62,6 +67,18 @@ test_cases:
       description: Prose containing passport tokens but not the fixed-width MRZ structure
     - value: 1234567890123456789012345678901234567890ABCD
       description: 44 characters but not a valid MRZ field layout (no sex marker or date structure in position)
+    - value: |-
+        Documentation example: Passport MRZ
+        P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<
+        L898902C36UTO7408122F1204159ZE184226B<<<<<10
+      description: Template/documentation block contains both lines but is vetoed by shared template evidence
+    - value: |-
+        Public specimen passport MRZ
+        P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<
+        L898902C36UTO7408122F1204159ZE184226B<<<<<10
+      description: Public specimen block is vetoed from enforcement by specimen context
+    - value: 'Visa number E12345678 issued by the border authority.'
+      description: Sibling travel-document identifier does not satisfy either TD3 line structure
 false_positives:
   - description: Long runs of uppercase letters, digits and '<' that coincidentally satisfy the fixed-width field layout.
     mitigation: Require corroborative passport/MRZ keywords within 300 characters; optionally validate the ICAO check digits.
@@ -81,9 +98,80 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_td3_second_line
+      matches:
+        - ref: Pattern_td3_first_line
+        - ref: Evidence_mrz_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_public_specimen
+      description: Fixed-width TD3 second line paired with the first line and explicit passport/MRZ context
+    - confidence_level: 75
+      id_match: Pattern_td3_second_line
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_public_specimen
+      description: Fixed-width TD3 second line with field-typed positions
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_td3_first_line
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_public_specimen
+      description: TD3 passport first-line candidate for discovery inventory only
+  regexes:
+    - id: Pattern_td3_first_line
+      pattern: (?<![A-Z0-9<])P[A-Z<][A-Z]{3}[A-Z]+<<[A-Z<]{2,}(?![A-Za-z0-9])
+    - id: Pattern_td3_second_line
+      pattern: (?<![A-Z0-9<])[A-Z0-9<]{9}[0-9<][A-Z<]{3}[0-9<]{6}[0-9<][MFXmfx<][0-9<]{6}[0-9<][A-Z0-9<]{14}[0-9<][0-9<](?![A-Za-z0-9])
+  keywords:
+    - id: Evidence_mrz_context
+      groups:
+        - match_style: word
+          terms:
+            - passport MRZ
+            - machine readable zone
+            - machine-readable zone
+            - travel document
+            - passport data page
+            - ICAO 9303
+      strength: domain
+    - id: Evidence_public_specimen
+      groups:
+        - match_style: word
+          terms:
+            - public specimen
+            - sample passport
+            - test vector
+            - public standard example
+            - specimen document
+      strength: exclusion
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add a TD3 first-line 65 discovery tier, a field-typed second-line 75 tier, and a paired-lines-plus-MRZ-context 85 tier; add exact-tier and sibling/public/template probes without changing the top-level detector semantics.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1554 without changing detector or package metadata.'

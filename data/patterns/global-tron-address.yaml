@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: TRON Address
 slug: global-tron-address
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -48,11 +48,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 'TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeL'
-      description: Address from the TRON developer docs Accounts page (34 chars)
+      description: Exact 65 discovery probe using a documented bare TRON address
     - value: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
       description: USDT-TRC20 contract address (widely documented, 34 chars)
     - value: 'TJCnKsPa7y5okkXvQAidZBzqx3QyQ6sxMW'
       description: Address from the TRON protocol overview section 6.2 worked example (34 chars)
+    - value: 'TRON address TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeL'
+      description: Exact 75 probe with explicit TRON context
+    - value: 'TRON withdrawal address TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeL'
+      description: Exact 85 probe with chain-specific and transfer-destination context
   should_not_match:
     - value: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
       description: Bitcoin legacy address — wrong prefix (starts 1, not T)
@@ -64,6 +68,8 @@ test_cases:
       description: Hyphen breaks the run so no contiguous 34-char body exists — rejected
     - value: 'tron wallet address example placeholder'
       description: Template/placeholder context should be excluded even when domain anchor words are present
+    - value: 'Database key TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeL'
+      description: Valid-shaped non-wallet key must remain discovery-only
 false_positives:
   - description: >-
       A single leading "T" plus a 34-char base58 run collides with other "T..."-leading base58 tokens;
@@ -93,7 +99,7 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: crypto-wallet-context
       as: Keyword_cryptocurrency
@@ -102,10 +108,29 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_tron_address
+      matches:
+        - ref: Keyword_tron_context
+        - ref: Keyword_transfer_destination_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_tron_address
       matches:
-        - ref: Keyword_cryptocurrency
+        - ref: Keyword_tron_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_tron_address
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -114,9 +139,35 @@ purview:
   regexes:
     - id: Regex_tron_address
       pattern: '\bT[1-9A-HJ-NP-Za-km-z]{33}\b'
+  keywords:
+    - id: Keyword_tron_context
+      groups:
+        - match_style: word
+          terms:
+            - text: TRON
+              case_sensitive: true
+            - TRON address
+            - TRON wallet
+            - text: TRX
+              case_sensitive: true
+      strength: domain
+    - id: Keyword_transfer_destination_context
+      groups:
+        - match_style: word
+          terms:
+            - withdrawal address
+            - deposit address
+            - destination wallet
+            - recipient address
+            - pay to
+            - transfer to
+      strength: specific
 created: '2026-07-07'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: keep bare TRON-shaped values at 65 discovery, require explicit chain context at 75 and additional transfer-destination evidence at 85, with exact-tier and database-key probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2133 without changing detector or package metadata.'

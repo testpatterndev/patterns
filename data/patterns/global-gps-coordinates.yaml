@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: GPS Coordinates (Decimal Degrees)
 slug: global-gps-coordinates
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -37,6 +37,10 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
+    - value: 'Location coordinates: -33.8688, 151.2093'
+      description: Exact 75 probe - geolocation label without an operational record context
+    - value: 'Asset location GPS coordinates: -33.8688, 151.2093; survey point verified.'
+      description: Exact 85 probe - explicit coordinate label plus operational asset/survey context
     - value: '-33.8688, 151.2093'
       description: Sydney GPS coordinates
     - value: 40.7128, -74.0060
@@ -60,6 +64,12 @@ test_cases:
       description: Missing comma separator between coordinates
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Public map coordinates: -33.8688, 151.2093'
+      description: Published mapping coordinate is vetoed from enforcement by public-map context
+    - value: 'Sample template: asset location GPS coordinates -33.8688, 151.2093; survey point.'
+      description: Template text contains high-tier evidence but is vetoed by the shared exclusion
+    - value: 'Grid reference: 40° 26'' 46" N'
+      description: Sibling DMS coordinate does not satisfy the decimal-degree primary
 false_positives:
   - description: Common words and phrases related to gps coordinates (decimal degrees) appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -96,13 +106,14 @@ purview:
       id_match: Regex_gps_decimal
       matches:
         - ref: Pattern_global_gps_coordinates_label_context
-        - ref: Keyword_global_gps_coordinates_domain_context
+        - ref: Keyword_location_record_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
+            - Keyword_public_mapping_context
+    - confidence_level: 75
       id_match: Regex_gps_decimal
       matches:
         - ref: Keyword_geolocation
@@ -111,6 +122,7 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_mapping_context
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_gps_decimal
@@ -120,6 +132,7 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_mapping_context
   regexes:
     - id: Regex_gps_decimal
       pattern: '(?<![\d.])-?(?:90\.0{4,}|[0-8]?\d\.\d{4,})\s*,\s*-?(?:180\.0{4,}|(?:1[0-7]\d|\d{1,2})\.\d{4,})(?!\d)'
@@ -153,9 +166,34 @@ purview:
             - decimal
             - degrees
       strength: domain
+    - id: Keyword_location_record_context
+      groups:
+        - match_style: word
+          terms:
+            - asset location
+            - incident location
+            - survey point
+            - site coordinates
+            - device fix
+            - field waypoint
+            - geofence vertex
+      strength: specific
+    - id: Keyword_public_mapping_context
+      groups:
+        - match_style: word
+          terms:
+            - public map
+            - published map
+            - open data map
+            - tourist map
+            - public gazetteer
+      strength: exclusion
 created: '2026-02-08'
-updated: '2026-07-18'
+updated: '2026-07-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: retain bounded coordinate pairs as 65 discovery, require geolocation context at 75 and an explicit coordinate label plus operational location-record context at 85; add public-map suppression and exact-tier/sibling/template probes.'
   - version: 1.4.1
     date: '2026-07-18'
     description: >-

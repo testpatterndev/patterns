@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: LPP Claim Assessment
 slug: lpp-claim-assessment
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -43,6 +43,12 @@ corroborative_evidence:
     - government-services
 test_cases:
   should_match:
+    - value: 'Privilege assessment intake note.'
+      description: Exact 65 discovery probe - assessment topic without matter facts or a legal conclusion
+    - value: 'Privilege assessment for Matter: RTI-771 covering documents 12-18.'
+      description: Exact 75 probe - populated matter context without a conclusion or privileged marking
+    - value: 'PROTECTED LPP assessment for Matter RTI-342: Crown Solicitor concludes documents 42-58 are vulnerable because distribution defeated dominant purpose.'
+      description: Exact 85 probe - populated matter, legal conclusion, and privileged/legal marking
     - value: |-
         PROTECTED — LEGAL PROFESSIONAL PRIVILEGE
         LPP Claim Assessment
@@ -92,62 +98,112 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 85
   pattern_tiers:
     - tier: high
-      confidence_level: 75
+      confidence_level: 85
       id_match: primary
       matches:
-        - ref: corroborative
+        - ref: Evidence_lpp_matter_context
+        - ref: Evidence_lpp_conclusion
+        - ref: Evidence_lpp_marking
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - exclusion
-      description: Privilege-assessment phrase plus corroborative matter/analysis evidence, gated by the authored exclusion vocabulary
-    - tier: high
+      description: Privilege assessment plus populated matter facts, a legal conclusion, and a privileged/legal marking
+    - tier: medium
+      confidence_level: 75
+      id_match: primary
+      matches:
+        - ref: Evidence_lpp_matter_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - exclusion
+      description: Privilege assessment plus populated matter or document context, gated by public/template exclusions
+    - tier: low
       confidence_level: 65
       id_match: primary
       discovery_only: true
-      description: LPP assessment + vulnerability analysis + government entity + PROTECTED
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - exclusion
+      description: Privilege-assessment terminology for discovery inventory only
   regexes:
     - pattern: (?i)\b(?:privilege\s+(?:claim|assessment|log|review)|LPP\s+assessment)\b
       description: Privilege assessment terminology
     - pattern: (?i)\bwaiver\s+risk\b
       description: Privilege waiver risk phrase
   keywords:
-    - group: primary
-      values:
-        - privilege claim
-        - privilege assessment
-        - LPP assessment
-        - privilege log
-        - privilege review
-        - waiver risk
+    - id: primary
+      groups:
+        - match_style: word
+          terms:
+            - privilege claim
+            - privilege assessment
+            - LPP assessment
+            - privilege log
+            - privilege review
+            - waiver risk
       strength: domain
-    - group: corroborative
-      values:
-        - assessment
-        - analysis
-        - vulnerable
-        - maintain
-        - PROTECTED
-        - waiver
-        - Crown Solicitor
-        - State Solicitor
-        - dominant purpose
-        - Evidence Act
+    - id: Evidence_lpp_matter_context
+      groups:
+        - match_style: word
+          terms:
+            - 'Matter:'
+            - matter number
+            - text: RTI
+              case_sensitive: true
+            - documents
+            - email chains
+            - discovery set
+            - client file
+            - legal services
       strength: domain
-    - group: exclusion
-      values:
-        - textbook
-        - article discusses
-        - published reasons
-        - template
-        - guide
-        - framework
-        - decision notice
-        - Information Commissioner
+    - id: Evidence_lpp_conclusion
+      groups:
+        - match_style: word
+          terms:
+            - vulnerable
+            - vulnerable to challenge
+            - privilege maintained
+            - privilege waived
+            - dominant purpose established
+            - dominant purpose not established
+            - distribution defeated
+            - mixed-purpose
+            - legal advice purpose
+      strength: domain
+    - id: Evidence_lpp_marking
+      groups:
+        - match_style: word
+          terms:
+            - legal professional privilege
+            - privileged and confidential
+            - PROTECTED
+            - CONFIDENTIAL
+            - Crown Solicitor
+            - State Solicitor
+            - prepared for legal advice
+      strength: domain
+    - id: exclusion
+      groups:
+        - match_style: word
+          terms:
+            - textbook
+            - article discusses
+            - published reasons
+            - template
+            - guide
+            - framework
+            - decision notice
+            - Information Commissioner
       strength: domain
   filters:
     - type: exclude_pattern
@@ -162,8 +218,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Legal
 references: []
 created: '2026-02-20'
-updated: '2026-07-17'
+updated: '2026-07-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: split matter facts, legal conclusions, and privilege/marking evidence into canonical keyword references; make RTI case-sensitive; author 65 discovery, 75 populated-matter, and 85 matter-plus-conclusion-plus-marking tiers with exact probes while preserving public-decision and template exclusions.'
   - version: 1.4.0
     date: '2026-07-17'
     description: 'TP-01482 approved reduced scope: add a policy-capable 75 tier wiring the existing primary keyword group to the existing corroborative group, NOT-gated by the existing exclusion group (all references pre-existing in this YAML; no new detection structure). The 65 tier remains discovery-only. Deferred per QA/independent review: the proposed 85 tier, pending a split of the flat corroborative group into independently referenceable marking/matter-detail/waiver-conclusion groups. Added a populated-assessment positive plus non-legal-privilege and guide/template negatives.'

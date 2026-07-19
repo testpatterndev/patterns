@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Cisco Network Config Credentials
 slug: snaffler-cisco-config-creds
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -11,11 +11,12 @@ description: >-
   with write access, PAC keys, and NVRAM/LDAP authentication indicators.
   Mirrors Snaffler rule KeepNetConfigCreds.
 operation: >-
-  Five regexes covering the key Cisco credential surface: (1) enable password or
-  secret directive; (2) SNMP community string with RW (write) access; (3) PAC key
-  with type indicator; (4) NVRAM config last updated marker; (5) LDAP simple-bind
-  encrypted authentication marker. Corroborative evidence: routing/interface
-  keywords within 300 characters.
+  Five matchers cover enable credentials, write-capable SNMP communities, PAC key
+  values, an NVRAM config marker, and LDAP simple-bind encryption. Every base
+  matcher is discovery-only at 65. Balanced tiers require evidence specific to
+  each directive family (device identity, AAA/PAC, or LDAP server structure).
+  High tiers add a second independent config structure; the NVRAM marker never
+  enforces by itself. Templates and placeholder values are excluded.
 risk_description: >-
   This high-confidence identifier pattern finds credential-bearing Cisco configuration directives such as enable passwords or secrets, write-capable SNMP communities, PAC keys, and LDAP authentication markers. A recipient could use a live value to administer a router or switch, alter network behavior, query or change SNMP-managed state, or target the associated authentication service. Harm normally affects the configured device or bounded network environment, and hash type, access reachability, and privilege determine exploitability. Risk 8 and SENSITIVE reflect serious contained network compromise, while current credentials controlling a critical multi-site core would raise the impact.
 sensitivity_labels:
@@ -55,23 +56,33 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: "hostname CORE-SW1\nenable secret 5 $1$mERr$hx5rVt7rPNoS4wqbXKX7m0\nservice password-encryption"
-      description: Cisco IOS enable secret with MD5 hash and hostname context
-    - value: "snmp-server community S3cr3tStr RW\nsnmp-server community public RO"
-      description: SNMP community string with RW (write) access privilege
+    - value: "hostname CORE-SW1\ninterface GigabitEthernet0/1\nenable secret 5 $1$mERr$hx5rVt7rPNoS4wqbXKX7m0\nservice password-encryption"
+      description: High-tier probe - enable secret with device identity and independent IOS config structure
+    - value: "hostname EDGE-R1\nsnmp-server community S3cr3tStr RW"
+      description: Medium-tier probe - write community bound to a named Cisco device
     - value: "snmp-server community private view ALL RW"
-      description: SNMP community string with intermediate view token before RW (Snaffler parity)
-    - value: "pac key 7 045802150C2E1D1C5A\nip route 0.0.0.0 0.0.0.0 192.168.1.1"
-      description: PAC key with obfuscation type 7 in routing context
+      description: Low-tier probe - write-community directive without independent config context
+    - value: "aaa new-model\npac key 7 045802150C2E1D1C5A"
+      description: Medium-tier probe - PAC key in Cisco AAA context
     - value: "NVRAM config last updated 09:14:23 UTC Mon Jun 10 2024\nhostname ROUTER-01"
-      description: NVRAM config last updated marker with hostname
+      description: Low-tier NVRAM inventory marker - never an enforcing credential path
     - value: "simple-bind authenticated encrypt\nldap-server host 10.1.1.50"
-      description: LDAP simple-bind encrypted authentication directive
+      description: Medium-tier probe - LDAP bind marker with LDAP server structure
   should_not_match:
     - value: "the network device must have an enable-secret configured per the security policy"
       description: Prose mention of enable-secret requirement without an actual IOS directive (hyphenated, no space before value)
     - value: "the snmp-server community string should be changed from the default RW setting"
       description: Documentation prose about SNMP without a live community string value
+    - value: "enable secret"
+      description: Malformed enable directive has no credential value
+    - value: "hostname CORE-SW1\ninterface GigabitEthernet0/1\nenable secret CHANGEME\nservice password-encryption"
+      description: Placeholder enable secret must not enforce
+    - value: "Documentation example: hostname CORE-SW1 interface GigabitEthernet0/1 enable secret 5 $1$mERr$hx5rVt7rPNoS4wqbXKX7m0 service password-encryption"
+      description: Documentation quoting a complete IOS fragment must not enforce
+    - value: "set system root-authentication encrypted-password $6$hash"
+      description: Sibling Juniper configuration syntax is not a Cisco IOS directive
+    - value: "hostname EDGE-R1\nsnmp-server community public RO"
+      description: Read-only SNMP community is outside the write-credential matcher
 false_positives:
   - description: Sanitised configuration exports or documentation samples that include IOS syntax without live credential values.
     mitigation: Require proximity to corroborative network keywords (hostname, interface, ip route) to confirm genuine Cisco config context. Template exclusion catches placeholder markers.
@@ -83,151 +94,182 @@ exports:
 scope: specific
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_cisco_enable_secret
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_cisco_enable_secret
-      matches:
-        - ref: Keyword_snaffler_cisco_creds_evidence
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_cisco_enable_secret
-      matches:
-        - ref: Keyword_snaffler_cisco_creds_evidence
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_cisco_snmp_rw
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_cisco_snmp_rw
-      matches:
-        - ref: Keyword_snaffler_cisco_creds_evidence
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_cisco_snmp_rw
-      matches:
-        - ref: Keyword_snaffler_cisco_creds_evidence
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_cisco_pac_key
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_cisco_pac_key
-      matches:
-        - ref: Keyword_snaffler_cisco_creds_evidence
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_cisco_pac_key
-      matches:
-        - ref: Keyword_snaffler_cisco_creds_evidence
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_cisco_nvram_marker
-      matches:
-        - ref: Keyword_snaffler_cisco_creds_evidence
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_cisco_ldap_simplebind
+    - confidence_level: 75
+      id_match: Regex_cisco_enable_secret
       matches:
+        - ref: Evidence_cisco_device_identity
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_cisco_placeholder
+    - confidence_level: 75
+      id_match: Regex_cisco_snmp_rw
+      matches:
+        - ref: Evidence_cisco_device_identity
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_cisco_placeholder
+    - confidence_level: 75
+      id_match: Regex_cisco_pac_key
+      matches:
+        - ref: Evidence_cisco_aaa_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_cisco_placeholder
     - confidence_level: 75
       id_match: Regex_cisco_ldap_simplebind
       matches:
-        - ref: Keyword_snaffler_cisco_creds_evidence
+        - ref: Evidence_cisco_ldap_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_cisco_placeholder
+    - confidence_level: 85
+      id_match: Regex_cisco_enable_secret
+      matches:
+        - ref: Evidence_cisco_device_identity
+        - ref: Evidence_cisco_config_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_cisco_placeholder
+    - confidence_level: 85
+      id_match: Regex_cisco_snmp_rw
+      matches:
+        - ref: Evidence_cisco_device_identity
+        - ref: Evidence_cisco_snmp_management
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_cisco_placeholder
+    - confidence_level: 85
+      id_match: Regex_cisco_pac_key
+      matches:
+        - ref: Evidence_cisco_aaa_context
+        - ref: Evidence_cisco_device_identity
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_cisco_placeholder
     - confidence_level: 85
       id_match: Regex_cisco_ldap_simplebind
       matches:
-        - ref: Keyword_snaffler_cisco_creds_evidence
+        - ref: Evidence_cisco_ldap_context
+        - ref: Evidence_cisco_aaa_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_cisco_placeholder
   regexes:
     - id: Regex_cisco_enable_secret
       pattern: enable\s+(?:password|secret)\s+\S
     - id: Regex_cisco_snmp_rw
       pattern: snmp-server\s+community\s+[^\s]{1,64}(?:\s+[^\s]{1,32}){0,2}\s+RW\b
     - id: Regex_cisco_pac_key
-      pattern: pac\s+key\s+[0-7]
+      pattern: pac\s+key\s+[0-7]\s+[A-Fa-f0-9]{8,128}
     - id: Regex_cisco_nvram_marker
       pattern: NVRAM\s+config\s+last\s+updated
     - id: Regex_cisco_ldap_simplebind
       pattern: simple-bind\s+authenticated\s+encrypt
   keywords:
-    - id: Keyword_snaffler_cisco_creds_evidence
+    - id: Evidence_cisco_device_identity
+      groups:
+        - match_style: string
+          terms:
+            - hostname
+            - boot system
+            - version 15
+            - version 16
+            - version 17
+    - id: Evidence_cisco_config_structure
       groups:
         - match_style: string
           terms:
             - service password-encryption
-            - hostname
             - interface
             - ip route
-            - version 1
             - no ip domain-lookup
             - spanning-tree
+    - id: Evidence_cisco_snmp_management
+      groups:
+        - match_style: string
+          terms:
+            - snmp-server host
+            - snmp-server location
+            - snmp-server contact
+            - snmp-server view
+    - id: Evidence_cisco_aaa_context
+      groups:
+        - match_style: string
+          terms:
+            - aaa new-model
+            - aaa authentication
+            - radius-server
+            - tacacs-server
+            - radius server
+            - tacacs server
+    - id: Evidence_cisco_ldap_context
+      groups:
+        - match_style: string
+          terms:
+            - ldap-server host
+            - ldap attribute-map
+            - ldap server
+            - ldap source-interface
+    - id: Evidence_cisco_placeholder
+      groups:
+        - match_style: string
+          terms:
+            - CHANGEME
+            - PLACEHOLDER
+            - REDACTED
+            - your-community
+            - your-secret
 created: '2026-06-26'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: make all Cisco directive bases discovery-only, add directive-family-specific balanced evidence, and require a second independent config structure at high; tighten PAC values and add exact-tier and malformed, placeholder, documentation, RO, and sibling-vendor negatives.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2044 without changing detector or package metadata.'

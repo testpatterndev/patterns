@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Litecoin Address
 slug: global-litecoin-address
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -49,11 +49,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 'LZyv3r9Tt6o7yUENc9AZf5FbQVe9GxL7w3'
-      description: Legacy P2PKH address (L prefix, version 0x30), documented example (34 chars)
+      description: Exact 65 discovery probe using a documented bare Litecoin address
     - value: 'MQMcJhpWHYVeQArcZR3sBgyPZxxRtnH441'
       description: P2SH address (M prefix, version 0x32), documented example (34 chars)
     - value: 'ltc1qg82u5u4mhn6n9l5xup0yfl52q3c4z9hsgwlj5n'
       description: Native SegWit bech32 address (ltc1 HRP), documented example (43 chars)
+    - value: 'Litecoin address LZyv3r9Tt6o7yUENc9AZf5FbQVe9GxL7w3'
+      description: Exact 75 probe with explicit Litecoin context
+    - value: 'Litecoin withdrawal address LZyv3r9Tt6o7yUENc9AZf5FbQVe9GxL7w3'
+      description: Exact 85 probe with chain-specific and transfer-destination context
   should_not_match:
     - value: '3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy'
       description: Bitcoin legacy P2SH "3" address — intentionally excluded (wrong prefix, collides with Bitcoin)
@@ -65,6 +69,8 @@ test_cases:
       description: Hyphen breaks the run so no contiguous body exists — rejected
     - value: 'litecoin wallet address example placeholder'
       description: Template/placeholder context should be excluded even when domain anchor words are present
+    - value: 'Database key LZyv3r9Tt6o7yUENc9AZf5FbQVe9GxL7w3'
+      description: Valid-shaped non-wallet key must remain discovery-only
 false_positives:
   - description: >-
       The legacy L/M base58 form shares the base58 alphabet and 34-char envelope with Bitcoin/Dogecoin
@@ -107,18 +113,40 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_litecoin_bech32
+      id_match:
+        type: any
+        ids:
+          - Regex_litecoin_legacy
+          - Regex_litecoin_bech32
       matches:
-        - ref: Keyword_cryptocurrency
+        - ref: Keyword_litecoin_context
+        - ref: Keyword_transfer_destination_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Regex_litecoin_legacy
+      id_match:
+        type: any
+        ids:
+          - Regex_litecoin_legacy
+          - Regex_litecoin_bech32
       matches:
-        - ref: Keyword_cryptocurrency
+        - ref: Keyword_litecoin_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_litecoin_legacy
+          - Regex_litecoin_bech32
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -129,9 +157,34 @@ purview:
       pattern: '\b[LM][1-9A-HJ-NP-Za-km-z]{25,34}\b'
     - id: Regex_litecoin_bech32
       pattern: '\bltc1[ac-hj-np-z02-9]{39,59}\b'
+  keywords:
+    - id: Keyword_litecoin_context
+      groups:
+        - match_style: word
+          terms:
+            - litecoin
+            - litecoin address
+            - litecoin wallet
+            - text: LTC
+              case_sensitive: true
+      strength: domain
+    - id: Keyword_transfer_destination_context
+      groups:
+        - match_style: word
+          terms:
+            - withdrawal address
+            - deposit address
+            - destination wallet
+            - recipient address
+            - pay to
+            - transfer to
+      strength: specific
 created: '2026-07-07'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: unify legacy and ltc1 shapes under a 65 discovery tier, require explicit Litecoin context at 75 and additional transfer-destination evidence at 85, with exact-tier and database-key probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2118 without changing detector or package metadata.'

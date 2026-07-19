@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Ethereum Address
 slug: global-ethereum-address
-version: 1.3.1
+version: 1.3.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -38,11 +38,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD28'
-      description: Ethereum address
+      description: Exact 65 discovery probe with a bare 0x-prefixed address shape
     - value: '0x0000000000000000000000000000000000000000'
       description: Zero address
     - value: '0xdAC17F958D2ee523a2206206994597C13D831ec7'
       description: USDT contract address format
+    - value: 'Ethereum address 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD28'
+      description: Exact 75 probe with explicit Ethereum context
+    - value: 'Ethereum withdrawal address 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD28'
+      description: Exact 85 probe with chain-specific and transfer-destination context
   should_not_match:
     - value: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD2'
       description: Only 39 hex characters instead of 40
@@ -52,6 +56,8 @@ test_cases:
       description: Contains invalid hex character G
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Constant 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD28'
+      description: Source-code-like constant must remain discovery-only
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -84,17 +90,26 @@ purview:
     - confidence_level: 85
       id_match: Regex_eth_address
       matches:
-        - ref: Pattern_global_ethereum_address_label_context
-        - ref: Keyword_global_ethereum_address_domain_context
+        - ref: Keyword_ethereum_context
+        - ref: Keyword_transfer_destination_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
+    - confidence_level: 75
       id_match: Regex_eth_address
       matches:
-        - ref: Keyword_cryptocurrency
+        - ref: Keyword_ethereum_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_eth_address
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -129,9 +144,33 @@ purview:
             - ethereum
             - address
       strength: domain
+    - id: Keyword_ethereum_context
+      groups:
+        - match_style: word
+          terms:
+            - ethereum
+            - ethereum address
+            - ethereum wallet
+            - text: ETH
+              case_sensitive: true
+      strength: domain
+    - id: Keyword_transfer_destination_context
+      groups:
+        - match_style: word
+          terms:
+            - withdrawal address
+            - deposit address
+            - destination wallet
+            - recipient address
+            - pay to
+            - transfer to
+      strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: keep bare 0x address shapes at 65 discovery, require explicit Ethereum context at 75 and additional transfer-destination evidence at 85, with exact-tier and source-constant probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1228 without changing detector or package metadata.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Supabase Key
 slug: global-supabase-key
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -68,18 +68,18 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: 'SUPABASE_ACCESS_TOKEN=sbp_abcdefghijklmnopqrstuvwxyz01234567890123'
-      description: Supabase personal access token (sbp_ + 40-char body) in the canonical env var
     - value: sbp_0123456789abcdefghij0123456789abcdefghij
-      description: Bare Supabase personal access token (distinctive prefix, no label needed)
-    - value: sb_secret_ABCDEFGHIJKLMNOPQRSTUV_abcdefgh
-      description: Supabase secret API key (sb_secret_ + 31-char body, the structure in Supabase's own CLI example)
+      description: Exact 65 probe - distinctive personal token without independent project context
+    - value: 'Supabase project database credential sb_secret_ABCDEFGHIJKLMNOPQRSTUV_abcdefgh'
+      description: Exact 75 probe - secret-key structure with Supabase project context
+    - value: 'Supabase Management API credential SUPABASE_ACCESS_TOKEN=sbp_abcdefghijklmnopqrstuvwxyz01234567890123'
+      description: Exact 85 probe - management context plus canonical token assignment
     - value: 'SUPABASE_SERVICE_ROLE_KEY=eyJABCDEFGHIJKLMNOPQRSTUVWXYZ.eyJabcdefghijklmnopqrstuvwxyz.0123456789ABCDEFGHIJabcdefghij'
       description: Legacy service_role JWT in a labelled assignment (context-gated branch)
     - value: 'supabase anon key: eyJabcdefghijklmnopqrstuvwxyz.eyJABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz012345'
       description: Legacy anon JWT after a prose-style supabase label with colon separator
     - value: service_role="eyJ0123456789ABCDEFGHIJ.eyJKLMNOPQRSTUVWXYZabcdefgh.ijklmnopqrstuvwxyz0123456789ABCD"
-      description: Legacy service_role JWT in a quoted config assignment keyed on the service_role label
+      description: Legacy service_role JWT retained as a discovery candidate
   should_not_match:
     - value: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
       description: Supabase publishable key (safe to expose by design, deliberately not detected; value is Supabase's own public CLI default)
@@ -87,6 +87,10 @@ test_cases:
       description: sbp_ body far too short (10 chars, not 40)
     - value: eyJABCDEFGHIJKLMNOPQRSTUVWXYZ.eyJabcdefghijklmnopqrstuvwxyz.0123456789ABCDEFGHIJabcdefghij
       description: Bare JWT with no Supabase label anywhere (eyJ tokens are ubiquitous; never fires value-only)
+    - value: 'Firebase project FIREBASE_TOKEN=sbp_0123456789abcdefghij0123456789abcdefghij'
+      description: Sibling backend-provider context does not corroborate a Supabase token
+    - value: 'Documentation example: Supabase Management API SUPABASE_ACCESS_TOKEN=sbp_0123456789abcdefghij0123456789abcdefghij'
+      description: Documentation example containing a valid-shaped token is excluded
     - value: rotate the supabase service_role key in project settings
       description: Prose mention without a token value
     - value: template example placeholder record identifier
@@ -116,24 +120,34 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 65
+      discovery_only: true
       id_match: Regex_supabase_key
       matches:
-        - ref: Keyword_supabase_key
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_supabase_legacy_jwt
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
       id_match: Regex_supabase_key
       matches:
+        - ref: Keyword_supabase_project_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -142,7 +156,27 @@ purview:
     - confidence_level: 75
       id_match: Regex_supabase_legacy_jwt
       matches:
-        - ref: Keyword_supabase_key
+        - ref: Keyword_supabase_project_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_supabase_key
+      matches:
+        - ref: Keyword_supabase_project_context
+        - ref: Pattern_supabase_secret_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_supabase_legacy_jwt
+      matches:
+        - ref: Keyword_supabase_project_context
+        - ref: Pattern_supabase_secret_assignment
         - type: any
           min_matches: 0
           max_matches: 0
@@ -153,23 +187,25 @@ purview:
       pattern: (?<![A-Za-z0-9_-])(?:sbp_[A-Za-z0-9_-]{40}|sb_secret_[A-Za-z0-9_-]{28,36})(?![A-Za-z0-9_-])
     - id: Regex_supabase_legacy_jwt
       pattern: (?i)(?:supabase|service_role|anon[_ ]key)[\s\S]{0,60}?[=:][\s"']{0,4}eyJ[A-Za-z0-9_-]{10,500}\.eyJ[A-Za-z0-9_-]{10,500}\.[A-Za-z0-9_-]{10,500}(?![A-Za-z0-9_-])
+    - id: Pattern_supabase_secret_assignment
+      pattern: (?i)\b(?:SUPABASE_ACCESS_TOKEN|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY)\s*[=:]
   keywords:
-    - id: Keyword_supabase_key
+    - id: Keyword_supabase_project_context
       groups:
-        - match_style: word
+        - match_style: string
           terms:
-            - supabase
+            - Supabase project
+            - Supabase database
+            - Supabase Management API
+            - Supabase service role
             - supabase.co
-            - SUPABASE_ACCESS_TOKEN
-            - SUPABASE_SERVICE_ROLE_KEY
-            - service_role
-            - supabase api
-            - access token
-            - api key
       strength: specific
 created: '2026-07-06'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Separate prefixed and legacy Supabase credentials into an individual 65 discovery / 75 project-context / 85 canonical-assignment contract with exact-tier and adversarial probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2131 without changing detector or package metadata.'

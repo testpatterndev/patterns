@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Payment Card Magnetic Stripe Track 2
 slug: global-payment-card-track2
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -49,11 +49,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: ';4111111111111111=250510100000000000?'
-      description: Track 2 sentinel form, fake 16-digit Visa PAN, expiry 2505 service 101
+      description: Exact 75 probe with complete Track 2 sentinel framing
     - value: 'TRACK2=;5500005555555559=26129990000000?'
-      description: Labelled Track 2 sentinel form, fake Mastercard PAN
+      description: Exact 85 probe with complete framing and explicit Track 2 context
     - value: 'pan=4012888888881881=2611101000000'
-      description: No-sentinel database form, fake PAN = expiry+service+discretionary
+      description: Exact 65 discovery probe with the weaker no-sentinel database form
   should_not_match:
     - value: ';4111111111111111=2505?'
       description: Sentinel form missing service-code digits (only 4 after =)
@@ -61,6 +61,8 @@ test_cases:
       description: Short number=number pair, not a 13-19 digit PAN with 7+ trailing digits
     - value: Track 2 data and the PAN must be truncated before storage
       description: Prose mentioning track 2, no encoded track
+    - value: 'Configuration key 4012888888881881=2611101000000'
+      description: No-sentinel numeric configuration pair must remain discovery-only
 false_positives:
   - description: Long numeric identifiers joined by = in exported config or log lines that coincidentally resemble PAN=digits.
     mitigation: Require corroborative keywords; validate the PAN portion with a Luhn check before alerting.
@@ -80,9 +82,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_track2_sentinel
+      matches:
+        - ref: Keyword_track2_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_track2_sentinel
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_track2_database
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_track2_sentinel
+      pattern: ';\d{13,19}=\d{4}\d{3}\d*\?'
+    - id: Regex_track2_database
+      pattern: '(?<![0-9;])\d{13,19}=\d{7,40}(?![0-9])'
+  keywords:
+    - id: Keyword_track2_context
+      groups:
+        - match_style: word
+          terms:
+            - text: TRACK2
+              case_sensitive: true
+            - Track 2 data
+            - magnetic stripe capture
+            - magstripe dump
+            - card reader export
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: keep the weaker no-sentinel PAN=digits form at 65 discovery, require full sentinel framing at 75, and require explicit track/capture context at 85, with exact-tier and configuration-pair probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1556 without changing detector or package metadata.'

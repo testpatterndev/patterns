@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Anthropic API Key
 slug: global-anthropic-api-key
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,7 +9,11 @@ description: >-
   Detects Anthropic (Claude) API keys. Standard keys use the sk-ant-api03- prefix
   followed by a long base64url body ending in AA; admin keys use sk-ant-admin01-.
   A leaked key grants billed access to the Anthropic API and any connected data.
-operation: 'Prefixed token formats sk-ant-api03- and sk-ant-admin01- followed by a ~95 char base64url body. Corroborative evidence: keywords within 300 characters.'
+operation: >-
+  The complete sk-ant-api03-/sk-ant-admin01- token shape is discovery-only at 65. An explicit
+  Anthropic/Claude credential label raises it to 75, while 85 additionally requires production,
+  deployment, environment-variable, secret-store, or live-service context. Enforcing tiers reject
+  documentation, samples, placeholders, and templates.
 pattern: (?<![A-Za-z0-9])sk-ant-(?:api03|admin01)-[A-Za-z0-9_-]{93}AA(?![A-Za-z0-9])
 confidence: high
 confidence_justification: >-
@@ -37,14 +41,81 @@ corroborative_evidence:
     - bearer token
     - x-api-key
   proximity: 300
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_anthropic_api_key
+      matches:
+        - ref: Evidence_anthropic_label
+        - ref: Evidence_live_deployment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_documentation_context
+    - confidence_level: 75
+      id_match: Regex_anthropic_api_key
+      matches:
+        - ref: Evidence_anthropic_label
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_documentation_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_anthropic_api_key
+  regexes:
+    - id: Regex_anthropic_api_key
+      pattern: (?<![A-Za-z0-9])sk-ant-(?:api03|admin01)-[A-Za-z0-9_-]{93}AA(?![A-Za-z0-9])
+  keywords:
+    - id: Evidence_anthropic_label
+      groups:
+        - match_style: word
+          terms:
+            - Anthropic API key
+            - Claude API key
+            - ANTHROPIC_API_KEY
+            - x-api-key
+            - Anthropic admin key
+      strength: specific
+    - id: Evidence_live_deployment
+      groups:
+        - match_style: word
+          terms:
+            - production deployment
+            - production service
+            - live service
+            - environment variable
+            - deployment secret
+            - secret store
+            - CI/CD secret
+      strength: specific
+    - id: Evidence_documentation_context
+      groups:
+        - match_style: word
+          terms:
+            - public documentation
+            - documentation example
+            - sample configuration
+            - placeholder token
+      strength: exclusion
 test_cases:
   should_match:
     - value: sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdeAA
-      description: Standard Anthropic API key, sk-ant-api03- prefix + 93 chars + AA
-    - value: 'ANTHROPIC_API_KEY=sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdeAA'
-      description: Labelled Anthropic key in an env assignment
-    - value: sk-ant-admin01-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdeAA
-      description: Anthropic admin API key, sk-ant-admin01- prefix
+      description: Low-tier probe - complete token without provider or deployment context
+    - value: 'Anthropic API key: sk-ant-admin01-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdeAA'
+      description: Medium-tier probe - provider-labelled token without live deployment context
+    - value: 'Production deployment secret ANTHROPIC_API_KEY=sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdeAA'
+      description: High-tier probe - provider label plus live deployment context
   should_not_match:
     - value: sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij
       description: Too short to be a valid Anthropic key body
@@ -52,6 +123,10 @@ test_cases:
       description: Wrong version marker (api02 instead of api03/admin01)
     - value: please rotate the anthropic claude api key before release
       description: Prose mention without a token value
+    - value: 'Public documentation example: production deployment ANTHROPIC_API_KEY=sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdeAA'
+      description: Public example containing a structurally complete token
+    - value: 'Template placeholder token: Anthropic API key sk-ant-admin01-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdeAA for a production service'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Documentation or examples showing placeholder sk-ant- strings.
     mitigation: Require corroborative keywords and check for placeholder markers (example, xxxx).
@@ -72,8 +147,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Profile quality: add bare-token discovery, provider-labelled medium, and live-deployment high tiers; reject documentation/templates and add exact-tier adversarial probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1524 without changing detector or package metadata.'

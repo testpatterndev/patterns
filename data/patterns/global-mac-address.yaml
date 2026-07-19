@@ -1,14 +1,16 @@
 schema: testpattern/v1
 name: Mac Address
 slug: global-mac-address
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects Mac Address patterns.
 operation: >-
-  Reference: https://ihateregex.io/expr/mac-address/ Corroborative evidence: 4 keywords within 300 characters. Keyword lists: pii-personal. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.
+  A six-octet colon- or hyphen-delimited MAC shape is discovery-only at 65. An explicit MAC address,
+  physical address, or hardware-address label raises it to 75. The 85 tier additionally requires an
+  asset register, assigned user, device inventory, NAC, switch-port, DHCP-lease, or endpoint-record
+  context. Enforcing tiers reject public manuals, vendor documentation, templates, and examples.
 pattern: \b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b
 confidence: medium
 confidence_justification: >-
@@ -39,11 +41,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 00:1A:2B:3C:4D:5E
-      description: MAC address with colons
-    - value: AA-BB-CC-DD-EE-FF
-      description: MAC address with hyphens
-    - value: 01:23:45:67:89:ab
-      description: Lowercase MAC address
+      description: Low-tier probe - MAC shape without a label
+    - value: 'MAC address: AA-BB-CC-DD-EE-FF'
+      description: Medium-tier probe - explicitly labelled MAC without an asset record
+    - value: 'Device inventory - assigned user endpoint record, MAC address: 01:23:45:67:89:ab'
+      description: High-tier probe - MAC label plus asset and user record context
   should_not_match:
     - value: 00:1A:2B:3C:4D
       description: Only 5 octets instead of 6
@@ -53,6 +55,10 @@ test_cases:
       description: No separators between octets
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Public vendor manual - MAC address: 00:1A:2B:3C:4D:5E'
+      description: Public manual contains a complete labelled MAC
+    - value: 'Template example: device inventory assigned user endpoint record MAC address AA-BB-CC-DD-EE-FF'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Technical identifiers appearing in public documentation, network configuration guides, or example configurations without representing actual infrastructure.
     mitigation: Cross-reference with known documentation patterns and reserved address ranges. Require proximity to infrastructure-specific context.
@@ -75,13 +81,13 @@ sensitivity_labels:
   ca_gov: Unclassified
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 85
       id_match: Regex_mac_address
       matches:
         - ref: Pattern_global_mac_address_label_context
@@ -91,29 +97,25 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_mac_context
     - confidence_level: 75
       id_match: Regex_mac_address
       matches:
-        - ref: Keyword_mac_address
+        - ref: Pattern_global_mac_address_label_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_mac_context
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_mac_address
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_mac_address
       pattern: \b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b
     - id: Pattern_global_mac_address_label_context
-      pattern: (?i)\b(?:mac\s+address|mac|address)\b
+      pattern: (?i)\b(?:mac\s+address|physical\s+address|hardware\s+address)\b
   keywords:
     - id: Keyword_mac_address
       groups:
@@ -139,13 +141,32 @@ purview:
       groups:
         - match_style: word
           terms:
-            - mac address
-            - mac
-            - address
+            - asset register
+            - assigned user
+            - device inventory
+            - network access control
+            - switch port
+            - DHCP lease
+            - endpoint record
       strength: domain
+    - id: Keyword_public_mac_context
+      groups:
+        - match_style: word
+          terms:
+            - public vendor manual
+            - public documentation
+            - manufacturer guide
+            - documentation example
+      strength: exclusion
+  filters:
+    - id: Guard_mac_same_digits
+      type: AllDigitsSameFilter
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: replace duplicate medium paths with bare-shape discovery, explicit-MAC-label medium, and asset-record high tiers; reject public manuals/templates and add exact-tier probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1250 without changing detector or package metadata.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: SQL Account Creation with Password
 slug: snaffler-sql-account-creation
-version: 1.2.1
+version: 1.2.2
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -44,17 +44,25 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: "CREATE LOGIN svc_app WITH PASSWORD = 'S3rv1ce!2024';"
-      description: SQL Server CREATE LOGIN with password
-    - value: "CREATE USER 'app'@'%' IDENTIFIED BY 'p4ss';"
-      description: MySQL CREATE USER IDENTIFIED BY
+    - value: "CREATE USER audit_reader WITH PASSWORD"
+      description: Exact 65 probe - account/password clause candidate without a populated value
+    - value: "CREATE USER 'app'@'%' IDENTIFIED BY 'p4ssWord9';"
+      description: Exact 75 probe - populated MySQL account password statement
+    - value: "CREATE LOGIN svc_app WITH PASSWORD = 'S3rv1ce!2024'; ALTER SERVER ROLE sysadmin ADD MEMBER svc_app;"
+      description: Exact 85 probe - populated login plus independent privileged-role grant
     - value: "CREATE USER etl_user WITH PASSWORD 'Etl$ecret2024';"
-      description: PostgreSQL CREATE USER WITH PASSWORD
+      description: Populated PostgreSQL account statement at the balanced tier
   should_not_match:
     - value: "CREATE TABLE Users (id INT, name VARCHAR(50));"
       description: DDL table creation, no password clause
     - value: "CREATE INDEX idx_login ON users(login);"
       description: Index DDL, not account creation
+    - value: "ALTER USER app IDENTIFIED BY 'N3wPassword';"
+      description: Sibling account-alter statement is outside this creation detector
+    - value: "CREATE USER app WITH PASSWORD = '';"
+      description: Empty password value remains discovery-only and cannot enforce
+    - value: "Documentation example: CREATE LOGIN demo WITH PASSWORD = 'S3rv1ce!2024'; ALTER SERVER ROLE sysadmin ADD MEMBER demo;"
+      description: Documentation example with a full privileged statement is excluded
 false_positives:
   - description: SQL migration scripts or database setup documentation that include CREATE USER statements with placeholder or masked passwords for illustrative purposes.
     mitigation: Require proximity to operational SQL keywords (GRANT, ALTER LOGIN, sp_addlogin) that indicate production-grade credential scripts rather than documentation.
@@ -66,13 +74,14 @@ exports:
 scope: specific
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_snaffler_sql_account_creation
       matches:
         - type: any
@@ -81,16 +90,15 @@ purview:
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Regex_snaffler_sql_account_creation
+      id_match: Regex_snaffler_sql_populated_password
       matches:
-        - ref: Keyword_snaffler_sql_account_creation_evidence
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 85
-      id_match: Regex_snaffler_sql_account_creation
+      id_match: Regex_snaffler_sql_populated_password
       matches:
         - ref: Keyword_snaffler_sql_account_creation_evidence
         - type: any
@@ -101,6 +109,8 @@ purview:
   regexes:
     - id: Regex_snaffler_sql_account_creation
       pattern: CREATE\s+(?:USER|LOGIN)\s+[\s\S]{0,200}(?:IDENTIFIED\s+BY|WITH\s+PASSWORD)
+    - id: Regex_snaffler_sql_populated_password
+      pattern: (?i)CREATE\s+(?:USER|LOGIN)\s+[\s\S]{1,160}?(?:IDENTIFIED\s+BY|WITH\s+PASSWORD)\s*(?:=\s*)?['"][^'"\r\n]{8,128}['"]
   keywords:
     - id: Keyword_snaffler_sql_account_creation_evidence
       groups:
@@ -108,11 +118,17 @@ purview:
           terms:
             - GRANT
             - ALTER LOGIN
-            - sp_addlogin
+            - ALTER SERVER ROLE
+            - SUPERUSER
             - sysadmin
+            - WITH ADMIN OPTION
+      strength: specific
 created: '2026-06-26'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.2
+    date: '2026-07-19'
+    description: 'Replace repeated tiers with an individual 65 clause discovery / 75 populated-password / 85 privileged-grant contract and add empty, sibling-DDL, malformed, and documentation probes.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2064 without changing detector or package metadata.'

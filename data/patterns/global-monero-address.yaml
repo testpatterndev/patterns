@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Monero Address
 slug: global-monero-address
-version: 1.1.2
+version: 1.1.3
 type: regex
 pattern_class: identifier
 engine: universal
@@ -51,11 +51,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: '4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge'
-      description: Standard address (network byte 18, "4" prefix) from the Monero standard-address docs (95 chars)
+      description: Exact 65 discovery probe using a documented bare Monero address
     - value: '4LL9oSLmtpccfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2bYXZKKQePHES9khPK'
       description: Integrated address (network byte 19, "4" prefix, + payment ID) from the Monero integrated-address docs (106 chars)
     - value: '888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H'
       description: Address with the 8 prefix (95 chars) from the Monero moneropedia address page (documented example)
+    - value: 'Monero address 4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge'
+      description: Exact 75 probe with explicit Monero context
+    - value: 'Monero withdrawal address 4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge'
+      description: Exact 85 probe with chain-specific and transfer-destination context
   should_not_match:
     - value: '5AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge'
       description: Wrong prefix (starts with 5, not 4 or 8)
@@ -67,6 +71,8 @@ test_cases:
       description: Hyphen breaks the run so no contiguous 95/106-char body exists — rejected
     - value: 'monero wallet address example placeholder'
       description: Template/placeholder context should be excluded even when domain anchor words are present
+    - value: 'Database key 4AdUndXHHZ6cfufTMvppY6JwXNouMBzSkbLYfpAV5Usx3skxNgYeYTRj5UzqtReoS44qo9mtmXCqY45DJ852K5Jv2684Rge'
+      description: Valid-shaped non-wallet key must remain discovery-only
 false_positives:
   - description: >-
       The fixed 95/106-char base58 envelope with a 4/8 leading character is extremely distinctive, but
@@ -110,7 +116,26 @@ purview:
     - confidence_level: 85
       id_match: Regex_monero_address
       matches:
-        - ref: Keyword_cryptocurrency
+        - ref: Keyword_monero_context
+        - ref: Keyword_transfer_destination_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_monero_address
+      matches:
+        - ref: Keyword_monero_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_monero_address
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -119,9 +144,34 @@ purview:
   regexes:
     - id: Regex_monero_address
       pattern: '\b4[1-9A-HJ-NP-Za-km-z]{94}\b|\b4[1-9A-HJ-NP-Za-km-z]{105}\b|\b8[1-9A-HJ-NP-Za-km-z]{94}\b'
+  keywords:
+    - id: Keyword_monero_context
+      groups:
+        - match_style: word
+          terms:
+            - monero
+            - monero address
+            - monero wallet
+            - text: XMR
+              case_sensitive: true
+      strength: domain
+    - id: Keyword_transfer_destination_context
+      groups:
+        - match_style: word
+          terms:
+            - withdrawal address
+            - deposit address
+            - destination wallet
+            - recipient address
+            - pay to
+            - transfer to
+      strength: specific
 created: '2026-07-07'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.3
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: keep bare Monero address shapes at 65 discovery, require explicit chain context at 75 and additional transfer-destination evidence at 85, with exact-tier and database-key probes.'
   - version: 1.1.2
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2119 without changing detector or package metadata.'

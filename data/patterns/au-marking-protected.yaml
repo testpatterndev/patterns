@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Marking - PROTECTED
 slug: au-marking-protected
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -12,9 +12,12 @@ description: >-
   receive at-least-PROTECTED handling. Regex logic ported from Microsoft's canonical PSPF SIT
   guidance; matched case-sensitively.
 operation: >-
-  Tier 95 requires the structured SEC=PROTECTED form. Tier 85 matches the PROTECTED banner. A third
-  tier 85 matches SECRET (and the SECRET in TOP SECRET) to roll the higher classifications into the
-  PROTECTED label.
+  An uppercase PROTECTED, SECRET, or TOP SECRET candidate is discovery-only at 65, with common
+  trade/API/client secret collocations excluded. A formal SEC, classification, security-classification,
+  protective-marking, or marking field raises it to 75; an explicit Australian or Queensland
+  protective-security context can also corroborate a standalone banner at 75. The 85 tier requires
+  a complete X-Protective-Marking header with VER, NS=gov.au, and SEC=PROTECTED, SECRET, or
+  TOP-SECRET. Public guides, training, templates, and examples do not enforce.
 pattern: '\bPROTECTED\b'
 confidence: high
 confidence_justification: >-
@@ -39,14 +42,18 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: "Briefing [SEC=PROTECTED]"
-      description: Email subject marking
+    - value: "Document footer candidate PROTECTED"
+      description: Low-tier probe - uppercase candidate without a formal marking field
+    - value: "Classification: PROTECTED"
+      description: Medium-tier probe - formal classification field without a complete header
+    - value: "Subject [SEC=PROTECTED]"
+      description: Operational email subject marking reaches the balanced tier
+    - value: "Australian Government PSPF briefing\nPROTECTED"
+      description: Medium-tier probe - standalone banner corroborated by explicit government marking context
     - value: "X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=PROTECTED, CAVEAT=SH:CABINET"
-      description: x-header with CABINET caveat (swept into PROTECTED)
-    - value: "This file is classified PROTECTED"
-      description: Document banner
-    - value: "Annex marked SECRET by the agency"
-      description: SECRET rolls up into the PROTECTED label
+      description: High-tier probe - complete Australian protective-marking header with caveat
+    - value: "Security Classification: SECRET"
+      description: Formal SECRET marking rolls up into PROTECTED handling at the medium tier
   should_not_match:
     - value: "wetlands are a protected area under the act"
       description: lowercase English word (case-sensitive exclusion)
@@ -56,11 +63,17 @@ test_cases:
       description: OFFICIAL belongs to au-marking-official
     - value: "ROTATE THE API SECRET KEY QUARTERLY"
       description: SECRET-collocation excluded from the SECRET roll-up tier by the secret-collocation NOT group
+    - value: "PROTECTED SPECIES - PUBLIC CONSERVATION NOTICE"
+      description: Incidental uppercase prose must not enforce
+    - value: "Public marking guide: Classification: PROTECTED"
+      description: Public guidance quotes a formal marking field
+    - value: "Template example: X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=PROTECTED, CAVEAT=SH:CABINET"
+      description: Template contains a complete formal header
 false_positives:
   - description: Uppercase PROTECTED in non-marking contexts (e.g. "PROTECTED SPECIES").
-    mitigation: Structured SEC= tier at 95; corroborative PSPF/government evidence raises banner confidence.
+    mitigation: Explicit PSPF/QGISCF government context or a structured marking field is required above discovery; the complete header remains the strict 85 path.
   - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare PROTECTED/SECRET banners rely on — any all-caps rendering of the word can fire with no protective-marking intent.
-    mitigation: Treat banner/roll-up-tier-only hits as lower confidence when the surrounding text is itself all-caps; the structured SEC=PROTECTED tier (95) remains the reliable signal.
+    mitigation: Treat uncorroborated banner hits as discovery inventory; structured or explicitly government-corroborated markings enforce at 75.
 exports:
   - purview_xml
   - yaml
@@ -78,49 +91,72 @@ sensitivity_labels:
   ca_gov: "Confidential"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 95
-      id_match: Regex_au_protected_struct
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 85
-      id_match: Regex_au_protected_banner
+      id_match: Regex_au_protected_complete_header
       matches:
+        - ref: Keyword_complete_marking_header
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_au_protected_secret
+            - Keyword_secret_collocation_exclusion
+            - Keyword_public_marking_context
+    - confidence_level: 75
+      id_match: Regex_au_protected_formal_label
       matches:
+        - ref: Keyword_formal_marking_label
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_secret_collocation_exclusion
+            - Keyword_public_marking_context
+    - confidence_level: 75
+      id_match: Regex_au_protected_candidate
+      matches:
+        - ref: Keyword_au_gov_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_secret_collocation_exclusion
+            - Keyword_public_marking_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_protected_candidate
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_secret_collocation_exclusion
   regexes:
-    - id: Regex_au_protected_struct
-      pattern: '\bSEC=PROTECTED\b'
-    - id: Regex_au_protected_banner
-      pattern: '\bPROTECTED\b'
-    - id: Regex_au_protected_secret
-      pattern: '\bSECRET\b'
+    - id: Regex_au_protected_complete_header
+      pattern: '\bX-Protective-Marking:\s*VER=[0-9]{4}\.[0-9]+,\s*NS=gov\.au,\s*SEC=(?:PROTECTED|TOP-SECRET|SECRET)\b(?:,\s*CAVEAT=[A-Z0-9:/-]+)?'
+    - id: Regex_au_protected_formal_label
+      pattern: '\b(?:SEC(?:URITY CLASSIFICATION)?|Security Classification|CLASSIFICATION|Classification|PROTECTIVE MARKING|Protective Marking|MARKING|Marking)\s*[:=]\s*(?:PROTECTED|(?:TOP[\s-]+)?SECRET)\b'
+    - id: Regex_au_protected_candidate
+      pattern: '\b(?:PROTECTED|(?:TOP[\s-]+)?SECRET)\b'
   keywords:
+    - id: Keyword_au_gov_context
+      groups:
+        - match_style: word
+          terms:
+            - Australian Government
+            - Queensland Government
+            - QGISCF
+            - PSPF
+            - Protective Security Policy Framework
+      strength: specific
     - id: Keyword_secret_collocation_exclusion
       groups:
         - match_style: word
@@ -135,9 +171,38 @@ purview:
               case_sensitive: true
             - text: SECRET MANAGER
               case_sensitive: true
+    - id: Keyword_complete_marking_header
+      groups:
+        - match_style: word
+          terms:
+            - X-Protective-Marking
+            - NS=gov.au
+            - VER=
+      strength: specific
+    - id: Keyword_formal_marking_label
+      groups:
+        - match_style: word
+          terms:
+            - Classification
+            - Security Classification
+            - Protective Marking
+            - SEC=
+      strength: specific
+    - id: Keyword_public_marking_context
+      groups:
+        - match_style: word
+          terms:
+            - public marking guide
+            - marking guide
+            - style guide
+            - training material
+      strength: exclusion
 created: '2026-06-29'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Profile quality: retain bare banners as 65 discovery, enforce formal labels or explicitly government-corroborated banners at the recommended 75 tier, reserve 85 for complete headers, preserve SECRET roll-up, exclude collocations/public guides/templates, and add exact-tier probes.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2073 without changing detector or package metadata.'

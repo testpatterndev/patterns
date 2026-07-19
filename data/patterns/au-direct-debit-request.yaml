@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Direct Debit Request (DDR/BECS)
 slug: au-direct-debit-request
-version: 1.3.1
+version: 1.3.2
 type: keyword_list
 pattern_class: concept
 description: >-
@@ -30,8 +30,14 @@ data_categories:
   - banking
 test_cases:
   should_match:
+    - value: Direct debit request received
+      description: Exact 65 discovery probe with a mandate phrase and no account or schedule details
+    - value: 'Direct debit request: BSB 062000'
+      description: Exact 75 probe with one banking-detail evidence family
+    - value: 'Direct debit request: BSB 062000, first debit date 01/03/2026'
+      description: Exact 85 probe with banking authority and payment schedule evidence
     - value: 'Direct Debit Request: I authorise debit my account'
-      description: Test match 1
+      description: Direct debit authority wording
     - value: DDR/BECS form with BSB and account number details
       description: Test match 2
     - value: Recurring debit arrangement with first debit date 01/03/2026
@@ -41,6 +47,8 @@ test_cases:
       description: Non-match 1
     - value: Please debit the inventory count
       description: Non-match 2
+    - value: 'User ID: 123456 architecture workshop'
+      description: BECS-shaped user identifier in technical prose without mandate or payment details
 false_positives:
   - description: Use of debit in general accounting contexts.
     mitigation: Require DDR, BECS, or bank authority language alongside debit terms.
@@ -67,19 +75,40 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_direct_debit
+      id_match:
+        type: any
+        ids:
+          - Regex_direct_debit
+          - Regex_becs_reference
       matches:
-        - ref: Keyword_direct_debit
         - ref: Keyword_bank_authority
+        - ref: Keyword_payment_schedule
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Regex_becs_reference
+      id_match:
+        type: any
+        ids:
+          - Regex_direct_debit
+          - Regex_becs_reference
       matches:
-        - ref: Keyword_direct_debit
+        - ref: Keyword_mandate_detail
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_direct_debit
+          - Regex_becs_reference
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -87,7 +116,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_direct_debit
-      pattern: (?i)\b(?:direct\s+debit\s+(?:request|authority|arrangement)|ddr|debit\s+authority)\b
+      pattern: (?i)\b(?:direct\s+debit\s+(?:request|authority|arrangement)|recurring\s+debit\s+arrangement|ddr|debit\s+authority)\b
     - id: Regex_becs_reference
       pattern: (?i)\b(?:becs|bulk\s+electronic\s+clearing|user\s+id\s*[:\-]?\s*\d{6})\b
   keywords:
@@ -121,9 +150,39 @@ purview:
               case_sensitive: true
             - account number
       strength: specific
+    - id: Keyword_payment_schedule
+      groups:
+        - match_style: word
+          terms:
+            - first debit date
+            - debit amount
+            - payment frequency
+            - recurring payment date
+            - final debit date
+            - payment schedule
+      strength: specific
+    - id: Keyword_mandate_detail
+      groups:
+        - match_style: word
+          terms:
+            - I authorise
+            - I authorize
+            - debit my account
+            - account holder
+            - text: BSB
+              case_sensitive: true
+            - account number
+            - first debit date
+            - debit amount
+            - payment frequency
+            - payment schedule
+      strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: keep mandate phrases at 65 discovery, require a curated bank-authority or schedule detail group at 75 and both independent evidence families at 85, extend genuine recurring-debit coverage, and add exact-tier plus technical-prose probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 537 without changing detector or package metadata.'

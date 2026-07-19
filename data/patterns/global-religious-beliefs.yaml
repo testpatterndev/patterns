@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Religious or Philosophical Beliefs
 slug: global-religious-beliefs
-version: 1.0.0
+version: 1.1.0
 type: keyword_list
 pattern_class: concept
 engine: universal
@@ -50,6 +50,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'Religious affiliation disclosure topic pending review.'
+      description: Exact 65 discovery probe - belief topic without a data-subject record
+    - value: 'Membership form includes a religious affiliation field.'
+      description: Exact 75 probe - person-record context without a populated belief response
+    - value: 'Patient record: religious affiliation captured; stated faith Hindu; place of worship recorded.'
+      description: Exact 85 probe - person record plus populated faith attribution
     - value: 'The intake form records religious affiliation under section 4.'
       description: Religious affiliation phrase present
     - value: 'Profile notes his faith tradition and place of worship.'
@@ -65,6 +71,12 @@ test_cases:
       description: Topical/educational mention, no personal disclosure phrase
     - value: 'Religious studies 101 is a required elective this semester.'
       description: Academic course listing, no disclosure phrase
+    - value: 'Public policy document reports aggregate congregation demographics.'
+      description: Public aggregate material is not a person-linked belief disclosure
+    - value: 'Sample template: patient record with stated faith Example Faith.'
+      description: Adjacent template language is not a populated belief record
+    - value: 'Patient record lists a vegetarian dietary preference.'
+      description: Sibling preference record does not satisfy the religious-belief primary
 false_positives:
   - description: >-
       Generic corporate or educational use of "believe"/"religion"/"religious" (values
@@ -79,6 +91,82 @@ exports:
   - yaml
   - regex_copy
 scope: broad
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_global_religious_belief
+      matches:
+        - ref: Evidence_belief_record_context
+        - ref: Evidence_belief_attribution
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_belief_public_context
+    - confidence_level: 75
+      id_match: Pattern_global_religious_belief
+      matches:
+        - ref: Evidence_belief_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_belief_public_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_global_religious_belief
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_belief_public_context
+  regexes:
+    - id: Pattern_global_religious_belief
+      pattern: '(?i)\b(?:religious\s+beliefs?|religious\s+affiliations?|philosophical\s+beliefs?|belief\s+systems?|faith\s+traditions?|religious\s+observance|place\s+of\s+worship|religious\s+denominations?|religious\s+conversion\s+record)\b'
+  keywords:
+    - id: Evidence_belief_record_context
+      groups:
+        - match_style: word
+          terms:
+            - membership form
+            - patient record
+            - profile field
+            - census response
+            - pastoral care file
+            - accommodation request
+      strength: domain
+    - id: Evidence_belief_attribution
+      groups:
+        - match_style: word
+          terms:
+            - stated faith
+            - 'denomination:'
+            - declared belief
+            - 'place of worship:'
+            - observance requirement
+            - converted to
+      strength: specific
+    - id: Evidence_belief_public_context
+      groups:
+        - match_style: word
+          terms:
+            - public policy document
+            - public dataset
+            - aggregate statistics
+            - museum catalogue
+            - academic course
+            - blank form
+      strength: exclusion
 risk_rating: 7
 risk_description: >-
   Religious or philosophical belief is a GDPR Article 9 special category; disclosure can lead
@@ -93,8 +181,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-07-12'
-updated: '2026-07-12'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add a 65 belief-topic discovery tier, a 75 person-record tier, and an 85 populated faith/observance attribution tier, with exact-tier and sibling/public/template probes.'
   - version: 1.0.0
     date: '2026-07-12'
     description: 'New pattern: replaces the deprecated au/global-top500-016-religious-or-philosophical-beliefs attribute-value patterns (needs-EDM/ML) with an honest topic-classifier concept, modeled on global-political-opinion. Deliberately avoids the deprecated pattern''s generic corroborative terms (personal, identity, demographics), which were the documented cause of its imprecision. Fills the D-wave coverage gap logged in c3-deprecation-report.md.'

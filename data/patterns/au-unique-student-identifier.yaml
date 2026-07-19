@@ -1,25 +1,23 @@
 schema: testpattern/v1
 name: Unique Student Identifier
 slug: au-unique-student-identifier
-version: 1.5.2
+version: 1.6.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
   Detects Unique Student Identifier (USI) patterns. A 10-character alphanumeric code (uppercase
   letters and digits) mandatory since January 2023 for higher education in Australia. The
-  current Purview export is inventory/discovery only: a match requires the labelled or bare
-  10-character format plus USI-term and education-context evidence, and no tier enforces.
+  Purview design inventories the broad bare shape at 65, enforces a labelled value in education
+  context at 75, and reserves 85 for labelled values with authoritative USI/VET record context.
 operation: >-
   Regex pattern using universal engine. The top-level regex \b[A-Z0-9]{10}\b matches exactly 10
   uppercase alphanumeric characters. The Purview engine uses two regexes: Pattern_usi_labeled
   (labeled format with USI/Unique Student Identifier/student identifier prefix + 10
-  alphanumeric chars) and Pattern_au_usi (bare 10-char format). One confidence tier: Low (65),
-  discovery_only — it requires USI-term AND education-context evidence within 500-character
-  proximity and excludes template/sample text; there are no 75/85 enforcing tiers. The defined
-  Guard_usi_same_digits and Guard_usi_exclude_test filters are currently unreferenced and must
-  be wired into any future enforcing tier before enforcement is introduced. Keyword lists:
-  au-identity-usi, industry-education.
+  alphanumeric chars) and Pattern_au_usi (bare 10-char format). The 65 tier is discovery-only;
+  75 requires the embedded USI label plus education context; 85 additionally requires USI
+  Registry, Student Identifiers Act, RTO, AVETMISS, or equivalent authoritative record context.
+  Template/sample text and repeated/sentinel digit values are excluded.
 pattern: \b[A-Z0-9]{10}\b
 confidence: low
 confidence_justification: >-
@@ -49,13 +47,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: ABC1234567
-      description: Regex-unit test for the bare 10-character format only — the Purview discovery tier additionally requires USI and education evidence from surrounding context
+      description: Exact 65 discovery probe - bare 10-character shape without a USI label
     - value: 2K48TF3GHP
-      description: Regex-unit test for the standard USI format only (see above — not sufficient for the discovery tier without context evidence)
+      description: Bare standard-format candidate remains discovery-only without a USI label
     - value: A1B2C3D4E5
-      description: Regex-unit test for the alternating format only (see above — not sufficient for the discovery tier without context evidence)
+      description: Bare alternating-format candidate remains discovery-only without a USI label
     - value: 'Student USI: 2K48TF3GHP; TAFE enrolment for Certificate IV.'
-      description: Labelled value with education context satisfies the 65 discovery tier (inventory only, no enforcement)
+      description: Exact 75 probe - labelled value with education context but no registry/legislative record evidence
+    - value: 'USI Registry AVETMISS record for RTO 30123 - Student USI: 2K48TF3GHP; TAFE enrolment confirmed.'
+      description: Exact 85 probe - labelled value with education and authoritative registry/VET evidence
   should_not_match:
     - value: ABC12345
       description: Only 8 characters instead of 10
@@ -69,6 +69,12 @@ test_cases:
       description: Placeholder sentinel value (separated) is not a 10-char contiguous USI and is also excluded by the sentinel filter
     - value: The TAFE campus opened a new short course hub.
       description: Education context alone contains no labelled or bare 10-character identifier
+    - value: 'Sample template: USI Registry AVETMISS record for RTO 30123 - Student USI: 2K48TF3GHP.'
+      description: Template text contains high-tier evidence but is vetoed by the shared exclusion
+    - value: 'Public guidance at usi.gov.au explains how students create a USI.'
+      description: Public guidance has no 10-character value
+    - value: 'Product serial ABC1234567 appears on the public catalogue.'
+      description: Sibling serial shape remains discovery-only because it has no embedded USI label
 false_positives:
   - description: Common words and phrases related to unique student identifier appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -105,22 +111,28 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 500
-  recommended_confidence: 65
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_usi_labeled
+      matches:
+        - ref: Evidence_education_context
+        - ref: Evidence_usi_authority_context
+      excludes:
+        - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_usi_labeled
+      matches:
+        - ref: Evidence_education_context
+      excludes:
+        - ref: Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match:
-        type: any
-        ids:
-          - Pattern_usi_labeled
-          - Pattern_au_usi
-      matches:
-        - ref: Evidence_usi_terms
-        - ref: Evidence_education_context
+      id_match: Pattern_au_usi
       excludes:
         - ref: Evidence_template_exclusion
   regexes:
@@ -162,6 +174,18 @@ purview:
             - registered training organisation
             - AVETMISS
       strength: noise
+    - id: Evidence_usi_authority_context
+      groups:
+        - match_style: word
+          terms:
+            - USI Registry
+            - usi.gov.au
+            - Student Identifiers Act
+            - AVETMISS
+            - registered training organisation
+            - RTO number
+            - Commonwealth Student Identifiers Registrar
+      strength: domain
   filters:
     - id: Guard_usi_same_digits
       type: AllDigitsSameFilter
@@ -174,8 +198,11 @@ purview:
         - "1111111111"
         - "1234567890"
 created: '2026-02-08'
-updated: '2026-07-17'
+updated: '2026-07-19'
 changelog:
+  - version: 1.6.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: make the broad 10-character shape a 65 discovery tier, require a labelled USI plus education context at 75, and require authoritative registry/VET context at 85; add exact-tier and sibling/public/template probes while preserving value guards.'
   - version: 1.5.2
     date: '2026-07-17'
     description: >-

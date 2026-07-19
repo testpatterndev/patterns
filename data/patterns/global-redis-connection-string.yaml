@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Redis
 slug: global-redis-connection-string
-version: 1.3.1
+version: 1.3.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -42,12 +42,12 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: redis://:password@redis.example.com:6379
-      description: Redis connection string
-    - value: redis://:s3cret@127.0.0.1:6379
-      description: Redis with localhost
-    - value: redis://:pass123@cache.internal:6380
-      description: Redis on non-default port
+    - value: redis://:password@redis.internal:6379
+      description: Exact 65 probe - complete credential URI without independent config labeling
+    - value: 'REDIS_URL=redis://:S3cretValue@cache.internal:6380'
+      description: Exact 75 probe - credential URI in a Redis-specific config field
+    - value: 'AWS ElastiCache production REDIS_URL=redis://:S3cretValue@cluster.cache.amazonaws.com:6379/0'
+      description: Exact 85 probe - provider config label plus managed-cache topology
   should_not_match:
     - value: redis://redis.example.com:6379
       description: Missing password (no :pass@ section)
@@ -55,6 +55,12 @@ test_cases:
       description: Missing port number
     - value: rediss://:password@redis.example.com:6379
       description: Wrong scheme (rediss instead of redis)
+    - value: 'MEMCACHED_URL=redis://:password@cache.internal:6379'
+      description: Sibling cache config label does not corroborate a Redis URI
+    - value: 'redis://:@cache.internal:6379'
+      description: Malformed connection has an empty password
+    - value: 'Documentation example: AWS ElastiCache REDIS_URL=redis://:changeme@cluster.cache.amazonaws.com:6379/0'
+      description: Documentation placeholder with managed-cache topology is excluded
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -75,11 +81,19 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
+    - confidence_level: 65
+      discovery_only: true
       id_match: Regex_redis_connection
       matches:
-        - ref: Pattern_global_redis_connection_string_label_context
-        - ref: Keyword_global_redis_connection_string_domain_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_redis_connection
+      matches:
+        - ref: Pattern_redis_config_label
         - type: any
           min_matches: 0
           max_matches: 0
@@ -88,7 +102,8 @@ purview:
     - confidence_level: 85
       id_match: Regex_redis_connection
       matches:
-        - ref: Keyword_redis
+        - ref: Pattern_redis_config_label
+        - ref: Pattern_redis_managed_topology
         - type: any
           min_matches: 0
           max_matches: 0
@@ -97,32 +112,10 @@ purview:
   regexes:
     - id: Regex_redis_connection
       pattern: redis://[^:]*:[^@]+@[^:]+:\d+
-    - id: Pattern_global_redis_connection_string_label_context
-      pattern: (?i)\b(?:redis|connection|string)\b
-  keywords:
-    - id: Keyword_redis
-      groups:
-        - match_style: word
-          terms:
-            - redis
-            - cache
-            - connection string
-            - REDIS_URL
-            - REDIS_HOST
-            - credentials
-            - password
-            - authentication
-            - sentinel
-            - elasticache
-      strength: domain
-    - id: Keyword_global_redis_connection_string_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - redis
-            - connection
-            - string
-      strength: domain
+    - id: Pattern_redis_config_label
+      pattern: (?i)\b(?:REDIS_URL|REDIS_CONNECTION_STRING)\s*[=:]
+    - id: Pattern_redis_managed_topology
+      pattern: (?i)(?:\.cache\.amazonaws\.com|\.redis\.cache\.windows\.net|\.upstash\.io)
 risk_description: >-
   This detector captures a redis URI with password, host, and port, reflecting Redis deployments where password-only authentication may be sufficient. A person with network reach can use a live value to read or modify cached data, sessions, queues, or configuration permitted by that Redis account. The usual impact is one cache or datastore instance and its dependent applications, while inaccessible internal hosts, test services, examples, and rotated passwords reduce harm. Risk 8 SENSITIVE is retained for serious application and data compromise; PROTECTED requires evidence of critical shared infrastructure or significant protected content.
 sensitivity_labels:
@@ -134,8 +127,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Replace duplicated high tiers with an individual 65 URI discovery / 75 Redis-config / 85 managed-cache-topology contract and exact-tier, sibling-cache, malformed, and documentation probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1263 without changing detector or package metadata.'

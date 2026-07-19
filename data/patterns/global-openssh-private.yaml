@@ -1,14 +1,21 @@
 schema: testpattern/v1
 name: OpenSSH Private Key Header
 slug: global-openssh-private
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects OpenSSH private key PEM headers in source code, configuration files, and documents. Private keys should never appear in plaintext.
+description: >-
+  Detects OpenSSH private-key armor. The fixed BEGIN line alone is discovery-only;
+  the encoded openssh-key-v1 container magic supports medium confidence and
+  normally wrapped near-header body lines support high confidence.
 operation: >-
-  Reference: https://www.rfc-editor.org/rfc/rfc7468 Corroborative evidence: 7 keywords within 300 characters. Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion
-  logic for template/sample/test text.
+  Regex_openssh_private matches the BEGIN marker. At 75, an adjacent Base64 line
+  must begin with b3BlbnNzaC1rZXktdjE, the encoded openssh-key-v1 NUL-terminated
+  format magic. At 85, three consecutive 70-character OpenSSH armor lines must
+  occur near the header. The 65 header-only tier is discovery-only; enforcing
+  tiers reject explicit template and sample framing and never depend on a distant
+  END marker.
 pattern: '-----BEGIN OPENSSH PRIVATE KEY-----'
 confidence: high
 confidence_justification: >-
@@ -44,22 +51,48 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: '-----BEGIN OPENSSH PRIVATE KEY-----'
-      description: OpenSSH private key PEM header
+      description: Low-tier probe - OpenSSH armor header without key body
     - value: |-
         -----BEGIN OPENSSH PRIVATE KEY-----
-        MIIE...
-      description: OpenSSH key with data following header
+        b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn
+        QQ==
+      description: Medium-tier probe - encoded openssh-key-v1 magic and body without closing armor
     - value: |-
         -----BEGIN OPENSSH PRIVATE KEY-----
-        Proc-Type:
-      description: Encrypted OpenSSH private key header
+        b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn
+        NhAAAAAwEAAQAAAYEAlswKGsdRkrNxMYSRY8MWnZLpaCagzxY7laz2e9py8KzeRWkHbqMV
+        5BP2NLG7qC6NqBXXdWPTIQt4bBRL6qPFQXSjpl7cZ2Ac7528HQUSFd4C9g9um+trhTM3c/
+        4+Kx6oP4keqYyKBXlRe3kyBUhqaGDMuvxFjOISPT0WTWwfGQzBM8V2kDhKdJXg0EqpzprW
+        jFQ72Tz7y1mbmB0KenoPy4YYWJnte9Gc2DkpZJ4Qkzcs0Qf+SSOcbPLFQHXJJ6H1CVkwpS
+        CH/xoQsMzJNyJuL9RT2+b77scMKkmjGe7Izgs9tB0+Er9jyURqIwPK6lmpN+W65KnfwFkg
+        -----END OPENSSH PRIVATE KEY-----
+      description: High-tier probe - realistically long OpenSSH body with footer beyond proximity
   should_not_match:
     - value: '-----BEGIN PUBLIC KEY-----'
       description: Public key, not private
     - value: '-----BEGIN CERTIFICATE-----'
       description: Certificate, not private key
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: |-
+        -----BEGIN OPENSSH PRIVATE KEY-----
+        QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ
+        AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+        BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+      description: Adversarial wrapped Base64 lacks the encoded openssh-key-v1 magic
+    - value: |-
+        -----BEGIN OPENSSH PRIVATE KEY-----
+        PLACEHOLDER
+        -----END OPENSSH PRIVATE KEY-----
+      description: Placeholder body must not enforce
+    - value: |-
+        Documentation example:
+        -----BEGIN OPENSSH PRIVATE KEY-----
+        b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn
+        NhAAAAAwEAAQAAAYEAlswKGsdRkrNxMYSRY8MWnZLpaCagzxY7laz2e9py8KzeRWkHbqMV
+        5BP2NLG7qC6NqBXXdWPTIQt4bBRL6qPFQXSjpl7cZ2Ac7528HQUSFd4C9g9um+trhTM3c/
+        -----END OPENSSH PRIVATE KEY-----
+      description: Documentation quoting realistic wrapped OpenSSH data must not enforce
+    - value: '-----BEGIN PRIVATE KEY-----'
+      description: Sibling PKCS#8 private-key armor is not OpenSSH format
 false_positives:
   - description: PEM-encoded certificates or public keys that use similar header formats
     mitigation: The pattern specifically matches the private key header text, but verify the full PEM block contains actual key material.
@@ -89,58 +122,38 @@ purview:
     - confidence_level: 85
       id_match: Regex_openssh_private
       matches:
-        - ref: Pattern_global_openssh_private_label_context
-        - ref: Keyword_global_openssh_private_domain_context
+        - ref: Evidence_openssh_v1_magic
+        - ref: Evidence_openssh_multiline_body
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
+    - confidence_level: 75
       id_match: Regex_openssh_private
       matches:
-        - ref: Keyword_openssh_private
+        - ref: Evidence_openssh_v1_magic
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_openssh_private
   regexes:
     - id: Regex_openssh_private
       pattern: '-----BEGIN OPENSSH PRIVATE KEY-----'
-    - id: Pattern_global_openssh_private_label_context
-      pattern: (?i)\b(?:openssh\s+private\s+key\s+header|openssh|private|key|header)\b
-  keywords:
-    - id: Keyword_openssh_private
-      groups:
-        - match_style: word
-          terms:
-            - private key
-            - openssh
-            - ssh key
-            - key file
-            - id_rsa
-            - id_ed25519
-            - id_ecdsa
-            - text: PEM
-              case_sensitive: true
-            - cryptographic
-            - ssh-keygen
-            - authorized_keys
-      strength: specific
-    - id: Keyword_global_openssh_private_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - openssh private key header
-            - openssh
-            - private
-            - key
-            - header
-      strength: domain
+    - id: Evidence_openssh_v1_magic
+      pattern: '(?:\r?\n)b3BlbnNzaC1rZXktdjE[A-Za-z0-9+/]{45,61}={0,2}(?:\r?\n)'
+    - id: Evidence_openssh_multiline_body
+      pattern: '(?:\r?\n)(?:[A-Za-z0-9+/]{70}\r?\n){3}'
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Independent-review blocker remediation: keep header-only discovery at 65, require the encoded openssh-key-v1 magic at 75, and require three near-header 70-character armor lines at 85. A long RSA fixture proves enforcement while the footer is beyond Purview proximity; adversarial wrapped-Base64, placeholder, documentation, and sibling-container negatives protect rejection.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1258 without changing detector or package metadata.'

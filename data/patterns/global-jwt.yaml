@@ -1,15 +1,23 @@
 schema: testpattern/v1
 name: JWT
 slug: global-jwt
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects JWT patterns.
+description: >-
+  Detects JSON Web Token candidates with three Base64url segments. A generic
+  encoded-JSON candidate is discovery-only; a standard encoded algorithm header
+  plus encoded JSON payload enforces at medium confidence, and HTTP or session
+  transport binding raises the result to high confidence.
 operation: >-
-  Reference: https://jwt.io/ Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion logic for
-  template/sample/test text.
-pattern: \beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\b
+  Regex_jwt_candidate requires three non-empty Base64url segments beginning with
+  encoded JSON. The 65 tier inventories that shape. The 75 tier additionally
+  requires the standard encoded "alg" header prefix and an explicit JWT field
+  label. The 85 tier requires an encoded JSON payload too and binds that fuller
+  token structure to an Authorization, Cookie, or Set-Cookie transport field.
+  Enforcing tiers reject template and placeholder text.
+pattern: \beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{3,}\b
 confidence: high
 confidence_justification: >-
   High confidence: structurally constrained pattern with corroborative keyword support reduces false positive rates significantly. Added context gating and exclusion rules improve precision and reduce
@@ -44,21 +52,25 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U
-      description: Standard JWT token
-    - value: eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UifQ.abc123-_def456
-      description: RS256 JWT token
-    - value: eyJhbGciOiJub25lIn0.eyJ0ZXN0IjoiMSJ9.c2ln
-      description: JWT token with minimal signature
+    - value: eyJmb28iOiJiYXIifQ.eyJzdWIiOiIxMjMifQ.c2lnbmF0dXJl
+      description: Low-tier probe - three encoded segments without a standard alg header
+    - value: 'JWT: eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UifQ.abc123-_def456'
+      description: Medium-tier probe - labelled JWT with standard header and encoded payload
+    - value: 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U'
+      description: High-tier probe - structurally plausible JWT bound to an Authorization header
   should_not_match:
     - value: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0
       description: Only 2 segments instead of 3
     - value: notJWT.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature
       description: First segment does not start with eyJ
-    - value: eyJ.eyJ.
+    - value: eyJ.eyJ.sig
       description: Segments too short to be valid JWT
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.REDACTED'
+      description: Placeholder signature in a transport-bound JWT
+    - value: 'Documentation example: Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln'
+      description: Documentation quoting a structurally valid JWT must not enforce
+    - value: 'session=YWJjZGVm.Z2hpamts.bW5vcHFy'
+      description: Sibling three-segment cookie value does not begin with encoded JSON
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -88,40 +100,57 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_jwt
+      id_match: Regex_jwt_candidate
       matches:
-        - ref: Pattern_global_jwt_label_context
-        - ref: Keyword_global_jwt_domain_context
+        - ref: Evidence_jwt_standard_header
+        - ref: Evidence_jwt_encoded_payload
+        - ref: Evidence_jwt_transport
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_placeholder_jwt
+    - confidence_level: 75
+      id_match: Regex_jwt_candidate
+      matches:
+        - ref: Evidence_jwt_standard_header
+        - ref: Evidence_jwt_label
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_placeholder_jwt
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_jwt
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+      id_match: Regex_jwt_candidate
   regexes:
-    - id: Regex_jwt
-      pattern: \beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\b
-    - id: Pattern_global_jwt_label_context
-      pattern: (?i)\b(?:jwt)\b
+    - id: Regex_jwt_candidate
+      pattern: \beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{3,}\b
+    - id: Evidence_jwt_standard_header
+      pattern: \beyJhbGciOiJ[A-Za-z0-9_-]{2,24}
+    - id: Evidence_jwt_encoded_payload
+      pattern: \.eyJ[A-Za-z0-9_-]{6,}\.
+    - id: Evidence_jwt_transport
+      pattern: '(?i)\bAuthorization\s*:\s*Bearer\s+|(?:Cookie|Set-Cookie)\s*:\s*[A-Za-z0-9_.-]+\s*='
+    - id: Evidence_jwt_label
+      pattern: '(?i)\bJWT\s*[:=]\s*'
   keywords:
-    - id: Keyword_global_jwt_domain_context
+    - id: Evidence_placeholder_jwt
       groups:
-        - match_style: word
+        - match_style: string
           terms:
-            - text: jwt
-              case_sensitive: true
-      strength: domain
+            - REDACTED
+            - PLACEHOLDER
+            - your-jwt-here
+            - example-token
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: tighten the candidate shape and separate encoded-JSON discovery, standard JWT structure, and transport-bound high confidence; add exact-tier and malformed, placeholder, documentation, and sibling-token negatives.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1247 without changing detector or package metadata.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Individual Healthcare Identifier
 slug: au-individual-healthcare-identifier
-version: 1.4.1
+version: 1.4.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -41,11 +41,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: '8003600000000001'
-      description: IHI with standard 800360 prefix
+      description: Exact 65 discovery probe with standard 800360 prefix and no context
     - value: '8003601234567890'
       description: IHI with typical digit sequence
     - value: '8003609999999999'
       description: IHI upper range
+    - value: 'Patient identifier 8003601234567890 in the clinical record'
+      description: Exact 75 probe with clinical context but no explicit IHI label
+    - value: 'Patient IHI 8003601234567890 in the clinical record'
+      description: Exact 85 probe with explicit IHI terminology and clinical context
   should_not_match:
     - value: '8003610000000001'
       description: Wrong prefix (800361 instead of 800360)
@@ -53,6 +57,8 @@ test_cases:
       description: Too few trailing digits (9 instead of 10)
     - value: '80036000000000020'
       description: Too many trailing digits (11 instead of 10)
+    - value: 'Invoice tracking number 8003601234567890'
+      description: Valid-shaped non-health number must remain discovery-only
 false_positives:
   - description: Long numeric sequences in unrelated contexts (tracking numbers, serial codes) matching the Individual Healthcare Identifier format
     mitigation: Use corroborative keywords and, where available, checksum validation to filter false matches.
@@ -85,30 +91,37 @@ purview:
       matches:
         - ref: Evidence_ihi_terms
         - type: any
-          min_matches: 2
+          min_matches: 1
           children:
             - ref: Evidence_clinical_context
             - ref: Evidence_health_system
-      exclusion:
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
       id_match: Pattern_au_ihi
       matches:
-        - ref: Evidence_ihi_terms
-    - confidence_level: 65
-      id_match: Pattern_au_ihi
-      matches:
-        - ref: Evidence_clinical_context
-      exclusion:
+        - type: any
+          min_matches: 1
+          children:
+            - ref: Evidence_clinical_context
+            - ref: Evidence_health_system
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_non_health_exclusion
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_au_ihi
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
   regexes:
     - id: Pattern_au_ihi
       pattern: \b800360\d{10}\b
@@ -160,8 +173,11 @@ purview:
             - serial
       strength: noise
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: make the bare 800360 structure discovery-only at 65, require independent clinical or health-system context at 75, add the explicit IHI label at 85, and add exact-tier plus non-health numeric probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 549 without changing detector or package metadata.'

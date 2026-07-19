@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: NuGet API Key
 slug: global-nuget-api-key
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -39,16 +39,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: oy2abcdefghijklmnopqrstuvwxyz0123456789abcdefg
-      description: NuGet API key, oy2 prefix + 43 base32 chars
-    - value: 'NUGET_API_KEY=oy2mnbvcxzlkjhgfdsapoiuytrewq0123456789abcdefg'
-      description: Labelled NuGet key in an env assignment
-    - value: oy2zyxwvutsrqponmlkjihgfedcba0987654321zyxwvut
-      description: Another NuGet key body
+      description: Exact 65 probe - fixed key structure without independent NuGet context
+    - value: 'NuGet package push credential oy2zyxwvutsrqponmlkjihgfedcba0987654321zyxwvut'
+      description: Exact 75 probe - key with NuGet package-publish context
+    - value: 'NuGet.org package publish secret NUGET_API_KEY=oy2mnbvcxzlkjhgfdsapoiuytrewq0123456789abcdefg'
+      description: Exact 85 probe - NuGet.org context plus canonical API-key assignment
   should_not_match:
     - value: oy2abcdefghijklmnopqrstuvwxyz
       description: Too short to be a valid NuGet key
     - value: oy3abcdefghijklmnopqrstuvwxyz0123456789abcdefg
       description: Wrong prefix (oy3 instead of oy2)
+    - value: 'NPM_TOKEN=oy2abcdefghijklmnopqrstuvwxyz0123456789abcdefg'
+      description: Sibling package-registry label does not corroborate a NuGet key
+    - value: 'Documentation example: NuGet.org package NUGET_API_KEY=oy2abcdefghijklmnopqrstuvwxyz0123456789abcdefg'
+      description: Documentation example containing a valid-shaped key is excluded
     - value: run dotnet nuget push with your nuget.org api key
       description: Prose mention without a token value
 false_positives:
@@ -70,9 +74,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_nuget_api_key
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_nuget_api_key
+      matches:
+        - ref: Keyword_nuget_publish_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_nuget_api_key
+      matches:
+        - ref: Keyword_nuget_publish_context
+        - ref: Pattern_nuget_key_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_nuget_api_key
+      pattern: (?<![A-Za-z0-9])oy2[a-z0-9]{43}(?![A-Za-z0-9])
+    - id: Pattern_nuget_key_assignment
+      pattern: (?i)\b(?:NUGET_API_KEY|NUGET_AUTH_TOKEN)\s*[=:]
+  keywords:
+    - id: Keyword_nuget_publish_context
+      groups:
+        - match_style: string
+          terms:
+            - NuGet.org package
+            - NuGet package push
+            - dotnet nuget push
+            - NuGet gallery publish
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 NuGet-publish / 85 canonical-assignment Purview contract with exact-tier, sibling-registry, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1552 without changing detector or package metadata.'

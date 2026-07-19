@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: QLD Bond Loan Application
 slug: au-qld-bond-loan-application
-version: 1.3.1
+version: 1.3.2
 type: keyword_list
 pattern_class: concept
 description: Detects QLD Bond Loan applications for rental assistance and financial hardship support.
@@ -27,8 +27,14 @@ data_categories:
   - government
 test_cases:
   should_match:
+    - value: Bond loan application received
+      description: Exact 65 discovery probe with an application phrase and no applicant details
+    - value: Bond loan application due to financial hardship
+      description: Exact 75 probe with applicant-need context
+    - value: Department of Housing bond loan application due to financial hardship
+      description: Exact 85 probe with applicant need and QLD housing provenance
     - value: Bond loan application for rental bond assistance due to financial hardship
-      description: Test match 1
+      description: Bond assistance application arising from hardship
     - value: QLD RTA bond loan with rental grant and tenancy support
       description: Test match 2
     - value: Bond assistance application for rental arrears and housing assistance
@@ -38,6 +44,8 @@ test_cases:
       description: Non-match 1
     - value: James Bond movie release
       description: Non-match 2
+    - value: Rental assistance application software demo
+      description: Product-demo wording must remain discovery-only
 false_positives:
   - description: Government bonds or entertainment references.
     mitigation: Require rental or tenancy keywords alongside bond loan.
@@ -64,22 +72,48 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_bond_loan
+      id_match:
+        type: any
+        ids:
+          - Pattern_bond_loan
+          - Pattern_rental_assistance
       matches:
-        - ref: Evidence_bond_assistance
+        - ref: Evidence_applicant_need_context
         - ref: Evidence_qld_housing
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_rental_assistance
+      id_match:
+        type: any
+        ids:
+          - Pattern_bond_loan
+          - Pattern_rental_assistance
       matches:
-        - ref: Evidence_qld_government
+        - ref: Evidence_applicant_need_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Pattern_bond_loan
+          - Pattern_rental_assistance
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
   regexes:
     - id: Pattern_bond_loan
-      pattern: (?i)\b(?:bond\s+loan\s+(?:application|agreement)|rental\s+(?:assistance|grant)\s+application)\b
+      pattern: (?i)\b(?:bond\s+loan(?:\s+(?:application|agreement))?|bond\s+assistance\s+application|rental\s+(?:assistance|grant)\s+application)\b
     - id: Pattern_rental_assistance
       pattern: (?i)\b(?:tenant\s+support|rental\s+subsidy|housing\s+assistance\s+(?:program|scheme))\b
   keywords:
@@ -117,9 +151,25 @@ purview:
             - Information Privacy Act 2009
             - Queensland Privacy Principles
       strength: specific
+    - id: Evidence_applicant_need_context
+      groups:
+        - match_style: word
+          terms:
+            - financial hardship
+            - rental arrears
+            - tenancy support
+            - household income
+            - applicant
+            - lease
+            - property address
+            - rental bond assistance
+      strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: keep bond/rental-assistance application phrases at 65 discovery, require applicant hardship or tenancy details at 75 and QLD housing provenance at 85, with exact-tier and software-demo probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 574 without changing detector or package metadata.'

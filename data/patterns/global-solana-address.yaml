@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Solana Address
 slug: global-solana-address
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -49,11 +49,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: '11111111111111111111111111111111'
-      description: Solana System Program address (documented canonical address, 32 chars — lower bound)
+      description: Exact 65 discovery probe using the documented Solana System Program address
     - value: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'
       description: SPL Token-2022 program address (documented canonical program id, 43 chars)
     - value: 'BPFLoader2111111111111111111111111111111111'
       description: BPF Loader program address (documented canonical program id, 43 chars)
+    - value: 'Solana address TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'
+      description: Exact 75 probe with explicit Solana context
+    - value: 'Solana withdrawal address TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'
+      description: Exact 85 probe with chain-specific and transfer-destination context
   should_not_match:
     - value: '1111111111111111111111111111111'
       description: 31 chars — below the 32-char minimum
@@ -63,6 +67,8 @@ test_cases:
       description: Hyphen breaks the run so no contiguous 32-44 char base58 body exists — rejected
     - value: 'solana wallet address example placeholder'
       description: Template/placeholder context should be excluded even when domain anchor words are present
+    - value: 'Database key 11111111111111111111111111111111'
+      description: Prefixless non-wallet key must remain discovery-only
 false_positives:
   - description: >-
       Prefix-less base58 32-44 char tokens are the highest-collision format in this family: random
@@ -93,7 +99,7 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: crypto-wallet-context
       as: Keyword_cryptocurrency
@@ -102,10 +108,29 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_solana_address
+      matches:
+        - ref: Keyword_solana_context
+        - ref: Keyword_transfer_destination_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_solana_address
       matches:
-        - ref: Keyword_cryptocurrency
+        - ref: Keyword_solana_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_solana_address
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -114,9 +139,34 @@ purview:
   regexes:
     - id: Regex_solana_address
       pattern: '\b[1-9A-HJ-NP-Za-km-z]{32,44}\b'
+  keywords:
+    - id: Keyword_solana_context
+      groups:
+        - match_style: word
+          terms:
+            - solana
+            - solana address
+            - solana wallet
+            - text: SOL
+              case_sensitive: true
+      strength: domain
+    - id: Keyword_transfer_destination_context
+      groups:
+        - match_style: word
+          terms:
+            - withdrawal address
+            - deposit address
+            - destination wallet
+            - recipient address
+            - pay to
+            - transfer to
+      strength: specific
 created: '2026-07-07'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: keep prefixless Solana-shaped values at 65 discovery, require explicit chain context at 75 and additional transfer-destination evidence at 85, with exact-tier and database-key probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2129 without changing detector or package metadata.'

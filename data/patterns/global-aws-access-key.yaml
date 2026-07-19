@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: AWS Access Key
 slug: global-aws-access-key
-version: 1.3.1
+version: 1.3.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -44,12 +44,12 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: AKIAIOSFODNN7EXAMPLE
-      description: AWS access key with AKIA prefix
-    - value: ASIAIOSFODNN7EXAMPLE
-      description: AWS temporary access key (ASIA)
-    - value: AGPAIOSFODNN7EXAMPLE
-      description: AWS group key (AGPA)
+    - value: AGPA7M4N2P9Q6R8T3V5X
+      description: Exact 65 probe - structurally valid AWS identifier without independent IAM context
+    - value: 'AWS access key ID: AKIA9Z8Y7X6W5V4U3T2S'
+      description: Exact 75 probe - access key identifier with an AWS-specific field label
+    - value: "AWS IAM credential\nAWS_ACCESS_KEY_ID=ASIA6R5T4Y3U2I1O9P8L\nAWS_SECRET_ACCESS_KEY=Z9pL2mN7qR4sT8vW1xY5aB3cD6eF0gH2iJ4kL7mN"
+      description: Exact 85 probe - access key ID independently paired with a populated secret key
   should_not_match:
     - value: XKIAIOSFODNN7EXAMPLE
       description: Invalid prefix (XKIA instead of AKIA/ASIA/etc.)
@@ -57,6 +57,10 @@ test_cases:
       description: Too few characters after prefix (15 instead of 16)
     - value: AKIAIOSFODNN7EXAMP!E
       description: Contains special character (!) not in allowed set
+    - value: 'AZURE_CLIENT_ID=AKIA9Z8Y7X6W5V4U3T2S'
+      description: Sibling cloud-provider assignment does not provide AWS corroboration
+    - value: 'Documentation example: AWS IAM credential AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+      description: AWS documentation placeholder pair is excluded
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -77,11 +81,19 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
+    - confidence_level: 65
+      discovery_only: true
       id_match: Regex_aws_access_key
       matches:
-        - ref: Pattern_global_aws_access_key_label_context
-        - ref: Keyword_global_aws_access_key_domain_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_aws_access_key
+      matches:
+        - ref: Keyword_aws_identity_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -90,7 +102,8 @@ purview:
     - confidence_level: 85
       id_match: Regex_aws_access_key
       matches:
-        - ref: Keyword_aws_access_key
+        - ref: Keyword_aws_identity_context
+        - ref: Pattern_aws_secret_key_pair
         - type: any
           min_matches: 0
           max_matches: 0
@@ -99,34 +112,18 @@ purview:
   regexes:
     - id: Regex_aws_access_key
       pattern: \b(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b
-    - id: Pattern_global_aws_access_key_label_context
-      pattern: (?i)\b(?:aws\s+access\s+key|aws|access|key)\b
+    - id: Pattern_aws_secret_key_pair
+      pattern: (?i)\bAWS_SECRET_ACCESS_KEY\s*[=:]\s*[A-Za-z0-9/+=]{32,64}
   keywords:
-    - id: Keyword_aws_access_key
+    - id: Keyword_aws_identity_context
       groups:
-        - match_style: word
+        - match_style: string
           terms:
-            - aws
-            - access key
-            - access_key
-            - aws_access_key_id
-            - AKIA
-            - text: IAM
-              case_sensitive: true
-            - secret key
-            - credentials
-            - amazon web services
-            - api key
+            - AWS access key ID
+            - AWS IAM credential
+            - Amazon IAM access key
+            - AWS security credential
       strength: specific
-    - id: Keyword_global_aws_access_key_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - aws access key
-            - aws
-            - access
-            - key
-      strength: domain
 risk_description: >-
   This regex detects an AWS access key ID with a recognized prefix and fixed identifier length, not the paired secret access key required to sign requests. Disclosure can reveal that an AWS principal exists and can help correlate logs, repositories, or a separately leaked secret, but the identifier alone cannot authenticate. The immediate impact on the AWS account owner is therefore low and usually reversible, with material additional credential and account context needed for misuse. Risk 5 OFFICIAL recognizes the identifier's security relevance; a matched secret pair or session credential would justify a higher classification.
 sensitivity_labels:
@@ -138,8 +135,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Replace duplicated high tiers with an individual 65 discovery / 75 AWS-labelled / 85 access-key-and-secret-pair contract and exact-tier adversarial probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1214 without changing detector or package metadata.'

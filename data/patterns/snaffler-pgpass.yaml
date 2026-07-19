@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: PostgreSQL Password File Entry
 slug: snaffler-pgpass
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -43,19 +43,25 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: "db.internal.corp:5432:billing:svc_billing:Pg$ecret2024"
-      description: Real pgpass entry with production host
-    - value: "localhost:5432:appdb:appuser:MyP@ssw0rd123"
-      description: Local postgres connection string
-    - value: "pg.prod.example.com:5432:*:postgres:SuperSecret!"
-      description: Wildcard database name in pgpass
-    - value: "db.example.com:*:*:postgres:S3cretPg"
-      description: Wildcard port and database in pgpass entry (Snaffler parity)
+    - value: "db.internal.corp:15432:billing:svc_billing:Pg$ecret2024"
+      description: Exact 65 probe - five-field candidate without canonical port or PostgreSQL identity
+    - value: "pg.prod.internal:5432:billing:postgres:SuperSecret!"
+      description: Exact 75 probe - canonical PostgreSQL port and identity in a five-field entry
+    - value: ".pgpass PostgreSQL password file\npg.prod.internal:5432:billing:postgres:SuperSecret!"
+      description: Exact 85 probe - balanced structure independently corroborated by pgpass file context
+    - value: "db.internal:*:*:postgres:S3cretPg"
+      description: Wildcard pgpass form retained as a discovery candidate
   should_not_match:
     - value: "This is a plain text file with no colon-separated credential fields"
       description: Plain text, no colon structure
     - value: "server host database user password"
       description: Space-separated fields, not colon-separated
+    - value: "event:5432:worker:ok:complete"
+      description: Five-field application log with the PostgreSQL port but no database identity
+    - value: "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+      description: IPv6 address is not corroborated as a pgpass credential
+    - value: "Documentation example: .pgpass PostgreSQL password file db.internal:5432:app:postgres:changeme"
+      description: Documentation placeholder with complete pgpass context is excluded
 false_positives:
   - description: Log entries or configuration files using colon-separated fields for non-credential data such as CSV records, IPv6 addresses, or structured logging.
     mitigation: Require proximity to pgpass-specific terms (pgpass, postgres, 5432) to limit matches to actual database credential files.
@@ -67,16 +73,26 @@ exports:
 scope: specific
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_snaffler_pgpass
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_snaffler_pgpass
       matches:
-        - ref: Keyword_snaffler_pgpass_evidence
+        - ref: Pattern_snaffler_pgpass_port
+        - ref: Keyword_snaffler_pgpass_postgres_identity
         - type: any
           min_matches: 0
           max_matches: 0
@@ -85,7 +101,9 @@ purview:
     - confidence_level: 85
       id_match: Regex_snaffler_pgpass
       matches:
-        - ref: Keyword_snaffler_pgpass_evidence
+        - ref: Pattern_snaffler_pgpass_port
+        - ref: Keyword_snaffler_pgpass_postgres_identity
+        - ref: Keyword_snaffler_pgpass_file_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -94,18 +112,30 @@ purview:
   regexes:
     - id: Regex_snaffler_pgpass
       pattern: '[^\s:]{1,64}:(?:\d{1,5}|\*):[^\s:]{1,64}:[^\s:]{1,64}:[^\s:]{1,128}'
+    - id: Pattern_snaffler_pgpass_port
+      pattern: ':5432:'
   keywords:
-    - id: Keyword_snaffler_pgpass_evidence
+    - id: Keyword_snaffler_pgpass_postgres_identity
       groups:
         - match_style: string
           terms:
-            - pgpass
-            - 5432
-            - localhost
             - postgres
+            - PostgreSQL
+      strength: domain
+    - id: Keyword_snaffler_pgpass_file_context
+      groups:
+        - match_style: string
+          terms:
+            - .pgpass
+            - PGPASSFILE
+            - PostgreSQL password file
+      strength: specific
 created: '2026-06-26'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 PostgreSQL-port-and-identity / 85 pgpass-file contract with exact-tier, log-record, IPv6, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2056 without changing detector or package metadata.'

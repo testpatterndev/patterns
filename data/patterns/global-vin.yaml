@@ -1,14 +1,17 @@
 schema: testpattern/v1
 name: Vehicle Identification Number
 slug: global-vin
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects Vehicle Identification Number patterns. Excludes I, O, Q characters
 operation: >-
-  Checksum: Check digit at position 9 (weights: 8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2) (NOT enforced in this regex-only pattern; structural detection only). Excludes I, O, Q characters. Reference: https://en.wikipedia.org/wiki/Vehicle_identification_number Corroborative
-  evidence: 4 keywords within 300 characters. Keyword lists: pii-civic-credentials. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  A 17-character VIN shape excluding I, O, and Q is discovery-only at 65. An explicit VIN, vehicle
+  identification number, or chassis-number label raises it to 75. The 85 tier additionally requires a
+  vehicle-registration, asset-register, owner, make/model, odometer, chassis-record, or fleet-inventory
+  context. Enforcing tiers reject public decoders, brochures, listings, templates, and examples. The
+  position-9 checksum remains documented but is not enforced by this regex-only detector.
 pattern: \b[A-HJ-NPR-Z0-9]{17}\b
 confidence: high
 confidence_justification: >-
@@ -39,11 +42,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 1HGBH41JXMN109186
-      description: Honda Civic VIN (excludes I, O, Q)
-    - value: WVWZZZ3CZWE123456
-      description: Volkswagen Golf VIN
-    - value: 5YJSA1E26MF123456
-      description: Tesla Model S VIN
+      description: Low-tier probe - VIN shape without a label
+    - value: 'VIN: WVWZZZ3CZWE123456'
+      description: Medium-tier probe - explicitly labelled VIN without a vehicle record
+    - value: 'Vehicle registration record - VIN: 5YJSA1E26MF123456; registered owner and make and model verified.'
+      description: High-tier probe - VIN label plus vehicle-record context
   should_not_match:
     - value: 1HGBH41JXMN10918
       description: Only 16 characters instead of 17
@@ -53,6 +56,10 @@ test_cases:
       description: Contains letter I (excluded from VIN)
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Public VIN decoder: VIN 1HGBH41JXMN109186'
+      description: Public decoder contains a complete labelled VIN
+    - value: 'Template example: vehicle registration record VIN 5YJSA1E26MF123456 with registered owner and make and model.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Technical identifiers appearing in public documentation, network configuration guides, or example configurations without representing actual infrastructure.
     mitigation: Cross-reference with known documentation patterns and reserved address ranges. Require proximity to infrastructure-specific context.
@@ -92,20 +99,25 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_vin_context
     - confidence_level: 75
       id_match: Regex_vin
       matches:
-        - ref: Keyword_vehicle
+        - ref: Pattern_global_vin_label_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_vin_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_vin
   regexes:
     - id: Regex_vin
       pattern: \b[A-HJ-NPR-Z0-9]{17}\b
     - id: Pattern_global_vin_label_context
-      pattern: (?i)\b(?:vehicle\s+identification\s+number|vehicle|vin)\b
+      pattern: (?i)\b(?:vehicle\s+identification\s+number|chassis\s+number|vin)\b
   keywords:
     - id: Keyword_vehicle
       groups:
@@ -127,16 +139,32 @@ purview:
       groups:
         - match_style: word
           terms:
-            - vehicle identification number
-            - vehicle
-            - vin
+            - vehicle registration record
+            - asset register
+            - registered owner
+            - make and model
+            - odometer
+            - chassis record
+            - fleet inventory
       strength: domain
+    - id: Keyword_public_vin_context
+      groups:
+        - match_style: word
+          terms:
+            - public VIN decoder
+            - manufacturer brochure
+            - public vehicle listing
+            - documentation example
+      strength: exclusion
   filters:
     - id: Guard_vin_same_digits
       type: AllDigitsSameFilter
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Profile quality: add bare-shape discovery, explicit-VIN-label medium, and vehicle-record high tiers; reject public decoders/templates and add exact-tier adversarial probes.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1274 without changing detector or package metadata.'

@@ -1,12 +1,20 @@
 schema: testpattern/v1
 name: Bearer
 slug: global-bearer-token
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects Bearer patterns.
-operation: 'Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.'
+description: >-
+  Detects JWT-shaped values presented with the Bearer authentication scheme. A
+  bare scheme/value pair is discovery-only; an Authorization header enforces at
+  medium confidence and a complete HTTP request or response context reaches high.
+operation: >-
+  Regex_bearer_token recognizes Bearer plus three Base64url-style segments. The
+  65 tier inventories the bare credential shape. The 75 tier requires an HTTP
+  Authorization header, while the 85 tier additionally requires request/response
+  framing such as a request line, Host header, or HTTP status line. Enforcing tiers
+  reject explicit templates and placeholder token values.
 pattern: \b[Bb]earer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b
 confidence: high
 confidence_justification: >-
@@ -43,11 +51,14 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.reCjcZ0-m3Q
-      description: Bearer token with JWT
-    - value: bearer eyJhbGciOiJub25lIn0.eyJ0ZXN0IjoiMSJ9.abc
-      description: Lowercase bearer with JWT
-    - value: Bearer eyJ0eXAiOiJKV1QifQ.eyJpZCI6MSwiYWRtaW4iOnRydWV9.sig
-      description: Bearer token with type claim
+      description: Low-tier probe - bare Bearer credential without transport framing
+    - value: 'Authorization: bearer eyJhbGciOiJub25lIn0.eyJ0ZXN0IjoiMSJ9.abc'
+      description: Medium-tier probe - JWT-shaped value in an Authorization header
+    - value: |-
+        GET /admin HTTP/1.1
+        Host: api.example.org
+        Authorization: Bearer eyJ0eXAiOiJKV1QifQ.eyJpZCI6MSwiYWRtaW4iOnRydWV9.sig
+      description: High-tier probe - Authorization header inside a complete HTTP request
   should_not_match:
     - value: Bearer single-segment-token
       description: Only one segment instead of three dot-separated
@@ -55,8 +66,12 @@ test_cases:
       description: Wrong keyword (Token instead of Bearer)
     - value: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0
       description: Only two dot-separated segments instead of three
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.REDACTED'
+      description: Placeholder token in an otherwise valid Authorization header
+    - value: 'Documentation example: Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc'
+      description: Documentation quoting a valid header must not enforce
+    - value: 'Authorization: Basic dXNlcjpwYXNz'
+      description: Sibling HTTP Basic authorization scheme
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -78,52 +93,43 @@ purview:
     - confidence_level: 85
       id_match: Regex_bearer_token
       matches:
-        - ref: Pattern_global_bearer_token_label_context
-        - ref: Keyword_global_bearer_token_domain_context
+        - ref: Evidence_authorization_header
+        - ref: Evidence_http_message
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
+            - Evidence_placeholder_token
+    - confidence_level: 75
       id_match: Regex_bearer_token
       matches:
-        - ref: Keyword_bearer_token
+        - ref: Evidence_authorization_header
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_placeholder_token
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_bearer_token
   regexes:
     - id: Regex_bearer_token
       pattern: \b[Bb]earer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b
-    - id: Pattern_global_bearer_token_label_context
-      pattern: (?i)\b(?:bearer|token)\b
+    - id: Evidence_authorization_header
+      pattern: '(?i)\bAuthorization\s*:\s*Bearer\s+'
+    - id: Evidence_http_message
+      pattern: '(?i)\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+/[^\r\n]{0,160}\s+HTTP/[12]\.[01]\b|\bHTTP/[12]\.[01]\s+\d{3}\b|\bHost\s*:\s*[A-Za-z0-9.-]+'
   keywords:
-    - id: Keyword_bearer_token
+    - id: Evidence_placeholder_token
       groups:
-        - match_style: word
+        - match_style: string
           terms:
-            - bearer
-            - authorization
-            - auth token
-            - text: JWT
-              case_sensitive: true
-            - access token
-            - token
-            - OAuth
-            - text: API
-              case_sensitive: true
-            - header
-            - authentication
-      strength: domain
-    - id: Keyword_global_bearer_token_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - bearer
-            - token
-      strength: domain
+            - REDACTED
+            - PLACEHOLDER
+            - your-token-here
+            - example-token
 risk_description: >-
   This pattern matches the literal Bearer scheme followed by a three-segment JWT-shaped token, making the hit a presented authentication credential rather than merely a token identifier. A recipient may replay an active token against its issuing service and exercise the subject's current scopes until expiry or revocation. The normal impact is limited to one user, application identity, or session and the resources authorized to it, while samples, expired tokens, and tokens rejected by the target cause no access. Risk 8 SENSITIVE reflects potentially serious session or API compromise; PROTECTED would require confirmed high privilege, broad scope, or critical-service authority.
 sensitivity_labels:
@@ -135,8 +141,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: separate bare Bearer discovery, Authorization-header enforcement, and full HTTP-message high confidence; add exact-tier and malformed, placeholder, documentation, and sibling-scheme negatives.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1218 without changing detector or package metadata.'

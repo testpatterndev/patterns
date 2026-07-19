@@ -1,12 +1,17 @@
 schema: testpattern/v1
 name: Kubernetes Internal Service URL
 slug: global-kubernetes-service-url
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects Kubernetes Internal Service URL patterns.
-operation: 'Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.'
+operation: >-
+  A complete svc.cluster.local HTTP(S) URL is discovery-only at 65. Explicit Kubernetes-service,
+  ClusterIP, kubectl, namespace-manifest, or service-discovery context raises it to 75. The 85 tier
+  additionally requires a production workload, deployment manifest, Helm values, ConfigMap, service
+  account, network policy, or ingress-controller context. Enforcing tiers reject public documentation,
+  tutorials, sample manifests, example configurations, and templates.
 pattern: https?://[a-z0-9][a-z0-9.\-]{1,200}\.svc\.cluster\.local(?::\d+)?
 confidence: medium
 confidence_justification: >-
@@ -43,11 +48,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: http://my-service.default.svc.cluster.local
-      description: Kubernetes service URL in default namespace
-    - value: https://api-gateway.production.svc.cluster.local:8443
-      description: Kubernetes service URL with port
-    - value: http://redis-master.cache.svc.cluster.local:6379
-      description: Kubernetes Redis service URL
+      description: Low-tier probe - internal service URL without explicit Kubernetes context
+    - value: 'Kubernetes service endpoint: http://redis-master.cache.svc.cluster.local:6379'
+      description: Medium-tier probe - explicit Kubernetes-service label without deployment context
+    - value: 'Production deployment manifest: Kubernetes service endpoint https://api-gateway.production.svc.cluster.local:8443 in Helm values and ConfigMap.'
+      description: High-tier probe - service label plus live deployment context
   should_not_match:
     - value: https://my-service.default.svc.cluster.remote
       description: Wrong domain suffix (.remote instead of .local)
@@ -57,6 +62,10 @@ test_cases:
       description: Wrong scheme (ftp instead of http/https)
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Public documentation: Kubernetes service endpoint http://my-service.default.svc.cluster.local'
+      description: Public documentation contains a complete labelled service URL
+    - value: 'Template example: production deployment manifest Kubernetes service endpoint https://api-gateway.production.svc.cluster.local:8443 in Helm values.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -79,22 +88,23 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 85
       id_match: Regex_kubernetes_service_url
       matches:
-        - ref: Pattern_global_kubernetes_service_url_label_context
+        - ref: Keyword_kubernetes_service_url
         - ref: Keyword_global_kubernetes_service_url_domain_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_technical_context
     - confidence_level: 75
       id_match: Regex_kubernetes_service_url
       matches:
@@ -104,15 +114,10 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_technical_context
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_kubernetes_service_url
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
   regexes:
     - id: Regex_kubernetes_service_url
       pattern: https?://[a-z0-9][a-z0-9.\-]{1,200}\.svc\.cluster\.local(?::\d+)?
@@ -123,32 +128,41 @@ purview:
       groups:
         - match_style: word
           terms:
-            - kubernetes
-            - k8s
-            - cluster
-            - service URL
-            - namespace
-            - pod
-            - container
-            - deployment
+            - Kubernetes service
+            - K8s service
+            - ClusterIP
             - kubectl
-            - ingress
-            - endpoint
-            - microservice
+            - namespace manifest
+            - service endpoint
+            - service discovery
       strength: domain
     - id: Keyword_global_kubernetes_service_url_domain_context
       groups:
         - match_style: word
           terms:
-            - kubernetes internal service url
-            - kubernetes
-            - internal
-            - service
-            - url
+            - production workload
+            - deployment manifest
+            - Helm values
+            - ConfigMap
+            - service account
+            - network policy
+            - ingress controller
       strength: domain
+    - id: Keyword_public_technical_context
+      groups:
+        - match_style: word
+          terms:
+            - public documentation
+            - tutorial
+            - sample manifest
+            - example configuration
+      strength: exclusion
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: replace duplicate medium paths with URL discovery, explicit Kubernetes-service medium, and deployment-context high tiers; reject public samples/templates and add exact-tier probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1248 without changing detector or package metadata.'

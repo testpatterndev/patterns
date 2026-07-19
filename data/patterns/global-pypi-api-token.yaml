@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: PyPI API Token
 slug: global-pypi-api-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -40,16 +40,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: pypi-AgEIcHlwaS5vcmcABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
-      description: PyPI upload token with pypi.org macaroon marker
-    - value: 'PYPI_TOKEN=pypi-AgEIcHlwaS5vcmczZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIhHgGfFeEdDcCbBaA0123456789_-'
-      description: Labelled PyPI token in an env assignment
-    - value: pypi-AgEIcHlwaS5vcmcaB3dE6gH9jK2mN5pQ8sT1uV4wX7yZ0aB3dE6gH9jK2mN5pQ8sT1uV4wX7yZ0aB3dE
-      description: Mixed-case PyPI token body
+      description: Exact 65 probe - macaroon marker and body without independent publish context
+    - value: 'twine upload credential pypi-AgEIcHlwaS5vcmcaB3dE6gH9jK2mN5pQ8sT1uV4wX7yZ0aB3dE6gH9jK2mN5pQ8sT1uV4wX7yZ0aB3dE'
+      description: Exact 75 probe - token with Twine upload context
+    - value: 'PyPI.org package publish secret PYPI_TOKEN=pypi-AgEIcHlwaS5vcmczZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIhHgGfFeEdDcCbBaA0123456789_-'
+      description: Exact 85 probe - PyPI publish context plus canonical token assignment
   should_not_match:
     - value: pypi-AgEIcHlwaS5vcmcTOOSHORT
       description: Body too short to be a valid PyPI token
     - value: pypi-AgEIbm90cGtlcQABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
       description: Wrong macaroon marker (does not decode to pypi.org)
+    - value: 'NPM_TOKEN=pypi-AgEIcHlwaS5vcmcABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+      description: Sibling package-registry label does not corroborate a PyPI token
+    - value: 'Documentation example: PyPI.org package PYPI_TOKEN=pypi-AgEIcHlwaS5vcmcABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+      description: Documentation example containing a valid-shaped token is excluded
     - value: set your pypi upload token with twine before publishing to pypi.org
       description: Prose mention without a token value
 false_positives:
@@ -71,9 +75,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_pypi_api_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_pypi_api_token
+      matches:
+        - ref: Keyword_pypi_publish_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_pypi_api_token
+      matches:
+        - ref: Keyword_pypi_publish_context
+        - ref: Pattern_pypi_token_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_pypi_api_token
+      pattern: pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{50,1000}
+    - id: Pattern_pypi_token_assignment
+      pattern: (?i)\b(?:PYPI_TOKEN|TWINE_PASSWORD)\s*[=:]
+  keywords:
+    - id: Keyword_pypi_publish_context
+      groups:
+        - match_style: string
+          terms:
+            - PyPI.org package
+            - twine upload
+            - Python package upload
+            - PyPI release publish
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 PyPI-publish / 85 canonical-assignment Purview contract with exact-tier, sibling-registry, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1560 without changing detector or package metadata.'

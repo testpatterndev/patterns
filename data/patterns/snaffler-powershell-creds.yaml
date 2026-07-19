@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: PowerShell Credential Objects with Plaintext Password
 slug: snaffler-powershell-creds
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -10,10 +10,11 @@ description: >-
   ConvertTo-SecureString with -AsPlainText and [Net.NetworkCredential]::new() calls.
   Mirrors Snaffler rule KeepPsCredentials.
 operation: >-
-  Matches two distinct PowerShell patterns used to create credential objects from
-  plaintext passwords: the ConvertTo-SecureString combined with -AsPlainText -Force
-  idiom, and the [Net.NetworkCredential]::new() constructor. These patterns appear in
-  automation scripts and runbooks where passwords are hardcoded rather than prompted.
+  Broad ConvertTo-SecureString -AsPlainText and NetworkCredential constructor use
+  is discovery-only at 65. The 75 tier requires a quoted inline password literal.
+  The 85 tier additionally requires that literal to be assembled into a
+  PSCredential object or assigned as a NetworkCredential object, proving reusable
+  credential construction. Enforcing tiers reject templates and placeholder values.
 risk_description: >-
   The detector finds PowerShell constructs that turn plaintext into SecureString with -AsPlainText or instantiate NetworkCredential with an embedded password. A script containing a literal value can hand an attacker the account and reusable secret, enabling automation abuse, remote login, or password reuse against related services. The normal exposure affects one credential and the systems it can reach, while variable references, examples, current validity, and privilege constrain impact. Risk 8 and SENSITIVE reflect serious contained access compromise, with higher impact requiring a live broadly privileged automation credential.
 sensitivity_labels:
@@ -48,19 +49,29 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: '$pw = ConvertTo-SecureString "P@ssw0rd1" -AsPlainText -Force'
-      description: Classic PowerShell ConvertTo-SecureString with plaintext password and Force flag
+    - value: '$pw = ConvertTo-SecureString $env:SVC_PASSWORD -AsPlainText -Force'
+      description: Low-tier probe - plaintext conversion API using a variable, not an inline literal
+    - value: '$pw = ConvertTo-SecureString "N7v!q2Lm9" -AsPlainText -Force'
+      description: Medium-tier probe - quoted inline password literal
     - value: '$cred = New-Object PSCredential("svcAdmin", (ConvertTo-SecureString "Hunter2" -AsPlainText -Force))'
-      description: PSCredential creation wrapping ConvertTo-SecureString plaintext
+      description: High-tier probe - inline secret assembled into a PSCredential object
     - value: '[Net.NetworkCredential]::new("admin", "S3cr3tPass")'
-      description: NetworkCredential constructor with inline username and password
-    - value: '[System.Net.NetworkCredential]::new("user@corp.com", "TopS3cr3t")'
-      description: Fully qualified System.Net.NetworkCredential constructor with plaintext password
+      description: Medium-tier probe - inline NetworkCredential literals without object assignment
+    - value: '$netCred = [System.Net.NetworkCredential]::new("user@corp.com", "TopS3cr3t")'
+      description: High-tier probe - inline NetworkCredential assigned for reuse
   should_not_match:
     - value: Get-Credential
       description: Get-Credential alone prompts interactively and contains no hardcoded password
     - value: '# Use Get-Credential for interactive prompts; avoid storing passwords in scripts'
       description: Security guidance comment with no actual password or SecureString conversion
+    - value: 'ConvertTo-SecureString "secret" -Force'
+      description: Malformed anti-pattern is missing -AsPlainText
+    - value: '$pw = ConvertTo-SecureString "CHANGEME" -AsPlainText -Force'
+      description: Placeholder password literal must not enforce
+    - value: 'Documentation example: $cred = New-Object PSCredential("svcAdmin", (ConvertTo-SecureString "N7v!q2Lm9" -AsPlainText -Force))'
+      description: Documentation quoting a complete credential object must not enforce
+    - value: '$cipher = ConvertFrom-SecureString $securePassword'
+      description: Sibling secure-string serialization command does not ingest plaintext
 false_positives:
   - description: Security training or documentation examples showing the anti-pattern to avoid, containing sample command syntax without real passwords.
     mitigation: Check for placeholder password values (password123, example, PLACEHOLDER) and documentation file types.
@@ -79,84 +90,79 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_snaffler_cts_plaintext
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Regex_snaffler_net_credential_new
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_snaffler_cts_plaintext
       matches:
-        - ref: Keyword_snaffler_ps_creds_evidence
+        - ref: Evidence_ps_inline_secret
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_ps_placeholder
     - confidence_level: 75
       id_match: Regex_snaffler_net_credential_new
       matches:
-        - ref: Keyword_snaffler_ps_creds_evidence
+        - ref: Evidence_ps_inline_secret
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_ps_placeholder
     - confidence_level: 85
       id_match: Regex_snaffler_cts_plaintext
       matches:
-        - ref: Keyword_snaffler_ps_creds_evidence
-        - ref: Keyword_snaffler_ps_force_context
+        - ref: Evidence_ps_inline_secret
+        - ref: Evidence_pscredential_object
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_ps_placeholder
     - confidence_level: 85
       id_match: Regex_snaffler_net_credential_new
       matches:
-        - ref: Keyword_snaffler_ps_creds_evidence
+        - ref: Evidence_ps_inline_secret
+        - ref: Evidence_networkcredential_assignment
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_ps_placeholder
   regexes:
     - id: Regex_snaffler_cts_plaintext
       pattern: 'ConvertTo-SecureString[\s\S]{0,80}-AsPlainText'
     - id: Regex_snaffler_net_credential_new
       pattern: '\[(?:System\.Net\.|Net\.)NetworkCredential\]::new\('
+    - id: Evidence_ps_inline_secret
+      pattern: 'ConvertTo-SecureString\s+["''][^"''\r\n]{8,}["''][\s\S]{0,80}-AsPlainText|\[(?:System\.Net\.|Net\.)NetworkCredential\]::new\(\s*["''][^"''\r\n]{2,}["'']\s*,\s*["''][^"''\r\n]{8,}["'']'
+    - id: Evidence_pscredential_object
+      pattern: '(?i)\b(?:New-Object\s+)?PSCredential\b|\[System\.Management\.Automation\.PSCredential\]'
+    - id: Evidence_networkcredential_assignment
+      pattern: '\$[A-Za-z_][A-Za-z0-9_]*\s*=\s*\[(?:System\.Net\.|Net\.)NetworkCredential\]::new\('
   keywords:
-    - id: Keyword_snaffler_ps_creds_evidence
+    - id: Evidence_ps_placeholder
       groups:
-        - match_style: word
+        - match_style: string
           terms:
-            - ConvertTo-SecureString
-            - AsPlainText
-            - NetworkCredential
-            - PSCredential
-            - password
-            - credential
-    - id: Keyword_snaffler_ps_force_context
-      groups:
-        - match_style: word
-          terms:
-            - -Force
-            - -AsPlainText
-            - Get-Credential
+            - CHANGEME
+            - PLACEHOLDER
+            - REDACTED
+            - your-password
 created: '2026-06-26'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: separate API-use discovery, quoted inline secrets, and reusable PSCredential/NetworkCredential object construction; add exact-tier and malformed, placeholder, documentation, and sibling-command negatives.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2057 without changing detector or package metadata.'

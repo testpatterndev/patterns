@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: QLD Mental Health Assessment
 slug: au-qld-mental-health-assessment
-version: 1.3.1
+version: 1.3.2
 type: keyword_list
 pattern_class: concept
 description: Detects QLD mental health assessment documents including psychiatric evaluations and involuntary treatment orders.
@@ -26,8 +26,14 @@ data_categories:
   - government
 test_cases:
   should_match:
+    - value: Mental health assessment scheduled
+      description: Exact 65 discovery probe with an assessment phrase and no case context
+    - value: Mental health assessment for a patient risk formulation
+      description: Exact 75 probe with clinical assessment context
+    - value: Mental health assessment for a patient under a treatment authority
+      description: Exact 85 probe with clinical and Mental Health Act context
     - value: 'Mental health assessment: involuntary treatment authority under Mental Health Act'
-      description: Test match 1
+      description: Assessment under involuntary treatment authority
     - value: Psychiatric assessment for mental health tribunal forensic order review
       description: Test match 2
     - value: QLD mental health review with examination authority and treatment plan
@@ -37,6 +43,8 @@ test_cases:
       description: Non-match 1
     - value: Check your mental health at the door
       description: Non-match 2
+    - value: Mental health evaluation software module release notes
+      description: Evaluation phrase in product documentation must remain discovery-only
 false_positives:
   - description: Mental health awareness content in non-clinical contexts.
     mitigation: Require clinical assessment terms like involuntary treatment or mental health tribunal.
@@ -63,19 +71,45 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_mental_health
+      id_match:
+        type: any
+        ids:
+          - Pattern_mental_health
+          - Pattern_psychiatric
       matches:
-        - ref: Evidence_mental_health
+        - ref: Evidence_clinical_assessment_context
         - ref: Evidence_mha_2016
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_psychiatric
+      id_match:
+        type: any
+        ids:
+          - Pattern_mental_health
+          - Pattern_psychiatric
       matches:
-        - ref: Evidence_qld_health_forms
+        - ref: Evidence_clinical_assessment_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Pattern_mental_health
+          - Pattern_psychiatric
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
   regexes:
     - id: Pattern_mental_health
       pattern: (?i)\b(?:mental\s+health\s+(?:assessment|act|evaluation)|psychiatric\s+(?:assessment|evaluation)|mha\s+2016)\b
@@ -119,9 +153,25 @@ purview:
             - Pathology Queensland
             - Clinical Excellence Queensland
       strength: specific
+    - id: Evidence_clinical_assessment_context
+      groups:
+        - match_style: word
+          terms:
+            - patient
+            - risk formulation
+            - treatment plan
+            - capacity assessment
+            - diagnosis
+            - medication
+            - involuntary treatment
+            - clinician
+      strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: separate assessment-topic discovery at 65 from patient/clinical enforcement at 75 and statutory Mental Health Act context at 85, with exact-tier and software-documentation probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 585 without changing detector or package metadata.'

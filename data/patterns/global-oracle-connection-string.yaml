@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Oracle Connection String
 slug: global-oracle-connection-string
-version: 1.4.1
+version: 1.4.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -43,16 +43,22 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: Data Source=mydb;PASSWORD=secret
-      description: Oracle connection string
-    - value: HOST=oracledb.example.com; PASSWORD=s3cret
-      description: Oracle with HOST keyword
-    - value: Data Source=(DESCRIPTION=(ADDRESS=(HOST=myhost)));PASSWORD=pass
-      description: Oracle TNS-style connection
+      description: Exact 65 probe - data-source/password pair without independent Oracle context
+    - value: 'Oracle database connection HOST=oracledb.internal; PASSWORD=S3cretValue'
+      description: Exact 75 probe - password-bearing connection with Oracle-specific context
+    - value: 'Oracle TNS credential Data Source=(DESCRIPTION=(ADDRESS=(HOST=myhost)));User Id=admin;PASSWORD=S3cretValue'
+      description: Exact 85 probe - Oracle context plus independent populated account identity
   should_not_match:
     - value: Data Source=mydb;User Id=admin
       description: Missing PASSWORD parameter
     - value: HOST=oracledb.example.com
       description: Missing PASSWORD parameter
+    - value: 'Server=sqlserver.internal;User Id=admin;PASSWORD=S3cretValue'
+      description: Sibling database connection lacks Oracle Data Source or HOST structure
+    - value: 'Data Source=mydb;PASSWORD='
+      description: Malformed connection has an empty password
+    - value: 'Documentation example: Oracle TNS Data Source=mydb;User Id=admin;PASSWORD=changeme'
+      description: Documentation placeholder with full Oracle context is excluded
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -84,11 +90,19 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
+    - confidence_level: 65
+      discovery_only: true
       id_match: Regex_oracle_conn
       matches:
-        - ref: Pattern_global_oracle_connection_string_label_context
-        - ref: Keyword_global_oracle_connection_string_domain_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_oracle_conn
+      matches:
+        - ref: Keyword_oracle_provider_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -97,7 +111,8 @@ purview:
     - confidence_level: 85
       id_match: Regex_oracle_conn
       matches:
-        - ref: Keyword_oracle
+        - ref: Keyword_oracle_provider_context
+        - ref: Pattern_oracle_user_identity
         - type: any
           min_matches: 0
           max_matches: 0
@@ -106,34 +121,25 @@ purview:
   regexes:
     - id: Regex_oracle_conn
       pattern: (?:Data\s+Source|HOST|data\s+source|host)\s*=\s*[\s\S]{1,300}?(?:PASSWORD|password)\s*=\s*[^;)\s]+
-    - id: Pattern_global_oracle_connection_string_label_context
-      pattern: (?i)\b(?:oracle\s+connection\s+string|oracle|connection|string)\b
+    - id: Pattern_oracle_user_identity
+      pattern: (?i)\b(?:User\s+Id|USER\s+ID|UID|USER)\s*=\s*[^;)\s]{2,128}
   keywords:
-    - id: Keyword_oracle
+    - id: Keyword_oracle_provider_context
       groups:
-        - match_style: word
+        - match_style: string
           terms:
-            - Oracle
+            - Oracle database
+            - Oracle TNS
             - OracleDB
-            - Oracle Database
-            - text: TNS
-              case_sensitive: true
-            - tnsnames
-            - connection string
-            - JDBC
-      strength: domain
-    - id: Keyword_global_oracle_connection_string_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - oracle connection string
-            - oracle
-            - connection
-            - string
-      strength: domain
+            - tnsnames.ora
+            - jdbc:oracle
+      strength: specific
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.2
+    date: '2026-07-19'
+    description: 'Replace duplicated high tiers with an individual 65 field-pair discovery / 75 Oracle-context / 85 populated-user contract and exact-tier, sibling-database, malformed, and documentation probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1259 without changing detector or package metadata.'

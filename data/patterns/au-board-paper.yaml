@@ -1,13 +1,16 @@
 schema: testpattern/v1
 name: Board Paper
 slug: au-board-paper
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
 description: Detects board papers, board memoranda, and governance documents prepared for board of directors consideration.
 operation: >-
-  Keyword-based detection matching board paper, board memorandum, board resolution, and committee report patterns.
-  Corroborative evidence: 13 keywords within 300 characters.
+  Board-paper, memorandum, pack, resolution, decision, and committee-report titles are discovery-only
+  at 65. A recommendation, decision sought, agenda item, proposed resolution, financial implication, or
+  approval request raises the match to 75. The 85 tier additionally requires a formal meeting or paper
+  field such as paper number, agenda number, meeting date, company secretary, quorum, directors present,
+  or minutes reference. Enforcing tiers reject templates and examples.
 confidence: medium
 confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
 jurisdictions:
@@ -25,17 +28,21 @@ data_categories:
   - governance
 test_cases:
   should_match:
-    - value: 'Board paper: for board consideration and approval'
-      description: Test match 1
-    - value: Board memorandum to audit committee regarding risk governance
-      description: Test match 2
-    - value: Board meeting pack with board resolution and decision items
-      description: Test match 3
+    - value: 'Board paper'
+      description: Low-tier probe - document title without decision content
+    - value: 'Board paper: recommendation and decision sought for approval.'
+      description: Medium-tier probe - substantive board decision content without formal record fields
+    - value: 'Board paper: paper number BP-2026-17, meeting date 19 July 2026, recommendation and decision sought.'
+      description: High-tier probe - decision content plus formal paper and meeting fields
   should_not_match:
     - value: White board used in the meeting room
-      description: Non-match 1
+      description: Office-equipment sibling
     - value: Board game night at the community centre
-      description: Non-match 2
+      description: Recreation sibling
+    - value: 'The public investor page links to a board paper.'
+      description: Public link mentions only the document title
+    - value: 'Template example: board paper BP-2026-17 with meeting date, recommendation, and decision sought.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Generic use of board in non-governance contexts.
     mitigation: Require governance-specific keywords like board paper, memorandum, or committee.
@@ -62,24 +69,39 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_board_paper
+      id_match:
+        type: any
+        ids:
+          - Regex_board_paper
+          - Regex_board_resolution
       matches:
-        - ref: Keyword_board
-        - ref: Keyword_confidential
+        - ref: Keyword_board_decision_content
+        - ref: Keyword_board_formal_record
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Regex_board_resolution
+      id_match:
+        type: any
+        ids:
+          - Regex_board_paper
+          - Regex_board_resolution
       matches:
-        - ref: Keyword_directors
+        - ref: Keyword_board_decision_content
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_board_paper
+          - Regex_board_resolution
   regexes:
     - id: Regex_board_paper
       pattern: (?i)\b(?:board\s+(?:paper|memorandum|pack)|for\s+board\s+(?:consideration|approval))\b
@@ -125,9 +147,36 @@ purview:
             - remuneration committee
             - governance
       strength: specific
+    - id: Keyword_board_decision_content
+      groups:
+        - match_style: word
+          terms:
+            - recommendation
+            - decision sought
+            - agenda item
+            - proposed resolution
+            - approval requested
+            - financial implications
+            - conflicts of interest
+      strength: domain
+    - id: Keyword_board_formal_record
+      groups:
+        - match_style: word
+          terms:
+            - paper number
+            - agenda number
+            - meeting date
+            - company secretary
+            - directors present
+            - quorum
+            - minutes reference
+      strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; unify board artifact discovery, decision-content medium, and formal-record high tiers; add public/template adversarial probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 521 without changing detector or package metadata.'

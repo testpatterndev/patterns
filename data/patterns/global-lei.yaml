@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Legal Entity Identifier (LEI) - Global
 slug: global-lei
-version: 1.1.2
+version: 1.1.3
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -64,11 +64,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 5493001KJTIIGC8Y1R12
-      description: GLEIF's own published LEI — 5493 LOU prefix, "00" at positions 5-6, valid MOD 97-10 check digits
+      description: Exact 65 discovery probe using GLEIF's published LEI
     - value: 213800LBQA1Y9L22JB70
       description: Barclays PLC's published LEI (2138 LOU prefix), checksum-verified
     - value: 529900T8BM49AURSDO55
       description: Structurally valid LEI under the 5299 LOU prefix with computed MOD 97-10 check digits
+    - value: 'LEI 5493001KJTIIGC8Y1R12'
+      description: Exact 75 probe with an explicit LEI label
+    - value: 'Counterparty transaction reporting LEI 5493001KJTIIGC8Y1R12'
+      description: Exact 85 probe with LEI label and entity-transaction context
   should_not_match:
     - value: HWUPKR0MPOU8FGXBT394
       description: Live checksum-valid pre-2013 CICI-era legacy LEI (Apple Inc.) without the reserved "00" at positions 5-6 — documented false-negative class, deliberately excluded
@@ -84,6 +88,8 @@ test_cases:
       description: Lowercase — LEIs are uppercase-only (pattern is case-sensitive)
     - value: X5493001KJTIIGC8Y1R12
       description: 21 characters — the boundary guards reject LEIs embedded in longer alphanumeric runs
+    - value: Asset serial 5493001KJTIIGC8Y1R12
+      description: LEI-shaped asset serial lacks entity context and must remain discovery-only
 false_positives:
   - description: >-
       A 20-character uppercase serial/reference number that happens to carry "00" at positions 5-6
@@ -114,6 +120,16 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
+      id_match: Regex_global_lei
+      matches:
+        - ref: Keyword_global_lei
+        - ref: Keyword_entity_transaction_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
       id_match: Regex_global_lei
       matches:
         - ref: Keyword_global_lei
@@ -156,6 +172,18 @@ purview:
             - text: EMIR
               case_sensitive: true
       strength: specific
+    - id: Keyword_entity_transaction_context
+      groups:
+        - match_style: word
+          terms:
+            - legal entity name
+            - counterparty
+            - transaction reporting
+            - reporting entity
+            - issuer
+            - derivative trade
+            - settlement counterparty
+      strength: specific
   filters:
     - id: Filter_global_lei_same_digits
       type: AllDigitsSameFilter
@@ -178,8 +206,11 @@ references:
   - url: https://en.wikipedia.org/wiki/Legal_Entity_Identifier
     title: "Legal Entity Identifier - Wikipedia (MOD 97-10 check digit description)"
 created: '2026-07-08'
-updated: '2026-07-18'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.3
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: retain bare LEI-shaped values at 65 discovery, require explicit LEI/GLEIF context at 75 and additional counterparty or transaction-reporting context at 85, with exact-tier and asset-serial probes.'
   - version: 1.1.2
     date: '2026-07-18'
     description: >-

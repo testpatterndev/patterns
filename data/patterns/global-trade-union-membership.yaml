@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Trade Union Membership
 slug: global-trade-union-membership
-version: 1.2.1
+version: 1.3.0
 type: keyword_list
 pattern_class: concept
 engine: universal
@@ -45,6 +45,12 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
+    - value: 'Union membership disclosure topic pending review.'
+      description: Exact 65 discovery probe - union-membership topic without an employment record
+    - value: 'HR record includes a union membership field for the employee.'
+      description: Exact 75 probe - employment-record context without populated membership details
+    - value: 'Payroll record: union dues amount AUD 42; deduction code U405; union local 405; join date recorded.'
+      description: Exact 85 probe - employment record with populated dues/local membership details
     - value: 'HR record lists the employee as a paid-up union member since 2019.'
       description: Union member term present
     - value: 'Payroll deducts union dues each month for the bargaining unit.'
@@ -60,6 +66,12 @@ test_cases:
       description: Near-miss ("Union" but not union membership), no labour vocabulary
     - value: 'She opened a savings account at the local credit union branch.'
       description: Credit union is a bank, not trade-union membership
+    - value: 'Public labour-organisation website explains joining and annual fees.'
+      description: Public labour information is not a person-linked membership record
+    - value: 'Sample template: payroll record, employee-association fee AUD 20, deduction code U100.'
+      description: Adjacent template language is not a populated trade-union record
+    - value: 'HR record includes professional association membership.'
+      description: Sibling professional membership does not satisfy the trade-union primary
 false_positives:
   - description: >-
       The word "union" appears in unrelated terms (European Union, credit union, student union, union
@@ -73,6 +85,83 @@ exports:
   - yaml
   - regex_copy
 scope: broad
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_trade_union_membership
+      matches:
+        - ref: Evidence_employment_record_context
+        - ref: Evidence_union_membership_detail
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_union_public_context
+    - confidence_level: 75
+      id_match: Pattern_trade_union_membership
+      matches:
+        - ref: Evidence_employment_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_union_public_context
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_trade_union_membership
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_union_public_context
+  regexes:
+    - id: Pattern_trade_union_membership
+      pattern: '(?i)\b(?:trade\s+union\s+members?|union\s+members?(?:hip)?|union\s+dues|shop\s+stewards?|collective\s+bargaining\s+unit\s+members?|union\s+local\s+(?:number|no\.?|#)?\s*\d*|union\s+affiliations?|paid-up\s+union\s+members?|union\s+enrol?ment)\b'
+  keywords:
+    - id: Evidence_employment_record_context
+      groups:
+        - match_style: word
+          terms:
+            - employee file
+            - payroll record
+            - HR record
+            - personnel record
+            - bargaining unit roster
+            - workplace profile
+      strength: domain
+    - id: Evidence_union_membership_detail
+      groups:
+        - match_style: word
+          terms:
+            - membership number
+            - dues amount
+            - deduction code
+            - local number
+            - join date
+            - paid-up status
+            - enrolment date
+      strength: specific
+    - id: Evidence_union_public_context
+      groups:
+        - match_style: word
+          terms:
+            - public union website
+            - public campaign
+            - published agreement
+            - union history article
+            - academic study
+            - blank form
+      strength: exclusion
 risk_rating: 7
 risk_description: >-
   The low-confidence keyword-list concept identifies explicit trade-union membership, dues, shop stewards, bargaining-unit status, local numbers, affiliations, and enrolment rather than a membership credential or union register. Disclosure of one person's affiliation can support workplace discrimination, retaliation, targeted persuasion, or unwanted inference about industrial activity. The ordinary unit is one worker's status and usually needs identity or employment context for misuse, while exclusions reduce but do not eliminate collisions with unrelated uses of union. Risk 7 and SENSITIVE reflect credible direct special-category privacy harm; PROTECTED would require a bulk registry, severe political repression, or an acute safety threat capable of significant irreversible damage.
@@ -85,8 +174,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: add a 65 union-topic discovery tier, a 75 employment-record tier, and an 85 populated dues/local-membership-detail tier, with exact-tier and sibling/public/template probes.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2040 without changing detector or package metadata.'

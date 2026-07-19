@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Terraform Cloud / Enterprise API Token
 slug: global-terraform-cloud-token
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -41,16 +41,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: aBcDeFgHiJkLmN.atlasv1.0123456789abcdefABCDEF0123456789abcdefABCDEF0123456789abcdef0123
-      description: Terraform Cloud token, 14-char id + .atlasv1. + body
-    - value: 'TF_TOKEN_app_terraform_io=12345678901234.atlasv1.zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIhHgGfFeEdDcCbBaA0123456789'
-      description: Labelled Terraform token in TF_TOKEN env var
-    - value: ABCDEFGHIJKLMN.atlasv1.aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789-_=ABCDEFGHIJKLMNOPQRST012345
-      description: Terraform token with hyphen/underscore/equals in body
+      description: Exact 65 probe - atlasv1 segmented token without independent workspace context
+    - value: 'Terraform Cloud workspace credential ABCDEFGHIJKLMN.atlasv1.aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789-_=ABCDEFGHIJKLMNOPQRST012345'
+      description: Exact 75 probe - token with Terraform Cloud workspace context
+    - value: 'Terraform Cloud workspace secret TF_TOKEN_app_terraform_io=12345678901234.atlasv1.zZyYxXwWvVuUtTsSrRqQpPoOnNmMlLkKjJiIhHgGfFeEdDcCbBaA0123456789'
+      description: Exact 85 probe - workspace context plus canonical host-token assignment
   should_not_match:
     - value: aBcDeFgHiJkLmN.atlasv1.tooShort
       description: Body too short to be a Terraform Cloud token
     - value: aBcDeFgHiJkLmN.atlasv2.0123456789abcdefABCDEF0123456789abcdefABCDEF0123456789abcdef0123
       description: Wrong marker (atlasv2) - not a Terraform Cloud token
+    - value: 'VAULT_TOKEN=aBcDeFgHiJkLmN.atlasv1.0123456789abcdefABCDEF0123456789abcdefABCDEF0123456789abcdef0123'
+      description: Sibling HashiCorp product label does not corroborate a Terraform Cloud token
+    - value: 'Documentation example: Terraform Cloud workspace TF_TOKEN_app_terraform_io=aBcDeFgHiJkLmN.atlasv1.0123456789abcdefABCDEF0123456789abcdefABCDEF0123456789abcdef0123'
+      description: Documentation example containing a valid-shaped token is excluded
     - value: store your terraform cloud token in the credentials file
       description: Prose mention without a token value
 false_positives:
@@ -72,9 +76,63 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_terraform_cloud_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_terraform_cloud_token
+      matches:
+        - ref: Keyword_terraform_workspace_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_terraform_cloud_token
+      matches:
+        - ref: Keyword_terraform_workspace_context
+        - ref: Pattern_terraform_token_assignment
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_terraform_cloud_token
+      pattern: (?<![A-Za-z0-9])[A-Za-z0-9]{14}\.atlasv1\.[A-Za-z0-9\-_=]{60,70}(?![A-Za-z0-9])
+    - id: Pattern_terraform_token_assignment
+      pattern: (?i)\b(?:TF_TOKEN_[A-Za-z0-9_]+|TFE_TOKEN|TERRAFORM_CLOUD_TOKEN)\s*[=:]
+  keywords:
+    - id: Keyword_terraform_workspace_context
+      groups:
+        - match_style: string
+          terms:
+            - Terraform Cloud workspace
+            - Terraform Enterprise workspace
+            - app.terraform.io
+            - Terraform Cloud API
+      strength: specific
 created: '2026-06-13'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Add an individual 65 discovery / 75 Terraform-workspace / 85 host-token-assignment Purview contract with exact-tier, sibling-product, malformed, and documentation probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1566 without changing detector or package metadata.'

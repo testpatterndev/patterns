@@ -1,11 +1,15 @@
 schema: testpattern/v1
 name: Security Audit Report
 slug: au-security-audit-report
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
 description: Detects security audit reports including SOC 2, ISO 27001, and IRAP findings.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+operation: >-
+  A SOC 2, ISO 27001, SSAE 18, security-audit, or security-control report title is discovery-only at
+  65. Security-control objectives, activities, trust-service criteria, Annex A, or applicability
+  evidence raises it to 75. The 85 tier additionally requires a classified audit finding, exception,
+  non-compliance, deviation, or required action. Enforcing tiers reject templates and examples.
 confidence: medium
 confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
 jurisdictions:
@@ -23,17 +27,21 @@ data_categories:
   - audit
 test_cases:
   should_match:
-    - value: 'Security audit report: SOC 2 Type II with ISO 27001 control assessment'
-      description: Test match 1
-    - value: 'IRAP security assessment: security control findings and audit results'
-      description: Test match 2
-    - value: 'Security certification audit: compliance audit and control objective review'
-      description: Test match 3
+    - value: 'Security audit report'
+      description: Low-tier probe - report title without control evidence
+    - value: 'Security audit report: control objective, control activity, and trust services criteria reviewed.'
+      description: Medium-tier probe - security-control evidence without a classified finding
+    - value: 'Security audit report: control objective and Annex A review found a high risk finding, audit exception, and required action.'
+      description: High-tier probe - security-control evidence plus classified findings
   should_not_match:
     - value: Security guard audit of premises
-      description: Non-match 1
+      description: Physical-security sibling
     - value: Home security system review
-      description: Non-match 2
+      description: Consumer-security sibling
+    - value: 'The public assurance page links to a security audit report.'
+      description: Public link mentions only the report title
+    - value: 'Template example: security audit report with control objective, Annex A, high risk finding, audit exception, and required action.'
+      description: Template contains otherwise high-tier evidence
 false_positives:
   - description: Physical security or home security references.
     mitigation: Require IT security framework terms like SOC 2, ISO 27001, or IRAP.
@@ -72,12 +80,15 @@ purview:
     - confidence_level: 75
       id_match: Regex_security_audit_framework
       matches:
-        - ref: Keyword_audit_general
+        - ref: Keyword_security_controls
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_security_audit_framework
   regexes:
     - id: Regex_security_audit_framework
       pattern: >-
@@ -144,8 +155,11 @@ purview:
             - IPPF
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; add report-title discovery, security-control medium, and classified-finding high tiers; add public/template adversarial probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 595 without changing detector or package metadata.'

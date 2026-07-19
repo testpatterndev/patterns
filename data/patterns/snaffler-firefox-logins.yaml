@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Firefox Encrypted Login Entry
 slug: snaffler-firefox-logins
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -10,9 +10,11 @@ description: >-
   by Firefox's NSS (Network Security Services) credential store. Mirrors Snaffler
   rule KeepFFRegexRed.
 operation: >-
-  Matches the encryptedPassword JSON field containing a base64-encoded NSS-encrypted
-  credential value of at least 16 characters. Firefox stores credentials in logins.json
-  with NSS/3DES encryption producing base64 ciphertext.
+  The 65 tier inventories one encryptedPassword field. The 75 tier requires a
+  paired encryptedUsername field from the same JSON fragment. The 85 tier also
+  requires origin metadata (hostname/formSubmitURL/httpRealm) and entry metadata
+  (guid/timeCreated/timeLastUsed), demonstrating a Firefox logins.json object.
+  Enforcing tiers reject template and placeholder ciphertext.
 risk_description: >-
   Firefox Encrypted Login Entry detects an encryptedPassword field in the JSON structure used by Firefox logins storage. The ciphertext is not immediately usable as a password, but an attacker who also obtains the associated Firefox profile keys can decrypt it or attempt offline recovery, exposing the user's saved accounts. Impact is serious yet normally limited to credentials in the affected profile and depends on companion key material. Risk 8 and SENSITIVE InfoTech are justified; PROTECTED would require decrypted privileged credentials, fleet-scale profile compromise, or access producing significant organizational damage.
 sensitivity_labels:
@@ -44,19 +46,27 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: '{"encryptedUsername":"MDIEEPgAAA==","encryptedPassword":"MFoECNQ3Mk7Yo7yEECabcdefghijklmnop","guid":"{abc}"}'
-      description: Firefox logins.json entry
     - value: '"encryptedPassword":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="'
-      description: Long base64 Firefox password
-    - value: '"encryptedPassword":"MDoEEPgAAAAAAAAAAAAAAAAAAAEwFDAN"'
-      description: Typical NSS-encrypted value
-    - value: '"encryptedPassword" : "MFoECNQ3Mk7+Yo7yEECabcdefghij1234=="'
-      description: encryptedPassword with spaces around JSON colon (Snaffler parity)
+      description: Low-tier probe - encrypted password field without paired login data
+    - value: '{"encryptedUsername":"MDIEEPgAAA==","encryptedPassword":"MFoECNQ3Mk7Yo7yEECabcdefghijklmnop"}'
+      description: Medium-tier probe - paired NSS-encrypted username and password
+    - value: '{"hostname":"https://portal.example.org","formSubmitURL":"https://portal.example.org/login","encryptedUsername":"MDIEEPgAAA==","encryptedPassword":"MFoECNQ3Mk7Yo7yEECabcdefghijklmnop","guid":"{7b2e}","timeCreated":1710000000000}'
+      description: High-tier probe - complete Firefox login entry with origin and metadata
+    - value: '{"encryptedUsername":"MDoEEPgAAAAAAAAAAAA=","encryptedPassword":"MDoEEPgAAAAAAAAAAAAAAAAAAAEwFDAN"}'
+      description: Medium-tier probe - paired NSS ciphertext fields
   should_not_match:
     - value: '"encryptedPassword":""'
       description: Empty value, under 16 chars
     - value: '"password":"hunter2"'
       description: Plaintext field name, not encryptedPassword
+    - value: '"encryptedPassword":"not base64 ciphertext!"'
+      description: Malformed ciphertext contains non-Base64 characters
+    - value: '{"hostname":"https://portal.example.org","encryptedUsername":"PLACEHOLDER","encryptedPassword":"REDACTED_REDACTED","guid":"{abc}","timeCreated":1}'
+      description: Placeholder Firefox entry must not enforce
+    - value: 'Documentation example: {"hostname":"https://portal.example.org","encryptedUsername":"MDIEEPgAAA==","encryptedPassword":"MFoECNQ3Mk7Yo7yEECabcdefghijklmnop","guid":"{abc}","timeCreated":1}'
+      description: Documentation quoting a complete login entry must not enforce
+    - value: '{"origin_url":"https://portal.example.org","username_value":"admin","password_value":"encrypted"}'
+      description: Sibling Chromium login-data field names are not Firefox logins.json
 false_positives:
   - description: Security research or malware analysis reports that quote Firefox logins.json content as examples without actual stolen credentials.
     mitigation: Require proximity to additional logins.json fields (encryptedUsername, formSubmitURL, guid) to confirm file context.
@@ -68,53 +78,61 @@ exports:
 scope: specific
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 65
-      id_match: Regex_snaffler_firefox_logins
-      matches:
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_snaffler_firefox_logins
-      matches:
-        - ref: Keyword_snaffler_firefox_logins_evidence
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
     - confidence_level: 85
       id_match: Regex_snaffler_firefox_logins
       matches:
-        - ref: Keyword_snaffler_firefox_logins_evidence
+        - ref: Evidence_firefox_encrypted_username
+        - ref: Evidence_firefox_origin
+        - ref: Evidence_firefox_entry_metadata
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Evidence_firefox_placeholder
+    - confidence_level: 75
+      id_match: Regex_snaffler_firefox_logins
+      matches:
+        - ref: Evidence_firefox_encrypted_username
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Evidence_firefox_placeholder
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_snaffler_firefox_logins
   regexes:
     - id: Regex_snaffler_firefox_logins
       pattern: '"encryptedPassword"\s*:\s*"[A-Za-z0-9+/=]{16,}"'
+    - id: Evidence_firefox_encrypted_username
+      pattern: '"encryptedUsername"\s*:\s*"[A-Za-z0-9+/=]{8,}"'
+    - id: Evidence_firefox_origin
+      pattern: '"(?:hostname|formSubmitURL|httpRealm)"\s*:\s*"[^"\r\n]{4,}"'
+    - id: Evidence_firefox_entry_metadata
+      pattern: '"(?:guid|timeCreated|timeLastUsed|timePasswordChanged)"\s*:'
   keywords:
-    - id: Keyword_snaffler_firefox_logins_evidence
+    - id: Evidence_firefox_placeholder
       groups:
         - match_style: string
           terms:
-            - encryptedUsername
-            - formSubmitURL
-            - guid
-            - timeCreated
+            - PLACEHOLDER
+            - REDACTED
+            - CHANGEME
+            - AAAAAAAAAAAAAAAA
 created: '2026-06-26'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: separate encryptedPassword discovery, paired NSS credentials, and full Firefox origin/entry metadata; add exact-tier and malformed, placeholder, documentation, and Chromium-sibling negatives.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2048 without changing detector or package metadata.'

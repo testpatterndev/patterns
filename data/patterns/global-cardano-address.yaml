@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Cardano Address
 slug: global-cardano-address
-version: 1.1.1
+version: 1.1.2
 type: regex
 pattern_class: identifier
 engine: universal
@@ -50,11 +50,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 'addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgse35a3x'
-      description: CIP-19 type-00 base address (payment + stake key hash), 103 chars — upper bound
+      description: Exact 65 discovery probe using a CIP-19 base address
     - value: 'addr1gx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer5pnz75xxcrzqf96k'
       description: CIP-19 type-04 pointer address, 67 chars
     - value: 'addr1vx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzers66hrl8'
       description: CIP-19 type-06 enterprise address (payment only), 58 chars — near lower bound
+    - value: 'Cardano address addr1vx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzers66hrl8'
+      description: Exact 75 probe with explicit Cardano context
+    - value: 'Cardano withdrawal address addr1vx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzers66hrl8'
+      description: Exact 85 probe with chain-specific and transfer-destination context
   should_not_match:
     - value: 'stake1uyehkck0lajq8gr28t9uxnuvgcqrc6070x3k9r8048z8y5gh6ffgw'
       description: Reward/stake address (stake1 HRP) — not a payment address, excluded (wrong prefix)
@@ -64,6 +68,8 @@ test_cases:
       description: Hyphen breaks the run so no contiguous addr1 body exists — rejected
     - value: 'cardano wallet address example placeholder'
       description: Template/placeholder context should be excluded even when domain anchor words are present
+    - value: 'Database key addr1vx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzers66hrl8'
+      description: Valid-shaped non-wallet key must remain discovery-only
 false_positives:
   - description: >-
       A long bech32 string beginning "addr1" is highly distinctive, but the bech32 checksum cannot be
@@ -107,7 +113,26 @@ purview:
     - confidence_level: 85
       id_match: Regex_cardano_address
       matches:
-        - ref: Keyword_cryptocurrency
+        - ref: Keyword_cardano_context
+        - ref: Keyword_transfer_destination_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_cardano_address
+      matches:
+        - ref: Keyword_cardano_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_cardano_address
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -116,9 +141,34 @@ purview:
   regexes:
     - id: Regex_cardano_address
       pattern: '\baddr1[ac-hj-np-z02-9]{50,100}\b'
+  keywords:
+    - id: Keyword_cardano_context
+      groups:
+        - match_style: word
+          terms:
+            - cardano
+            - cardano address
+            - cardano wallet
+            - text: ADA
+              case_sensitive: true
+      strength: domain
+    - id: Keyword_transfer_destination_context
+      groups:
+        - match_style: word
+          terms:
+            - withdrawal address
+            - deposit address
+            - destination wallet
+            - recipient address
+            - pay to
+            - transfer to
+      strength: specific
 created: '2026-07-07'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.1.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: keep bare Cardano payment-address shapes at 65 discovery, require explicit chain context at 75 and additional transfer-destination evidence at 85, with exact-tier and database-key probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2107 without changing detector or package metadata.'

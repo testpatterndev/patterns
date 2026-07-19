@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Email Address
 slug: global-email-address
-version: 1.1.1
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -57,13 +57,15 @@ corroborative_evidence:
     - pii-personal
 test_cases:
   should_match:
+    - value: 'Customer contact record; contact email: jane.doe@northwind.com.au'
+      description: Exact 85 probe - labelled address in a populated contact-record context
     - value: jane.doe@example.com
       description: Simple dot-atom local part with a common two-label domain
     - value: Please reach j.smith+news99@sub.example.co.uk today.
       description: Plus-addressing local part with a multi-label subdomain and double TLD
     - value: user_name-99@my-domain123.org
       description: Underscore/hyphen local part with a hyphenated, digit-bearing domain label
-    - value: 'Contact email: jane.doe@example.com for details.'
+    - value: 'Contact email: jane.doe@northwind.com.au for details.'
       description: Address value embedded in a labelled sentence
   should_not_match:
     - value: not an email address at all
@@ -72,6 +74,12 @@ test_cases:
       description: Domain has no top-level label — no dot follows the host name (WHATWG-valid but deliberately excluded here; see the divergence note in the description)
     - value: '@missinglocalpart.com'
       description: No local-part characters precede the @ sign
+    - value: 'Public website contact email: media@example.org'
+      description: Published generic contact address is vetoed from enforcement by public-contact context
+    - value: 'Sample template: customer contact record; contact email: jane.doe@example.com'
+      description: Template text contains high-tier evidence but is vetoed by the shared exclusion
+    - value: 'Customer profile URL: https://example.org/people/jane-doe'
+      description: Sibling contact locator contains no email-address primary
 false_positives:
   - description: >-
       Retina-resolution image asset filenames such as logo@2x.png or icon@3x.png structurally satisfy
@@ -92,12 +100,23 @@ exports:
 scope: narrow
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_global_email_address
+      matches:
+        - ref: Keyword_global_email_address_context
+        - ref: Keyword_email_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_public_email_context
     - confidence_level: 75
       id_match: Regex_global_email_address
       matches:
@@ -107,6 +126,7 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_email_context
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_global_email_address
@@ -116,6 +136,7 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_public_email_context
   regexes:
     - id: Regex_global_email_address
       pattern: '\b[A-Za-z0-9][A-Za-z0-9.!#$%&''*+/=?^_{|}~-]{0,63}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?){1,8}\b'
@@ -134,6 +155,28 @@ purview:
             - reply to
             - mailto
       strength: specific
+    - id: Keyword_email_record_context
+      groups:
+        - match_style: word
+          terms:
+            - customer contact record
+            - employee directory record
+            - account holder
+            - contact record
+            - recipient list
+            - personal details
+            - client profile
+      strength: domain
+    - id: Keyword_public_email_context
+      groups:
+        - match_style: word
+          terms:
+            - public website
+            - public directory
+            - published contact
+            - media enquiries
+            - generic mailbox
+      strength: exclusion
 risk_rating: 3
 risk_description: >-
   The identifier extracts a pragmatic local-part@domain address with a dotted domain, excluding quoted local parts, comments, domain literals, and dotless intranet addresses; it is distinct from concept patterns that merely mention email. Exposure enables spam, phishing, unwanted contact, and account correlation, but many addresses are deliberately public business contact points and the value supplies neither mailbox access nor message content. One normal match affects one address and may even be an asset token such as a retina-image filename. Risk 3 and OFFICIAL reflect low, reversible standalone harm; SENSITIVE would require a private address tied to credentials, protected communications, a vulnerable person, or a confidential relationship.
@@ -153,8 +196,11 @@ references:
   - url: https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address
     title: "WHATWG HTML Living Standard: valid e-mail address"
 created: '2026-07-06'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Targeted blocker remediation: retain bare addresses as 65 discovery, require an email label at 75 and a populated contact-record context at 85, add public-contact suppression, and add exact-tier plus sibling/public/template probes.'
   - version: 1.1.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2112 without changing detector or package metadata.'
