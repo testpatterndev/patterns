@@ -1,24 +1,25 @@
 schema: testpattern/v1
 name: Religious or Philosophical Beliefs
 slug: global-religious-beliefs
-version: 1.1.0
+version: 1.2.0
 type: keyword_list
 pattern_class: concept
 engine: universal
 description: >-
-  Detects references to religious or philosophical belief disclosure: religious affiliation,
-  belief system, faith tradition, place of worship, and religious conversion records. GDPR
-  Article 9 lists religious or philosophical beliefs as a special category of personal data
-  with no fixed format — it is detectable only by topic vocabulary. Topic-grade detector, low
-  confidence by design.
+  Detects religious or philosophical belief information in person-linked membership, patient,
+  workforce, census, pastoral-care, and accommodation records. The detector recognises explicit
+  belief, affiliation, observance, denomination, and structured religion-field terminology,
+  then raises confidence only for person records and populated belief or accommodation
+  statements. Religious or philosophical beliefs are protected under GDPR Article 9 and
+  Australian anti-discrimination and privacy law. Topic-grade detector, low confidence by
+  design.
 operation: >-
-  Phrase regex matching indicative religious/philosophical-belief disclosure terminology
-  (religious beliefs, religious affiliation, philosophical beliefs, belief system, faith
-  tradition, religious observance, place of worship, religious denomination, religious
-  conversion record). Detects the presence of religious/belief subject matter in a
-  disclosure/record context; not a structured-token detector. Pair with corroborative
-  keywords to raise precision.
-pattern: '(?i)\b(?:religious\s+beliefs?|religious\s+affiliations?|philosophical\s+beliefs?|belief\s+systems?|faith\s+traditions?|religious\s+observance|place\s+of\s+worship|religious\s+denominations?|religious\s+conversion\s+record)\b'
+  The primary regex matches explicit religious/philosophical-belief phrases and structured
+  religion, faith, or denomination labels. The 65 tier is discovery-only. The 75 tier requires
+  a person-record context, and the 85 tier additionally requires a populated belief,
+  denomination, observance, conversion, or accommodation statement. Public policy, aggregate,
+  museum, academic, comparative-religion, and blank-form contexts are excluded from every tier.
+pattern: '(?i)\b(?:religious\s+(?:or\s+philosophical\s+)?beliefs?|philosophical\s+beliefs?|religious\s+affiliations?|faith\s+affiliations?|belief\s+systems?|faith\s+traditions?|religious\s+(?:observance|preference|denominations?|conversion\s+record)|place\s+of\s+worship|(?:religion|faith|denomination)\s*(?::|(?:field|code|response)))\b'
 confidence: low
 confidence_justification: >-
   Low by design. Religious or philosophical belief is a GDPR Article 9 special category with
@@ -28,9 +29,12 @@ confidence_justification: >-
   be paired with corroborative keywords (faith, congregation, worship) to raise precision.
 jurisdictions:
   - global
+  - au
   - eu
 regulations:
   - GDPR
+  - Privacy Act 1988 (Cth)
+  - Fair Work Act 2009 (Cth)
 frameworks:
   - ISO 27001
   - NIST CSF
@@ -52,9 +56,9 @@ test_cases:
   should_match:
     - value: 'Religious affiliation disclosure topic pending review.'
       description: Exact 65 discovery probe - belief topic without a data-subject record
-    - value: 'Membership form includes a religious affiliation field.'
+    - value: 'Employee file includes a religious affiliation field.'
       description: Exact 75 probe - person-record context without a populated belief response
-    - value: 'Patient record: religious affiliation captured; stated faith Hindu; place of worship recorded.'
+    - value: 'Patient record: religious affiliation recorded as Hindu; denomination: Shaivism.'
       description: Exact 85 probe - person record plus populated faith attribution
     - value: 'The intake form records religious affiliation under section 4.'
       description: Religious affiliation phrase present
@@ -64,6 +68,8 @@ test_cases:
       description: Religious conversion record term present
     - value: 'The census field asks respondents to state their religious beliefs voluntarily.'
       description: Religious beliefs phrase present
+    - value: 'Admission record captures religion: Sikh.'
+      description: Structured religion label in a person record
   should_not_match:
     - value: 'We believe in transparent pricing for all customers.'
       description: Generic corporate "believe", not a belief-system disclosure
@@ -83,9 +89,9 @@ false_positives:
       statements, history/comparative-religion content) has nothing to do with a personal
       belief-disclosure record.
     mitigation: >-
-      The regex targets full disclosure phrases ("religious affiliation", "faith tradition",
-      "religious conversion record") rather than the bare words "believe"/"religion"; require
-      corroborative keywords (faith, congregation, worship, clergy) for confidence.
+      The regex targets full disclosure phrases and structured belief labels rather than the
+      bare words "believe" or "religion"; enforcement requires a person-record context, and the
+      high tier also requires a populated attribution or accommodation signal.
 exports:
   - purview_xml
   - yaml
@@ -132,7 +138,7 @@ purview:
             - Evidence_belief_public_context
   regexes:
     - id: Pattern_global_religious_belief
-      pattern: '(?i)\b(?:religious\s+beliefs?|religious\s+affiliations?|philosophical\s+beliefs?|belief\s+systems?|faith\s+traditions?|religious\s+observance|place\s+of\s+worship|religious\s+denominations?|religious\s+conversion\s+record)\b'
+      pattern: '(?i)\b(?:religious\s+(?:or\s+philosophical\s+)?beliefs?|philosophical\s+beliefs?|religious\s+affiliations?|faith\s+affiliations?|belief\s+systems?|faith\s+traditions?|religious\s+(?:observance|preference|denominations?|conversion\s+record)|place\s+of\s+worship|(?:religion|faith|denomination)\s*(?::|(?:field|code|response)))\b'
   keywords:
     - id: Evidence_belief_record_context
       groups:
@@ -140,6 +146,11 @@ purview:
           terms:
             - membership form
             - patient record
+            - patient intake
+            - admission record
+            - employee file
+            - personnel record
+            - HR adjustment request
             - profile field
             - census response
             - pastoral care file
@@ -150,10 +161,16 @@ purview:
         - match_style: word
           terms:
             - stated faith
+            - recorded as
+            - faith recorded as
+            - 'religion:'
+            - 'faith:'
             - 'denomination:'
             - declared belief
             - 'place of worship:'
             - observance requirement
+            - observance requested
+            - religious accommodation approved
             - converted to
       strength: specific
     - id: Evidence_belief_public_context
@@ -161,17 +178,22 @@ purview:
         - match_style: word
           terms:
             - public policy document
+            - public policy guidance
             - public dataset
             - aggregate statistics
             - museum catalogue
             - academic course
+            - comparative religion
             - blank form
+            - blank questionnaire
       strength: exclusion
 risk_rating: 7
 risk_description: >-
-  Religious or philosophical belief is a GDPR Article 9 special category; disclosure can lead
-  to discrimination, social exclusion, or persecution in jurisdictions or workplaces where
-  religious minority status carries legal or social risk.
+  A true positive attributes a religious or philosophical belief, affiliation, observance, or
+  accommodation need to a person. Disclosure can enable discrimination, coercion, exclusion,
+  harassment, or safety harm where minority status carries legal or social risk. The normal
+  single-person record does not by itself establish the scale or severe consequence required
+  for PROTECTED. Risk 7 and SENSITIVE Personal-Privacy are appropriate.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -183,6 +205,9 @@ sensitivity_labels:
 created: '2026-07-12'
 updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Consolidate the retired Australian alias into the global detector: add Australian legal and workforce/accommodation evidence, recognise structured religion and denomination fields, retain 65 discovery, and require person-record plus populated belief evidence at 75/85.'
   - version: 1.1.0
     date: '2026-07-19'
     description: 'Targeted blocker remediation: add a 65 belief-topic discovery tier, a 75 person-record tier, and an 85 populated faith/observance attribution tier, with exact-tier and sibling/public/template probes.'
@@ -193,14 +218,22 @@ author: testpattern-community
 license: MIT
 keywords:
   - religious beliefs
+  - religious or philosophical beliefs
   - religious affiliation
+  - faith affiliation
   - philosophical beliefs
   - belief system
   - faith tradition
   - religious observance
+  - religious preference
   - place of worship
   - religious denomination
   - religious conversion record
+  - 'religion:'
+  - 'faith:'
+  - 'denomination:'
 references:
   - url: https://gdpr-info.eu/art-9-gdpr/
     title: GDPR Article 9 — processing of special categories of personal data (religious or philosophical beliefs)
+  - url: https://www.fairwork.gov.au/tools-and-resources/fact-sheets/rights-and-obligations/protection-from-discrimination-at-work
+    title: Protection from discrimination at work — Fair Work Ombudsman

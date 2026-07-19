@@ -1,35 +1,42 @@
 schema: testpattern/v1
 name: Sexual Orientation
 slug: global-sexual-orientation
-version: 1.1.0
+version: 1.2.0
 type: keyword_list
 pattern_class: concept
 engine: universal
 description: >-
-  Detects references to sexual orientation disclosure: the phrase "sexual orientation" itself,
-  LGBTQ+ status fields, explicit identification statements, and same-sex partner/spouse
-  references. GDPR Article 9 lists sex life and sexual orientation as a special category of
-  personal data with no fixed format — it is detectable only by topic vocabulary. Topic-grade
-  detector, low confidence by design.
+  Detects sexual-orientation information in person-linked workforce, patient, survey, member,
+  relationship, intake, and case records. The detector recognises the explicit sexual
+  orientation phrase, orientation-specific identification statements, coming-out statements,
+  and same-sex partner or spouse references, then raises confidence only for person records and
+  populated attributions. It deliberately excludes transgender status, gender identity, and
+  pronouns because those are distinct attributes. Sexual orientation is protected under GDPR
+  Article 9 and Australian anti-discrimination and privacy law. Topic-grade detector, low
+  confidence by design.
 operation: >-
-  Phrase regex matching indicative sexual-orientation disclosure terminology (sexual
-  orientation, LGBTQ+ status, identifies as gay/lesbian/bisexual/transgender, same-sex
-  partner/spouse, gender identity disclosure, coming out as). Detects the presence of
-  sexual-orientation subject matter in a disclosure/record context; not a structured-token
-  detector. Pair with corroborative keywords to raise precision.
-pattern: '(?i)\b(?:sexual\s+orientations?|LGBTQ\+?\s+status|identifies\s+as\s+(?:gay|lesbian|bisexual|transgender)|same-sex\s+(?:partner|spouse)|gender\s+identity\s+disclosure|coming\s+out\s+as)\b'
+  The primary regex matches orientation-specific phrases only. The 65 tier is discovery-only.
+  The 75 tier additionally requires a person-record context, and the 85 tier requires a
+  populated orientation or relationship attribution. Public policy, aggregate, awareness,
+  training, and blank-questionnaire contexts are excluded from every tier. This is not a
+  structured-token detector and does not classify gender identity.
+pattern: '(?i)\b(?:sexual\s+orientations?|identif(?:y|ies|ied)\s+as\s+(?:gay|lesbian|bisexual|queer)|same-sex\s+(?:partner|spouse)|coming\s+out\s+as\s+(?:gay|lesbian|bisexual|queer))\b'
 confidence: low
 confidence_justification: >-
   Low by design. Sexual orientation is a GDPR Article 9 special category with no fixed format,
   so it is detected purely by topic vocabulary. The bare word "orientation" appears constantly
   in non-sensitive prose (employee orientation, building orientation); the regex is scoped to
-  full disclosure phrases only, and hits should be paired with corroborative keywords (LGBTQ,
-  partner, pride) to raise precision.
+  full disclosure phrases only and requires person-record and attribution evidence to raise
+  precision. LGBTQ+ or Pride terminology alone is not a primary match because it can describe
+  public events, communities, or gender identity rather than a person's sexual orientation.
 jurisdictions:
   - global
+  - au
   - eu
 regulations:
   - GDPR
+  - Privacy Act 1988 (Cth)
+  - Sex Discrimination Act 1984 (Cth)
 frameworks:
   - ISO 27001
   - NIST CSF
@@ -38,27 +45,27 @@ data_categories:
   - pii
 corroborative_evidence:
   keywords:
-    - LGBTQ
+    - sexual orientation
     - gay
     - lesbian
     - bisexual
-    - transgender
     - queer
     - partner
-    - pride
+    - spouse
+    - demographic response
   proximity: 300
 test_cases:
   should_match:
     - value: 'Sexual orientation disclosure topic pending review.'
       description: Exact 65 discovery probe - orientation topic without a data-subject record
-    - value: 'Data subject profile includes a sexual orientation field.'
+    - value: 'HR diversity survey includes a sexual orientation field.'
       description: Exact 75 probe - person-record context without a populated response
-    - value: 'Patient intake record: sexual orientation recorded value bisexual; response code confirmed.'
+    - value: 'Patient intake record: sexual orientation recorded as bisexual; response selected voluntarily.'
       description: Exact 85 probe - person record plus populated orientation attribution
     - value: "HR file notes the employee's sexual orientation as part of the diversity survey."
       description: Sexual orientation phrase present
-    - value: 'The profile lists LGBTQ+ status alongside other demographic fields.'
-      description: LGBTQ+ status field present
+    - value: 'The member profile records sexual orientation under optional demographic fields.'
+      description: Explicit sexual-orientation field present
     - value: 'He mentioned coming out as gay to his manager last year.'
       description: Coming out as / identifies as gay terms present
     - value: 'The intake form notes that she identifies as bisexual under optional demographic questions.'
@@ -76,21 +83,25 @@ test_cases:
       description: Adjacent template language is not a populated orientation record
     - value: 'Patient intake record lists preferred pronouns as they and them.'
       description: Sibling gender-expression data is excluded from the orientation-only Purview primary
+    - value: 'Employee profile records transgender status and gender identity.'
+      description: Gender identity is a distinct attribute and must not satisfy this classifier
+    - value: 'The organisation published its LGBTQ+ inclusion policy for Pride month.'
+      description: Community and policy terminology without a person-linked orientation
 false_positives:
   - description: >-
       The bare word "orientation" appears in unrelated contexts (employee orientation,
       building/map orientation) that have nothing to do with sexual orientation.
     mitigation: >-
-      The regex targets full disclosure phrases ("sexual orientation", "LGBTQ+ status",
-      "identifies as gay") rather than the bare word "orientation"; require corroborative
-      keywords (LGBTQ, partner, pride) for confidence.
+      The regex targets full orientation-specific phrases rather than the bare word
+      "orientation"; enforcement requires a person-record context, and the high tier also
+      requires a populated attribution.
   - description: >-
       "Coming out as" can appear in non-disclosure prose unrelated to sexual orientation
       (e.g. "the album is coming out as a double LP", "the report is coming out as
       scheduled").
     mitigation: >-
-      Require corroborative keywords (LGBTQ, gay, lesbian, bisexual, transgender, queer,
-      partner, pride) within the proximity window to confirm a personal-disclosure context.
+      The regex now requires "coming out as" to be followed by an orientation term, and
+      enforcement requires person-record evidence in the same bounded span.
 exports:
   - purview_xml
   - yaml
@@ -137,17 +148,23 @@ purview:
             - Evidence_orientation_public_context
   regexes:
     - id: Pattern_global_sexual_orientation
-      pattern: '(?i)\b(?:sexual\s+orientation|LGBTQ\+?\s+status|identif(?:y|ies)\s+as\s+(?:gay|lesbian|bisexual|queer)|same-sex\s+(?:partner|spouse)|coming\s+out\s+as\s+(?:gay|lesbian|bisexual|queer))\b'
+      pattern: '(?i)\b(?:sexual\s+orientations?|identif(?:y|ies|ied)\s+as\s+(?:gay|lesbian|bisexual|queer)|same-sex\s+(?:partner|spouse)|coming\s+out\s+as\s+(?:gay|lesbian|bisexual|queer))\b'
   keywords:
     - id: Evidence_orientation_record_context
       groups:
         - match_style: word
           terms:
             - data subject profile
+            - HR file
+            - HR diversity survey
+            - employee profile
             - patient intake
+            - intake form
             - case record
+            - case note
             - survey response
             - member profile
+            - client record
             - relationship record
       strength: domain
     - id: Evidence_orientation_attribution
@@ -155,10 +172,16 @@ purview:
         - match_style: word
           terms:
             - self-identifies as
+            - self-identified as
+            - recorded as
             - recorded value
-            - 'status:'
+            - 'sexual orientation:'
             - disclosed orientation
+            - disclosed to
+            - response selected
             - partner name
+            - partner named
+            - spouse name
             - response code
       strength: specific
     - id: Evidence_orientation_public_context
@@ -166,17 +189,21 @@ purview:
         - match_style: word
           terms:
             - public policy document
+            - public policy guidance
             - public dataset
             - aggregate statistics
             - awareness campaign
             - blank questionnaire
             - training course
+            - public report
       strength: exclusion
 risk_rating: 7
 risk_description: >-
-  Sexual orientation is a GDPR Article 9 special category; disclosure can lead to
-  discrimination, harassment, and outing individuals without consent, particularly in
-  jurisdictions or workplaces where LGBTQ+ status carries legal or social risk.
+  A true positive attributes sexual orientation or a same-sex relationship to a person.
+  Disclosure can cause involuntary outing, discrimination, harassment, coercion, or safety
+  harm, particularly where orientation carries legal or social risk. The normal single-person
+  record does not by itself establish the scale or severe consequence required for PROTECTED.
+  Risk 7 and SENSITIVE Personal-Privacy are appropriate.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -188,6 +215,9 @@ sensitivity_labels:
 created: '2026-07-12'
 updated: '2026-07-19'
 changelog:
+  - version: 1.2.0
+    date: '2026-07-19'
+    description: 'Consolidate the retired Australian alias into the global detector: add Australian legal and workforce evidence, align the top-level and Purview primaries, remove transgender/gender-identity/LGBTQ-policy scope, retain 65 discovery, and require person-record plus populated orientation evidence at 75/85.'
   - version: 1.1.0
     date: '2026-07-19'
     description: 'Targeted blocker remediation: add an orientation-only 65 topic-discovery tier, a 75 data-subject-record tier, and an 85 populated orientation-attribution tier, with exact-tier and sibling/public/template probes.'
@@ -201,15 +231,18 @@ author: testpattern-community
 license: MIT
 keywords:
   - sexual orientation
-  - LGBTQ+ status
   - identifies as gay
   - identifies as lesbian
   - identifies as bisexual
-  - identifies as transgender
+  - identifies as queer
   - same-sex partner
   - same-sex spouse
-  - gender identity disclosure
-  - coming out as
+  - coming out as gay
+  - coming out as lesbian
+  - coming out as bisexual
+  - coming out as queer
 references:
   - url: https://gdpr-info.eu/art-9-gdpr/
     title: GDPR Article 9 — processing of special categories of personal data (sex life and sexual orientation)
+  - url: https://humanrights.gov.au/our-work/sex-discrimination
+    title: Sex discrimination — Australian Human Rights Commission
