@@ -98,6 +98,14 @@ const DICTIONARY_REGISTRY = [
     scope: 'au',
     matchStyle: 'word',
     sources: ['au-surnames-australian']
+  },
+  {
+    placeholder: '{{DICT_AU_SUBURBS_LOCALITIES}}',
+    name: 'TestPattern - Australian Suburbs and Localities',
+    description: 'Consolidated Australian suburb and locality names across all states and territories',
+    scope: 'au',
+    matchStyle: 'word',
+    sources: ['au-suburbs-localities']
   }
 ]
 
