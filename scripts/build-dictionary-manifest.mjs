@@ -129,7 +129,18 @@ function loadKeywordDict(slug) {
     console.error(`  ERROR: keyword dict has no keywords array: ${slug}`)
     return null
   }
-  return data.keywords.map(t => typeof t === 'string' ? t : String(t))
+  const terms = []
+  for (const term of data.keywords) {
+    if (typeof term === 'string') {
+      terms.push(term)
+    } else if (term && typeof term.text === 'string') {
+      terms.push(term.text)
+    } else {
+      console.error(`  ERROR: keyword dict has an invalid term in ${slug}: ${JSON.stringify(term)}`)
+      return null
+    }
+  }
+  return terms
 }
 
 function computeHash(terms) {
