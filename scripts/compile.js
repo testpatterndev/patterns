@@ -227,10 +227,16 @@ if (existsSync(classResultsPath)) {
   try { classificationResults = JSON.parse(readFileSync(classResultsPath, 'utf-8')) } catch { /* skip */ }
 }
 
+// Deprecated classifiers stay in source YAML for audit, but are omitted from
+// the compiled catalog so consumers do not process retired SITs and so the
+// pretty-printed KV payload stays under Cloudflare's 25 MiB value limit.
+const deprecatedCount = patterns.filter(p => p.status === 'deprecated').length
+const publishedPatterns = patterns.filter(p => p.status !== 'deprecated')
+
 const output = {
   version: '1.0.0',
   generated: new Date().toISOString(),
-  patterns,
+  patterns: publishedPatterns,
   collections,
   keywords: keywordDicts,
   packageTags: packageTags?.metadata ?? null,
@@ -238,11 +244,11 @@ const output = {
   classificationResults
 }
 
-// Compact JSON for Cloudflare KV (25 MiB value limit). Pretty-print would
-// push the full catalog over the limit (~26 MB pretty vs ~17 MB compact).
-writeFileSync(OUT_FILE, JSON.stringify(output))
+// Pretty-print for readable diffs and safe downstream processing. Catalog
+// size is controlled by excluding deprecated classifiers, not by minifying.
+writeFileSync(OUT_FILE, JSON.stringify(output, null, 2))
 
-console.log(`Done: ${patterns.length} patterns, ${collections.length} collections, ${keywordDicts.length} keyword dictionaries → patterns.json`)
+console.log(`Done: ${publishedPatterns.length} patterns (${deprecatedCount} deprecated excluded), ${collections.length} collections, ${keywordDicts.length} keyword dictionaries → patterns.json`)
 if (resolvedCount > 0) {
   console.log(`  (${resolvedCount} patterns had keyword_lists references resolved)`)
 }
