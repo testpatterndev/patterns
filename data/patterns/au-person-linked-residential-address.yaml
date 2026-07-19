@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Person-Linked Residential Address
 slug: au-person-linked-residential-address
-version: 1.0.1
+version: 1.1.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -12,8 +12,10 @@ description: >-
 operation: >-
   Pattern_au_person_linked_street_address matches a populated street number, street name, and Australian
   road type. The 65 tier is discovery-only. The 75 tier requires a labelled person, an explicit
-  residence relationship, and at least one state, major-locality, or postcode signal. The 85 tier requires
-  the same person and residence relationship plus both an Australian state or territory and a postcode.
+  residence relationship, and at least one state, locality, or postcode signal, where locality evidence
+  draws on the consolidated 15,829-entry Australian suburbs and localities registry. The 85 tier requires
+  the same person and residence relationship plus an explicit residential-address label, an Australian
+  state or territory, a postcode, and registry or major-locality evidence.
   Template and example content is excluded from the enforcing tiers.
 pattern: >-
   (?i)\b\d{1,5}[A-Z]?(?:\s*[-/]\s*\d{1,5}[A-Z]?)?\s+[A-Z][A-Z'-]{1,30}(?:\s+[A-Z][A-Z'-]{0,30}){0,5}\s+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Place|Pl|Court|Ct|Crescent|Cres|Close|Cl|Lane|La|Way|Parade|Pde|Boulevard|Blvd|Terrace|Tce|Circuit|Cct|Highway|Hwy|Grove|Gv|Square|Sq|Esplanade|Esp|Rise|View|Gardens|Loop|Trail|Track|Pass|Heights)\b
@@ -52,6 +54,7 @@ corroborative_evidence:
   keyword_lists:
     - au-road-classification-extended
     - au-major-cities
+    - au-suburbs-localities
     - au-states-full
     - au-states-abbreviations
     - au-unit-types
@@ -65,6 +68,8 @@ test_cases:
       description: Exact 85 probe - person-linked residence with state and postcode
     - value: 'Tenant: Grace Osei; principal place of residence: Unit 4, 12 Ocean Rise, Redcliffe QLD 4020'
       description: Unit-prefixed person-linked Australian residence
+    - value: 'Resident: Priya Sharma; residential address: 18 Boronia Street, Abbeywood QLD 4613'
+      description: Registry-locality high probe - non-major suburb corroborated by the consolidated suburbs and localities registry
   should_not_match:
     - value: 'Resident: Alex Nguyen; residential address:'
       description: Person and residential labels without a populated address
@@ -110,6 +115,9 @@ purview:
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
+    - dict: au-suburbs-localities
+      as: Evidence_au_locality_registry
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_au_person_linked_street_address
@@ -117,7 +125,11 @@ purview:
         - ref: Pattern_au_person_linked_labelled_person
         - ref: Evidence_au_person_linked_residential_context
         - ref: Evidence_au_person_linked_state_territory
-        - ref: Evidence_au_person_linked_major_locality
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_au_person_linked_major_locality
+            - Evidence_au_locality_registry
         - ref: Pattern_au_person_linked_postcode
         - ref: Pattern_au_person_linked_address_label
         - type: any
@@ -135,6 +147,7 @@ purview:
           refs:
             - Evidence_au_person_linked_state_territory
             - Evidence_au_person_linked_major_locality
+            - Evidence_au_locality_registry
             - Pattern_au_person_linked_postcode
         - type: any
           min_matches: 0
@@ -232,8 +245,11 @@ purview:
             - Parramatta
       strength: domain
 created: '2026-07-19'
-updated: '2026-07-19'
+updated: '2026-07-20'
 changelog:
+  - version: 1.1.0
+    date: '2026-07-20'
+    description: 'Wire the consolidated au-suburbs-localities registry (15,829 suburb/locality names, all states and territories) as Evidence_au_locality_registry: accepted as the geographic signal in the 75 tier and as locality corroboration in the 85 tier alongside the major-locality list, so complete addresses in non-major suburbs reach the intended tiers; add a registry-locality high probe.'
   - version: 1.0.1
     date: '2026-07-19'
     description: 'Make the 85 tier demonstrably cumulative by requiring an explicit residential-address field label and major-locality evidence in addition to person, state, and postcode corroboration.'
