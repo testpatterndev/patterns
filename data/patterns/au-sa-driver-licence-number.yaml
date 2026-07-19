@@ -1,0 +1,156 @@
+schema: testpattern/v1
+name: SA Driver Licence Number
+slug: au-sa-driver-licence-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects South Australian driver licence and learner permit numbers in the established one-letter-plus-five-or-six-
+  digit shape. Enforceable tiers require an explicit licence-number label and South Australian context; the strict tier
+  additionally requires Service SA or Department for Infrastructure and Transport authority evidence.
+operation: >-
+  The bare alphanumeric shape is discovery-only at 65. A labelled value with SA context reaches 75. A labelled value
+  with SA licensing authority evidence reaches 85. Template fixtures and sibling licence types are excluded by gating.
+pattern: \b[A-Z]\d{5,6}\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the alphanumeric shape collides with product and case codes, while a driver-licence-number label
+  and South Australian context support balanced classification and authority evidence supports strict classification.
+jurisdictions:
+  - au-sa
+regulations:
+  - Motor Vehicles Act 1959 (SA)
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - ISO 27001
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - SA driver licence number
+    - South Australian driver licence number
+    - Service SA
+    - Department for Infrastructure and Transport
+  proximity: 300
+test_cases:
+  should_match:
+    - value: S482915
+      description: Exact 65 discovery probe - bare South Australian-shaped candidate
+    - value: 'SA driver licence number: S482915'
+      description: Exact 75 balanced probe - labelled candidate with SA context but no authority
+    - value: 'Service SA South Australian driver licence number: S482915'
+      description: Exact 85 strict probe - labelled candidate with Service SA authority
+    - value: 'Department for Infrastructure and Transport SA learner permit no. A48291'
+      description: Strict five-digit learner permit variant
+  should_not_match:
+    - value: 'Product code: S482915'
+      description: Alphanumeric product collision has no licence label or SA context
+    - value: 'TAS driver licence number: S482915'
+      description: Wrong-state collision must not reach an enforceable SA tier
+    - value: 'Service SA vehicle registration number: S482915'
+      description: Sibling transport identifier is not a driver licence number
+    - value: 'SA software licence number: S482915'
+      description: Software licence collision lacks the driver primary
+    - value: 'Example data: SA driver licence number: S482915'
+      description: Example fixture is excluded
+false_positives:
+  - description: Product codes, case references, software licences, and other letter-prefixed identifiers.
+    mitigation: Require an explicit driver licence or learner permit number label and South Australian context.
+  - description: Tasmanian or other alphanumeric licence-number shapes.
+    mitigation: Require SA context and Service SA or DIT evidence for strict classification.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 5
+risk_description: >-
+  A confirmed South Australian driver licence or learner permit number can assist identity correlation or
+  impersonation when linked to a person. The number alone is not a card image, client record, driving history, or
+  authenticator. Risk 5 and OFFICIAL reflect the bounded impact of one government identifier.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_sa_driver_licence_labelled
+      matches:
+        - ref: Evidence_sa_context
+        - ref: Evidence_sa_authority
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_sa_driver_licence_labelled
+      matches:
+        - ref: Evidence_sa_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_sa_driver_licence_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+  regexes:
+    - id: Pattern_sa_driver_licence_number
+      pattern: \b[A-Z]\d{5,6}\b
+    - id: Pattern_sa_driver_licence_labelled
+      pattern: (?i)\b(?:driver(?:'s|s)?\s+licen[cs]e|learner(?:'s)?\s+permit)\s*(?:number|no\.?|#)\s*[:=-]?\s*[A-Z]\d{5,6}\b
+  keywords:
+    - id: Evidence_sa_context
+      groups:
+        - match_style: word
+          terms:
+            - text: SA
+              case_sensitive: true
+            - South Australia
+            - South Australian
+      strength: specific
+    - id: Evidence_sa_authority
+      groups:
+        - match_style: word
+          terms:
+            - Service SA
+            - Department for Infrastructure and Transport
+            - text: DIT
+              case_sensitive: true
+      strength: specific
+  filters:
+    - id: Guard_sa_driver_licence_same_digits
+      type: AllDigitsSameFilter
+created: '2026-07-19'
+updated: '2026-07-19'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-19'
+    description: Initial state-specific split with exact 65/75/85 probes and collision negatives.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://www.sa.gov.au/topics/driving-and-transport/licences/steps
+    title: Steps to getting a driver's licence - SA.GOV.AU
+  - url: https://www.sa.gov.au/__data/assets/pdf_file/0015/22218/MR206-P1-or-P2-Provisional-Licence-Drivers-Licence-Learners-Permit-Renewal%2C-Replacement-and-Issue-Application.pdf
+    title: South Australian licence and learner permit application - Service SA

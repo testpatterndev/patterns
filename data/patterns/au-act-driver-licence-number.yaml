@@ -1,0 +1,162 @@
+schema: testpattern/v1
+name: ACT Driver Licence Number
+slug: au-act-driver-licence-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Australian Capital Territory driver licence numbers in the established eight-to-ten-digit shape. Enforceable
+  tiers require an explicit driver-licence-number label and ACT context; the strict tier additionally requires Access
+  Canberra or ACT Road Transport Authority evidence.
+operation: >-
+  The bare numeric shape is discovery-only at 65. A labelled value with ACT context reaches 75. A labelled value with
+  Access Canberra or Road Transport Authority evidence reaches 85. Template fixtures and Australian mobile-number
+  collisions are excluded.
+pattern: \b(?!04\d{8}\b)(?!0{8,10}\b)\d{8,10}\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: eight-to-ten-digit values are broadly ambiguous, while a driver-licence-number label and ACT
+  context materially improve precision and issuing-authority evidence supports strict classification.
+jurisdictions:
+  - au-act
+regulations:
+  - Information Privacy Act 2014 (ACT)
+  - Privacy Act 1988 (Cth)
+  - Road Transport (Driver Licensing) Act 1999 (ACT)
+frameworks:
+  - ISO 27001
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - ACT driver licence number
+    - Australian Capital Territory driver licence number
+    - Access Canberra
+    - Road Transport Authority
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '4062981735'
+      description: Exact 65 discovery probe - bare ten-digit ACT-shaped candidate
+    - value: 'ACT driver licence number: 4062981735'
+      description: Exact 75 balanced probe - labelled candidate with ACT context but no authority
+    - value: 'Access Canberra ACT driver licence number: 4062981735'
+      description: Exact 85 strict probe - labelled candidate with Access Canberra authority
+    - value: 'ACT Road Transport Authority driver license no. 62981735'
+      description: Strict eight-digit variant with authority evidence
+  should_not_match:
+    - value: 'Medicare number: 4062981735'
+      description: Ten-digit Medicare-shaped collision has no licence label or ACT context
+    - value: 'VIC driver licence number: 4062981735'
+      description: Wrong-state collision must not reach an enforceable ACT tier
+    - value: 'Access Canberra vehicle registration number: 4062981735'
+      description: Sibling transport identifier is not a driver licence number
+    - value: 'ACT driver licence contact mobile: 0412345678'
+      description: Australian mobile number must not classify as an ACT licence number
+    - value: 'Documentation example: ACT driver licence number: 4062981735'
+      description: Documentation fixture is excluded
+false_positives:
+  - description: Eight-to-ten-digit Medicare, telephone, account, customer, and payment identifiers.
+    mitigation: Require the labelled licence-number primary and exclude Australian mobile-number shapes.
+  - description: Victorian and other numeric driver licence formats overlap the ACT candidate range.
+    mitigation: Require ACT context and ACT licensing-authority evidence for confidence 85.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 5
+risk_description: >-
+  A confirmed ACT driver licence number can support identity correlation and licence-themed impersonation when linked
+  to a holder. It is not the separate card number, licence image, driving record, or authentication credential. Risk 5
+  and OFFICIAL reflect the bounded impact of one atomic government identifier.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_act_driver_licence_labelled
+      matches:
+        - ref: Evidence_act_context
+        - ref: Evidence_act_authority
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Guard_act_mobile_number
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_act_driver_licence_labelled
+      matches:
+        - ref: Evidence_act_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Guard_act_mobile_number
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_act_driver_licence_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Guard_act_mobile_number
+            - ref: Evidence_template_exclusion
+  regexes:
+    - id: Pattern_act_driver_licence_number
+      pattern: \b(?!04\d{8}\b)(?!0{8,10}\b)\d{8,10}\b
+    - id: Pattern_act_driver_licence_labelled
+      pattern: (?i)\bdriver(?:'s|s)?\s+licen[cs]e\s*(?:number|no\.?|#)\s*[:=-]?\s*(?!04\d{8}\b)(?!0{8,10}\b)\d{8,10}\b
+    - id: Guard_act_mobile_number
+      pattern: (?i)\b(?:\+?61[ -]?4|04)\d(?:[ -]?\d){7}\b
+  keywords:
+    - id: Evidence_act_context
+      groups:
+        - match_style: word
+          terms:
+            - text: ACT
+              case_sensitive: true
+            - Australian Capital Territory
+      strength: specific
+    - id: Evidence_act_authority
+      groups:
+        - match_style: word
+          terms:
+            - Access Canberra
+            - Road Transport Authority
+            - ACT Road Transport Authority
+            - ACT Government
+      strength: specific
+  filters:
+    - id: Guard_act_driver_licence_same_digits
+      type: AllDigitsSameFilter
+created: '2026-07-19'
+updated: '2026-07-19'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-19'
+    description: Initial territory-specific split with exact 65/75/85 probes and collision negatives.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://www.accesscanberra.act.gov.au/driving-transport-and-parking/licences
+    title: Driver licences - Access Canberra
+  - url: https://www.accesscanberra.act.gov.au/driving-transport-and-parking/licences/renew-or-replace-your-driver-licence
+    title: Renew or replace an ACT driver licence - Access Canberra

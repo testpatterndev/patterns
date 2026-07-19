@@ -1,0 +1,158 @@
+schema: testpattern/v1
+name: QLD Driver Licence Number
+slug: au-qld-driver-licence-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Queensland driver licence numbers in the established eight-to-nine-digit shape. This identifier SIT is
+  separate from au-qld-driver-licence-form, which detects application and renewal documents rather than populated
+  licence numbers.
+operation: >-
+  The bare numeric shape is discovery-only at 65. A labelled value with QLD/Queensland context reaches 75. A labelled
+  value with Department of Transport and Main Roads or TMR authority evidence reaches 85. Form numbers and unpopulated
+  form language do not satisfy the enforceable primary.
+pattern: \b(?!0{8,9}\b)\d{8,9}\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: eight-to-nine-digit values collide with routine identifiers, while an explicit licence-number
+  label plus Queensland context materially improves precision and TMR authority supports the strict tier.
+jurisdictions:
+  - au-qld
+regulations:
+  - Information Privacy Act 2009 (Qld)
+  - Privacy Act 1988 (Cth)
+  - Transport Operations (Road Use Management) Act 1995 (Qld)
+frameworks:
+  - ISO 27001
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - QLD driver licence number
+    - Queensland driver licence number
+    - Transport and Main Roads
+    - TMR
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '082946135'
+      description: Exact 65 discovery probe - bare nine-digit Queensland-shaped candidate
+    - value: 'QLD driver licence number: 082946135'
+      description: Exact 75 balanced probe - labelled candidate with QLD context but no authority
+    - value: 'TMR Queensland driver licence number: 082946135'
+      description: Exact 85 strict probe - labelled candidate with TMR authority
+    - value: 'Department of Transport and Main Roads QLD driver license no. 82946135'
+      description: Strict eight-digit variant with full authority name
+  should_not_match:
+    - value: 'Payment reference number: 082946135'
+      description: Nine-digit payment collision has no licence label or Queensland context
+    - value: 'VIC driver licence number: 082946135'
+      description: Wrong-state collision must not reach an enforceable QLD tier
+    - value: 'TMR vehicle registration number: 082946135'
+      description: Sibling registration identifier is not a driver licence number
+    - value: 'TMR driver licence application form number: 082946135'
+      description: QLD form/document evidence must remain separate from the number SIT
+    - value: 'Template: QLD driver licence number: 082946135'
+      description: Template fixture is excluded
+false_positives:
+  - description: Eight-to-nine-digit payment, customer, account, and registration references.
+    mitigation: Require the labelled licence-number primary and Queensland context for enforcement.
+  - description: QLD licence application and renewal forms can contain unrelated form or customer numbers.
+    mitigation: Do not treat application/form wording as a number label; keep the form SIT separate.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 5
+risk_description: >-
+  A confirmed Queensland driver licence number can support identity correlation and licence-themed fraud when linked
+  to a holder. It is distinct from a TMR card number, customer reference number, form number, licence image, or driving
+  history. Risk 5 and OFFICIAL reflect one bounded government identifier.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_qld_driver_licence_labelled
+      matches:
+        - ref: Evidence_qld_context
+        - ref: Evidence_qld_authority
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_qld_driver_licence_labelled
+      matches:
+        - ref: Evidence_qld_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_qld_driver_licence_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+  regexes:
+    - id: Pattern_qld_driver_licence_number
+      pattern: \b(?!0{8,9}\b)\d{8,9}\b
+    - id: Pattern_qld_driver_licence_labelled
+      pattern: (?i)\bdriver(?:'s|s)?\s+licen[cs]e\s*(?:number|no\.?|#)\s*[:=-]?\s*(?!0{8,9}\b)\d{8,9}\b
+  keywords:
+    - id: Evidence_qld_context
+      groups:
+        - match_style: word
+          terms:
+            - text: QLD
+              case_sensitive: true
+            - Queensland
+      strength: specific
+    - id: Evidence_qld_authority
+      groups:
+        - match_style: word
+          terms:
+            - Department of Transport and Main Roads
+            - Transport and Main Roads
+            - text: TMR
+              case_sensitive: true
+            - Queensland Transport
+      strength: specific
+  filters:
+    - id: Guard_qld_driver_licence_same_digits
+      type: AllDigitsSameFilter
+created: '2026-07-19'
+updated: '2026-07-19'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-19'
+    description: Initial number-specific split, separate from the existing QLD form SIT, with exact tier probes.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://www.qld.gov.au/transport/code
+    title: Finding Transport and Main Roads reference numbers - Queensland Government
+  - url: https://www.tmr.qld.gov.au/business-industry/accreditations/operator-accreditations/operator-accreditation-responsibilities/checking-the-currency-and-category
+    title: Queensland driver authorisation number guidance - TMR

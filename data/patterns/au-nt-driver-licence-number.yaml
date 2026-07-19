@@ -1,0 +1,157 @@
+schema: testpattern/v1
+name: NT Driver Licence Number
+slug: au-nt-driver-licence-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Northern Territory driver licence numbers in the established six-to-eight-digit shape. Enforceable tiers
+  require an explicit driver-licence-number label and NT context; the strict tier additionally requires Motor Vehicle
+  Registry authority evidence.
+operation: >-
+  The bare numeric shape is discovery-only at 65. A labelled value with Northern Territory context reaches 75. A
+  labelled value with Motor Vehicle Registry authority evidence reaches 85. Template and sibling-reference collisions
+  remain discovery-only or are excluded.
+pattern: \b(?!0{6,8}\b)\d{6,8}\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: six-to-eight-digit values are common outside licensing, while a labelled value and NT context
+  provide balanced confidence and Motor Vehicle Registry evidence provides strict confidence.
+jurisdictions:
+  - au-nt
+regulations:
+  - Information Act 2002 (NT)
+  - Motor Vehicles Act 1949 (NT)
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - ISO 27001
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - NT driver licence number
+    - Northern Territory driver licence number
+    - Motor Vehicle Registry
+    - MVR
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '4829157'
+      description: Exact 65 discovery probe - bare seven-digit Northern Territory-shaped candidate
+    - value: 'NT driver licence number: 4829157'
+      description: Exact 75 balanced probe - labelled candidate with NT context but no authority
+    - value: 'Motor Vehicle Registry Northern Territory driver licence number: 4829157'
+      description: Exact 85 strict probe - labelled candidate with MVR authority
+    - value: 'MVR NT driver license no. 829415'
+      description: Strict six-digit variant with authority acronym
+  should_not_match:
+    - value: 'Case reference: 4829157'
+      description: Seven-digit case collision has no licence label or NT context
+    - value: 'WA driver licence number: 4829157'
+      description: Wrong-state collision must not reach an enforceable NT tier
+    - value: 'MVR vehicle registration number: 4829157'
+      description: Sibling registry identifier is not a driver licence number
+    - value: 'NT permit application number: 4829157'
+      description: Generic permit reference lacks the driver-licence-number primary
+    - value: 'Sample file: NT driver licence number: 4829157'
+      description: Sample fixture is excluded
+false_positives:
+  - description: Six-to-eight-digit case, invoice, account, and registry identifiers.
+    mitigation: Require an explicit driver licence number label and Northern Territory context.
+  - description: Numeric driver licence formats from WA, NSW, and other jurisdictions.
+    mitigation: Require NT context and Motor Vehicle Registry evidence for strict classification.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 5
+risk_description: >-
+  A confirmed Northern Territory driver licence number can support identity correlation or impersonation when linked
+  to a holder. It is not a registration identifier, licence image, driving history, or authenticator. Risk 5 and
+  OFFICIAL reflect the bounded impact of one government identifier.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_nt_driver_licence_labelled
+      matches:
+        - ref: Evidence_nt_context
+        - ref: Evidence_nt_authority
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_nt_driver_licence_labelled
+      matches:
+        - ref: Evidence_nt_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_nt_driver_licence_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+  regexes:
+    - id: Pattern_nt_driver_licence_number
+      pattern: \b(?!0{6,8}\b)\d{6,8}\b
+    - id: Pattern_nt_driver_licence_labelled
+      pattern: (?i)\bdriver(?:'s|s)?\s+licen[cs]e\s*(?:number|no\.?|#)\s*[:=-]?\s*(?!0{6,8}\b)\d{6,8}\b
+  keywords:
+    - id: Evidence_nt_context
+      groups:
+        - match_style: word
+          terms:
+            - text: NT
+              case_sensitive: true
+            - Northern Territory
+      strength: specific
+    - id: Evidence_nt_authority
+      groups:
+        - match_style: word
+          terms:
+            - Motor Vehicle Registry
+            - text: MVR
+              case_sensitive: true
+            - NT Motor Vehicle Registry
+      strength: specific
+  filters:
+    - id: Guard_nt_driver_licence_same_digits
+      type: AllDigitsSameFilter
+created: '2026-07-19'
+updated: '2026-07-19'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-19'
+    description: Initial territory-specific split with exact 65/75/85 probes and collision negatives.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://nt.gov.au/driving
+    title: Driver licences and Motor Vehicle Registry - NT.GOV.AU
+  - url: https://www.service.nsw.gov.au/verifying-your-identity/document-examples
+    title: Australian driver licence document examples - Service NSW

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Legal full name
 slug: au-top500-001-legal-full-name
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -9,9 +9,9 @@ description: >-
   Identifies documents containing references to legal full name in Australian contexts. This information type is classified as personally identifiable information under applicable data protection
   regulations.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
-  lists: pii-personal, salutations-standard, au-forenames-australian, au-surnames-australian. Uses additional domain-context evidence
-  and explicit exclusion logic for template/sample/test text.
+  A broad name-field phrase is discovery-only at 65. The canonical legal-full-name label reaches 75,
+  while 85 additionally requires two distinct non-overlapping name-field terms. Template/sample/test
+  exclusions apply to every tier.
 pattern: (?is)\b(?:legal\s+full\s+name|legal\s+name|full\s+name|given\s+name|family\s+name|first\s+name|last\s+name|personal\s+details)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
@@ -52,13 +52,15 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: legal full name
-      description: Primary topic phrase match
+      description: Exact 75 probe - canonical label without two additional name-field terms
     - value: legal name
       description: Case-insensitive topic phrase match
     - value: full name
       description: Alternative topic phrase match
     - value: given name
-      description: Additional topic phrase match
+      description: Exact 65 discovery probe - alternative name-field phrase without the canonical legal-full-name label
+    - value: 'Australian identity verification record. Legal full name of the applicant, including given name and family name, exactly as shown on the identity document.'
+      description: Exact 85 probe - canonical label with two additional non-overlapping name-field terms
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -66,6 +68,8 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: name disability
       description: Generic word pair from old broad template should not match
+    - value: 'Sample: Australian applicant legal full name, given name and family name'
+      description: High-like template fixture must be rejected by the shared exclusion dictionary
 false_positives:
   - description: Common words and phrases related to legal full name appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -89,7 +93,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_legal_full_name
       matches:
-        - ref: Evidence_legal_full_name
+        - ref: Pattern_au_top500_001_legal_full_name_label_context
+        - ref: Evidence_additional_name_fields
           min_count: 2
           unique_results: true
         - type: any
@@ -100,7 +105,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_legal_full_name
       matches:
-        - ref: Evidence_legal_full_name
+        - ref: Pattern_au_top500_001_legal_full_name_label_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -111,6 +116,11 @@ purview:
       id_match: Pattern_legal_full_name
       matches:
         - ref: Evidence_legal_full_name
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
   regexes:
     - id: Pattern_legal_full_name
       pattern: (?is)\b(?:legal\s+full\s+name|legal\s+name|full\s+name|given\s+name|family\s+name|first\s+name|last\s+name|personal\s+details)\b
@@ -132,14 +142,17 @@ purview:
             - personal details
             - identity
             - demographics
-    - id: Keyword_au_top500_001_legal_full_name_domain_context
+    - id: Evidence_additional_name_fields
       groups:
         - match_style: word
           terms:
-            - legal full name
-            - legal
-            - full
-            - name
+            - given name
+            - family name
+            - surname
+            - first name
+            - last name
+            - middle name
+      strength: specific
 risk_description: >-
   The Legal full name pattern detects labels such as legal name, full name, given name, or surname, rather than resolving the text entered into that field. A standalone match usually communicates that a form or record expects identity information and can appear in blank templates, policies, or HR instructions. A completed name combined with account, employment, or case data would add correlation and targeting risk, but that content is not guaranteed by this detector. Risk 3 and OFFICIAL follow the phrase-level unit and avoid treating a field heading as a populated personal record.
 sensitivity_labels:
@@ -151,8 +164,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-07-19'
+    description: 'Australian personal-name baseline: make 65/75/85 cumulative and exact by separating broad phrase discovery, the canonical legal-full-name label, and two non-overlapping additional name-field terms; retain template exclusion at every tier and add exact-tier/adversarial probes.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 608 without changing detector or package metadata.'

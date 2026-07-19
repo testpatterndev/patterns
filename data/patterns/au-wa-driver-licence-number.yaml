@@ -1,0 +1,161 @@
+schema: testpattern/v1
+name: WA Driver Licence Number
+slug: au-wa-driver-licence-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Western Australian driver licence numbers in the established seven-digit shape. Enforceable tiers require an
+  explicit driver-licence-number label and WA context; the strict tier additionally requires WA transport or Driver and
+  Vehicle Services authority evidence.
+operation: >-
+  The bare seven-digit value is discovery-only at 65. A labelled value with Western Australian context reaches 75. A
+  labelled value with WA licensing-authority evidence reaches 85. Template fixtures and sibling transport identifiers
+  are excluded by evidence gating.
+pattern: \b(?!0{7}\b)\d{7}\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: seven-digit values are common in business records, while a driver-licence-number label and WA
+  context support balanced classification and issuing-authority evidence supports strict classification.
+jurisdictions:
+  - au-wa
+regulations:
+  - Privacy Act 1988 (Cth)
+  - Road Traffic (Authorisation to Drive) Act 2008 (WA)
+frameworks:
+  - ISO 27001
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - WA driver licence number
+    - Western Australian driver licence number
+    - Driver and Vehicle Services
+    - Department of Transport and Major Infrastructure
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '4082915'
+      description: Exact 65 discovery probe - bare seven-digit Western Australian-shaped candidate
+    - value: 'WA driver licence number: 4082915'
+      description: Exact 75 balanced probe - labelled candidate with WA context but no authority
+    - value: 'Driver and Vehicle Services Western Australia driver licence number: 4082915'
+      description: Exact 85 strict probe - labelled candidate with WA authority
+    - value: 'DTMI WA driver license no. 6829415'
+      description: Strict alternate candidate with current authority acronym
+  should_not_match:
+    - value: 'Invoice number: 4082915'
+      description: Seven-digit invoice collision has no licence label or WA context
+    - value: 'NT driver licence number: 4082915'
+      description: Wrong-territory collision must not reach an enforceable WA tier
+    - value: 'Transport WA vehicle account number: 4082915'
+      description: Sibling transport identifier is not a driver licence number
+    - value: 'WA fishing licence number: 4082915'
+      description: Another licence type lacks the driver primary
+    - value: 'Training example: WA driver licence number: 4082915'
+      description: Training fixture is excluded
+false_positives:
+  - description: Seven-digit invoices, customer IDs, claims, orders, and vehicle references.
+    mitigation: Require an explicit driver licence number label and Western Australian context.
+  - description: Seven-digit licence numbers issued by other Australian jurisdictions.
+    mitigation: Require WA context and WA transport-authority evidence for strict classification.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 5
+risk_description: >-
+  A confirmed Western Australian driver licence number can assist identity correlation or licence-themed fraud when
+  linked to a holder. It is not the licence card, driving history, vehicle account, or authentication credential. Risk
+  5 and OFFICIAL reflect the bounded impact of one government identifier.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_wa_driver_licence_labelled
+      matches:
+        - ref: Evidence_wa_context
+        - ref: Evidence_wa_authority
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_wa_driver_licence_labelled
+      matches:
+        - ref: Evidence_wa_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_wa_driver_licence_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+  regexes:
+    - id: Pattern_wa_driver_licence_number
+      pattern: \b(?!0{7}\b)\d{7}\b
+    - id: Pattern_wa_driver_licence_labelled
+      pattern: (?i)\bdriver(?:'s|s)?\s+licen[cs]e\s*(?:number|no\.?|#)\s*[:=-]?\s*(?!0{7}\b)\d{7}\b
+  keywords:
+    - id: Evidence_wa_context
+      groups:
+        - match_style: word
+          terms:
+            - text: WA
+              case_sensitive: true
+            - Western Australia
+            - Western Australian
+      strength: specific
+    - id: Evidence_wa_authority
+      groups:
+        - match_style: word
+          terms:
+            - Driver and Vehicle Services
+            - Department of Transport and Major Infrastructure
+            - Department of Transport
+            - Transport WA
+            - text: DTMI
+              case_sensitive: true
+            - text: DVS
+              case_sensitive: true
+      strength: specific
+  filters:
+    - id: Guard_wa_driver_licence_same_digits
+      type: AllDigitsSameFilter
+created: '2026-07-19'
+updated: '2026-07-19'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-19'
+    description: Initial state-specific split with exact 65/75/85 probes and collision negatives.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://www.transport.wa.gov.au/licensing/drivers-licence
+    title: Driver licences - Transport WA
+  - url: https://www.transport.wa.gov.au/about-us/help-centre/renew-your-drivers-licence-online
+    title: Driver licence renewal guidance - Transport WA

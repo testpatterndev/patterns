@@ -1,0 +1,249 @@
+schema: testpattern/v1
+name: Australian Person-Linked Residential Address
+slug: au-person-linked-residential-address
+version: 1.0.1
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects a populated Australian residential street address linked to a labelled person. Bare address
+  structure is available for discovery, the balanced tier requires person and residential context plus
+  Australian geography, and the strict tier requires state and postcode corroboration.
+operation: >-
+  Pattern_au_person_linked_street_address matches a populated street number, street name, and Australian
+  road type. The 65 tier is discovery-only. The 75 tier requires a labelled person, an explicit
+  residence relationship, and at least one state, major-locality, or postcode signal. The 85 tier requires
+  the same person and residence relationship plus both an Australian state or territory and a postcode.
+  Template and example content is excluded from the enforcing tiers.
+pattern: >-
+  (?i)\b\d{1,5}[A-Z]?(?:\s*[-/]\s*\d{1,5}[A-Z]?)?\s+[A-Z][A-Z'-]{1,30}(?:\s+[A-Z][A-Z'-]{0,30}){0,5}\s+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Place|Pl|Court|Ct|Crescent|Cres|Close|Cl|Lane|La|Way|Parade|Pde|Boulevard|Blvd|Terrace|Tce|Circuit|Cct|Highway|Hwy|Grove|Gv|Square|Sq|Esplanade|Esp|Rise|View|Gardens|Loop|Trail|Track|Pass|Heights)\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: enforcement requires a populated Australian street structure, a labelled person,
+  an explicit residential relationship, and geographic corroboration. The high tier additionally requires
+  complete state/postcode evidence, while bare structures remain discovery-only.
+jurisdictions:
+  - au
+regulations:
+  - AML/CTF Act (Cth)
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+  - TIA Act 1979 (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - contact-information
+  - location
+corroborative_evidence:
+  keywords:
+    - resident
+    - tenant
+    - occupant
+    - home address
+    - residential address
+    - principal place of residence
+    - postcode
+  proximity: 300
+  keyword_lists:
+    - au-road-classification-extended
+    - au-major-cities
+    - au-states-full
+    - au-states-abbreviations
+    - au-unit-types
+test_cases:
+  should_match:
+    - value: 7B George Street
+      description: Exact 65 probe - populated street structure without person or residential context
+    - value: 'Resident: Alex Nguyen; residential address: 18 Church Street, Parramatta 2150'
+      description: Exact 75 probe - person-linked residence with locality and postcode but no state
+    - value: 'Resident: Alex Nguyen; residential address: 18 Church Street, Parramatta NSW 2150'
+      description: Exact 85 probe - person-linked residence with state and postcode
+    - value: 'Tenant: Grace Osei; principal place of residence: Unit 4, 12 Ocean Rise, Redcliffe QLD 4020'
+      description: Unit-prefixed person-linked Australian residence
+  should_not_match:
+    - value: 'Resident: Alex Nguyen; residential address:'
+      description: Person and residential labels without a populated address
+    - value: 'Contact: Alex Nguyen; office address: 18 Church Street, Parramatta NSW 2150'
+      description: Person-linked business address without a residential relationship must not enforce
+    - value: 'The conference speaker is Alex Nguyen at 200 George Street, Sydney NSW 2000'
+      description: Named person near a public venue without labelled person or residential relationship
+    - value: 'Resident: Full Name; residential address: 18 Church Street, Parramatta NSW 2150'
+      description: A populated address with a blank-form name placeholder must not establish person linkage
+    - value: 'Documentation example: Resident: Alex Nguyen; residential address: 18 Church Street, Parramatta NSW 2150'
+      description: Complete but explicitly documented example is excluded from enforcing tiers
+    - value: The tenant rights guide explains how to update an address.
+      description: Residential topic without a populated address value
+false_positives:
+  - description: A person name and valid address can refer to a business contact, venue, or correspondence destination rather than a residence.
+    mitigation: Require an explicit resident, tenant, occupant, home-address, or place-of-residence relationship for enforcement.
+  - description: Completed example records in forms, documentation, or training material can look genuine.
+    mitigation: Apply the shared template-exclusion NOT-group to the 75 and 85 tiers.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 6
+risk_description: >-
+  A true enforcing match links an identified person to a populated Australian residence. Disclosure can
+  enable unwanted contact, residence verification, targeted social engineering, or physical targeting,
+  although a single ordinary record does not establish vulnerability, a safety threat, or a protected
+  location. Risk 6 supports SENSITIVE Personal-Privacy treatment; protected-person and safety-critical
+  residences require stronger controls.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_au_person_linked_street_address
+      matches:
+        - ref: Pattern_au_person_linked_labelled_person
+        - ref: Evidence_au_person_linked_residential_context
+        - ref: Evidence_au_person_linked_state_territory
+        - ref: Evidence_au_person_linked_major_locality
+        - ref: Pattern_au_person_linked_postcode
+        - ref: Pattern_au_person_linked_address_label
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_au_person_linked_street_address
+      matches:
+        - ref: Pattern_au_person_linked_labelled_person
+        - ref: Evidence_au_person_linked_residential_context
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_au_person_linked_state_territory
+            - Evidence_au_person_linked_major_locality
+            - Pattern_au_person_linked_postcode
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_au_person_linked_street_address
+  regexes:
+    - id: Pattern_au_person_linked_street_address
+      pattern: >-
+        (?i)\b\d{1,5}[A-Z]?(?:\s*[-/]\s*\d{1,5}[A-Z]?)?\s+[A-Z][A-Z'-]{1,30}(?:\s+[A-Z][A-Z'-]{0,30}){0,5}\s+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Place|Pl|Court|Ct|Crescent|Cres|Close|Cl|Lane|La|Way|Parade|Pde|Boulevard|Blvd|Terrace|Tce|Circuit|Cct|Highway|Hwy|Grove|Gv|Square|Sq|Esplanade|Esp|Rise|View|Gardens|Loop|Trail|Track|Pass|Heights)\b
+    - id: Pattern_au_person_linked_postcode
+      pattern: \b(?:0[289]\d{2}|[1-9]\d{3})\b
+    - id: Pattern_au_person_linked_address_label
+      pattern: >-
+        (?i)\b(?:home\s+address|residential\s+address|permanent\s+address|usual\s+residential\s+address|principal\s+place\s+of\s+residence)\s*[:#-]
+    - id: Pattern_au_person_linked_labelled_person
+      pattern: >-
+        (?i)\b(?:resident|tenant|occupant|applicant|customer|account\s+holder|name)\s*(?:is\s*)?[:#-]\s*(?!(?:full|given|first|last|customer|resident|tenant|occupant|account\s+holder)\s+name\b)(?!firstname\s+lastname\b)(?!(?:john|jane)\s+doe\b)[A-Z][A-Za-z'-]{1,30}(?:\s+[A-Z][A-Za-z'-]{1,30}){1,3}\b
+  keywords:
+    - id: Evidence_au_person_linked_residential_context
+      groups:
+        - match_style: word
+          terms:
+            - home address
+            - residential address
+            - principal place of residence
+            - place of residence
+            - permanent address
+            - usual residential address
+            - resides at
+            - lives at
+            - resident
+            - tenant
+            - occupant
+      strength: specific
+    - id: Evidence_au_person_linked_state_territory
+      groups:
+        - match_style: word
+          terms:
+            - text: NSW
+              case_sensitive: true
+            - text: VIC
+              case_sensitive: true
+            - text: QLD
+              case_sensitive: true
+            - text: SA
+              case_sensitive: true
+            - text: WA
+              case_sensitive: true
+            - text: TAS
+              case_sensitive: true
+            - text: NT
+              case_sensitive: true
+            - text: ACT
+              case_sensitive: true
+            - New South Wales
+            - Victoria
+            - Queensland
+            - South Australia
+            - Western Australia
+            - Tasmania
+            - Northern Territory
+            - Australian Capital Territory
+      strength: domain
+    - id: Evidence_au_person_linked_major_locality
+      groups:
+        - match_style: word
+          terms:
+            - Sydney
+            - Melbourne
+            - Brisbane
+            - Perth
+            - Adelaide
+            - Hobart
+            - Darwin
+            - Canberra
+            - Gold Coast
+            - Newcastle
+            - Wollongong
+            - Geelong
+            - Townsville
+            - Cairns
+            - Toowoomba
+            - Ballarat
+            - Bendigo
+            - Albury
+            - Wodonga
+            - Launceston
+            - Mackay
+            - Rockhampton
+            - Redcliffe
+            - Parramatta
+      strength: domain
+created: '2026-07-19'
+updated: '2026-07-19'
+changelog:
+  - version: 1.0.1
+    date: '2026-07-19'
+    description: 'Make the 85 tier demonstrably cumulative by requiring an explicit residential-address field label and major-locality evidence in addition to person, state, and postcode corroboration.'
+  - version: 1.0.0
+    date: '2026-07-19'
+    description: 'Initial Australian person-linked residential-address detector with distinct 65, 75, and 85 tiers.'
+author: testpattern-community
+license: MIT
+references:
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-personal-information
+    title: What is personal information? | OAIC
+  - url: https://auspost.com.au/business/shipping/check-sending-guidelines/addressing-guidelines
+    title: Addressing guidelines | Australia Post

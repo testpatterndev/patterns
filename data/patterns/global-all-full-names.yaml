@@ -1,16 +1,18 @@
 schema: testpattern/v1
 name: All Full Names
 slug: global-all-full-names
-version: 1.3.1
+version: 1.4.0
 type: keyword_list
 pattern_class: concept
 description: >-
-  Detects All Full Names patterns. This pattern is based on a Microsoft Purview built-in
-  sensitive information type that uses machine learning and function-based detection for
-  personal name identification. This keyword list provides name-related terms for supplementary matching.
+  Catalogue reference for the Microsoft Purview built-in All Full Names named-entity SIT.
+  This YAML-only record supplies supplementary name-field vocabulary for registry search
+  and testing; it does not reproduce Microsoft's opaque name-recognition resources.
 operation: >-
-  Function-based detection in Microsoft Purview. This pattern uses keyword matching for
-  name-related terminology to identify personal names in documents.
+  In Microsoft Purview, enable the built-in All Full Names SIT to use Microsoft's name
+  recognition. The TestPattern representation below is supplementary keyword logic only:
+  65 discovers a name-field term, 75 adds person-record context, and 85 requires two
+  additional distinct name-field terms. It exports YAML, not custom Purview XML.
 keywords:
   - first name
   - last name
@@ -43,12 +45,12 @@ data_categories:
   - pii
 test_cases:
   should_match:
-    - value: "please enter your full name below"
-      description: Contains name keyword 'full name'
-    - value: "applicant surname and given name"
-      description: Contains name keywords 'surname' and 'given name'
-    - value: "patient first name and last name on file"
-      description: Contains name keywords 'first name' and 'last name'
+    - value: "given name"
+      description: Exact 65 supplementary discovery probe - one name-field term without person-record context
+    - value: "applicant full name on identity record"
+      description: Exact 75 supplementary probe - name-field term with person-record context but no additional fields
+    - value: "identity record for applicant: full name, given name, surname"
+      description: Exact 85 supplementary probe - person-record context with two additional distinct name fields
   should_not_match:
     - value: "quarterly financial report for fiscal year 2024"
       description: Financial text with no name-related keywords
@@ -73,6 +75,18 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Keyword_full_names
+      matches:
+        - ref: Keyword_full_names_context
+        - ref: Keyword_additional_name_fields
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Keyword_full_names
       matches:
@@ -85,6 +99,12 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Keyword_full_names
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   keywords:
     - id: Keyword_full_names
       groups:
@@ -119,6 +139,21 @@ purview:
             - personnel
             - next of kin
       strength: domain
+    - id: Keyword_additional_name_fields
+      groups:
+        - match_style: word
+          terms:
+            - first name
+            - last name
+            - given name
+            - surname
+            - family name
+            - middle name
+            - maiden name
+            - forename
+            - patronymic
+            - matronymic
+      strength: specific
 risk_rating: 3
 risk_description: >-
   This low-confidence supplementary keyword list recognises name-field language such as surname, given name, and full name; it is not the machine-learning name recogniser and does not guarantee that a person's name is present. Where an actual full name is captured, it identifies an individual and can aid correlation or targeted contact, but names are often public and rarely cause material harm alone. Forms, database documentation, and empty templates are normal false positives, so the affected scale cannot be inferred from one match. Risk 3 OFFICIAL reflects low standalone impact; SENSITIVE would require names linked to protected attributes, a sensitive case, a high-risk cohort, or a consequential bulk roster.
@@ -134,8 +169,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-all-full-names
     title: "All Full Names entity definition - Microsoft Learn"
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Clarify that this is a YAML-only reference to the Microsoft built-in, retain source:microsoft and no custom XML export, and make the supplementary 65/75/85 vocabulary tiers materially distinct with exact-tier probes.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1210 without changing detector or package metadata.'

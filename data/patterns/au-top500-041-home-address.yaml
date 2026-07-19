@@ -1,22 +1,29 @@
 schema: testpattern/v1
 name: Home address
 slug: au-top500-041-home-address
-version: 1.3.1
+version: 2.0.1
 type: regex
-pattern_class: concept
+pattern_class: identifier
 engine: boost_regex
 description: >-
-  Identifies documents containing references to home address in Australian contexts. This information type is classified as personally identifiable information under applicable data protection
-  regulations.
+  Detects populated Australian residential street addresses. Bare street structure is retained for
+  discovery, while enforcing tiers require Australian geographic evidence and home/residential context;
+  the strict tier also requires a labelled person linked to the address.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Keyword
-  lists: pii-personal, au-road-classification-extended, au-major-cities, au-states-full, au-states-abbreviations, au-unit-types. Uses additional domain-context evidence and explicit exclusion logic
-  for template/sample/test text.
-pattern: (?is)\b(?:home\s+address|residential\s+address|street\s+address|dwelling\s+address|permanent\s+address|place\s+of\s+residence|unit\s+number|property\s+address|delivery\s+address)\b
+  Pattern_au_home_street_address matches a populated street number, street name, and Australian road type.
+  The 65 tier is discovery-only. The 75 tier requires home/residential context plus at least one state,
+  major-locality, or postcode signal. The 85 tier requires home/residential context, a labelled person,
+  an Australian state or territory, and a postcode. Template and example content is excluded from the
+  enforcing tiers.
+pattern: >-
+  (?i)\b\d{1,5}[A-Z]?(?:\s*[-/]\s*\d{1,5}[A-Z]?)?\s+[A-Z][A-Z'-]{1,30}(?:\s+[A-Z][A-Z'-]{0,30}){0,5}\s+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Place|Pl|Court|Ct|Crescent|Cres|Close|Cl|Lane|La|Way|Parade|Pde|Boulevard|Blvd|Terrace|Tce|Circuit|Cct|Highway|Hwy|Grove|Gv|Square|Sq|Esplanade|Esp|Rise|View|Gardens|Loop|Trail|Track|Pass|Heights)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: a populated Australian street structure plus residential and geographic context
+  is materially stronger than a home-address label alone. The high tier additionally proves person
+  attribution and complete state/postcode geography.
 jurisdictions:
-  - global
+  - au
 regulations:
   - AML/CTF Act (Cth)
   - HRIPA (Cth)
@@ -30,48 +37,52 @@ frameworks:
   - ISO 27701
 data_categories:
   - pii
+  - contact-information
+  - location
 corroborative_evidence:
   keywords:
     - home address
-    - home
-    - address
-    - contact
-    - location
-    - data
+    - residential address
+    - principal place of residence
+    - resident
+    - tenant
+    - occupant
+    - postcode
   proximity: 300
   keyword_lists:
-    - pii-personal
     - au-road-classification-extended
     - au-major-cities
     - au-states-full
     - au-states-abbreviations
     - au-unit-types
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: home address
-      description: Primary topic phrase match
-    - value: residential address
-      description: Case-insensitive topic phrase match
-    - value: street address
-      description: Alternative topic phrase match
-    - value: dwelling address
-      description: Additional topic phrase match
+    - value: 7B George Street
+      description: Exact 65 probe - populated street structure without residential or geographic context
+    - value: 'Home address: 18 Banksia Road, Brisbane QLD 4000'
+      description: Exact 75 probe - populated home address with geography but no labelled person
+    - value: 'Resident: Full Name; home address: 18 Banksia Road, Brisbane QLD 4000'
+      description: Exact 75 probe - blank-form person placeholder must not elevate the address to 85
+    - value: 'Resident: Mia Chen; residential address: Unit 4, 12 Ocean Rise, Redcliffe QLD 4020'
+      description: Exact 85 probe - populated residential address with person, state, and postcode
+    - value: 'Principal place of residence: 91 King Street, Melbourne VIC 3000'
+      description: Populated residence with an explicit residential relationship
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: address mac
-      description: Generic word pair from old broad template should not match
+    - value: 'Home address:'
+      description: Blank label must not be treated as a populated address
+    - value: The home address field is mandatory on the application form.
+      description: Policy or form prose without an address value
+    - value: The conference is at 200 George Street, Sydney NSW 2000.
+      description: Public venue address lacks residential context and must not enforce
+    - value: 'Documentation example: Resident: Mia Chen; home address: 12 Ocean Rise, Redcliffe QLD 4020'
+      description: Complete but explicitly documented example is excluded from enforcing tiers
+    - value: Road to recovery was published in 2024.
+      description: Metaphorical road wording without address structure
 false_positives:
-  - description: Common words and phrases related to home address appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Public venues and business premises can have valid Australian street structures.
+    mitigation: Require explicit home or residential context for enforcing tiers and person attribution at high confidence.
+  - description: Completed example addresses in forms, documentation, or training material can look genuine.
+    mitigation: Apply the shared template-exclusion NOT-group to the 75 and 85 tiers.
 exports:
   - purview_xml
   - yaml
@@ -86,20 +97,29 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_home_address
+      id_match: Pattern_au_home_street_address
       matches:
-        - ref: Evidence_home_address
-          min_count: 2
-          unique_results: true
+        - ref: Evidence_au_home_residential_context
+        - ref: Pattern_au_home_labelled_person
+        - ref: Evidence_au_home_state_territory
+        - ref: Evidence_au_home_major_locality
+        - ref: Pattern_au_home_postcode
+        - ref: Pattern_au_home_address_label
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_home_address
+      id_match: Pattern_au_home_street_address
       matches:
-        - ref: Evidence_home_address
+        - ref: Evidence_au_home_residential_context
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_au_home_state_territory
+            - Evidence_au_home_major_locality
+            - Pattern_au_home_postcode
         - type: any
           min_matches: 0
           max_matches: 0
@@ -107,40 +127,99 @@ purview:
             - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_home_address
-      matches:
-        - ref: Evidence_home_address
+      id_match: Pattern_au_home_street_address
   regexes:
-    - id: Pattern_home_address
-      pattern: (?is)\b(?:home\s+address|residential\s+address|street\s+address|dwelling\s+address|permanent\s+address|place\s+of\s+residence|unit\s+number|property\s+address|delivery\s+address)\b
-    - id: Pattern_au_top500_041_home_address_label_context
-      pattern: (?i)\b(?:home\s+address)\b
+    - id: Pattern_au_home_street_address
+      pattern: >-
+        (?i)\b\d{1,5}[A-Z]?(?:\s*[-/]\s*\d{1,5}[A-Z]?)?\s+[A-Z][A-Z'-]{1,30}(?:\s+[A-Z][A-Z'-]{0,30}){0,5}\s+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Place|Pl|Court|Ct|Crescent|Cres|Close|Cl|Lane|La|Way|Parade|Pde|Boulevard|Blvd|Terrace|Tce|Circuit|Cct|Highway|Hwy|Grove|Gv|Square|Sq|Esplanade|Esp|Rise|View|Gardens|Loop|Trail|Track|Pass|Heights)\b
+    - id: Pattern_au_home_postcode
+      pattern: \b(?:0[289]\d{2}|[1-9]\d{3})\b
+    - id: Pattern_au_home_address_label
+      pattern: >-
+        (?i)\b(?:home\s+address|residential\s+address|permanent\s+address|usual\s+residential\s+address|principal\s+place\s+of\s+residence)\s*[:#-]
+    - id: Pattern_au_home_labelled_person
+      pattern: >-
+        (?i)\b(?:resident|tenant|occupant|applicant|customer|account\s+holder|name)\s*(?:is\s*)?[:#-]\s*(?!(?:full|given|first|last|customer|resident|tenant|occupant|account\s+holder)\s+name\b)(?!firstname\s+lastname\b)(?!(?:john|jane)\s+doe\b)[A-Z][A-Za-z'-]{1,30}(?:\s+[A-Z][A-Za-z'-]{1,30}){1,3}\b
   keywords:
-    - id: Evidence_home_address
+    - id: Evidence_au_home_residential_context
       groups:
         - match_style: word
           terms:
             - home address
             - residential address
-            - street address
-            - dwelling address
-            - permanent address
-            - domicile
+            - principal place of residence
             - place of residence
-            - suburb
-            - postcode
-            - unit number
-            - property address
-            - delivery address
-    - id: Keyword_au_top500_041_home_address_domain_context
+            - permanent address
+            - usual residential address
+            - resident
+            - tenant
+            - occupant
+      strength: specific
+    - id: Evidence_au_home_state_territory
       groups:
         - match_style: word
           terms:
-            - home address
-            - home
-            - address
+            - text: NSW
+              case_sensitive: true
+            - text: VIC
+              case_sensitive: true
+            - text: QLD
+              case_sensitive: true
+            - text: SA
+              case_sensitive: true
+            - text: WA
+              case_sensitive: true
+            - text: TAS
+              case_sensitive: true
+            - text: NT
+              case_sensitive: true
+            - text: ACT
+              case_sensitive: true
+            - New South Wales
+            - Victoria
+            - Queensland
+            - South Australia
+            - Western Australia
+            - Tasmania
+            - Northern Territory
+            - Australian Capital Territory
+      strength: domain
+    - id: Evidence_au_home_major_locality
+      groups:
+        - match_style: word
+          terms:
+            - Sydney
+            - Melbourne
+            - Brisbane
+            - Perth
+            - Adelaide
+            - Hobart
+            - Darwin
+            - Canberra
+            - Gold Coast
+            - Newcastle
+            - Wollongong
+            - Geelong
+            - Townsville
+            - Cairns
+            - Toowoomba
+            - Ballarat
+            - Bendigo
+            - Albury
+            - Wodonga
+            - Launceston
+            - Mackay
+            - Rockhampton
+            - Redcliffe
+            - Parramatta
+      strength: domain
+risk_rating: 3
 risk_description: >-
-  The Home address concept pattern finds labels such as home address, residential address, or street address rather than parsing a completed location. The phrase commonly appears on blank forms, data dictionaries, and account instructions, so an ordinary match may reveal only that residential information is requested. A populated address linked to a vulnerable or protected person could enable unwanted contact or physical targeting, but neither the value nor occupant is established here. Risk 3 and OFFICIAL fit the concept-level unit and leave actual person-location combinations to contextual controls.
+  This detector now requires a populated Australian street address for every match. Enforcing tiers add
+  residential and geographic evidence, and the high tier links the residence to a labelled person.
+  A single ordinary address can support unwanted contact or correlation but does not by itself establish
+  vulnerability, occupancy history, or a protected location. Risk 3 and OFFICIAL remain appropriate;
+  the dedicated person-linked residential-address SIT provides stronger treatment for attributed records.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -150,8 +229,17 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 2.0.1
+    date: '2026-07-19'
+    description: 'Make the 85 tier demonstrably cumulative by requiring an explicit residential-address field label and major-locality evidence in addition to person, state, and postcode corroboration.'
+  - version: 2.0.0
+    date: '2026-07-19'
+    description: >-
+      Replace label-only concept matching with populated Australian residential-address detection.
+      Add exact 65/75/85 probes, person/state/postcode high-confidence logic, template exclusions,
+      and adversarial blank-label, public-venue, and documented-example cases.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 644 without changing detector or package metadata.'
@@ -173,11 +261,7 @@ changelog:
 author: testpattern-community
 license: MIT
 references:
-  - https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-personal-information
-  - https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-sensitive-information
-  - https://www.oaic.gov.au/privacy/australian-privacy-principles-guidelines
-  - https://www.service.nsw.gov.au/transaction/check-a-vehicle-registration
-  - https://www.gsma.com/get-involved/working-groups/terminal-steering-group/imei-database/
-  - https://www.itu.int/rec/T-REC-E.118.1/en
-
-risk_rating: 3
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-personal-information
+    title: What is personal information? | OAIC
+  - url: https://auspost.com.au/business/shipping/check-sending-guidelines/addressing-guidelines
+    title: Addressing guidelines | Australia Post

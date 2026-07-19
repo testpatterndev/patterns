@@ -1,21 +1,25 @@
 schema: testpattern/v1
 name: Australian Individual Name Record
 slug: au-individual-name-record
-version: 2.5.1
-type: keyword_dictionary
+version: 2.6.0
+type: keyword_proximity
 pattern_class: concept
+engine: boost_regex
 description: >-
-  Identifies Australian personal names using structural regex for capitalised name patterns combined
-  with family-name and forename census dictionaries. Supports Western, Vietnamese, Indian, Chinese,
-  and Korean naming patterns.
+  Identifies Australian personal names using capitalised name structure with controlled evidence
+  from the consolidated Australian forename and surname dictionaries. Supports the multicultural
+  name coverage represented in Australian birth, immigration, and administrative sources.
 operation: >-
-  Structural regex for capitalised name components combined with corroborative keyword dictionaries of
-  family names and forenames. Context keywords required. 3 tiers: structural + context + family name
-  (high), structural + context + forename (medium), salutation + name dict (low).
-confidence: low
+  Capitalised two-to-four component name structure is the primary signal. The consolidated Australian
+  dictionaries are supporting evidence only: 65 requires either dictionary and is discovery-only, 75
+  adds an explicit person-to-name relation plus both dictionary classes, and 85 additionally requires
+  a name-field label. Strong business-suffix and formatted-address collisions veto enforcement.
+case_sensitive: true
+confidence: medium
 confidence_justification: >-
-  Low confidence: personal names are common words. Without PII context keywords the false positive rate
-  is unacceptable. Requires corroborative evidence.
+  Medium confidence: enforcement requires capitalised name structure, Australian dictionary evidence,
+  and personal-record context. Broad dictionary-only recognition remains discovery-only because names
+  and name-like words can occur in organisations, headings, and ordinary prose.
 jurisdictions:
   - au
 regulations:
@@ -34,6 +38,12 @@ data_categories:
   - personal-name
 test_cases:
   should_match:
+    - value: Aaliyah Abbasi attended the briefing.
+      description: Exact 65 discovery probe - structured name with both consolidated dictionary hits but no personal-record context
+    - value: Applicant identified as Aaliyah Abbasi during identity intake.
+      description: Exact 75 probe - structured name with a person-to-name relation and both dictionary classes but no field label
+    - value: 'Customer name: Aaliyah Abbasi'
+      description: Exact 85 probe - structured name with record context plus consolidated forename and surname evidence
     - value: 'Customer name: Sarah Williams'
       description: Common Western female name with surname
     - value: 'Patient: Nguyen Van Minh'
@@ -44,11 +54,20 @@ test_cases:
     - value: Please review the attached quarterly sales figures before Friday.
       description: Generic business text with no name pattern
     - value: Southern Cross Engineering submitted a tender for the contract.
-      description: Business name without a listed surname, not a personal name
+      description: Organisation name may surface in discovery but lacks personal-record context and must not reach enforcement
+    - value: 'Applicant organisation: Southern Cross Engineering Pty Ltd'
+      description: Business-suffix collision in the Australian name dictionaries must not reach enforcement
+    - value: 'Delivery location: Victoria Park Road, QLD 4000'
+      description: Formatted-address vocabulary present in both name dictionaries must not reach enforcement
+    - value: 'Client name: Quarterly Revenue'
+      description: Name-field wording and capitalised structure without Australian name-dictionary evidence
+    - value: 'Sample: Customer name: Aaliyah Abbasi'
+      description: High-like template fixture must be rejected by the shared exclusion dictionary
 false_positives:
   - description: Common surnames such as Brown, Young, or Green appear frequently as everyday words.
     mitigation: Use corroborative evidence keywords to filter. Require PII context.
 exports:
+  - purview_xml
   - yaml
 scope: wide
 risk_rating: 5
@@ -64,41 +83,54 @@ sensitivity_labels:
   ca_gov: "Protected A"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
+      match_style: word
+    - dict: au-forenames-australian
+      as: Evidence_au_forename_registry
+      match_style: word
+    - dict: au-surnames-australian
+      as: Evidence_au_surname_registry
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_individual_name
       matches:
+        - ref: Pattern_individual_name_relation
         - ref: Evidence_name_record_context
-        - ref: Evidence_family_name_registry
+        - ref: Evidence_au_forename_registry
+        - ref: Evidence_au_surname_registry
+        - ref: Pattern_individual_name_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Pattern_non_person_name_collision
     - confidence_level: 75
       id_match: Pattern_individual_name
       matches:
+        - ref: Pattern_individual_name_relation
         - ref: Evidence_name_record_context
-        - ref: Evidence_forename_registry
+        - ref: Evidence_au_forename_registry
+        - ref: Evidence_au_surname_registry
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Pattern_non_person_name_collision
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_individual_titled
+      id_match: Pattern_individual_name
       matches:
         - type: any
           min_matches: 1
-          children:
-            - ref: Evidence_family_name_registry
-            - ref: Evidence_forename_registry
+          refs:
+            - Evidence_au_forename_registry
+            - Evidence_au_surname_registry
         - type: any
           min_matches: 0
           max_matches: 0
@@ -106,9 +138,13 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Pattern_individual_name
-      pattern: \b[A-Z][a-z]+(?:\s+[A-Z][a-z]{1,20}){1,3}\b
-    - id: Pattern_individual_titled
-      pattern: \b(?:Mr|Mrs|Ms|Miss|Dr|Prof)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]{1,20}){0,2}\b
+      pattern: \b(?:[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}|[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}|[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20})\b
+    - id: Pattern_individual_name_relation
+      pattern: (?i)\b(?:(?:full\s+name|legal\s+name|first\s+name|last\s+name|surname|given\s+name|middle\s+name|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+name|applicant|customer|client|patient|employee|member|holder|contact)\s*(?::|-|is)\s*(?:[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20})|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+(?:identified\s+as|recorded\s+as|named|details\s+for)\s+(?:[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}))\b
+    - id: Pattern_individual_name_field
+      pattern: (?i)\b(?:full\s+name|legal\s+name|first\s+name|last\s+name|surname|given\s+name|middle\s+name|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+name|applicant|customer|client|patient|employee|member|holder|contact)\s*(?::|-|is)\s*
+    - id: Pattern_non_person_name_collision
+      pattern: (?i)\b(?:(?:engineering|consulting|holdings|services|pty\s+ltd|ltd|limited|company|corporation|council|university)|(?:street|road|avenue|highway|parade|drive|lane|terrace|crescent)\s*,?\s*(?:NSW|QLD|VIC|TAS|SA|WA|NT|ACT|\d{4}))\b
   keywords:
     - id: Evidence_name_record_context
       groups:
@@ -131,175 +167,12 @@ purview:
             - owner
             - contact
       strength: domain
-    - id: Evidence_family_name_registry
-      groups:
-        - match_style: word
-          terms:
-            - Smith
-            - Jones
-            - Williams
-            - Brown
-            - Wilson
-            - Taylor
-            - Anderson
-            - Johnson
-            - White
-            - Thompson
-            - Lee
-            - Martin
-            - Thomas
-            - Walker
-            - Kelly
-            - Young
-            - Harris
-            - King
-            - Ryan
-            - Roberts
-            - Hall
-            - Evans
-            - Davis
-            - Wright
-            - Baker
-            - Campbell
-            - Edwards
-            - Clark
-            - Robinson
-            - McDonald
-            - Hill
-            - Scott
-            - Clarke
-            - Mitchell
-            - Stewart
-            - Moore
-            - Turner
-            - Miller
-            - Green
-            - Watson
-            - Bell
-            - Wood
-            - Cooper
-            - Murphy
-            - Jackson
-            - James
-            - Lewis
-            - Allen
-            - Bennett
-            - Robertson
-            - Nguyen
-            - Tran
-            - Le
-            - Pham
-            - Hoang
-            - Huynh
-            - Phan
-            - Vo
-            - Dang
-            - Bui
-            - Singh
-            - Kaur
-            - Patel
-            - Kumar
-            - Sharma
-            - Gupta
-            - Rao
-            - Reddy
-            - Nair
-            - Wang
-            - Li
-            - Zhang
-            - Liu
-            - Chen
-            - Wong
-            - Huang
-            - Lin
-            - Wu
-            - Kim
-            - Park
-            - Choi
-            - Jung
-            - Kang
-            - Cho
-      strength: domain
-    - id: Evidence_forename_registry
-      groups:
-        - match_style: word
-          terms:
-            - Noah
-            - Oliver
-            - Theodore
-            - Luca
-            - Henry
-            - Leo
-            - Hudson
-            - Charlie
-            - Lucas
-            - Elijah
-            - William
-            - Thomas
-            - Levi
-            - Jack
-            - Liam
-            - Alexander
-            - Archie
-            - Arthur
-            - Isaac
-            - Kai
-            - James
-            - Sebastian
-            - Oscar
-            - Muhammad
-            - George
-            - Harrison
-            - Max
-            - Harvey
-            - Hugo
-            - Cooper
-            - Charlotte
-            - Amelia
-            - Olivia
-            - Mia
-            - Isla
-            - Chloe
-            - Harper
-            - Hazel
-            - Sophia
-            - Evelyn
-            - Lily
-            - Isabella
-            - Sienna
-            - Ava
-            - Ella
-            - Matilda
-            - Grace
-            - Mila
-            - Sofia
-            - Ivy
-            - Audrey
-            - Ruby
-            - Sophie
-            - Zoe
-            - Willow
-            - Aria
-            - Ellie
-            - Violet
-            - Daisy
-            - Lucy
-            - Minh
-            - Linh
-            - Anh
-            - Duc
-            - Raj
-            - Arjun
-            - Priya
-            - Ananya
-            - Wei
-            - Jing
-            - Fang
-            - Ming
-      strength: domain
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 2.6.0
+    date: '2026-07-19'
+    description: 'Australian personal-name baseline: make capitalised name structure the primary signal with explicit component alternatives accepted by Purview; wire the consolidated 10,961-forename and 23,065-surname sources through keyword-dictionary references; distinguish dictionary-backed discovery, person-related medium, and explicit-field high tiers; veto strong business/address collisions; remove bare keyword fallback; add exact-tier and adversarial probes.'
   - version: 2.5.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 550 without changing detector or package metadata.'
@@ -320,37 +193,3 @@ changelog:
     description: Bound inner quantifier in repeated name-component group to remove Purview-flagged nested-quantifier shape
 author: testpattern-community
 license: MIT
-keywords:
-  - Smith
-  - Jones
-  - Williams
-  - Brown
-  - Wilson
-  - Taylor
-  - Anderson
-  - Johnson
-  - White
-  - Thompson
-  - Lee
-  - Martin
-  - Thomas
-  - Walker
-  - Kelly
-  - Young
-  - Harris
-  - King
-  - Ryan
-  - Roberts
-  - Nguyen
-  - Tran
-  - Singh
-  - Kaur
-  - Patel
-  - Kumar
-  - Wang
-  - Li
-  - Zhang
-  - Chen
-  - Wong
-  - Kim
-  - Park

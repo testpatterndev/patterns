@@ -1,0 +1,158 @@
+schema: testpattern/v1
+name: TAS Driver Licence Number
+slug: au-tas-driver-licence-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Tasmanian driver licence numbers in the established seven-digit or one-letter-plus-five-or-six-digit shapes.
+  Enforceable tiers require an explicit licence-number label and Tasmanian context; the strict tier additionally
+  requires Transport Services, Service Tasmania, or Department of State Growth authority evidence.
+operation: >-
+  The bare state-shaped value is discovery-only at 65. A labelled value with TAS/Tasmania context reaches 75. A
+  labelled value with Tasmanian licensing-authority evidence reaches 85. Template and cross-state collisions remain
+  discovery-only or are excluded.
+pattern: \b(?:(?!0{7}\b)\d{7}|[A-Z]\d{5,6})\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: both Tasmanian shapes overlap business identifiers and other states, while a labelled value plus
+  Tasmanian context improves precision and authority evidence supports strict classification.
+jurisdictions:
+  - au-tas
+regulations:
+  - Personal Information Protection Act 2004 (Tas)
+  - Privacy Act 1988 (Cth)
+  - Vehicle and Traffic Act 1999 (Tas)
+frameworks:
+  - ISO 27001
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - TAS driver licence number
+    - Tasmanian driver licence number
+    - Transport Services
+    - Service Tasmania
+  proximity: 300
+test_cases:
+  should_match:
+    - value: T482915
+      description: Exact 65 discovery probe - bare alphanumeric Tasmanian-shaped candidate
+    - value: 'TAS driver licence number: T482915'
+      description: Exact 75 balanced probe - labelled candidate with TAS context but no authority
+    - value: 'Service Tasmania Tasmanian driver licence number: T482915'
+      description: Exact 85 strict probe - labelled candidate with Service Tasmania authority
+    - value: 'Transport Services Tasmania driver license no. 6829415'
+      description: Strict seven-digit numeric variant
+  should_not_match:
+    - value: 'Stock item: T482915'
+      description: Alphanumeric stock-code collision has no licence label or TAS context
+    - value: 'SA driver licence number: T482915'
+      description: Wrong-state collision must not reach an enforceable TAS tier
+    - value: 'Service Tasmania payment number: 6829415'
+      description: Sibling government payment identifier is not a driver licence number
+    - value: 'TAS recreational licence number: T482915'
+      description: Another licence type lacks the driver primary
+    - value: 'Example only: TAS driver licence number: T482915'
+      description: Example fixture is excluded
+false_positives:
+  - description: Product codes, payment references, and seven-digit business identifiers.
+    mitigation: Require a driver-licence-number label and Tasmanian context for enforcement.
+  - description: South Australian and Western Australian formats overlap Tasmanian candidates.
+    mitigation: Require TAS context and Tasmanian authority evidence for confidence 85.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 5
+risk_description: >-
+  A confirmed Tasmanian driver licence number can support identity correlation or impersonation when linked to its
+  holder. It is not the licence card, driving record, or authentication secret. Risk 5 and OFFICIAL reflect the bounded
+  impact of one atomic government identifier.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_tas_driver_licence_labelled
+      matches:
+        - ref: Evidence_tas_context
+        - ref: Evidence_tas_authority
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_tas_driver_licence_labelled
+      matches:
+        - ref: Evidence_tas_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_tas_driver_licence_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+  regexes:
+    - id: Pattern_tas_driver_licence_number
+      pattern: \b(?:(?!0{7}\b)\d{7}|[A-Z]\d{5,6})\b
+    - id: Pattern_tas_driver_licence_labelled
+      pattern: (?i)\bdriver(?:'s|s)?\s+licen[cs]e\s*(?:number|no\.?|#)\s*[:=-]?\s*(?:(?!0{7}\b)\d{7}|[A-Z]\d{5,6})\b
+  keywords:
+    - id: Evidence_tas_context
+      groups:
+        - match_style: word
+          terms:
+            - text: TAS
+              case_sensitive: true
+            - Tasmania
+            - Tasmanian
+      strength: specific
+    - id: Evidence_tas_authority
+      groups:
+        - match_style: word
+          terms:
+            - Transport Services
+            - Service Tasmania
+            - Department of State Growth
+            - myServiceTas
+      strength: specific
+  filters:
+    - id: Guard_tas_driver_licence_same_digits
+      type: AllDigitsSameFilter
+created: '2026-07-19'
+updated: '2026-07-19'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-19'
+    description: Initial state-specific split with exact 65/75/85 probes and collision negatives.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://www.transport.tas.gov.au/licensing
+    title: Licensing - Tasmania Transport Services
+  - url: https://www.service.tas.gov.au/services/transport/driver-and-rider-licences/renew-a-driver-or-motorcycle-licence/
+    title: Renew a driver licence - Service Tasmania

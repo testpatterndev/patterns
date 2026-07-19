@@ -1,31 +1,31 @@
 schema: testpattern/v1
 name: Australian Driver's Licence Number
 slug: au-motor-vehicle-permit
-version: 2.5.0
+version: 2.6.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Identifies Australian driver's licence numbers across all 8 states and territories using state-specific digit/letter
-  formats (NSW 8-digit / 4+2 letter forms, QLD/VIC 8-10 digit, SA letter+digits, WA/NT/TAS 6-8 digit, ACT 10 digit, and
-  related jurisdiction shapes). State context is supplied via jurisdiction and agency regexes rather than keyword-only
-  lists. A generic fallback shape is discovery-only and is gated against AU mobile-number overmatch. The stable slug
-  au-motor-vehicle-permit is retained for catalog compatibility; this detector is a driver's-licence identifier, not a
-  separate vehicle-permit product.
+  Discovery-only compatibility coverage for Australian driver's licence number candidates across all states and
+  territories. The stable au-motor-vehicle-permit slug is retained for catalogue, collection, workbook, and package
+  compatibility. State and territory enforcement belongs to the eight au-*-driver-licence-number SITs. Microsoft
+  Purview tenants can instead select the free built-in Australia Driver's License Number entity
+  (1cbbc8f5-9216-4392-9eb5-5ac2298d1356); this compatibility pattern is not a custom clone of that built-in.
 operation: >-
-  State-specific regexes for each jurisdiction's licence format combined with a consolidated licence/permit-term keyword
-  list and jurisdiction agency keyword list. State context uses regex patterns for state names and abbreviations rather
-  than keyword lists. Per-jurisdiction confidence tiers: state format + licence terms + matching jurisdiction + agency
-  keywords with template exclusion (85), state format + licence terms + matching jurisdiction (75); the generic fallback
-  shape is discovery-only (65) with broad licence terms and an AU mobile-number NONE-of gate.
-pattern: \b(?:(?!0{8}\b)\d{8}|\d{4}[A-Z]{2})\b
+  A broad six-to-ten digit or six-to-seven alphanumeric candidate is gated by driver-licence context, template
+  exclusion, and an Australian mobile-number exclusion at a single discovery-only 65 tier. There are no enforceable
+  national tiers. The regional SITs carry exact `au-*` jurisdiction values such as `au-qld`; package consumers must
+  explicitly include the state or territory jurisdictions in the customer footprint rather than treating `au` as a
+  wildcard for every regional detector.
+pattern: \b(?:(?!0{6,10}\b)\d{6,10}|[A-Z]\d{5,6}|\d{4}[A-Z]{2})\b
 confidence: low
-confidence_justification: 'Low confidence: generic digit patterns match many non-licence identifiers. State-specific regex combined with licence-term and jurisdiction-agency keywords essential for reliable detection.'
+confidence_justification: >-
+  Low confidence: this national compatibility detector intentionally inventories broad candidates only. Use a
+  state/territory SIT at confidence 75 or 85, or Microsoft's built-in entity, for policy enforcement.
 jurisdictions:
   - au
 regulations:
   - AML/CTF Act (Cth)
-  - IPA 2009 (Qld)
   - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
 frameworks:
@@ -39,7 +39,6 @@ corroborative_evidence:
     - driver licence
     - drivers license
     - driver license
-    - DL
     - licence number
     - license number
     - driving licence
@@ -51,39 +50,35 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: '40829161'
-      description: NSW format (8 digits)
+      description: NSW-shaped compatibility candidate
     - value: '082946135'
-      description: QLD/VIC format (9 digits)
-    - value: A12345
-      description: SA format (letter + 5 digits)
-    - value: A123456
-      description: TAS format (letter + 6 digits)
+      description: QLD/VIC-shaped compatibility candidate
+    - value: A482915
+      description: SA/TAS-shaped compatibility candidate
     - value: '4082915'
-      description: WA/NT/TAS format (7 digits)
+      description: WA/NT/TAS-shaped compatibility candidate
     - value: '4062981735'
-      description: ACT format (10 digits)
+      description: ACT/VIC-shaped compatibility candidate
   should_not_match:
     - value: 12345
-      description: Too few digits (5 instead of minimum 6)
+      description: Too few characters
     - value: 12345678901
-      description: Too many digits (11 instead of maximum 10)
+      description: Too many digits
     - value: AB12345
-      description: Two leading letters not valid for any state
+      description: Unsupported seven-character two-letter shape
     - value: '00000000'
-      description: Placeholder numeric value excluded by sentinel filter
+      description: All-zero placeholder excluded by the regex and same-digit filter
     - value: '111111111'
-      description: All-same digit sequence excluded by sentinel filter
+      description: Repeated-digit sentinel excluded by the same-digit filter
     - value: Mobile 0412345678 for proof of identity contact.
-      description: Australian mobile number must be suppressed by the AU mobile-number NONE-of gate and must not reach an enforceable tier
+      description: Australian mobile number is excluded from discovery
 false_positives:
-  - description: Generic numeric sequences matching licence digit counts.
-    mitigation: Require licence-term keywords and state context for reliable detection.
-  - description: Australian mobile telephone numbers can satisfy the generic 10-digit licence fallback and caused material overmatch.
-    mitigation: Use the AU mobile number NONE-of regex gate on licence-number tiers where phone numbers are not valid positive evidence.
-  - description: Policy documents discussing licence formats without actual data.
-    mitigation: Layer with form-field or database-column context signals.
-  - description: Case-insensitive state abbreviations (SA, WA, ACT) can match ordinary English words.
-    mitigation: Enforce tiers require licence terms in addition to jurisdiction regexes; treat bare jurisdiction hits as insufficient.
+  - description: Account, invoice, order, telephone, and other numeric identifiers with six to ten digits.
+    mitigation: Treat the stable national slug as discovery-only and enforce with the matching regional SIT.
+  - description: Policy and public guidance discussing licence-number formats without a populated value.
+    mitigation: Require a regional labelled-number primary and state authority evidence at higher confidence.
+  - description: Australian mobile telephone numbers can satisfy a ten-digit candidate shape.
+    mitigation: Exclude AU mobile-number shapes from the discovery tier.
 regional_tuning:
   - jurisdiction: au
     signal: au-mobile-number-overmatch-numeric-id-20260525
@@ -100,12 +95,11 @@ exports:
 scope: wide
 risk_rating: 5
 risk_description: >-
-  This detector recognises one Australian state or territory driver's licence number through jurisdiction-specific
-  formats. If tied to the holder, the identifier can strengthen identity verification fraud or help correlate transport
-  and licensing correspondence. The number alone is not a licence image, does not reveal driving history, and cannot
-  authenticate a person without additional evidence; low-confidence formats may also collide with mobile or account
-  numbers. Risk 5 and OFFICIAL represent the bounded credential-reference risk of the atomic identifier. The catalog
-  slug remains au-motor-vehicle-permit for compatibility only.
+  This discovery detector inventories possible Australian driver's licence numbers without assigning an issuing state.
+  If tied to a holder, a genuine number can strengthen identity-verification fraud or correlate licensing
+  correspondence. The candidate alone is not a licence image, driving history, or authenticator, and broad numeric
+  shapes collide with routine business identifiers. Risk 5 and OFFICIAL describe a confirmed atomic licence number;
+  discovery hits require regional corroboration before that assessment is applied.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -116,258 +110,57 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 65
   shared_keywords:
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Pattern_permit_nsw
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_nsw
-        - ref: Evidence_permit_agency
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
-    - confidence_level: 85
-      id_match: Pattern_permit_vic
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_vic
-        - ref: Evidence_permit_agency
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
-    - confidence_level: 85
-      id_match: Pattern_permit_qld
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_qld
-        - ref: Evidence_permit_agency
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
-    - confidence_level: 85
-      id_match: Pattern_permit_sa
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_sa
-        - ref: Evidence_permit_agency
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
-    - confidence_level: 85
-      id_match: Pattern_permit_wa
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_wa
-        - ref: Evidence_permit_agency
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
-    - confidence_level: 85
-      id_match: Pattern_permit_tas
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_tas
-        - ref: Evidence_permit_agency
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
-    - confidence_level: 85
-      id_match: Pattern_permit_nt
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_nt
-        - ref: Evidence_permit_agency
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
-    - confidence_level: 85
-      id_match: Pattern_permit_act
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_act
-        - ref: Evidence_permit_agency
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
-    - confidence_level: 75
-      id_match: Pattern_permit_nsw
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_nsw
-    - confidence_level: 75
-      id_match: Pattern_permit_vic
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_vic
-    - confidence_level: 75
-      id_match: Pattern_permit_qld
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_qld
-    - confidence_level: 75
-      id_match: Pattern_permit_sa
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_sa
-    - confidence_level: 75
-      id_match: Pattern_permit_wa
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_wa
-    - confidence_level: 75
-      id_match: Pattern_permit_tas
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_tas
-    - confidence_level: 75
-      id_match: Pattern_permit_nt
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_nt
-    - confidence_level: 75
-      id_match: Pattern_permit_act
-      matches:
-        - ref: Evidence_permit_terms
-        - ref: Pattern_jurisdiction_act
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_permit_generic
+      id_match: Pattern_au_driver_licence_candidate
       matches:
-        - ref: Evidence_permit_broad
+        - ref: Evidence_driver_licence_context
         - type: any
           min_matches: 0
           max_matches: 0
           children:
             - ref: Guard_au_mobile_number
+            - ref: Evidence_template_exclusion
   regexes:
-    - id: Pattern_permit_nsw
-      pattern: \b(?:(?!0{8}\b)\d{8}|\d{4}[A-Z]{2})\b
-    - id: Pattern_permit_vic
-      pattern: \b\d{8,10}\b
-    - id: Pattern_permit_qld
-      pattern: \b\d{8,9}\b
-    - id: Pattern_permit_sa
-      pattern: \b[A-Z]\d{5,6}\b
-    - id: Pattern_permit_wa
-      pattern: \b\d{7}\b
-    - id: Pattern_permit_tas
-      pattern: \b(?:\d{7}|[A-Z]\d{5,6})\b
-    - id: Pattern_permit_nt
-      pattern: \b\d{6,8}\b
-    - id: Pattern_permit_act
-      pattern: \b\d{8,10}\b
-    - id: Pattern_permit_generic
-      pattern: \b(?:\d{6,10}|[A-Z]\d{5,6}|\d{4}[A-Z]{2})\b
-    - id: Pattern_jurisdiction_nsw
-      pattern: (?i)\b(?:NSW|New\s+South\s+Wales|Service\s+NSW|Roads?\s+and\s+Maritime)\b
-    - id: Pattern_jurisdiction_vic
-      pattern: (?i)\b(?:VIC|Victoria|VicRoads)\b
-    - id: Pattern_jurisdiction_qld
-      pattern: (?i)\b(?:QLD|Queensland|TMR|Transport\s+and\s+Main\s+Roads)\b
-    - id: Pattern_jurisdiction_sa
-      pattern: (?i)\b(?:SA|South\s+Australia|Service\s+SA)\b
-    - id: Pattern_jurisdiction_wa
-      pattern: (?i)\b(?:WA|Western\s+Australia|Department\s+of\s+Transport)\b
-    - id: Pattern_jurisdiction_tas
-      pattern: (?i)\b(?:TAS|Tasmania|Service\s+Tasmania)\b
-    - id: Pattern_jurisdiction_nt
-      pattern: (?i)\b(?:NT|Northern\s+Territory|Motor\s+Vehicle\s+Registry|MVR)\b
-    - id: Pattern_jurisdiction_act
-      pattern: (?i)\b(?:ACT|Australian\s+Capital\s+Territory|Access\s+Canberra)\b
+    - id: Pattern_au_driver_licence_candidate
+      pattern: \b(?:(?!0{6,10}\b)\d{6,10}|[A-Z]\d{5,6}|\d{4}[A-Z]{2})\b
     - id: Guard_au_mobile_number
       pattern: (?i)\b(?:\+?61[ -]?4|04)\d(?:[ -]?\d){7}\b
   keywords:
-    - id: Evidence_permit_terms
+    - id: Evidence_driver_licence_context
       groups:
         - match_style: word
           terms:
             - drivers licence
             - driver licence
+            - driver's licence
             - drivers license
             - driver license
-            - text: DL
-              case_sensitive: true
+            - driver's license
             - licence number
             - license number
             - driving licence
             - driving license
-            - motor vehicle permit
-            - licence no
-            - permit number
-      strength: specific
-    - id: Evidence_permit_agency
-      groups:
-        - match_style: word
-          terms:
-            - Service NSW
-            - VicRoads
-            - text: TMR
-              case_sensitive: true
-            - Transport and Main Roads
-            - Service SA
-            - Department of Transport
-            - Service Tasmania
-            - Motor Vehicle Registry
-            - text: MVR
-              case_sensitive: true
-            - Access Canberra
-            - Roads and Maritime
-            - text: RMS
-              case_sensitive: true
-      strength: specific
-    - id: Evidence_permit_broad
-      groups:
-        - match_style: word
-          terms:
-            - licence
-            - license
-            - permit
-            - identification
-            - identity document
             - proof of identity
       strength: domain
   filters:
-    - id: Guard_permit_same_digits
+    - id: Guard_au_driver_licence_same_digits
       type: AllDigitsSameFilter
-    - id: Guard_permit_exclude_test
-      type: TextMatchFilter
-      direction: Full
-      logic: Exclude
-      terms:
-        - "000000"
-        - "0000000"
-        - "00000000"
-        - "000000000"
-        - "0000000000"
-        - "123456"
-        - "1234567"
-        - "12345678"
-        - "123456789"
-        - "1234567890"
 created: '2026-02-08'
-updated: '2026-07-18'
+updated: '2026-07-19'
 changelog:
+  - version: 2.6.0
+    date: '2026-07-19'
+    description: >-
+      Regional split: retain the stable slug as a single 65 discovery-only compatibility detector, move enforceable
+      state logic to eight state/territory number SITs, identify Microsoft's free built-in by entity ID without cloning
+      it, and assign exact state/territory jurisdiction values for explicit regional package selection.
   - version: 2.5.0
     date: '2026-07-18'
     description: >-
@@ -392,7 +185,7 @@ changelog:
     description: 'C1 verdict-model: add pattern_class: identifier — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
   - version: 2.1.1
     date: '2026-07-09'
-    description: Replace sentinel should_match values (12345678/123456789/1234567/1234567890) that the pattern's own Guard_permit_exclude_test TextMatchFilter excludes with realistic non-sentinel licence numbers — the old positives could never match in Purview (tier-harness triage class T3)
+    description: 'Replace sentinel should_match values (12345678/123456789/1234567/1234567890) that the pattern''s own Guard_permit_exclude_test TextMatchFilter excludes with realistic non-sentinel licence numbers — the old positives could never match in Purview (tier-harness triage class T3)'
   - version: 2.1.0
     date: '2026-07-04'
     description: case/evidence metadata update
@@ -400,4 +193,6 @@ author: testpattern-community
 license: MIT
 references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-australia-drivers-license-number
-    title: Australia drivers license number entity definition - Microsoft Learn
+    title: Australia Driver's License Number entity definition - Microsoft Learn
+  - url: https://www.service.nsw.gov.au/verifying-your-identity/document-examples
+    title: Australian driver licence document examples - Service NSW

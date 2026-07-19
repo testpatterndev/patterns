@@ -1,0 +1,161 @@
+schema: testpattern/v1
+name: VIC Driver Licence Number
+slug: au-vic-driver-licence-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Victorian driver licence and learner permit numbers in the established eight-to-ten-digit shape. Enforceable
+  tiers require an explicit licence-number label and Victorian context; the strict tier additionally requires VicRoads
+  authority evidence.
+operation: >-
+  The bare numeric shape is discovery-only at 65. A labelled value with VIC/Victoria context reaches 75. A labelled
+  value with VicRoads authority reaches 85. Template fixtures and Australian mobile-number collisions are excluded.
+pattern: \b(?!04\d{8}\b)(?!0{8,10}\b)\d{8,10}\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: eight-to-ten-digit values are common outside licensing, but a licence-number label plus Victorian
+  context provides a balanced signal and VicRoads evidence provides a strict signal.
+jurisdictions:
+  - au-vic
+regulations:
+  - Privacy Act 1988 (Cth)
+  - Privacy and Data Protection Act 2014 (Vic)
+  - Road Safety Act 1986 (Vic)
+frameworks:
+  - ISO 27001
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - VIC driver licence number
+    - Victoria driver licence number
+    - Victorian learner permit number
+    - VicRoads
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '728491635'
+      description: Exact 65 discovery probe - bare nine-digit Victorian-shaped candidate
+    - value: 'VIC driver licence number: 728491635'
+      description: Exact 75 balanced probe - labelled candidate with VIC context but no authority
+    - value: 'VicRoads Victoria driver licence number: 728491635'
+      description: Exact 85 strict probe - labelled candidate with VicRoads authority
+    - value: 'VicRoads Victorian learner permit no. 72849163'
+      description: Strict eight-digit learner permit variant
+  should_not_match:
+    - value: 'Customer account number: 728491635'
+      description: Nine-digit account collision has no licence label or Victorian context
+    - value: 'NSW driver licence number: 728491635'
+      description: Wrong-state collision must not reach an enforceable VIC tier
+    - value: 'VicRoads vehicle registration number: 728491635'
+      description: Sibling registration identifier is not a driver licence number
+    - value: 'VIC driver licence contact mobile: 0412345678'
+      description: Australian mobile number must not classify as a Victorian licence number
+    - value: 'Sample data: VIC driver licence number: 728491635'
+      description: Sample fixture is excluded
+false_positives:
+  - description: Eight-to-ten-digit customer, claim, invoice, Medicare, and telephone values.
+    mitigation: Require a labelled licence-number primary and exclude AU mobile shapes from all tiers.
+  - description: Numeric licence formats from other Australian jurisdictions.
+    mitigation: Require Victorian context and VicRoads evidence for strict classification.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 5
+risk_description: >-
+  A confirmed Victorian licence or learner permit number can strengthen identity correlation or impersonation when
+  linked to its holder. It is not the separate security card number, licence image, driving record, or authentication
+  secret. Risk 5 and OFFICIAL reflect one bounded government identifier.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_vic_driver_licence_labelled
+      matches:
+        - ref: Evidence_vic_context
+        - ref: Evidence_vic_authority
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Guard_vic_mobile_number
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_vic_driver_licence_labelled
+      matches:
+        - ref: Evidence_vic_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Guard_vic_mobile_number
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_vic_driver_licence_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Guard_vic_mobile_number
+            - ref: Evidence_template_exclusion
+  regexes:
+    - id: Pattern_vic_driver_licence_number
+      pattern: \b(?!04\d{8}\b)(?!0{8,10}\b)\d{8,10}\b
+    - id: Pattern_vic_driver_licence_labelled
+      pattern: (?i)\b(?:driver(?:'s|s)?\s+licen[cs]e|learner\s+permit)\s*(?:number|no\.?|#)\s*[:=-]?\s*(?!04\d{8}\b)(?!0{8,10}\b)\d{8,10}\b
+    - id: Guard_vic_mobile_number
+      pattern: (?i)\b(?:\+?61[ -]?4|04)\d(?:[ -]?\d){7}\b
+  keywords:
+    - id: Evidence_vic_context
+      groups:
+        - match_style: word
+          terms:
+            - text: VIC
+              case_sensitive: true
+            - Victoria
+            - Victorian
+      strength: specific
+    - id: Evidence_vic_authority
+      groups:
+        - match_style: word
+          terms:
+            - VicRoads
+            - myVicRoads
+            - Service Victoria
+      strength: specific
+  filters:
+    - id: Guard_vic_driver_licence_same_digits
+      type: AllDigitsSameFilter
+created: '2026-07-19'
+updated: '2026-07-19'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-19'
+    description: Initial state-specific split with exact 65/75/85 probes and collision negatives.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://www.vicroads.vic.gov.au/licences
+    title: Licences - VicRoads
+  - url: https://www.vicroads.vic.gov.au/licences/manage-your-licence/evidence-of-identity/protecting-identity
+    title: Victorian licence and security card numbers - VicRoads

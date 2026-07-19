@@ -1,0 +1,160 @@
+schema: testpattern/v1
+name: NSW Driver Licence Number
+slug: au-nsw-driver-licence-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects New South Wales driver licence numbers in the established eight-digit or four-digit-plus-two-letter shapes.
+  Enforceable tiers require an explicit driver-licence-number label and NSW context; the strict tier additionally
+  requires Transport for NSW, Service NSW, or a legacy NSW road authority.
+operation: >-
+  The bare NSW-shaped value is discovery-only at 65. A labelled value with NSW context reaches 75. A labelled value
+  with NSW context and issuing-authority evidence reaches 85. Template/example language is excluded at every tier.
+pattern: \b(?:(?!0{8}\b)\d{8}|\d{4}[A-Z]{2})\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the candidate shapes collide with routine identifiers, while a nearby licence-number label and
+  NSW context materially improve precision. Authority evidence supports high-confidence classification.
+jurisdictions:
+  - au-nsw
+regulations:
+  - Privacy Act 1988 (Cth)
+  - Privacy and Personal Information Protection Act 1998 (NSW)
+  - Road Transport Act 2013 (NSW)
+frameworks:
+  - ISO 27001
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - NSW driver licence number
+    - New South Wales driver licence number
+    - Transport for NSW
+    - Service NSW
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '40829161'
+      description: Exact 65 discovery probe - bare eight-digit NSW-shaped candidate
+    - value: 'NSW driver licence number: 40829161'
+      description: Exact 75 balanced probe - labelled candidate with NSW context but no authority
+    - value: 'Transport for NSW - NSW driver licence number: 40829161'
+      description: Exact 85 strict probe - labelled candidate with NSW authority
+    - value: 'Service NSW driver license no. 4829AB'
+      description: Strict alternate four-digit-plus-two-letter shape
+  should_not_match:
+    - value: 'Invoice number: 40829161'
+      description: Eight-digit invoice collision has no licence label or NSW context
+    - value: 'QLD driver licence number: 40829161'
+      description: Wrong-state collision must not reach an enforceable NSW tier
+    - value: 'Service NSW vehicle registration number: 40829161'
+      description: Sibling transport identifier is not a driver licence number
+    - value: 'NSW driver licence card number: 40829161'
+      description: Card number label must not be treated as the stable licence number
+    - value: 'Template example: NSW driver licence number: 40829161'
+      description: Template fixture is excluded
+false_positives:
+  - description: Eight-digit invoices, accounts, orders, and registration references.
+    mitigation: Require the labelled-number primary and NSW jurisdiction context for enforcement.
+  - description: Other states can issue numeric licence numbers with the same length.
+    mitigation: Require explicit NSW context and use NSW authority evidence for confidence 85.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: specific
+risk_rating: 5
+risk_description: >-
+  A confirmed NSW driver licence number can support identity correlation and licence-themed impersonation, especially
+  when paired with the holder's name or date of birth. The number alone is not a licence image, card number, driving
+  history, or authenticator. Risk 5 and OFFICIAL reflect the bounded harm of one atomic government identifier.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_nsw_driver_licence_labelled
+      matches:
+        - ref: Evidence_nsw_context
+        - ref: Evidence_nsw_authority
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_nsw_driver_licence_labelled
+      matches:
+        - ref: Evidence_nsw_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_nsw_driver_licence_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          children:
+            - ref: Evidence_template_exclusion
+  regexes:
+    - id: Pattern_nsw_driver_licence_number
+      pattern: \b(?:(?!0{8}\b)\d{8}|\d{4}[A-Z]{2})\b
+    - id: Pattern_nsw_driver_licence_labelled
+      pattern: (?i)\bdriver(?:'s|s)?\s+licen[cs]e\s*(?:number|no\.?|#)\s*[:=-]?\s*(?:(?!0{8}\b)\d{8}|\d{4}[A-Z]{2})\b
+  keywords:
+    - id: Evidence_nsw_context
+      groups:
+        - match_style: word
+          terms:
+            - text: NSW
+              case_sensitive: true
+            - New South Wales
+      strength: specific
+    - id: Evidence_nsw_authority
+      groups:
+        - match_style: word
+          terms:
+            - Transport for NSW
+            - Service NSW
+            - Roads and Maritime Services
+            - text: RMS
+              case_sensitive: true
+            - Roads and Traffic Authority
+            - text: RTA
+              case_sensitive: true
+      strength: specific
+  filters:
+    - id: Guard_nsw_driver_licence_same_digits
+      type: AllDigitsSameFilter
+created: '2026-07-19'
+updated: '2026-07-19'
+changelog:
+  - version: 1.0.0
+    date: '2026-07-19'
+    description: Initial state-specific split with exact 65/75/85 probes and collision negatives.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://www.service.nsw.gov.au/services/nsw-driver-licence
+    title: NSW driver licence - Service NSW
+  - url: https://www.service.nsw.gov.au/verifying-your-identity/document-examples
+    title: Australian driver licence document examples - Service NSW

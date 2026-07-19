@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Previous legal names and aliases
 slug: au-top500-002-previous-legal-names-and-aliases
-version: 1.5.1
+version: 1.6.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -9,10 +9,10 @@ description: >-
   Identifies documents containing references to previous legal names and aliases in Australian contexts. This information type is classified as personally identifiable information under applicable
   data protection regulations.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Keyword
-  lists: pii-personal, salutations-standard, au-forenames-australian, au-surnames-australian. Uses additional domain-context evidence
-  and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:previous\s+name|former\s+name|maiden\s+name|also\s+known\s+as|name\s+change|deed\s+poll|previous\s+legal\s+name|former\s+surname|birth\s+name)\b
+  A broad former-name phrase is discovery-only at 65. The canonical previous-legal-names-and-aliases
+  label reaches 75, while 85 additionally requires two distinct non-overlapping alias-history terms.
+  Template/sample/test exclusions apply to every tier.
+pattern: (?is)\b(?:previous\s+name|former\s+name|maiden\s+name|also\s+known\s+as|name\s+change|deed\s+poll|previous\s+legal\s+names?|former\s+surname|birth\s+name)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
@@ -55,11 +55,15 @@ test_cases:
     - value: previous name
       description: Primary topic phrase match
     - value: former name
-      description: Case-insensitive topic phrase match
+      description: Exact 65 discovery probe - former-name phrase without the canonical previous-names-and-aliases label
     - value: maiden name
       description: Alternative topic phrase match
     - value: also known as
       description: Additional topic phrase match
+    - value: previous legal names and aliases
+      description: Exact 75 probe - canonical label without two additional alias-history terms
+    - value: 'Australian change-of-name record. Previous legal names and aliases held by the applicant: maiden name and former name as registered by deed poll.'
+      description: Exact 85 probe - canonical label with multiple additional non-overlapping alias-history terms
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -67,6 +71,8 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: name disability
       description: Generic word pair from old broad template should not match
+    - value: 'Sample: Previous legal names and aliases, maiden name and former name'
+      description: High-like template fixture must be rejected by the shared exclusion dictionary
 false_positives:
   - description: Common words and phrases related to previous legal names and aliases appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -90,7 +96,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_previous_names
       matches:
-        - ref: Evidence_previous_names
+        - ref: Pattern_au_top500_002_previous_legal_names_and_aliases_label_context
+        - ref: Evidence_additional_alias_history
           min_count: 2
           unique_results: true
         - type: any
@@ -101,7 +108,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_previous_names
       matches:
-        - ref: Evidence_previous_names
+        - ref: Pattern_au_top500_002_previous_legal_names_and_aliases_label_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -112,9 +119,14 @@ purview:
       id_match: Pattern_previous_names
       matches:
         - ref: Evidence_previous_names
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
   regexes:
     - id: Pattern_previous_names
-      pattern: (?is)\b(?:previous\s+name|former\s+name|maiden\s+name|also\s+known\s+as|name\s+change|deed\s+poll|previous\s+legal\s+name|former\s+surname|birth\s+name)\b
+      pattern: (?is)\b(?:previous\s+name|former\s+name|maiden\s+name|also\s+known\s+as|name\s+change|deed\s+poll|previous\s+legal\s+names?|former\s+surname|birth\s+name)\b
     - id: Pattern_au_top500_002_previous_legal_names_and_aliases_label_context
       pattern: (?i)\b(?:previous\s+legal\s+names\s+and\s+aliases)\b
   keywords:
@@ -132,19 +144,25 @@ purview:
             - name change
             - deed poll
             - previous legal name
+            - previous legal names
+            - aliases
             - former surname
             - birth name
       strength: specific
-    - id: Keyword_au_top500_002_previous_legal_names_and_aliases_domain_context
+    - id: Evidence_additional_alias_history
       groups:
         - match_style: word
           terms:
-            - previous legal names and aliases
-            - previous
-            - legal
-            - names
-            - aliases
-      strength: domain
+            - former name
+            - maiden name
+            - also known as
+            - text: AKA
+              case_sensitive: true
+            - name change
+            - deed poll
+            - former surname
+            - birth name
+      strength: specific
 risk_description: >-
   This concept regex finds wording such as previous name, former name, maiden name, or also known as rather than extracting the earlier name itself. A hit can identify a form or record area where identity-linkage information may be collected, but policy documents and blank HR templates use the same phrases. Actual paired current and former names could support identity correlation or evasion checks, yet those values are not guaranteed by the detector. Risk 3 and OFFICIAL therefore fit the ordinary phrase-level signal, with populated alias histories requiring contextual escalation.
 sensitivity_labels:
@@ -156,8 +174,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-19'
 changelog:
+  - version: 1.6.0
+    date: '2026-07-19'
+    description: 'Australian personal-name baseline: make 65/75/85 cumulative and exact by separating former-name discovery, the canonical previous-names-and-aliases label, and two non-overlapping additional alias-history terms; apply template exclusion at every tier and add exact-tier/adversarial probes.'
   - version: 1.5.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 609 without changing detector or package metadata.'
