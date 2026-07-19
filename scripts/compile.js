@@ -238,7 +238,9 @@ const output = {
   classificationResults
 }
 
-writeFileSync(OUT_FILE, JSON.stringify(output, null, 2))
+// Compact JSON for Cloudflare KV (25 MiB value limit). Pretty-print would
+// push the full catalog over the limit (~26 MB pretty vs ~17 MB compact).
+writeFileSync(OUT_FILE, JSON.stringify(output))
 
 console.log(`Done: ${patterns.length} patterns, ${collections.length} collections, ${keywordDicts.length} keyword dictionaries → patterns.json`)
 if (resolvedCount > 0) {
