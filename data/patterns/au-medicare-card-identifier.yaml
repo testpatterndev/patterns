@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australia Medicare Card Identifier
 slug: au-medicare-card-identifier
-version: 2.3.1
+version: 2.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,15 +9,18 @@ description: >-
   Identifies Australian Medicare card numbers (10-11 digits, first digit 2-6). Filters same-digit
   sequences. Requires corroborative health-scheme keywords for reliable detection.
 operation: >-
-  Structural detection of a 10-11 digit Medicare card number (first digit 2-6) with AllDigitsSameFilter
-  and health-scheme corroborative keywords. Note: Func_australian_medical_account_number is a Purview
-  detection function, not a usable validator, so the checksum is not enforced in the exported SIT.
+  Detection of a 10-11 digit Medicare card number (first digit 2-6) with an inline Checksum validator
+  (Weights 1,3,7,9,1,3,7,9,0,0,0 / Mod 10 / CheckDigit 9 — weighted sum of digits 1-8 mod 10 must equal
+  digit 9), AllDigitsSameFilter, and health-scheme corroborative keywords. Note:
+  Func_australian_medical_account_number is a Purview detection function, not a usable validator
+  (it is not on Microsoft's validator-function list), but the generic Checksum validator now enforces
+  the Medicare checksum in the exported SIT.
   Corroborative evidence: 3 tiers with health-scheme-specific and broad health keywords within 300 characters.
 pattern: '\b[2-6]\d{3}[\s-]?\d{5}[\s-]?\d(?:[\s-]?\d)?\b'
 confidence: medium
 confidence_justification: >-
-  Medium confidence: eight-digit numbers are common. Validator function and health-scheme keywords
-  significantly improve accuracy. AllDigitsSameFilter removes trivial matches.
+  Medium confidence: 10-11 digit numbers are common in the wild. The Medicare checksum validator and
+  health-scheme keywords significantly improve accuracy. AllDigitsSameFilter removes trivial matches.
 jurisdictions:
   - au
 regulations:
@@ -51,11 +54,11 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: '2123456701'
-      description: Ten-digit Medicare card number (first digit 2-6)
-    - value: '3456 78901 2'
-      description: Ten-digit Medicare card with display spacing
-    - value: '41234567890'
-      description: Eleven-digit Medicare card with IRN
+      description: Ten-digit Medicare card number (first digit 2-6), passes mod-10 checksum
+    - value: '2270 19324 8'
+      description: Ten-digit Medicare card with display spacing, passes mod-10 checksum
+    - value: '4851 93897 0 1'
+      description: Eleven-digit Medicare card with IRN, passes mod-10 checksum
   should_not_match:
     - value: '1234567890'
       description: First digit 1, not a valid Medicare prefix (2-6)
@@ -63,9 +66,13 @@ test_cases:
       description: Too short for a Medicare card number
     - value: '234567890123'
       description: Twelve digits, too long
+    - value: '2270193258'
+      description: fails mod-10 checksum (single-digit perturbation of valid value 2270 19324 8)
+    - value: '4851 93898 0'
+      description: fails mod-10 checksum (single-digit perturbation of valid value 4851 93897 0)
 false_positives:
-  - description: Generic eight-digit reference numbers in non-health contexts.
-    mitigation: Require health-scheme keywords in proximity. AllDigitsSameFilter removes trivial matches.
+  - description: Generic 10-11 digit reference numbers in non-health contexts.
+    mitigation: Require health-scheme keywords in proximity. The Medicare checksum validator and AllDigitsSameFilter remove non-conforming and trivial matches.
 exports:
   - purview_xml
   - yaml
@@ -114,6 +121,18 @@ purview:
   regexes:
     - id: Pattern_medicare_card
       pattern: '\b[2-6]\d{3}[\s-]?\d{5}[\s-]?\d(?:[\s-]?\d)?\b'
+      validators:
+        - ref: Validator_au_medicare_checksum
+  validators:
+    - id: Validator_au_medicare_checksum
+      type: Checksum
+      params:
+        - name: Weights
+          value: 1, 3, 7, 9, 1, 3, 7, 9, 0, 0, 0
+        - name: Modulo
+          value: '10'
+        - name: CheckDigit
+          value: '9'
   keywords:
     - id: Evidence_health_scheme_specific
       groups:
@@ -158,8 +177,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-australia-medical-account-number
     title: "Australia Medical Account Number entity definition - Microsoft Learn"
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-07-20'
 changelog:
+  - version: 2.4.0
+    date: '2026-07-20'
+    description: 'Enforce the Medicare checksum: add inline Checksum validator Validator_au_medicare_checksum (Weights 1,3,7,9,1,3,7,9,0,0,0 / Modulo 10 / CheckDigit 9 — weighted sum of digits 1-8 mod 10 must equal digit 9; zero weights for the check-digit, issue-number, and IRN positions per the Purview docs encoding, see docs/checksum-validator-semantics.md) wired to Pattern_medicare_card. Func_australian_medical_account_number remains unusable as a validator, but the generic Checksum validator now enforces the algorithm. Fixed stale "eight-digit" text (regex requires 10-11 digits). Test cases upgraded to checksum-valid should_match values plus invalid-twin should_not_match regression values.'
   - version: 2.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 555 without changing detector or package metadata.'

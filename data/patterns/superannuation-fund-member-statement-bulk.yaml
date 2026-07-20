@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Superannuation Fund Member Statement - Bulk
 slug: superannuation-fund-member-statement-bulk
-version: 1.3.3
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -61,6 +61,10 @@ test_cases:
       description: Superannuation contact context with no TFN-format or member-number token
     - value: 'Superannuation test file with placeholder sentinel member data only. No real TFN or member number is present.'
       description: Placeholder member data — excluded by sentinel/test filters in the SIT
+    - value: 485 564 503
+      description: fails mod-11 checksum (single-digit perturbation of valid value 485 564 502) — the TFN Checksum validator rejects it in the exported SIT
+    - value: '590821739'
+      description: fails mod-11 checksum (single-digit perturbation of valid value 590 821 738) — the TFN Checksum validator rejects it in the exported SIT
 false_positives:
   - description: Individual superannuation member statements sent to single members
     mitigation: Require bulk indicators (multiple member records, 'extract', 'bulk', 'data file') to distinguish from individual statements
@@ -174,11 +178,11 @@ purview:
       type: Checksum
       params:
         - name: Weights
-          value: 1, 4, 3, 7, 5, 8, 6, 9, 10
+          value: 1, 4, 3, 7, 5, 8, 6, 9, 0
         - name: Modulo
           value: '11'
-        - name: Result
-          value: '0'
+        - name: CheckDigit
+          value: '9'
   filters:
     - id: Guard_super_tfn_same_digits
       type: AllDigitsSameFilter
@@ -206,8 +210,11 @@ sensitivity_labels:
   qgiscf_dlm: PROTECTED Financial
 references: []
 created: '2026-02-20'
-updated: '2026-07-15'
+updated: '2026-07-20'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-20'
+    description: 'Checksum-encoding fix: rewrite Validator_australian_tfn to the docs-compliant Purview encoding (Weights 1,4,3,7,5,8,6,9,0 / Modulo 11 / CheckDigit 9; the old Weights ...,10 / Result 0 form exported CheckDigit=0 which Purview rejects — see docs/checksum-validator-semantics.md). Added invalid-twin should_not_match regression values (single checked-digit perturbations of checksum-valid TFNs).'
   - version: 1.3.3
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1443; detector and package metadata unchanged.'

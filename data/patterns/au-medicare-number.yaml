@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Medicare Number
 slug: au-medicare-number
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -11,7 +11,11 @@ description: >-
   6, followed by 8 additional digits and a single check digit. Numbers are commonly formatted as groups of 4-5-1 digits
   separated by spaces or hyphens.
 operation: >-
-  Checksum: Mod 10 with weights [1,3,7,9,1,3,7,9] (not enforced in the exported SIT — Func_australian_medical_account_number is not a usable validator; structural detection only). Reference: https://clearwater.com.au/code/medicare/,
+  Checksum: Mod 10 with weights [1,3,7,9,1,3,7,9] on digits 1-8 compared against digit 9 — now enforced
+  in the exported SIT by the inline generic Checksum validator Validator_au_medicare_number_checksum
+  (Weights 1,3,7,9,1,3,7,9,0,0 / Modulo 10 / CheckDigit 9; Func_australian_medical_account_number remains
+  genuinely absent from Microsoft's validator-function list, so the generic Checksum validator is used
+  instead — see docs/checksum-validator-semantics.md). Reference: https://clearwater.com.au/code/medicare/,
   https://learn.microsoft.com/en-us/purview/sit-defn-australia-medical-account-number Corroborative evidence: 6 keywords
   within 300 characters. Keyword lists: au-health-scheme-terms, au-healthcare-identifiers, pii-civic-credentials.
 pattern: \b[2-6]\d{3}[\s-]?\d{5}[\s-]?\d{1}\b
@@ -55,16 +59,20 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: 2123 45670 1
-      description: Standard spaced format (4-5-1 grouping)
+      description: Standard spaced format (4-5-1 grouping), passes mod-10 checksum
     - value: 2123-45670-1
-      description: Hyphen-separated format (4-5-1 grouping)
-    - value: '2123456701'
-      description: Continuous digits without separators
+      description: Hyphen-separated format (4-5-1 grouping), passes mod-10 checksum
+    - value: '2270193248'
+      description: Continuous digits without separators, passes mod-10 checksum
   should_not_match:
     - value: 1234 56789 0
       description: First digit is 1, which is outside the valid range of 2-6
     - value: 7890 12345 6
       description: First digit is 7, which is outside the valid range of 2-6
+    - value: 2270 19325 8
+      description: fails mod-10 checksum (single-digit perturbation of valid value 2270 19324 8)
+    - value: '4851938980'
+      description: fails mod-10 checksum (single-digit perturbation of valid value 4851 93897 0)
 false_positives:
   - description: Phone numbers starting with digits 2-6
     mitigation: >-
@@ -111,6 +119,18 @@ purview:
   regexes:
     - id: Regex_au_medicare
       pattern: \b[2-6]\d{3}[\s-]?\d{5}[\s-]?\d{1}\b
+      validators:
+        - ref: Validator_au_medicare_number_checksum
+  validators:
+    - id: Validator_au_medicare_number_checksum
+      type: Checksum
+      params:
+        - name: Weights
+          value: 1, 3, 7, 9, 1, 3, 7, 9, 0, 0
+        - name: Modulo
+          value: '10'
+        - name: CheckDigit
+          value: '9'
   keywords:
     - id: Keyword_au_medicare_specific
       groups:
@@ -156,8 +176,11 @@ sensitivity_labels:
   nz_gov: "CONFIDENTIAL"
   ca_gov: "Protected B"
 created: '2026-02-08'
-updated: '2026-07-18'
+updated: '2026-07-20'
 changelog:
+  - version: 1.4.0
+    date: '2026-07-20'
+    description: 'Enforce the Medicare checksum: add inline Checksum validator Validator_au_medicare_number_checksum (Weights 1,3,7,9,1,3,7,9,0,0 / Modulo 10 / CheckDigit 9 — weighted sum of digits 1-8 mod 10 must equal digit 9; zero weights for the check-digit and issue-number positions per the Purview docs encoding, see docs/checksum-validator-semantics.md) wired to Regex_au_medicare. Func_australian_medical_account_number remains absent from Microsoft''s validator-function list, but the generic Checksum validator now enforces the algorithm. Test cases: checksum-valid should_match values retained/added plus invalid-twin should_not_match regression values.'
   - version: 1.3.2
     date: '2026-07-18'
     description: >-
