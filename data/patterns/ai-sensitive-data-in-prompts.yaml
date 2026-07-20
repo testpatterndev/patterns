@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: AI Sensitive Data in Prompts
 slug: ai-sensitive-data-in-prompts
-version: 0.4.1
+version: 0.5.0
 type: keyword_list
 pattern_class: concept
 description: >-
@@ -37,14 +37,58 @@ corroborative_evidence:
   keyword_lists: [ai-context-markers]
 purview:
   patterns_proximity: 300
-  recommended_confidence: 65
+  recommended_confidence: 75
   regexes:
     - id: Pattern_ai_prompt_context
       pattern: '(?i)\b(?:in\s+(?:the\s+|my\s+)?(?:copilot|AI)\s+prompt|prompt\s+to\s+(?:copilot|the\s+assistant)|I\s+asked\s+(?:copilot|the\s+AI)|copilot\s+chat)\b'
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_ai_prompt_context
+      matches:
+        - ref: Evidence_sensitive_payload
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_ai_prompt_context
+      matches:
+        - ref: Evidence_sensitive_payload
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_ai_prompt_context
+  keywords:
+    - id: Evidence_sensitive_payload
+      groups:
+        - match_style: word
+          terms:
+            - customer record
+            - account details
+            - patient
+            - diagnosis
+            - medical record
+            - personal information
+            - credit card
+            - card number
+            - bank account
+            - password
+            - api key
+            - credentials
+            - tax file number
+            - confidential
+      strength: domain
 risk_rating: 7
 risk_description: >-
   This low-confidence rule marks typed prompt, Copilot Chat, uploaded-file, or asked-Copilot context so separate personal, regulated, credential, and proprietary-data SITs can identify what was submitted. A corroborated event can expose customer, health, financial, source-code, research, or secret material to an AI service and affect the data subjects and owning organization. Ordinary AI workflow documentation, approved internal analysis, templates, and test data can match the context wording without any sensitive payload, and uploaded-file coverage has a documented platform gap. Risk 7 reflects a verified sensitive-prompt incident; PSPF and QGISCF remain N/A for the context marker because the submitted data retains its own label.
@@ -59,7 +103,7 @@ test_cases:
     - value: 'In my Copilot prompt I included the full customer record for analysis.'
       description: AI-prompt context marker (PII detection delegated to existing SITs)
     - value: 'I asked Copilot to summarise the patient diagnosis from the attached chart.'
-      description: AI-prompt context marker via "I asked Copilot" framing
+      description: Exact 85 probe - prompt marker with two distinct payload terms (patient, diagnosis)
     - value: 'She pasted the account details into Copilot Chat during the session.'
       description: AI-prompt context marker via "Copilot Chat" framing
   should_not_match:
@@ -81,8 +125,11 @@ false_positives:
       Require corroborating regulated-data detection from a delegated SIT within the proximity window before
       raising a verdict.
 created: '2026-06-08'
-updated: '2026-07-14'
+updated: '2026-07-20'
 changelog:
+  - version: 0.5.0
+    date: '2026-07-20'
+    description: 'QG/CI pilot inclusion: promote from discovery-only to a full tier ladder - 75 requires the prompt marker plus sensitive-payload vocabulary (new Evidence_sensitive_payload group), 85 additionally requires two distinct payload terms; both carry the shared template-exclusion veto; discovery 65 unchanged; recommended_confidence 65->75; mark the existing patient-diagnosis positive as the 85 probe.'
   - version: 0.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1520 without changing detector or package metadata.'
