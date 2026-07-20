@@ -1,0 +1,172 @@
+schema: testpattern/v1
+name: Ministerial/Executive Briefing
+slug: global-ministerial-briefing
+version: 1.6.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Identifies substantive Australian ministerial, Director-General, secretary, and executive briefing
+  documents. Topic phrases are retained for discovery; enforcement requires issue, recommendation,
+  option, risk, financial, stakeholder, communications, decision, or implementation content, and high
+  confidence also requires a formal brief reference or decision/approval signal.
+operation: >-
+  Regex_executive_brief recognises ministerial, Director-General, DG, secretary, and executive brief
+  topics. The topic alone is discovery-only at 65. Substantive decision-support content raises it to 75;
+  that content plus a formal brief reference or decision/approval signal reaches 85. Enforcing tiers
+  reject explicit templates and training examples.
+pattern: >-
+  (?is)\b(?:ministerial\s+brief(?:ing)?|brief(?:ing)?\s+(?:for\s+)?(?:the\s+)?minister|DG\s+brief(?:ing)?|director[\s-]?general\s+brief(?:ing)?|secretary\s+brief(?:ing)?|brief(?:ing)?\s+for\s+(?:the\s+)?secretary)\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence requires substantive decision-support content. High confidence adds formal
+  reference, decision, or approval evidence.
+jurisdictions:
+  - global
+regulations:
+- "IPA 2009 (Qld)"
+- "Privacy Act 1988 (Cth)"
+- "SOCI Act 2018 (Cth)"
+frameworks:
+- DISP
+- ISO 27001
+- NIST CSF
+data_categories:
+  - government
+test_cases:
+  should_match:
+    - value: Ministerial brief
+      description: Low-tier probe - briefing topic without decision-support content
+    - value: 'Ministerial brief: key issues, policy options, recommendations, stakeholder positions, risks, communications lines, and implementation timing'
+      description: Medium-tier probe - substantive decision support without formal reference or action signal
+    - value: 'Ministerial brief reference: MB-2026-104, for decision by the Minister: key issues, options, recommendations, risks, stakeholder positions, and implementation timing'
+      description: High-tier probe - substantive brief with formal reference and decision signal
+  should_not_match:
+    - value: A brief summary of the project
+      description: Non-match 1
+    - value: The minister of music at the church
+      description: Non-government minister usage
+    - value: 'The public handbook explains how to write a ministerial brief.'
+      description: Public process guidance without a live brief
+    - value: 'Training example: ministerial brief MB-2026-104 for decision with recommendations and risks'
+      description: Explicit training content must not enforce
+false_positives:
+  - description: Public writing guidance and general government commentary discuss ministerial briefs, recommendations, options, and risks without containing a live decision document.
+    mitigation: Keep briefing topics discovery-only and require issue, recommendation, option, risk, financial, stakeholder, communications, decision, or implementation content.
+  - description: Training briefs can contain realistic references, decision signals, options, recommendations, and risks.
+    mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
+exports:
+  - yaml
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The detector targets ministerial briefs, Director-General briefings, briefing notes, and executive documents prepared for a decision or approval, not a generic short summary. A true brief can expose unreleased options, recommendations, stakeholder positions, risks, communications lines, and decision timing before the authorised audience acts. Premature release may prejudice deliberation, negotiation, parliamentary handling, or public confidence around a defined issue, causing serious but normally bounded government harm. Risk 8 SENSITIVE Government fits that unit; PROTECTED is not met without Cabinet privilege, protected operations, critical-service consequences, or credible significant damage.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Government
+  us_gov: "CUI Specified"
+  uk_gov: "SECRET"
+  nz_gov: "SECRET"
+  ca_gov: "Confidential"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_executive_brief
+      matches:
+        - ref: Evidence_executive_brief_content
+        - ref: Evidence_executive_brief_action
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_executive_brief
+      matches:
+        - ref: Evidence_executive_brief_content
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_executive_brief
+  regexes:
+    - id: Regex_executive_brief
+      pattern: >-
+        (?is)\b(?:ministerial\s+brief(?:ing)?|brief(?:ing)?\s+(?:for\s+)?(?:the\s+)?minister|DG\s+brief(?:ing)?|director[\s-]?general\s+brief(?:ing)?|secretary\s+brief(?:ing)?|brief(?:ing)?\s+for\s+(?:the\s+)?secretary)\b
+    - id: Evidence_executive_brief_action
+      pattern: >-
+        (?i)\b(?:brief\s*(?:number|no\.?|reference|ref\.?)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{3,}|for\s+(?:ministerial\s+)?(?:decision|approval)|minister(?:'s)?\s+decision|decision\s*[:=]\s*(?:approved|not\s+approved|noted))\b
+  keywords:
+    - id: Evidence_executive_brief_content
+      groups:
+        - match_style: word
+          terms:
+            - key issues
+            - recommendations
+            - policy options
+            - financial implications
+            - stakeholder positions
+            - risks
+            - communications lines
+            - decision required
+            - implementation timing
+            - legal advice
+            - next steps
+      strength: domain
+created: '2026-02-09'
+updated: '2026-07-04'
+changelog:
+  - version: 1.6.0
+    date: '2026-07-04'
+    description: Split executive-brief discovery, decision-support content, and formal action evidence into calibrated 65/75/85 tiers; narrow enforcement and exclude training content.
+  - version: 1.5.1
+    date: '2026-07-14'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 558 without changing detector or package metadata.'
+  - version: 1.5.0
+    date: '2026-07-09'
+    description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
+  - version: 1.4.0
+    date: '2026-07-09'
+    description: 'Noise-gate sweep: wire the declared template-exclusion noise dictionary (Keyword_noise_exclusion) into the NOT-group of every evidence-bearing tier — the dictionary was declared in shared_keywords but no tier referenced it (dead noise gate); dictionary terms verified collision-free against this pattern''s should_match values and specific/domain vocabulary'
+  - version: 1.3.0
+    date: '2026-07-04'
+    description: Restore a pattern_tiers entry the bulk collapse dropped when confidence canonicalization put two distinct-evidence tiers in the same bucket and mergeDuplicateTiers kept only one; the dropped tier carried genuine domain-specific evidence, now reinstated alongside the surviving tier
+  - version: 1.2.0
+    date: '2026-07-04'
+    description: Replace bare generic keyword terms with domain-anchored phrases (FP reduction)
+  - version: 1.1.0
+    date: '2026-07-04'
+    description: Mapped non-canonical confidence 95 to 85.; Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.
+author: testpattern-community
+license: MIT
+keywords:
+  - ministerial
+  - ministerial approval
+  - brief for the minister
+  - ministerial brief
+  - briefing note
+  - briefing document
+  - brief for decision
+  - for decision
+  - for information
+  - for approval
+  - key issues
+  - recommendations
+  - director general
+  - DG briefing
+remediation:
+  catalog_quality_2026_06_02:
+    status: applied
+    changes:
+      - 'Mapped non-canonical confidence 95 to 85.'
+      - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'

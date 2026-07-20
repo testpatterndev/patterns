@@ -1,26 +1,34 @@
 schema: testpattern/v1
 name: Committee meeting minutes
 slug: global-top500-162-committee-meeting-minutes
-version: 1.2.3
+version: 1.3.1
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to committee meeting minutes in international contexts.
-  These are corporate committee governance records; they are not inherently personally identifiable information.
-operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Identifies documents containing references to committee meeting minutes in Australian contexts. This information type is classified as personally identifiable information under applicable data
+  protection regulations.
+operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
 pattern: >-
-  (?is)\b(?:committee\s+meeting\s+minutes|audit\s+committee|risk\s+committee|remuneration\s+committee|nominations\s+committee|committee\s+resolution|committee\s+agenda|committee\s+charter|terms\s+of\s+reference|committee\s+members|governance\s+committee)\b
+  (?is)\b(?:committee\s+meeting\s+minutes|audit\s+committee|risk\s+committee|remuneration\s+committee|nomination\s+committee|terms\s+of\s+reference|action\s+items|corporate\s+governance|committee\s+resolution)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+  - TIA Act 1979 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
-  - governance
+  - pii
 corroborative_evidence:
   keywords:
     - committee meeting minutes
@@ -51,9 +59,7 @@ test_cases:
 false_positives:
   - description: Common words and phrases related to committee meeting minutes appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -67,64 +73,57 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_committee_meeting_minutes
+    - confidence_level: 85
+      id_match: Pattern_committee_meeting_minutes
       matches:
-        - ref: Pattern_global_top500_162_committee_meeting_minutes_label_context
-        - ref: Keyword_global_top500_162_committee_meeting_minutes_domain_context
+        - ref: Evidence_committee_meeting_minutes
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_committee_meeting_minutes
+      matches:
+        - ref: Evidence_committee_meeting_minutes
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_committee_meeting_minutes
+      id_match: Pattern_committee_meeting_minutes
       matches:
-        - ref: Keyword_committee_meeting_minutes
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_committee_meeting_minutes
   regexes:
-    - id: Regex_committee_meeting_minutes
+    - id: Pattern_committee_meeting_minutes
       pattern: >-
-        (?is)\b(?:committee\s+meeting\s+minutes|audit\s+committee|risk\s+committee|remuneration\s+committee|nominations\s+committee|committee\s+resolution|committee\s+agenda|committee\s+charter|terms\s+of\s+reference|committee\s+members|governance\s+committee)\b
-    - id: Pattern_global_top500_162_committee_meeting_minutes_label_context
-      pattern: (?i)\b(?:committee\s+meeting\s+minutes)\b
+        (?is)\b(?:committee\s+meeting\s+minutes|audit\s+committee|risk\s+committee|remuneration\s+committee|nomination\s+committee|terms\s+of\s+reference|action\s+items|corporate\s+governance|committee\s+resolution)\b
   keywords:
-    - id: Keyword_committee_meeting_minutes
+    - id: Evidence_committee_meeting_minutes
       groups:
         - match_style: word
           terms:
             - committee meeting minutes
+            - subcommittee
             - audit committee
             - risk committee
             - remuneration committee
-            - nominations committee
-            - committee resolution
-            - committee agenda
-            - committee charter
-            - subcommittee
+            - nomination committee
             - terms of reference
-            - committee members
-            - governance committee
-      strength: specific
-    - id: Keyword_global_top500_162_committee_meeting_minutes_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - committee meeting minutes
-            - committee
-            - meeting
-            - minutes
-      strength: domain
+            - quorum
+            - agenda
+            - action items
+            - corporate governance
+            - committee resolution
 risk_description: >-
-  This regex flags committee minutes, agendas, resolutions, charters, terms of reference, and named audit, risk, remuneration, or nomination committees rather than verifying completed minutes. A real record may expose control findings, risk decisions, executive pay discussions, candidate assessments, dissent, and assigned actions that could prejudice governance or harm named participants. The normal unit is one committee meeting within one organization, and published charters, committee descriptions, and blank agendas can generate benign hits. Risk 8 and SENSITIVE reflect serious but bounded governance and privacy harm; PROTECTED would require a protected inquiry, critical operation, or similarly significant consequence.
+  The classifier targets committee minutes and specific audit, risk, and remuneration committee material with seven nearby governance terms. Actual minutes can reveal control weaknesses, executive pay deliberations, assurance concerns, dissenting views, and assigned actions before resolution, creating unfair advantage or harming named staff. Consequences are serious but contained to the committee's remit and organisation unless the record concerns a critical government or market-wide decision. Risk 8 and SENSITIVE Personal-Privacy are appropriate; PROTECTED would require significant systemic damage, protected operations, or severe consequences extending well beyond the committee matter.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -134,37 +133,27 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-18'
+updated: '2026-07-14'
 changelog:
-  - version: 1.2.3
-    date: '2026-07-18'
-    description: >-
-      Adversarial accuracy pass: correct data_categories from ['pii'] to ['governance'] so package routing and workbook category claims match the detector content (description may already have been fixed in wave1).
-  - version: 1.2.2
-    date: '2026-07-16'
-    description: 'SIT alignment wave1 (TP-01083, reduced scope): description-only correction — removed the blanket PII claim and reworded the category as a business/commercial record per the approved reduced scope. The proposed behavioral tier rebalance was NOT implemented (no concrete replacement references were defined) and remains deferred; detection logic unchanged.'
-  - version: 1.2.1
+  - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1721 without changing detector or package metadata.'
-  - version: 1.2.0
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 763 without changing detector or package metadata.'
+  - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.1.1
-    date: '2026-07-09'
-    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.2.0
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
   - version: 1.1.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
 references:
   - https://www.legislation.gov.au/C2004A00818/latest/text
   - https://www.finance.gov.au/government/managing-commonwealth-resources/commonwealth-entities-financial-statements-guide-rmg-125
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
 
 risk_rating: 8

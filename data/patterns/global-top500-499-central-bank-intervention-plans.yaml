@@ -6,10 +6,10 @@ type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to central bank intervention plans in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies documents containing references to central bank intervention plans in Australian contexts. This information type is classified as personally identifiable information under the Privacy Act
+  1988.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 1 keywords within 240 characters. Uses
+  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
 pattern: (?i)\b(?:central\s+bank\s+intervention\s+plans?)\b
 confidence: medium
@@ -17,14 +17,29 @@ confidence_justification: identifier/document-structure anchored regex with cons
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
 data_categories:
+  - government-id
   - pii
 corroborative_evidence:
   keywords:
     - central bank intervention plans
-  proximity: 240
+    - central
+    - bank
+    - intervention
+    - plans
+    - elections
+    - diplomacy
+    - statecraft
+  proximity: 300
   keyword_lists:
+    - government-services
     - generic-data-labels
     - data-record-context
 test_cases:
@@ -36,6 +51,10 @@ test_cases:
     - value: 'this record references the central bank intervention plans held on file'
       description: Topic phrase within surrounding text
   should_not_match:
+    - value: unrelated generic text
+      description: No relevant phrase context
+    - value: placeholder value 12345
+      description: Random text should not match phrase marker
     - value: generic narrative without identifier/document anchors
       description: Should not match plain mention
     - value: template example placeholder record identifier
@@ -43,9 +62,7 @@ test_cases:
 false_positives:
   - description: Common words and phrases related to central bank intervention plans appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -55,59 +72,66 @@ exports:
   - regex_copy
 scope: wide
 purview:
-  patterns_proximity: 240
+  patterns_proximity: 300
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
     - dict: generic-data-labels
       as: Evidence_generic_data_labels
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_central_bank
+    - confidence_level: 85
+      id_match: Pattern_central_bank_intervention_plans
       matches:
-        - ref: Keyword_central_bank
+        - ref: Evidence_central_bank_intervention_plans
+          min_count: 2
+          unique_results: true
         - ref: Evidence_generic_data_labels
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 65
-      discovery_only: true
-      id_match: Regex_central_bank
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_central_bank_intervention_plans
       matches:
+        - ref: Evidence_central_bank_intervention_plans
+        - ref: Evidence_generic_data_labels
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_central_bank_intervention_plans
+      matches:
+        - ref: Evidence_central_bank_intervention_plans
   regexes:
-    - id: Regex_central_bank
+    - id: Pattern_central_bank_intervention_plans
       pattern: (?i)\b(?:central\s+bank\s+intervention\s+plans?)\b
-    - id: Pattern_global_top500_499_central_bank_intervention_plans_label_context
+    - id: Pattern_au_top500_499_central_bank_intervention_plans_label_context
       pattern: (?i)\b(?:central\s+bank\s+intervention\s+plans)\b
   keywords:
-    - id: Keyword_central_bank
+    - id: Evidence_central_bank_intervention_plans
       groups:
         - match_style: word
           terms:
-            - central bank intervention plans
-            - central bank
+            - central bank intervention
+            - RBA intervention
+            - Reserve Bank
             - monetary policy
             - interest rate decision
-            - foreign exchange intervention
-            - quantitative easing
-            - reserve requirement
-            - open market operations
-            - currency stabilization
-            - liquidity injection
-            - policy rate
             - market intervention
-      strength: specific
-    - id: Keyword_global_top500_499_central_bank_intervention_plans_domain_context
+            - currency intervention
+            - open market operations
+            - quantitative easing
+            - cash rate
+            - foreign exchange reserve
+            - liquidity facility
+    - id: Keyword_au_top500_499_central_bank_intervention_plans_domain_context
       groups:
         - match_style: word
           terms:
@@ -116,9 +140,8 @@ purview:
             - bank
             - intervention
             - plans
-      strength: domain
 risk_description: >-
-  The detector matches the specific phrase central bank intervention plan or plans with nearby intervention context, identifying a strategic topic rather than proving that an executable plan is present. A confirmed current plan can expose timing, instruments, thresholds, scale, and counterparties, enabling front-running and frustrating a systemically important market operation. That credible significant financial and policy damage supports risk 9 with PROTECTED Financial handling. Risk 10 is reserved for an imminent, large-scale intervention where compromise itself has a clear path to extreme national economic disruption; historical, public, and analytical references remain lower-confidence exceptions.
+  The medium-confidence regex targets references to planned central-bank intervention, with record context and template exclusions, but it can also match policy analysis or narrative discussion. Disclosure of an actionable currency, liquidity, or asset-purchase plan could let market participants trade ahead, position against the operation, and reduce its effectiveness. Early disclosure permits front-running, destabilises markets, frustrates intervention, and can create government-wide fiscal and monetary loss. The record is inherently market-moving. The significant-damage threshold is met for the substantive Central bank intervention plans artifact, making risk 10 and PROTECTED Financial appropriate after corroboration.
 sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
@@ -132,10 +155,10 @@ updated: '2026-07-15'
 changelog:
   - version: 1.3.2
     date: '2026-07-15'
-    description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 2038; detector and package metadata unchanged.'
+    description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1085; detector and package metadata unchanged.'
   - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2038 without changing detector or package metadata.'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1085 without changing detector or package metadata.'
   - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
@@ -143,22 +166,15 @@ changelog:
     date: '2026-07-09'
     description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
   - version: 1.2.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
-  - version: 1.1.0
     date: '2026-03-14'
-    description: Wire generic-data-labels evidence keywords at 75/85 tiers
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
+  - version: 1.1.0
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
   - version: 1.0.0
     date: '2026-02-08'
     description: Initial release
 author: testpattern-community
 license: MIT
-references: []
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
 
-risk_rating: 9
+risk_rating: 10

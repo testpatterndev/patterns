@@ -1,24 +1,34 @@
 schema: testpattern/v1
 name: Defect backlog with customer impact
 slug: global-top500-223-defect-backlog-with-customer-impact
-version: 1.2.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to defect backlog with customer impact in international contexts. This information type is classified as personally identifiable information under
-  applicable data protection regulations.
+  Identifies documents containing references to defect backlog with customer impact in Australian contexts. Higher confidence identifies backlog records that connect product defects to concrete
+  customer impact (BUG/DEFECT/ISSUE identifiers with affected customers/accounts, customer impact, workaround, severity, or release-target detail); defect and customer-impact vocabulary alone
+  remains discovery-only.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 8 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: >-
-  (?is)\b(?:defect\s+backlog\s+with\s+customer\s+impact|defect\s+backlog|customer\s+impact|bug\s+report|product\s+quality|safety\s+issue|severity\s+assessment|defect\s+tracking|issue\s+backlog|customer\s+complaint)\b
+pattern: (?is)\b(?:defect\s+backlog|customer\s+impact|bug\s+tracker|defect\s+report|severity\s+assessment|incident\s+report|product\s+defect|quality\s+issue|customer\s+complaint|root\s+cause\s+analysis)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+  - TIA Act 1979 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - pii
 corroborative_evidence:
@@ -34,14 +44,16 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: defect backlog with customer impact
-      description: Primary topic phrase match
     - value: defect backlog
-      description: Case-insensitive topic phrase match
+      description: Primary topic phrase match
     - value: customer impact
+      description: Case-insensitive topic phrase match
+    - value: bug tracker
       description: Alternative topic phrase match
-    - value: bug report
+    - value: defect report
       description: Additional topic phrase match
+    - value: 'BUG-4821 Severity 1; customer impact: 318 accounts cannot export; workaround: CSV API; fix version 7.2.'
+      description: Defect ID tied to affected customers, severity, workaround, and release (enforces at 75 via Pattern_defect_customer_link)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -49,12 +61,20 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: product failure
       description: Generic word pair from old broad template should not match
+    - value: Bug tracker lists internal cosmetic issue BUG-9 with no customer impact.
+      description: Defect without the defining customer-impact condition — discovery only, must not enforce
+    - value: 'BUG-42 triaged this sprint; no customer impact observed.'
+      description: Negated customer impact next to a valid defect ID must not enforce (negation-safe evidence regex)
+    - value: Customer impact of the office parking closure is limited to Friday.
+      description: Impact not caused by a product defect — discovery only, must not enforce
+    - value: 'Training example BUG-001: sample customer impact and placeholder workaround.'
+      description: Training/sample/placeholder marks synthetic backlog content — suppressed from enforcement
+    - value: customer impact
+      description: Topic phrase cannot satisfy both defect and impact roles — discovery only, must not enforce
 false_positives:
   - description: Common words and phrases related to defect backlog with customer impact appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -68,52 +88,58 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_defect_backlog
+    - confidence_level: 85
+      id_match: Pattern_defect_customer_link
       matches:
-        - ref: Pattern_global_top500_223_defect_backlog_with_customer_impact_label_context
-        - ref: Keyword_global_top500_223_defect_backlog_with_customer_impact_domain_context
+        - ref: Evidence_defect_backlog_customer_impact
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_defect_customer_link
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_defect_backlog
+      id_match: Pattern_defect_backlog_customer_impact
       matches:
-        - ref: Keyword_defect_backlog
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_defect_backlog_customer_impact
   regexes:
-    - id: Regex_defect_backlog
+    - id: Pattern_defect_backlog_customer_impact
       pattern: >-
-        (?is)\b(?:defect\s+backlog\s+with\s+customer\s+impact|defect\s+backlog|customer\s+impact|bug\s+report|product\s+quality|safety\s+issue|severity\s+assessment|defect\s+tracking|issue\s+backlog|customer\s+complaint)\b
-    - id: Pattern_global_top500_223_defect_backlog_with_customer_impact_label_context
+        (?is)\b(?:defect\s+backlog|customer\s+impact|bug\s+tracker|defect\s+report|severity\s+assessment|incident\s+report|product\s+defect|quality\s+issue|customer\s+complaint|root\s+cause\s+analysis)\b
+    - id: Pattern_defect_customer_link
+      pattern: >-
+        (?is)\b(?:BUG|DEFECT|ISSUE)[-_ ]?\d{2,8}\b[\s\S]{0,220}\b(?:affected\s+customers?|affected\s+accounts?|(?<!no\s)customer\s+impact|workaround|severity|fix\s+version|target\s+release)\b
+    - id: Pattern_au_top500_223_defect_backlog_with_customer_impact_label_context
       pattern: (?i)\b(?:defect\s+backlog\s+with\s+customer\s+impact)\b
   keywords:
-    - id: Keyword_defect_backlog
+    - id: Evidence_defect_backlog_customer_impact
       groups:
         - match_style: word
           terms:
-            - defect backlog with customer impact
             - defect backlog
             - customer impact
-            - bug report
-            - product quality
-            - safety issue
+            - bug tracker
+            - defect report
             - severity assessment
-            - defect tracking
-            - issue backlog
+            - incident report
+            - product defect
+            - quality issue
             - customer complaint
-      strength: specific
-    - id: Keyword_global_top500_223_defect_backlog_with_customer_impact_domain_context
+            - root cause analysis
+    - id: Keyword_au_top500_223_defect_backlog_with_customer_impact_domain_context
       groups:
         - match_style: word
           terms:
@@ -122,39 +148,41 @@ purview:
             - backlog
             - customer
             - impact
-      strength: domain
 risk_description: >-
-  The regex looks for defect-backlog, customer-impact, and bug-report concepts together with product-quality context, indicating operational defect material rather than an atomic identifier. A genuine backlog entry can reveal affected customers, unremediated failures, release weaknesses, or support exposure that competitors and attackers could exploit and that could undermine customer trust. The normal record may concern a bounded product or customer cohort, so the likely damage is serious but contained rather than organization-wide. Risk 8 and SENSITIVE fit this composite operational content; PROTECTED would require exploitable critical-service defects, widespread safety consequences, or a backlog enabling major systemic compromise.
+  The regex finds defect backlog, customer impact, bug tracker, defect report, severity assessment, incident report, product defect, quality issue, customer complaint, or root-cause-analysis terminology. These phrases appear in templates, training, support processes, public incident reporting, and routine quality work, and they do not establish an exploitable defect or identify an affected customer. Serious misuse requires technical reproduction steps, unpatched vulnerability detail, named customers, impact scale, or a confidential remediation plan beyond the topic match. Risk 5 supports OFFICIAL; SENSITIVE would require that substantive non-public defect and customer-impact record.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: SENSITIVE
-  qgiscf_dlm: SENSITIVE Personal-Privacy
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
   us_gov: CUI
-  uk_gov: OFFICIAL-SENSITIVE
+  uk_gov: OFFICIAL
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-16'
 changelog:
-  - version: 1.2.1
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: 'SIT alignment wave1 (TP-00349, reduced scope): enforcement (75/85) now anchors on Pattern_defect_customer_link (BUG/DEFECT/ISSUE id plus affected-customer/impact/workaround/severity/release detail) with a negation-safe fixed-width lookbehind so "no customer impact" cannot enforce (QA-required correction to the proposed evidence regex); topic tier demoted to 65 discovery_only; banned .{0,N} idiom replaced with [\s\S]{0,N}; adversarial tests added including the BUG-42 negation case.'
+  - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1782 without changing detector or package metadata.'
-  - version: 1.2.0
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 824 without changing detector or package metadata.'
+  - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.1.1
+  - version: 1.2.1
     date: '2026-07-09'
     description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.2.0
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
   - version: 1.1.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
 
-risk_rating: 8
+risk_rating: 5

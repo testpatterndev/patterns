@@ -1,23 +1,33 @@
 schema: testpattern/v1
 name: Time and attendance records
 slug: global-top500-077-time-and-attendance-records
-version: 1.2.1
+version: 1.3.1
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to time and attendance records in international contexts. This information type is classified as personally identifiable information under applicable data
+  Identifies documents containing references to time and attendance records in Australian contexts. This information type is classified as personally identifiable information under applicable data
   protection regulations.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:time\s+and\s+attendance|clock\s+in|clock\s+out|hours\s+worked|time\s+tracking|attendance\s+record|shift\s+roster|work\s+hours|overtime\s+record|time\s+card)\b
+pattern: (?is)\b(?:time\s+and\s+attendance|clock\s+in|clock\s+out|attendance\s+record|shift\s+roster|hours\s+worked|overtime\s+record|time\s+tracking|work\s+hours|rostered\s+hours|attendance\s+log)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+  - TIA Act 1979 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - pii
 corroborative_evidence:
@@ -37,7 +47,7 @@ test_cases:
       description: Case-insensitive topic phrase match
     - value: clock out
       description: Alternative topic phrase match
-    - value: hours worked
+    - value: attendance record
       description: Additional topic phrase match
   should_not_match:
     - value: unrelated generic text without domain phrases
@@ -49,9 +59,7 @@ test_cases:
 false_positives:
   - description: Common words and phrases related to time and attendance records appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -65,36 +73,41 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_time_attendance
+    - confidence_level: 85
+      id_match: Pattern_time_attendance
       matches:
-        - ref: Pattern_global_top500_077_time_and_attendance_records_label_context
-        - ref: Keyword_global_top500_077_time_and_attendance_records_domain_context
+        - ref: Evidence_time_attendance
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_time_attendance
+      matches:
+        - ref: Evidence_time_attendance
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_time_attendance
+      id_match: Pattern_time_attendance
       matches:
-        - ref: Keyword_time_attendance
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_time_attendance
   regexes:
-    - id: Regex_time_attendance
-      pattern: (?is)\b(?:time\s+and\s+attendance|clock\s+in|clock\s+out|hours\s+worked|time\s+tracking|attendance\s+record|shift\s+roster|work\s+hours|overtime\s+record|time\s+card)\b
-    - id: Pattern_global_top500_077_time_and_attendance_records_label_context
+    - id: Pattern_time_attendance
+      pattern: (?is)\b(?:time\s+and\s+attendance|clock\s+in|clock\s+out|attendance\s+record|shift\s+roster|hours\s+worked|overtime\s+record|time\s+tracking|work\s+hours|rostered\s+hours|attendance\s+log)\b
+    - id: Pattern_au_top500_077_time_and_attendance_records_label_context
       pattern: (?i)\b(?:time\s+and\s+attendance\s+records)\b
   keywords:
-    - id: Keyword_time_attendance
+    - id: Evidence_time_attendance
       groups:
         - match_style: word
           terms:
@@ -102,54 +115,53 @@ purview:
             - timesheet
             - clock in
             - clock out
-            - hours worked
-            - time tracking
             - attendance record
             - shift roster
-            - work hours
+            - hours worked
             - overtime record
-            - time card
-      strength: specific
-    - id: Keyword_global_top500_077_time_and_attendance_records_domain_context
+            - time tracking
+            - work hours
+            - rostered hours
+            - attendance log
+    - id: Keyword_au_top500_077_time_and_attendance_records_domain_context
       groups:
         - match_style: word
           terms:
             - time and attendance records
             - time
             - attendance
-      strength: domain
 risk_description: >-
-  The concept pattern seeks time-and-attendance, clock-in, clock-out, and hours-worked language intended to identify an employee's recorded presence and labour time. A genuine record can expose schedules, absences, pay inputs, workplace movements, and disciplinary evidence, enabling payroll fraud, stalking, or employment prejudice against the worker. Timesheet instructions and system documentation can match, but the normal substantive unit is a person-linked chronology rather than one isolated timestamp. Risk 8 SENSITIVE reflects serious contained privacy and employment harm; PROTECTED would require protected-person schedules, critical workforce deployment, bulk attendance systems, or an immediate safety or service-continuity consequence.
+  The regex identifies time and attendance records, timesheets, clock-in or clock-out entries, attendance logs, and similar routine workforce administration. A normal record reveals when an employee worked or was absent and may support payroll error, low-level profiling, or inference about availability, but it does not itself contain pay authority, disciplinary findings, or a location history beyond the recorded workplace event. Templates, scheduling guidance, and generic payroll discussion can also match. Risk 5 OFFICIAL reflects bounded person-linked harm; SENSITIVE would require detailed movement monitoring, health or leave reasons, payroll and bank data, disciplinary use, or a bulk longitudinal workforce dossier.
 sensitivity_labels:
-  pspf: "OFFICIAL: Sensitive"
-  qgiscf: SENSITIVE
-  qgiscf_dlm: SENSITIVE Personal-Privacy
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
   us_gov: CUI
-  uk_gov: OFFICIAL
+  uk_gov: OFFICIAL-SENSITIVE
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
 updated: '2026-07-14'
 changelog:
-  - version: 1.2.1
+  - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1638 without changing detector or package metadata.'
-  - version: 1.2.0
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 680 without changing detector or package metadata.'
+  - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.1.1
+  - version: 1.2.1
     date: '2026-07-09'
     description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.2.0
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
   - version: 1.1.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
 
-risk_rating: 8
+risk_rating: 5

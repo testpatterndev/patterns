@@ -1,23 +1,29 @@
 schema: testpattern/v1
 name: Gender or sex marker
 slug: global-top500-014-gender-or-sex-marker
-version: 1.2.1
+version: 1.3.1
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to gender or sex marker in international contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Identifies documents containing references to gender or sex marker in Australian contexts. This information type is classified as personally identifiable information under applicable data protection
+  regulations.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
   lists: pii-personal. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:sex\s+marker|sex\s+assigned|gender\s+identity|gender\s+marker|sex\s+designation|gender\s+classification)\b
+pattern: (?is)\b(?:sex\s+marker|gender\s+identity|gender\s+marker|sex\s+assigned\s+at\s+birth)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
 data_categories:
   - government-id
   - pii
@@ -39,11 +45,11 @@ test_cases:
   should_match:
     - value: sex marker
       description: Primary topic phrase match
-    - value: sex assigned
-      description: Case-insensitive topic phrase match
     - value: gender identity
-      description: Alternative topic phrase match
+      description: Case-insensitive topic phrase match
     - value: gender marker
+      description: Alternative topic phrase match
+    - value: sex assigned at birth
       description: Additional topic phrase match
   should_not_match:
     - value: unrelated generic text without domain phrases
@@ -55,9 +61,7 @@ test_cases:
 false_positives:
   - description: Common words and phrases related to gender or sex marker appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -71,52 +75,55 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_gender_sex_marker
+    - confidence_level: 85
+      id_match: Pattern_gender_sex_marker
       matches:
-        - ref: Pattern_global_top500_014_gender_or_sex_marker_label_context
-        - ref: Keyword_global_top500_014_gender_or_sex_marker_domain_context
+        - ref: Evidence_gender_sex_marker
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_gender_sex_marker
+      matches:
+        - ref: Evidence_gender_sex_marker
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_gender_sex_marker
+      id_match: Pattern_gender_sex_marker
       matches:
-        - ref: Keyword_gender_sex_marker
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_gender_sex_marker
   regexes:
-    - id: Regex_gender_sex_marker
-      pattern: (?is)\b(?:sex\s+marker|sex\s+assigned|gender\s+identity|gender\s+marker|sex\s+designation|gender\s+classification)\b
-    - id: Pattern_global_top500_014_gender_or_sex_marker_label_context
+    - id: Pattern_gender_sex_marker
+      pattern: (?is)\b(?:sex\s+marker|gender\s+identity|gender\s+marker|sex\s+assigned\s+at\s+birth)\b
+    - id: Pattern_au_top500_014_gender_or_sex_marker_label_context
       pattern: (?i)\b(?:gender\s+or\s+sex\s+marker)\b
   keywords:
-    - id: Keyword_gender_sex_marker
+    - id: Evidence_gender_sex_marker
       groups:
         - match_style: word
           terms:
             - gender
+            - sex
             - sex marker
-            - sex assigned
             - gender identity
             - male
             - female
             - non-binary
             - intersex
             - gender marker
-            - sex designation
-            - gender classification
-      strength: specific
-    - id: Keyword_global_top500_014_gender_or_sex_marker_domain_context
+            - sex assigned at birth
+    - id: Keyword_au_top500_014_gender_or_sex_marker_domain_context
       groups:
         - match_style: word
           terms:
@@ -124,9 +131,8 @@ purview:
             - gender
             - sex
             - marker
-      strength: domain
 risk_description: >-
-  The medium-confidence pattern finds sex-marker, assigned-sex, gender-identity, designation, marker, or classification terminology with seven personal-data context terms, not the actual attribute value. A disclosed topic marker may indicate that gender data is collected, but discrimination or unwanted outing requires linkage to an identifiable person's specific information. The normal true positive has low standalone impact and can occur in forms, equality policy, or administrative guidance. Risk 3 and OFFICIAL are appropriate, while an attributable gender-identity record used in a consequential decision would warrant SENSITIVE handling.
+  The Gender or sex marker detector matches phrases such as sex marker, gender marker, or gender identity. These terms can occur in forms, policy, demographic reporting, and system schemas without stating any person's recorded sex or gender. A populated value linked to an individual can create privacy, safety, or discrimination concerns in some settings, but that contextual fact is not established by the phrase detector. Risk 3 and OFFICIAL fit the normal concept hit while leaving person-linked sensitive circumstances for contextual classification.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -138,28 +144,29 @@ sensitivity_labels:
 created: '2026-02-08'
 updated: '2026-07-14'
 changelog:
-  - version: 1.2.1
+  - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1580 without changing detector or package metadata.'
-  - version: 1.2.0
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 620 without changing detector or package metadata.'
+  - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.1.1
+  - version: 1.2.1
     date: '2026-07-09'
     description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.2.0
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
   - version: 1.1.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
 references:
-  - https://eur-lex.europa.eu/eli/reg/2016/679/oj
   - https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-personal-information
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
+  - https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-sensitive-information
+  - https://www.oaic.gov.au/privacy/australian-privacy-principles-guidelines
 
 risk_rating: 3

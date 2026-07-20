@@ -1,23 +1,31 @@
 schema: testpattern/v1
 name: Biometric identifiers
 slug: global-top500-007-biometric-identifiers
-version: 1.3.2
+version: 1.3.1
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to biometric identifiers in international contexts. This information type is classified as personally identifiable information under applicable data
+  Identifies documents containing references to biometric identifiers in Australian contexts. This information type is classified as personally identifiable information under applicable data
   protection regulations.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Keyword
   lists: biometric-biometric-types. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?i)\b(?:biometric\s+identifiers?)\b
+pattern: (?is)\b(?:biometric\s+identifiers?|biometric\s+(?:data|template|record|sample|enrolment|enrollment|authentication))\b
 confidence: medium
 confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
   - global
 regulations:
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - government-id
   - pii
@@ -32,31 +40,29 @@ corroborative_evidence:
   proximity: 300
   keyword_lists:
     - biometric-biometric-types
-    - generic-data-labels
     - data-record-context
+    - generic-data-labels
 test_cases:
   should_match:
-    - value: 'Biometric identifiers'
-      description: Topic phrase present
-    - value: 'biometric identifiers'
-      description: Topic phrase, lowercase
-    - value: 'this record references the biometric identifiers held on file'
-      description: Topic phrase within surrounding text
+    - value: biometric identifiers
+      description: Exact phrase match
+    - value: biometric data
+      description: Biometric data phrase match
+    - value: biometric template
+      description: Biometric template phrase match
+    - value: biometric authentication
+      description: Biometric authentication phrase match
   should_not_match:
     - value: unrelated generic text
-      description: No relevant phrase context
-    - value: placeholder value 12345
-      description: Random text should not match phrase marker
-    - value: generic narrative without identifier/document anchors
-      description: Should not match plain mention
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+      description: No biometric terminology present
+    - value: identifier number 12345
+      description: Generic identifier without biometric context
+    - value: record reference A12345
+      description: Generic anchor terms no longer match
 false_positives:
   - description: Common words and phrases related to biometric identifiers appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -67,111 +73,101 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
-      match_style: word
-    - dict: generic-data-labels
-      as: Evidence_generic_data_labels
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_biometric_identifiers
+      id_match: Pattern_biometric_identifiers
       matches:
-        - ref: Keyword_biometric_identifiers
-        - ref: Evidence_generic_data_labels
+        - ref: Evidence_biometric_identifiers
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_biometric_identifiers
+      matches:
+        - ref: Evidence_biometric_identifiers
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_biometric_identifiers
+      id_match: Pattern_biometric_identifiers
       matches:
-        - ref: Evidence_generic_data_labels
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_biometric_identifiers
   regexes:
-    - id: Regex_biometric_identifiers
-      pattern: (?i)\b(?:biometric\s+identifiers?)\b
-    - id: Pattern_global_top500_007_biometric_identifiers_label_context
+    - id: Pattern_biometric_identifiers
+      pattern: (?is)\b(?:biometric\s+identifiers?|biometric\s+(?:data|template|record|sample|enrolment|enrollment|authentication))\b
+    - id: Pattern_au_top500_007_biometric_identifiers_label_context
       pattern: (?i)\b(?:biometric\s+identifiers)\b
   keywords:
-    - id: Keyword_biometric_identifiers
+    - id: Evidence_biometric_identifiers
       groups:
         - match_style: word
           terms:
-            - biometric identifiers
+            - biometric identifier
             - biometric data
             - biometric template
-            - biometric scan
-            - fingerprint
+            - biometric record
+            - biometric sample
+            - biometric enrolment
+            - fingerprint template
             - facial recognition
             - iris scan
-            - retina scan
             - voiceprint
-            - biometric enrollment
-            - biometric record
             - biometric authentication
-      strength: specific
-    - id: Keyword_global_top500_007_biometric_identifiers_domain_context
+    - id: Keyword_au_top500_007_biometric_identifiers_domain_context
       groups:
         - match_style: word
           terms:
             - biometric identifiers
             - biometric
             - identifiers
-      strength: domain
 risk_description: >-
-  The detector matches the specific phrase biometric identifier or identifiers with six nearby biometric context terms, identifying a document topic rather than parsing a biometric template. In a genuine enrolment or identity record, disclosure can expose immutable authentication characteristics, enable cross-system tracking, and create long-lived identity risk for the subject. A substantive biometric identifier can enable persistent tracking, authentication attack and cross-system linkage using a trait the person cannot replace. For this substantive Biometric identifiers match, the consequence is major rather than merely material, supporting risk 9 with PROTECTED Personal-Privacy.
+  This Biometric identifiers pattern detects concept phrases including biometric identifiers, biometric data, and biometric template. Those words can reveal that a document concerns biometric processing and may point reviewers toward nearby high-impact material, but they are not themselves an enrolled person's face, fingerprint, iris, or template. Procurement specifications, privacy notices, and security designs can match without any individual record. Risk 5 and OFFICIAL represent the topic's review value while reserving SENSITIVE for an actual immutable biometric artefact or person-linked enrolment data.
 sensitivity_labels:
-  pspf: PROTECTED
-  qgiscf: PROTECTED
-  qgiscf_dlm: PROTECTED Personal-Privacy
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
   us_gov: CUI Specified
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: CONFIDENTIAL
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-15'
+updated: '2026-07-14'
 changelog:
-  - version: 1.3.2
-    date: '2026-07-15'
-    description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1573; detector and package metadata unchanged.'
   - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1573 without changing detector or package metadata.'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 613 without changing detector or package metadata.'
   - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
   - version: 1.2.1
     date: '2026-07-09'
-    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
   - version: 1.2.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 90 to 85.; Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
-  - version: 1.1.0
     date: '2026-03-14'
-    description: Wire generic-data-labels evidence keywords at 75/85 tiers
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
+  - version: 1.1.0
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
   - version: 1.0.0
     date: '2026-02-08'
     description: Initial release
 author: testpattern-community
 license: MIT
 references:
-  - https://eur-lex.europa.eu/eli/reg/2016/679/oj
   - https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-personal-information
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 90 to 85.'
-      - 'Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.'
-      - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
+  - https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-sensitive-information
+  - https://www.oaic.gov.au/privacy/australian-privacy-principles-guidelines
 
-risk_rating: 9
+risk_rating: 5

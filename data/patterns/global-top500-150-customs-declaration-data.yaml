@@ -1,26 +1,35 @@
 schema: testpattern/v1
 name: Customs declaration data
 slug: global-top500-150-customs-declaration-data
-version: 1.2.3
+version: 1.4.1
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to customs declaration data in international contexts.
-  This is regulated trade and logistics declaration data; it is not inherently personally identifiable information.
+  Identifies documents containing references to customs declaration data in Australian contexts. This information type is classified as personally identifiable information under applicable data
+  protection regulations.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: >-
-  (?is)\b(?:customs\s+declaration|import\s+declaration|export\s+declaration|HS\s+code|tariff\s+classification|customs\s+duty|country\s+of\s+origin|customs\s+broker|duty\s+rate|border\s+clearance|commercial\s+invoice|bill\s+of\s+entry)\b
+pattern: (?is)\b(?:customs\s+declaration|import\s+declaration|export\s+declaration|tariff\s+classification|customs\s+duty|border\s+force|goods\s+declaration|country\s+of\s+origin|harmonised\s+tariff)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+  - TIA Act 1979 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
-  - business
+  - pii
 corroborative_evidence:
   keywords:
     - customs declaration data
@@ -39,7 +48,7 @@ test_cases:
       description: Case-insensitive topic phrase match
     - value: export declaration
       description: Alternative topic phrase match
-    - value: HS code
+    - value: tariff classification
       description: Additional topic phrase match
   should_not_match:
     - value: unrelated generic text without domain phrases
@@ -51,9 +60,7 @@ test_cases:
 false_positives:
   - description: Common words and phrases related to customs declaration data appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -67,54 +74,57 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_customs_declaration_data
+    - confidence_level: 85
+      id_match: Pattern_customs_declaration
       matches:
-        - ref: Pattern_global_top500_150_customs_declaration_data_label_context
-        - ref: Keyword_global_top500_150_customs_declaration_data_domain_context
+        - ref: Evidence_customs_declaration
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_customs_declaration
+      matches:
+        - ref: Evidence_customs_declaration
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_customs_declaration_data
+      id_match: Pattern_customs_declaration
       matches:
-        - ref: Keyword_customs_declaration_data
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_customs_declaration
   regexes:
-    - id: Regex_customs_declaration_data
-      pattern: >-
-        (?is)\b(?:customs\s+declaration|import\s+declaration|export\s+declaration|HS\s+code|tariff\s+classification|customs\s+duty|country\s+of\s+origin|customs\s+broker|duty\s+rate|border\s+clearance|commercial\s+invoice|bill\s+of\s+entry)\b
-    - id: Pattern_global_top500_150_customs_declaration_data_label_context
+    - id: Pattern_customs_declaration
+      pattern: (?is)\b(?:customs\s+declaration|import\s+declaration|export\s+declaration|tariff\s+classification|customs\s+duty|border\s+force|goods\s+declaration|country\s+of\s+origin|harmonised\s+tariff)\b
+    - id: Pattern_au_top500_150_customs_declaration_data_label_context
       pattern: (?i)\b(?:customs\s+declaration\s+data)\b
   keywords:
-    - id: Keyword_customs_declaration_data
+    - id: Evidence_customs_declaration
       groups:
         - match_style: word
           terms:
             - customs declaration
             - import declaration
             - export declaration
-            - HS code
+            - text: ABF
+              case_sensitive: true
             - tariff classification
             - customs duty
+            - border force
+            - goods declaration
             - country of origin
-            - customs broker
-            - duty rate
-            - border clearance
-            - commercial invoice
-            - bill of entry
+            - harmonised tariff
       strength: specific
-    - id: Keyword_global_top500_150_customs_declaration_data_domain_context
+    - id: Keyword_au_top500_150_customs_declaration_data_domain_context
       groups:
         - match_style: word
           terms:
@@ -123,47 +133,43 @@ purview:
             - declaration
       strength: domain
 risk_description: >-
-  The detector flags customs or import-export declarations, tariff classifications, origin, duty, broker, clearance, and commercial-invoice language rather than validating a declaration number. A completed declaration can reveal shipper and consignee identities, goods, values, routes, origin, and clearance status that supports cargo targeting, trade fraud, or regulatory evasion. The ordinary unit is one consignment and its trading parties, while customs guidance and blank forms can produce topic hits without live shipment data. Risk 8 and SENSITIVE recognize serious contained commercial and supply-chain harm; PROTECTED would require strategic or hazardous cargo, a critical operation, or other circumstances capable of significant damage.
+  The detector recognises customs declaration, import declaration, export declaration, and tariff classification language with seven nearby terms. A populated declaration can expose importer and exporter identities, goods, values, origin, destination, tariff treatment, and shipment timing, enabling fraud, evasion, theft, or commercial profiling. Public customs guidance, blank forms, and training can also match, so the concept does not guarantee live shipment data. Risk 8 SENSITIVE Personal-Privacy fits serious contained trade and party harm; PROTECTED requires controlled strategic goods, protected routes, systemic evasion, or significant national damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Personal-Privacy
   us_gov: CUI
   uk_gov: OFFICIAL-SENSITIVE
-  nz_gov: IN-CONFIDENCE
-  ca_gov: Protected A
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-18'
+updated: '2026-07-14'
 changelog:
-  - version: 1.2.3
-    date: '2026-07-18'
-    description: >-
-      Adversarial accuracy pass: correct data_categories from ['pii'] to ['business'] so package routing and workbook category claims match the detector content (description may already have been fixed in wave1).
-  - version: 1.2.2
-    date: '2026-07-16'
-    description: 'SIT alignment wave1 (TP-01071, reduced scope): description-only correction — removed the blanket PII claim and reworded the category as a business/commercial record per the approved reduced scope. The proposed behavioral tier rebalance was NOT implemented (no concrete replacement references were defined) and remains deferred; detection logic unchanged.'
-  - version: 1.2.1
+  - version: 1.4.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1709 without changing detector or package metadata.'
-  - version: 1.2.0
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 751 without changing detector or package metadata.'
+  - version: 1.4.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.1.1
+  - version: 1.3.1
     date: '2026-07-09'
     description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
-  - version: 1.1.0
+  - version: 1.3.0
     date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+    description: case/evidence metadata update
+  - version: 1.2.0
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
+  - version: 1.1.0
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
 references:
   - https://www.abf.gov.au/importing-exporting-and-manufacturing/importing/how-to-import/import-declaration
   - https://www.legislation.gov.au/C1968A00068/latest/text
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
 
 risk_rating: 8
