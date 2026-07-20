@@ -1,0 +1,179 @@
+schema: testpattern/v1
+name: Internal Audit Report
+slug: global-internal-audit-report
+version: 1.4.0
+type: regex
+pattern_class: concept
+description: Detects internal audit reports containing control assessments and organisational vulnerability findings.
+operation: >-
+  An internal-audit report, finding summary, management letter, or audit conclusion title is
+  discovery-only at 65. Audit scope, objective, opinion, conclusion, recommendation, IIA, or IPPF
+  content raises it to 75. The 85 tier additionally requires both a classified finding/exception and
+  a management response, owner, corrective action, or completion date. Enforcing tiers reject
+  templates and examples.
+confidence: medium
+confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+jurisdictions:
+  - global
+regulations:
+- "IPA 2009 (Qld)"
+- "Privacy Act 1988 (Cth)"
+- "SOCI Act 2018 (Cth)"
+frameworks:
+- DISP
+- ISO 27001
+- NIST CSF
+data_categories:
+  - audit
+  - governance
+test_cases:
+  should_match:
+    - value: 'Internal audit report'
+      description: Low-tier probe - report title without substantive audit content
+    - value: 'Internal audit report: audit scope, audit objective, and audit opinion.'
+      description: Medium-tier probe - substantive audit sections without a classified finding response
+    - value: 'Internal audit report: high risk finding and audit exception; management response, corrective action, and target completion date.'
+      description: High-tier probe - classified finding plus management response
+  should_not_match:
+    - value: Tax audit by the ATO
+      description: External tax-audit sibling
+    - value: Audit the financial statements
+      description: Financial-audit instruction
+    - value: 'The public annual report links to an internal audit report.'
+      description: Public link mentions only the report title
+    - value: 'Template example: internal audit report with high risk finding, audit exception, management response, and target completion date.'
+      description: Template contains otherwise high-tier evidence
+false_positives:
+  - description: External audit or financial audit references.
+    mitigation: Require internal audit specific terms like internal audit plan or management letter.
+exports:
+  - yaml
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The concept detector identifies internal audit reports, management letters, audit opinions, control assessments, and follow-up findings rather than external financial-audit references. A substantive report can consolidate unremediated control weaknesses, evidence gaps, accountable owners, and recommendations that an attacker, dishonest insider, or litigant could exploit. The exposure normally affects one audited organisation and can prejudice remediation, regulator engagement, or staff reputations, producing serious but contained operational harm. Risk 8 SENSITIVE Government is justified; PROTECTED is not met without critical-infrastructure weaknesses, a protected investigation, or credible significant damage.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Government
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_internal_audit_report
+      matches:
+        - ref: Keyword_audit_finding_classification
+        - ref: Keyword_management_response
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_internal_audit_report
+      matches:
+        - ref: Keyword_audit_general
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_internal_audit_report
+  regexes:
+    - id: Regex_internal_audit_report
+      pattern: >-
+        (?i)\b(?:internal\s+audit\s+(?:report|findings?|memorandum)|audit\s+report|audit\s+findings?\s+(?:report|summary)|management\s+letter|audit\s+conclusion)\b
+  keywords:
+    - id: Keyword_audit_finding_classification
+      groups:
+        - match_style: word
+          terms:
+            - critical finding
+            - high risk finding
+            - medium risk finding
+            - low risk finding
+            - priority one
+            - priority two
+            - priority three
+            - required action
+            - audit observation
+            - audit exception
+            - non-compliance
+            - deviation
+      strength: specific
+    - id: Keyword_management_response
+      groups:
+        - match_style: word
+          terms:
+            - management response
+            - management comment
+            - management action plan
+            - corrective action
+            - remediation plan
+            - action owner
+            - responsible party
+            - target completion date
+            - implementation date
+            - action items
+      strength: specific
+    - id: Keyword_audit_general
+      groups:
+        - match_style: word
+          terms:
+            - audit opinion
+            - audit scope
+            - audit objective
+            - audit conclusion
+            - audit recommendation
+            - IIA standards
+            - IPPF
+      strength: specific
+created: '2026-02-09'
+updated: '2026-07-19'
+changelog:
+  - version: 1.4.0
+    date: '2026-07-19'
+    description: 'Profile quality: align the regex-backed detector type; add report-title discovery, substantive-audit medium, and finding-plus-response high tiers; add public/template adversarial probes.'
+  - version: 1.3.1
+    date: '2026-07-14'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 551 without changing detector or package metadata.'
+  - version: 1.3.0
+    date: '2026-07-09'
+    description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
+  - version: 1.2.0
+    date: '2026-07-09'
+    description: 'Noise-gate sweep: wire the declared template-exclusion noise dictionary (Keyword_noise_exclusion) into the NOT-group of every evidence-bearing tier — the dictionary was declared in shared_keywords but no tier referenced it (dead noise gate); dictionary terms verified collision-free against this pattern''s should_match values and specific/domain vocabulary'
+  - version: 1.1.0
+    date: '2026-07-04'
+    description: Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.
+author: testpattern-community
+license: MIT
+keywords:
+  - internal audit
+  - audit report
+  - audit finding
+  - audit recommendation
+  - audit opinion
+  - control assessment
+  - risk assessment
+  - audit scope
+  - audit objective
+  - management letter
+  - internal audit plan
+  - follow-up audit
+remediation:
+  catalog_quality_2026_06_02:
+    status: applied
+    changes:
+      - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'

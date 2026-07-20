@@ -1,24 +1,33 @@
 schema: testpattern/v1
 name: Manufacturing deviation records
 slug: global-top500-238-manufacturing-deviation-records
-version: 1.2.2
+version: 1.4.1
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to manufacturing deviation records in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies documents containing references to manufacturing deviation records in Australian contexts. Higher confidence identifies records of actual manufacturing departures from requirement
+  (deviation/OOS/NCR identifiers with affected batch or lot and expected-versus-actual, disposition, or approval detail); deviation and batch-record vocabulary alone remains discovery-only.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: >-
-  (?is)\b(?:manufacturing\s+deviation|deviation\s+record|process\s+deviation|production\s+variance|nonconformance\s+report|batch\s+record|lot\s+deviation|manufacturing\s+exception|out\s+of\s+specification|deviation\s+approval)\b
+pattern: (?is)\b(?:manufacturing\s+deviation|deviation\s+record|process\s+deviation|production\s+deviation|batch\s+record|lot\s+deviation|out\s+of\s+specification|manufacturing\s+defect|deviation\s+report)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+  - TIA Act 1979 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - intellectual-property
   - business
@@ -40,8 +49,10 @@ test_cases:
       description: Case-insensitive topic phrase match
     - value: process deviation
       description: Alternative topic phrase match
-    - value: production variance
+    - value: production deviation
       description: Additional topic phrase match
+    - value: 'DEV-884 Batch B21; required fill 500+/-5 mL; observed 486 mL; disposition: quarantine; approved by QA 16 Jul.'
+      description: Deviation ID linking batch, specification, observation, disposition, and approval (enforces at 75/85)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -49,12 +60,18 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: product failure
       description: Generic word pair from old broad template should not match
+    - value: Batch record retention policy covers manufacturing defects.
+      description: Governance prose, not an event record — discovery only, must not enforce
+    - value: The theatre production deviated from its script.
+      description: Production/deviation outside manufacturing must not match
+    - value: Sample deviation form DEV-000; batch placeholder; observed example.
+      description: Sample/placeholder/example identify an unpopulated form — suppressed from enforcement
+    - value: manufacturing deviation
+      description: Topic phrase cannot prove a populated event — discovery only, must not enforce
 false_positives:
   - description: Common words and phrases related to manufacturing deviation records appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -68,95 +85,103 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_manufacturing_deviation
+    - confidence_level: 85
+      id_match: Pattern_manufacturing_deviation_record
       matches:
-        - ref: Pattern_global_top500_238_manufacturing_deviation_records_label_context
-        - ref: Keyword_global_top500_238_manufacturing_deviation_records_domain_context
+        - ref: Evidence_manufacturing_deviation
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_manufacturing_deviation_record
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_manufacturing_deviation
+      id_match: Pattern_manufacturing_deviation
       matches:
-        - ref: Keyword_manufacturing_deviation
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_manufacturing_deviation
   regexes:
-    - id: Regex_manufacturing_deviation
+    - id: Pattern_manufacturing_deviation
       pattern: >-
-        (?is)\b(?:manufacturing\s+deviation|deviation\s+record|process\s+deviation|production\s+variance|nonconformance\s+report|batch\s+record|lot\s+deviation|manufacturing\s+exception|out\s+of\s+specification|deviation\s+approval)\b
-    - id: Pattern_global_top500_238_manufacturing_deviation_records_label_context
+        (?is)\b(?:manufacturing\s+deviation|deviation\s+record|process\s+deviation|production\s+deviation|batch\s+record|lot\s+deviation|out\s+of\s+specification|manufacturing\s+defect|deviation\s+report)\b
+    - id: Pattern_au_top500_238_manufacturing_deviation_records_label_context
       pattern: (?i)\b(?:manufacturing\s+deviation\s+records)\b
+    - id: Pattern_manufacturing_deviation_record
+      pattern: >-
+        (?is)\b(?:DEV|OOS|NCR)[-_ ]?\d{2,10}\b[\s\S]{0,240}\b(?:batch|lot)\b[\s\S]{0,240}\b(?:expected|required|specification|actual|observed|disposition|approved)\b
   keywords:
-    - id: Keyword_manufacturing_deviation
+    - id: Evidence_manufacturing_deviation
       groups:
         - match_style: word
           terms:
             - manufacturing deviation
             - deviation record
             - process deviation
-            - production variance
-            - nonconformance report
+            - production deviation
+            - nonconformance
             - batch record
             - lot deviation
-            - manufacturing exception
             - out of specification
-            - deviation approval
-      strength: specific
-    - id: Keyword_global_top500_238_manufacturing_deviation_records_domain_context
+            - manufacturing defect
+            - deviation report
+    - id: Keyword_au_top500_238_manufacturing_deviation_records_domain_context
       groups:
         - match_style: word
           terms:
             - manufacturing deviation records
             - manufacturing
             - deviation
-      strength: domain
 risk_description: >-
-  This contextual pattern recognizes manufacturing-deviation, deviation-record, process-deviation, or production-variance language associated with product quality. A genuine deviation record can disclose nonconforming processes, affected lots, approvals, and unresolved controls, enabling supplier pressure, regulatory challenge, counterfeiting intelligence, or targeted exploitation of weak product runs. Although one record is usually bounded to a batch or process, disclosure can create serious legal, commercial, and customer harm where the deviation affects quality claims. Risk 8 and SENSITIVE fit that consequence; PROTECTED would require widespread unsafe output, critical-service dependence, or major irreversible public harm.
+  This detector identifies manufacturing, process, production, and deviation-record language with seven corroborators, targeting an internal record of departure from an approved process or specification. A genuine record may disclose affected batches, equipment settings, material substitutions, investigation status, disposition, and temporary controls that competitors or counterfeiters could exploit. Harm is moderate and normally limited to a product, batch, or process, while quality procedures, training, and blank deviation forms can match. Risk 7 and SENSITIVE InfoTech fit the proprietary production record; risk 8 or PROTECTED requires severe safety impact, systemic production failure, strategic technology, or significant regulatory and market damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
-  qgiscf_dlm: SENSITIVE Personal-Privacy
+  qgiscf_dlm: SENSITIVE InfoTech
   us_gov: CUI
-  uk_gov: OFFICIAL-SENSITIVE
+  uk_gov: OFFICIAL
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
 updated: '2026-07-18'
 changelog:
-  - version: 1.2.2
+  - version: 1.4.1
     date: '2026-07-18'
     description: >-
-      Quality bar: data_categories ['pii'] -> ['intellectual-property', 'business'] for routing/classification consistency.
-  - version: 1.2.1
+      Adversarial accuracy pass: correct data_categories from ['pii'] to ['intellectual-property', 'business'] so package routing and workbook category claims match the detector content (description may already have been fixed in wave1).
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: 'SIT alignment wave1 (TP-00364): enforcement (75/85) now anchors on populated deviation records (Pattern_manufacturing_deviation_record — DEV/OOS/NCR id plus batch/lot plus expected/actual/disposition/approval attribute); deviation/OOS topic tier demoted to 65 discovery_only; adversarial test cases added.'
+  - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1797 without changing detector or package metadata.'
-  - version: 1.2.0
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 839 without changing detector or package metadata.'
+  - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.1.1
+  - version: 1.2.1
     date: '2026-07-09'
     description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.2.0
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
   - version: 1.1.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
 
-risk_rating: 8
+risk_rating: 7

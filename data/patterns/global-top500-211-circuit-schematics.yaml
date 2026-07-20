@@ -1,23 +1,33 @@
 schema: testpattern/v1
 name: Circuit schematics
 slug: global-top500-211-circuit-schematics
-version: 1.2.2
+version: 1.4.1
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to circuit schematics in international contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
-operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:circuit\s+schematics|schematic\s+diagram|circuit\s+design|intellectual\s+property|trade\s+secrets|proprietary\s+design|PCB\s+layout|hardware\s+design|electronic\s+design|circuit\s+board)\b
+  Identifies documents containing circuit schematic or layout content in Australian contexts. Enforcement denotes actual schematic or layout artifacts (reference designators with pin/net/node/footprint
+  relations, netlists, sheet numbers, EDA design files) — circuit-design topic language alone, i.e. the discipline of circuit design, is discovery-only. This information type is classified as personally
+  identifiable information under applicable data protection regulations.
+operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
+pattern: >-
+  (?is)\b(?:circuit\s+schematics|circuit\s+design|schematic\s+diagram|PCB\s+layout|electronic\s+design|intellectual\s+property|proprietary\s+design|hardware\s+design|component\s+layout|board\s+schematic)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+  - TIA Act 1979 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - intellectual-property
 corroborative_evidence:
@@ -34,15 +44,21 @@ test_cases:
   should_match:
     - value: circuit schematics
       description: Primary topic phrase match
-    - value: schematic diagram
-      description: Case-insensitive topic phrase match
     - value: circuit design
+      description: Case-insensitive topic phrase match
+    - value: schematic diagram
       description: Alternative topic phrase match
-    - value: intellectual property
+    - value: PCB layout
       description: Additional topic phrase match
+    - value: 'Sheet 3: U14 pin 7 connects to net VREF; R22 10k; source board.kicad_sch rev B.'
+      description: Reference designators with pin/net relations plus an EDA filename prove schematic content (artifact enforcement branch)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
+    - value: 'Tutorial sample schematic: U1 pin 1 to NET_A.'
+      description: Tutorial/sample teaching material must not enforce (single artifact token, noise-gated)
+    - value: The seating layout places component teams near each other.
+      description: Layout/component words in organisational prose are not schematic content
     - value: placeholder value 12345
       description: Random text should not match topic-specific regex
     - value: algorithm schematic
@@ -50,9 +66,7 @@ test_cases:
 false_positives:
   - description: Common words and phrases related to circuit schematics appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -66,65 +80,64 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_circuit_schematics
+    - confidence_level: 85
+      id_match: Pattern_circuit_artifact
       matches:
-        - ref: Pattern_global_top500_211_circuit_schematics_label_context
-        - ref: Keyword_global_top500_211_circuit_schematics_domain_context
+        - ref: Pattern_circuit_artifact
+          min_count: 3
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_circuit_artifact
+      matches:
+        - ref: Pattern_circuit_artifact
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_circuit_schematics
+      id_match: Pattern_circuit_schematics
       matches:
-        - ref: Keyword_circuit_schematics
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_circuit_schematics
   regexes:
-    - id: Regex_circuit_schematics
+    - id: Pattern_circuit_schematics
       pattern: >-
-        (?is)\b(?:circuit\s+schematics|schematic\s+diagram|circuit\s+design|intellectual\s+property|trade\s+secrets|proprietary\s+design|PCB\s+layout|hardware\s+design|electronic\s+design|circuit\s+board)\b
-    - id: Pattern_global_top500_211_circuit_schematics_label_context
-      pattern: (?i)\b(?:circuit\s+schematics)\b
+        (?is)\b(?:circuit\s+schematics|circuit\s+design|schematic\s+diagram|PCB\s+layout|electronic\s+design|intellectual\s+property|proprietary\s+design|hardware\s+design|component\s+layout|board\s+schematic)\b
+    - id: Pattern_circuit_artifact
+      pattern: >-
+        (?im)(?:\b(?:R|C|U|Q|D|J)\d+\b[^\r\n]{0,80}\b(?:pin|net|node|footprint)\b|\b(?:\.kicad_sch|\.sch|\.brd|\.pcb|netlist|sheet\s+\d+)\b)
   keywords:
-    - id: Keyword_circuit_schematics
+    - id: Evidence_circuit_schematics
       groups:
         - match_style: word
           terms:
             - circuit schematics
-            - schematic diagram
             - circuit design
-            - intellectual property
-            - trade secrets
-            - proprietary design
+            - schematic diagram
             - PCB layout
-            - hardware design
             - electronic design
-            - circuit board
-      strength: specific
-    - id: Keyword_global_top500_211_circuit_schematics_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - circuit schematics
-            - circuit
-            - schematics
-      strength: domain
+            - intellectual property
+            - proprietary design
+            - hardware design
+            - component layout
+            - board schematic
 risk_description: >-
-  This concept regex recognizes circuit-schematic, schematic-diagram, circuit-design, or general intellectual-property language rather than extracting an actual drawing or netlist. A match can reveal that engineering design work is being discussed, which may help a competitor identify a product area, but it does not expose component values, interfaces, tolerances, or implementation dependencies. The affected organization therefore faces low and reversible standalone harm unless the surrounding document contains the proprietary schematic itself. Risk 4 and OFFICIAL fit the detected topic reference; a complete unreleased design, safety-critical control circuit, or exploitable system diagram would cross toward SENSITIVE.
+  The detector matches circuit schematic, circuit design, schematic diagram, PCB layout, electronic design, hardware design, component layout, or proprietary-design terminology. A substantive schematic can reveal topology, interfaces, component choices, test points, and attack surfaces, enabling copying, reverse engineering, or targeted hardware exploitation. Public reference designs and educational diagrams can also match, so the normal unit is one bounded engineering design rather than an entire product portfolio. Risk 8 supports SENSITIVE InfoTech; PROTECTED would require critical-system hardware, exploitable safety controls, or aggregated architecture whose compromise causes significant damage.
 sensitivity_labels:
-  pspf: OFFICIAL
-  qgiscf: OFFICIAL
-  qgiscf_dlm: OFFICIAL
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
   us_gov: CUI
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: IN-CONFIDENCE
@@ -132,33 +145,36 @@ sensitivity_labels:
 created: '2026-02-08'
 updated: '2026-07-18'
 changelog:
-  - version: 1.2.2
+  - version: 1.4.1
     date: '2026-07-18'
     description: >-
-      Quality bar: data_categories ['pii'] -> ['intellectual-property'] for routing/classification consistency.
-  - version: 1.2.1
+      Adversarial accuracy pass: correct data_categories from ['pii'] to ['intellectual-property'] so package routing and workbook category claims match the detector content (description may already have been fixed in wave1).
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: >-
+      Tier rebalance: enforcement now anchors on new Pattern_circuit_artifact (reference designator + pin/net/node/footprint relation, or netlist/sheet-number/EDA-file token) — 75 requires the anchor
+      plus two unique artifact tokens, 85 three, both noise-gated; the circuit-design topic branch is demoted to discovery-only 65 so design-discipline prose can no longer enforce. Description now
+      states enforcement denotes schematic/layout content, not the discipline of circuit design.
+  - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1770 without changing detector or package metadata.'
-  - version: 1.2.0
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 812 without changing detector or package metadata.'
+  - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.1.1
-    date: '2026-07-09'
-    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.2.0
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
   - version: 1.1.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
 references:
   - https://www.ipaustralia.gov.au/patents/what-are-patents
   - https://www.ipaustralia.gov.au/designs
   - https://www.ipaustralia.gov.au/tools-and-research/business-resources/non-disclosure-agreements
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
 
-risk_rating: 4
+risk_rating: 8

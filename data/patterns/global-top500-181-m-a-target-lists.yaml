@@ -6,19 +6,27 @@ type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to m&a target lists in international contexts. This information type is classified as personally identifiable information under applicable data protection
+  Identifies documents containing references to m&a target lists in Australian contexts. This information type is classified as personally identifiable information under applicable data protection
   regulations.
-operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 500 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters.'
 pattern: >-
-  (?is)\b(?:m&a\s+target\s+lists|acquisition\s+target|merger\s+target|target\s+company|due\s+diligence|valuation\s+analysis|deal\s+pipeline|strategic\s+acquisition|takeover\s+candidate|market\s+screening|indicative\s+offer)\b
+  (?is)\b(?:m&a\s+target\s+lists|acquisition\s+target|merger\s+target|target\s+company|deal\s+pipeline|due\s+diligence|valuation\s+analysis|strategic\s+acquisition|takeover\s+candidate|indicative\s+offer|enterprise\s+value|synergy\s+assessment)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+  - TIA Act 1979 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - pii
 corroborative_evidence:
@@ -29,7 +37,7 @@ corroborative_evidence:
     - mergers
     - acquisitions
     - strategy
-  proximity: 500
+  proximity: 300
 test_cases:
   should_match:
     - value: m&a target lists
@@ -50,9 +58,7 @@ test_cases:
 false_positives:
   - description: Common words and phrases related to m&a target lists appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -62,73 +68,65 @@ exports:
   - regex_copy
 scope: wide
 purview:
-  patterns_proximity: 500
+  patterns_proximity: 300
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_ma_target_lists
+    - confidence_level: 85
+      id_match: Pattern_ma_target_lists
       matches:
-        - ref: Pattern_global_top500_181_m_a_target_lists_label_context
-        - ref: Keyword_global_top500_181_m_a_target_lists_domain_context
+        - ref: Evidence_ma_target_lists
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_ma_target_lists
+      matches:
+        - ref: Evidence_ma_target_lists
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_ma_target_lists
+      id_match: Pattern_ma_target_lists
       matches:
-        - ref: Keyword_ma_target_lists
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_ma_target_lists
   regexes:
-    - id: Regex_ma_target_lists
+    - id: Pattern_ma_target_lists
       pattern: >-
-        (?is)\b(?:m&a\s+target\s+lists|acquisition\s+target|merger\s+target|target\s+company|due\s+diligence|valuation\s+analysis|deal\s+pipeline|strategic\s+acquisition|takeover\s+candidate|market\s+screening|indicative\s+offer)\b
-    - id: Pattern_global_top500_181_m_a_target_lists_label_context
-      pattern: (?i)\b(?:m\&a\s+target\s+lists)\b
+        (?is)\b(?:m&a\s+target\s+lists|acquisition\s+target|merger\s+target|target\s+company|deal\s+pipeline|due\s+diligence|valuation\s+analysis|strategic\s+acquisition|takeover\s+candidate|indicative\s+offer|enterprise\s+value|synergy\s+assessment)\b
   keywords:
-    - id: Keyword_ma_target_lists
+    - id: Evidence_ma_target_lists
       groups:
         - match_style: word
           terms:
             - m&a target lists
-            - text: M&A
-              case_sensitive: true
             - acquisition target
             - merger target
             - target company
+            - deal pipeline
             - due diligence
             - valuation analysis
-            - deal pipeline
             - strategic acquisition
             - takeover candidate
-            - market screening
-            - shortlist
             - indicative offer
-      strength: specific
-    - id: Keyword_global_top500_181_m_a_target_lists_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - m&a target lists
-            - target
-            - lists
-      strength: domain
+            - enterprise value
+            - synergy assessment
 risk_description: >-
-  The concept detector flags acquisition or merger targets, target companies, due diligence, valuation analysis, deal pipelines, strategic acquisitions, takeover candidates, market screening, and indicative offers rather than proving an active transaction. A genuine target list can reveal corporate intentions, valuation priorities, and counterparties before announcement, allowing price movement, defensive action, insider dealing, or loss of negotiating leverage. The ordinary exposure concerns one organization's bounded transaction pipeline and the candidate companies, while public market analysis and advisory templates may match. Risk 8 and SENSITIVE reflect serious contained strategic and market harm; PROTECTED would require systemic market consequences, protected government policy, or significant national damage.
+  The concept regex recognises acquisition target, merger target, target company, and M&A list language, with the intended unit being an internal pipeline of prospective transactions rather than public merger news. Disclosure can reveal corporate strategy, screening criteria, likely bidders, and potential counterparties, enabling insider trading, defensive action by targets, competitor interference, or loss of negotiating leverage across the listed opportunities. The medium-confidence rule may also match adviser marketing and public deal commentary, so non-public list structure and evaluation notes are important. Risk 8 and SENSITIVE Financial reflect serious contained transaction harm; PROTECTED would require a transformative or nationally strategic transaction whose compromise could credibly cause significant damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
-  qgiscf_dlm: SENSITIVE Personal-Privacy
+  qgiscf_dlm: SENSITIVE Financial
   us_gov: CUI
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: IN-CONFIDENCE
@@ -138,30 +136,24 @@ updated: '2026-07-14'
 changelog:
   - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1740 without changing detector or package metadata.'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 782 without changing detector or package metadata.'
   - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.2.1
-    date: '2026-07-09'
-    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
   - version: 1.2.0
-    date: '2026-07-04'
-    description: Widen patterns_proximity 300->500 and add M&A single-token keyword alternative so keyword evidence still gates at the challenging-layout distance (ph<50 cohort)
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
   - version: 1.1.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
 references:
   - https://www.accc.gov.au/business/mergers
   - https://www.takeovers.gov.au/guidance-notes
   - https://www.legislation.gov.au/C2004A00818/latest/text
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
 
 risk_rating: 8

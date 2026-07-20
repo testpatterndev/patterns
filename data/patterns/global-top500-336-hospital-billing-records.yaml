@@ -1,21 +1,28 @@
 schema: testpattern/v1
 name: Hospital billing records
 slug: global-top500-336-hospital-billing-records
-version: 1.2.1
+version: 1.3.1
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: Identifies hospital billing records references in healthcare and patient records. Protected health information under applicable data protection regulations.
-operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:hospital\s+billing|billing\s+record|medical\s+billing|claim\s+submission|procedure\s+code|diagnosis\s+code|insurance\s+claim|patient\s+account|revenue\s+cycle|charge\s+master)\b
+operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
+pattern: (?is)\b(?:hospital\s+billing|billing\s+record|patient\s+billing|hospital\s+invoice|medical\s+billing|claim\s+submission|billing\s+code|hospital\s+charges|inpatient\s+billing|DRG\s+code)\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection.
 jurisdictions:
   - global
 regulations:
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - SOC 2
 data_categories:
   - healthcare
   - phi
@@ -31,17 +38,15 @@ corroborative_evidence:
   proximity: 300
   keyword_lists:
     - healthcare-clinical
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
     - value: hospital billing
       description: Primary topic phrase match
     - value: billing record
       description: Case-insensitive topic phrase match
-    - value: medical billing
+    - value: patient billing
       description: Alternative topic phrase match
-    - value: claim submission
+    - value: hospital invoice
       description: Additional topic phrase match
   should_not_match:
     - value: unrelated generic text without domain phrases
@@ -60,8 +65,61 @@ exports:
   - yaml
   - regex_copy
 scope: wide
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_hospital_billing_records
+      matches:
+        - ref: Evidence_hospital_billing_records
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_hospital_billing_records
+      matches:
+        - ref: Evidence_hospital_billing_records
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_hospital_billing_records
+      matches:
+        - ref: Evidence_hospital_billing_records
+  regexes:
+    - id: Pattern_hospital_billing_records
+      pattern: (?is)\b(?:hospital\s+billing|billing\s+record|patient\s+billing|hospital\s+invoice|medical\s+billing|claim\s+submission|billing\s+code|hospital\s+charges|inpatient\s+billing|DRG\s+code)\b
+  keywords:
+    - id: Evidence_hospital_billing_records
+      groups:
+        - match_style: word
+          terms:
+            - hospital billing
+            - billing record
+            - patient billing
+            - hospital invoice
+            - medical billing
+            - health
+            - biomedical
+            - claim submission
+            - billing code
+            - hospital charges
+            - inpatient billing
+            - DRG code
 risk_description: >-
-  The medium-confidence detector matches hospital-billing, medical-billing, or billing-record phrases with seven healthcare corroborators and template exclusions, targeting an itemized healthcare financial record. A true bill can disclose the patient, provider, dates, procedures, diagnosis-related codes, insurance status, and amounts, enabling condition inference, fraud, or targeted debt and payment scams. Its mixed administrative, financial, and clinical content creates moderate direct harm, but it is not automatically a full chart and public billing guidance can trigger the rule. Risk 7 and SENSITIVE are justified; risk 8 or PROTECTED requires detailed stigmatized treatment, exploitable payment data, bulk billing exports, or major service impact.
+  The detector recognizes hospital and patient billing, medical invoices, claim submissions, charges, DRG codes, and inpatient billing in clinical context. A genuine bill can link identity, provider, dates, procedures, diagnosis-related groups, insurer, and financial liability, allowing condition inference, fraud, debt targeting, or dispute manipulation. The normal record is one account or episode rather than a hospital ledger, so the combined financial and health impact is serious but contained. Risk 8 and SENSITIVE are justified; PROTECTED would require a bulk revenue-cycle database, payment credentials, or compromise causing significant institutional and patient harm.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -70,87 +128,25 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: CONFIDENTIAL
   ca_gov: Protected B
-purview:
-  patterns_proximity: 300
-  recommended_confidence: 75
-  shared_keywords:
-    - dict: template-exclusion
-      as: Keyword_noise_exclusion
-      match_style: word
-  pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_hospital_billing_records
-      matches:
-        - ref: Pattern_global_top500_336_hospital_billing_records_label_context
-        - ref: Keyword_global_top500_336_hospital_billing_records_domain_context
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 65
-      discovery_only: true
-      id_match: Regex_hospital_billing_records
-      matches:
-        - ref: Keyword_hospital_billing_records
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-  regexes:
-    - id: Regex_hospital_billing_records
-      pattern: (?is)\b(?:hospital\s+billing|billing\s+record|medical\s+billing|claim\s+submission|procedure\s+code|diagnosis\s+code|insurance\s+claim|patient\s+account|revenue\s+cycle|charge\s+master)\b
-    - id: Pattern_global_top500_336_hospital_billing_records_label_context
-      pattern: (?i)\b(?:hospital\s+billing\s+records)\b
-  keywords:
-    - id: Keyword_hospital_billing_records
-      groups:
-        - match_style: word
-          terms:
-            - hospital billing
-            - billing record
-            - medical billing
-            - claim submission
-            - procedure code
-            - health
-            - biomedical
-            - diagnosis code
-            - insurance claim
-            - patient account
-            - revenue cycle
-            - charge master
-      strength: specific
-    - id: Keyword_global_top500_336_hospital_billing_records_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - hospital billing records
-            - hospital
-            - billing
-      strength: domain
 created: '2026-02-08'
 updated: '2026-07-14'
 changelog:
-  - version: 1.2.1
+  - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1882 without changing detector or package metadata.'
-  - version: 1.2.0
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 923 without changing detector or package metadata.'
+  - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.1.1
-    date: '2026-07-09'
-    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.2.0
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
   - version: 1.1.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
 
-risk_rating: 7
+risk_rating: 8

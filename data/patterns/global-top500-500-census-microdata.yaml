@@ -1,39 +1,49 @@
 schema: testpattern/v1
 name: Census microdata
 slug: global-top500-500-census-microdata
-version: 1.2.1
+version: 1.3.1
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: >-
-  Identifies documents containing references to census microdata in international contexts. This information type is classified as personally identifiable information under applicable data protection
-  regulations.
-operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 1 keywords within 240 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+description: Identifies documents containing references to census microdata in Australian contexts. This information type is classified as personally identifiable information under the Privacy Act 1988.
+operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters.'
 pattern: >-
-  (?is)\b(?:census\s+microdata|census\s+record|population\s+census|household\s+survey|demographic\s+data|census\s+tract|statistical\s+area|person\s+record|dwelling\s+record|census\s+questionnaire|microdata\s+file)\b
+  (?is)\b(?:census\s+microdata|ABS\s+census|census\s+record|unit\s+record|microdata\s+file|statistical\s+area|census\s+collection|population\s+census|confidentialised\s+data|census\s+variable|demographic\s+data)\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection.
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
 data_categories:
+  - government-id
   - pii
 corroborative_evidence:
   keywords:
     - census microdata
-  proximity: 240
+    - census
+    - microdata
+    - elections
+    - diplomacy
+    - statecraft
+  proximity: 300
+  keyword_lists:
+    - government-services
 test_cases:
   should_match:
     - value: census microdata
       description: Primary topic phrase match
-    - value: census record
+    - value: abs census
       description: Case-insensitive topic phrase match
-    - value: population census
+    - value: census record
       description: Alternative topic phrase match
-    - value: household survey
+    - value: unit record
       description: Additional topic phrase match
   should_not_match:
     - value: unrelated generic text without domain phrases
@@ -45,9 +55,7 @@ test_cases:
 false_positives:
   - description: Common words and phrases related to census microdata appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -57,67 +65,61 @@ exports:
   - regex_copy
 scope: wide
 purview:
-  patterns_proximity: 240
+  patterns_proximity: 300
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_census_microdata
+    - confidence_level: 85
+      id_match: Pattern_census_microdata
       matches:
-        - ref: Pattern_global_top500_500_census_microdata_label_context
-        - ref: Keyword_global_top500_500_census_microdata_domain_context
+        - ref: Evidence_census_microdata
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_census_microdata
+      matches:
+        - ref: Evidence_census_microdata
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_census_microdata
+      id_match: Pattern_census_microdata
       matches:
-        - ref: Keyword_census_microdata
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_census_microdata
   regexes:
-    - id: Regex_census_microdata
+    - id: Pattern_census_microdata
       pattern: >-
-        (?is)\b(?:census\s+microdata|census\s+record|population\s+census|household\s+survey|demographic\s+data|census\s+tract|statistical\s+area|person\s+record|dwelling\s+record|census\s+questionnaire|microdata\s+file)\b
-    - id: Pattern_global_top500_500_census_microdata_label_context
-      pattern: (?i)\b(?:census\s+microdata)\b
+        (?is)\b(?:census\s+microdata|ABS\s+census|census\s+record|unit\s+record|microdata\s+file|statistical\s+area|census\s+collection|population\s+census|confidentialised\s+data|census\s+variable|demographic\s+data)\b
   keywords:
-    - id: Keyword_census_microdata
+    - id: Evidence_census_microdata
       groups:
         - match_style: word
           terms:
             - census microdata
+            - ABS census
             - census record
-            - population census
-            - household survey
-            - demographic data
-            - enumeration
-            - census tract
-            - statistical area
-            - person record
-            - dwelling record
-            - census questionnaire
+            - unit record
             - microdata file
-      strength: specific
-    - id: Keyword_global_top500_500_census_microdata_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - census microdata
-            - census
-            - microdata
-      strength: domain
+            - statistical area
+            - census collection
+            - population census
+            - TableBuilder
+            - confidentialised data
+            - census variable
+            - demographic data
 risk_description: >-
-  The classifier recognises census microdata, person or dwelling records, household surveys, demographic data, census tracts, questionnaires, and microdata files; it does not require direct identifiers or prove that raw respondent-level data is present. Genuine microdata can combine household composition, location, demographic, social, and economic attributes, creating re-identification, discrimination, and community-stigmatisation risk even after obvious names are removed. Exposure may cover many respondents, but ordinary statistical tables, methodology, and public census discussion also trigger the concept. Risk 8 and SENSITIVE fit serious but contained microdata disclosure; PROTECTED would require identifiable national-scale raw data or rare attributes whose release is likely to cause significant, widespread, or irreversible harm.
+  This concept regex looks for census microdata, unit records, ABS census records, and related dataset language, aiming at row-level population data rather than a published statistical table. Even when direct names are removed, granular combinations of geography, household structure, age, employment, ethnicity, or other attributes can permit re-identification and expose private facts about many respondents when linked with external data. The medium-confidence topic detector can also match public microdata documentation or approved-access descriptions without containing records. Risk 8 and SENSITIVE Personal-Privacy reflect serious aggregate privacy and trust harm; PROTECTED would require directly identifiable population-scale data or linkage conditions capable of significant and widespread damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -129,26 +131,26 @@ sensitivity_labels:
 created: '2026-02-08'
 updated: '2026-07-14'
 changelog:
-  - version: 1.2.1
+  - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2039 without changing detector or package metadata.'
-  - version: 1.2.0
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1086 without changing detector or package metadata.'
+  - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.1.1
-    date: '2026-07-09'
-    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.2.0
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
   - version: 1.1.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
-references: []
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
+references:
+  - https://www.abs.gov.au/statistics/microdata-tablebuilder
+  - https://www.abs.gov.au/about/data-services/data-integration
+  - https://www.oaic.gov.au/privacy/australian-privacy-principles-guidelines
 
 risk_rating: 8

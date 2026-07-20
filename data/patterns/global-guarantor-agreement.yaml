@@ -1,0 +1,214 @@
+schema: testpattern/v1
+name: Guarantor Agreement
+slug: global-guarantor-agreement
+version: 1.4.2
+type: keyword_proximity
+pattern_class: concept
+description: Detects guarantor agreements and personal guarantee documents with indemnity obligations.
+operation: >-
+  Keyword-based detection matching guarantor, guarantee, indemnity, and related legal terms. Corroborative evidence: 12
+  keywords within 300 characters.
+confidence: medium
+confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+jurisdictions:
+  - global
+regulations:
+- "AML/CTF Act (Cth)"
+- "IPA 2009 (Qld)"
+- "NDB Scheme (Cth)"
+- "Privacy Act 1988 (Cth)"
+- "SOCI Act 2018 (Cth)"
+frameworks:
+- ISO 27001
+- ISO 27701
+- PCI-DSS
+- SOC 2
+data_categories:
+  - legal
+  - financial
+  - pii
+test_cases:
+  should_match:
+    - value: Corporate guarantee document
+      description: Exact 65 discovery probe with a guarantee instrument phrase and no obligation details
+    - value: Corporate guarantee with indemnity obligations
+      description: Exact 75 probe with substantive guarantee obligations
+    - value: Corporate guarantee with indemnity for a loan amount of $250,000
+      description: Exact 85 probe with guarantee obligations and underlying loan terms
+    - value: 'Guarantor agreement: personal guarantee and indemnity for loan facility'
+      description: Guarantor agreement tied to a loan facility
+    - value: Deed of guarantee with joint and several guarantor liability
+      description: Test match 2
+    - value: Continuing guarantee with unlimited guarantee and indemnity obligations
+      description: Test match 3
+  should_not_match:
+    - value: Money-back guarantee on all products
+      description: Non-match 1
+    - value: We guarantee quality service
+      description: Non-match 2
+    - value: Corporate guarantee marketing brochure
+      description: Instrument-like wording without obligations must remain discovery-only
+false_positives:
+  - description: Product guarantees or warranty language.
+    mitigation: Require legal guarantee terms like guarantor, indemnity, or deed of guarantee.
+exports:
+  - yaml
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  This concept classifier identifies guarantor agreements and deeds containing a named guarantor, personal guarantee, indemnity, joint liability, secured obligation, and continuing or unlimited exposure. Disclosure can reveal an individual's contingent debts, assets at risk, relationships, and negotiation pressure points, enabling fraud, coercion, or targeted financial exploitation. The guarantor, borrower, lender, and related household may face serious personal, legal, and financial harm within one facility, while enforcement still requires a valid underlying obligation and legal process. Risk 8 and SENSITIVE Legal fit that composite commitment, while a broad portfolio of guarantees or privileged lending-system access would be needed for PROTECTED.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Legal
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_guarantee
+      matches:
+        - ref: Keyword_guarantee_obligations
+        - ref: Keyword_loan_terms
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_guarantee
+      matches:
+        - ref: Keyword_guarantee_obligations
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_guarantee
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_guarantee
+      pattern: >-
+        (?i)\b(?:(?:personal|corporate|unlimited|limited|continuing)\s+guarantee|guarantee\s+(?:agreement|deed)|deed\s+of\s+guarantee|guarantor\s+(?:agreement|undertaking))\b
+  keywords:
+    - id: Keyword_guarantee_terms
+      groups:
+        - match_style: word
+          terms:
+            - guarantor
+            - guarantee obligations
+            - extend a guarantee
+            - guarantee provisions
+            - unconditional guarantee
+            - guarantee payment
+            - guarantee performance
+            - liability
+            - indemnity
+            - release of guarantor
+            - discharge of guarantee
+      strength: domain
+    - id: Keyword_loan_terms
+      groups:
+        - match_style: word
+          terms:
+            - loan amount
+            - principal sum
+            - interest rate
+            - annual percentage rate
+            - text: APR
+              case_sensitive: true
+            - repayment
+            - monthly instalment
+            - default interest
+            - prepayment
+            - drawdown
+            - facility limit
+            - loan facility
+      strength: specific
+    - id: Keyword_guarantee_obligations
+      groups:
+        - match_style: word
+          terms:
+            - indemnity
+            - joint and several
+            - guarantor liability
+            - secured obligations
+            - principal debtor
+            - payment on demand
+            - continuing security
+            - unconditional guarantee
+      strength: specific
+    - id: Keyword_legal_general
+      groups:
+        - match_style: word
+          terms:
+            - agreement
+            - contract
+            - deed
+            - executed
+            - witnessed
+            - signature
+            - cooling off
+            - default
+            - termination
+            - entire agreement
+      strength: domain
+created: '2026-02-09'
+updated: '2026-07-19'
+changelog:
+  - version: 1.4.2
+    date: '2026-07-19'
+    description: 'Targeted finance/health blocker remediation: align the evidence-gated detector to keyword_proximity, make guarantee-instrument phrases 65 discovery, require substantive indemnity/liability terms at 75 and underlying loan terms at 85, broaden deed/continuing-guarantee coverage, and add exact-tier plus brochure probes.'
+  - version: 1.4.1
+    date: '2026-07-14'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 545 without changing detector or package metadata.'
+  - version: 1.4.0
+    date: '2026-07-09'
+    description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
+  - version: 1.3.0
+    date: '2026-07-09'
+    description: 'Noise-gate sweep: wire the declared template-exclusion noise dictionary (Keyword_noise_exclusion) into the NOT-group of every evidence-bearing tier — the dictionary was declared in shared_keywords but no tier referenced it (dead noise gate); dictionary terms verified collision-free against this pattern''s should_match values and specific/domain vocabulary'
+  - version: 1.2.0
+    date: '2026-07-04'
+    description: Replace bare generic keyword terms with domain-anchored phrases (FP reduction)
+  - version: 1.1.0
+    date: '2026-07-04'
+    description: Mapped non-canonical confidence 95 to 85.; Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.
+author: testpattern-community
+license: MIT
+keywords:
+  - guarantor
+  - guarantee obligations
+  - extend a guarantee
+  - guarantee provisions
+  - personal guarantee
+  - guarantor agreement
+  - indemnity
+  - joint and several
+  - guarantee and indemnity
+  - guarantor liability
+  - continuing guarantee
+  - unlimited guarantee
+  - guarantee limit
+  - deed of guarantee
+remediation:
+  catalog_quality_2026_06_02:
+    status: applied
+    changes:
+      - 'Mapped non-canonical confidence 95 to 85.'
+      - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'

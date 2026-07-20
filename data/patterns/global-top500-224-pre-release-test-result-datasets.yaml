@@ -1,26 +1,36 @@
 schema: testpattern/v1
 name: Pre-release test result datasets
 slug: global-top500-224-pre-release-test-result-datasets
-version: 1.2.1
+version: 1.4.1
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to pre-release test result datasets in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
+  Identifies documents containing references to pre-release test result datasets in Australian contexts. Higher confidence identifies datasets of executed tests for not-yet-released builds (result
+  rows with pass/fail outcomes tied to a candidate, RC, or unreleased build identifier); general QA and testing vocabulary remains discovery-only.
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 9 keywords within 300 characters. Keyword
   lists: au-healthcare-records. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
 pattern: >-
-  (?is)\b(?:pre[\s-]+release\s+test\s+result\s+datasets|pre[\s-]+release\s+test|test\s+results|test\s+dataset|product\s+quality|safety\s+testing|validation\s+results|verification\s+testing|regression\s+test|acceptance\s+test)\b
+  (?is)\b(?:pre[\s-]+release\s+test\s+results|test\s+dataset|test\s+results|quality\s+assurance|regression\s+testing|validation\s+results|pre[\s-]+release\s+testing|test\s+report|acceptance\s+testing|performance\s+testing)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
   - global
 regulations:
+  - AML/CTF Act (Cth)
+  - HRIPA (Cth)
+  - IPA 2009 (Qld)
+  - My Health Records Act 2012 (Cth)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
+  - TIA Act 1979 (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
-  - pii
+  - intellectual-property
 corroborative_evidence:
   keywords:
     - pre-release test result datasets
@@ -39,14 +49,16 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: pre-release test result datasets
+    - value: pre-release test results
       description: Primary topic phrase match
-    - value: pre-release test
+    - value: test dataset
       description: Case-insensitive topic phrase match
     - value: test results
       description: Alternative topic phrase match
-    - value: test dataset
+    - value: quality assurance
       description: Additional topic phrase match
+    - value: "TC-881 | FAIL | build RC-2027.04 | latency 842 ms | expected <500 ms\nTC-882 | PASS | build RC-2027.04"
+      description: Executed test-result rows tied to a release-candidate build (enforces at 75/85)
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -54,12 +66,18 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: product failure
       description: Generic word pair from old broad template should not match
+    - value: Regression testing guide for released version 4.0.
+      description: Testing discussion without candidate-build result rows — discovery only, must not enforce
+    - value: The school test results were mailed to parents.
+      description: Educational results, not product testing — must not enforce
+    - value: 'QA training sample: TC-001 | PASS | build RC-DEMO.'
+      description: Training/sample and demo markers identify synthetic data — suppressed from enforcement
+    - value: test results
+      description: Heading alone supplies no dataset or lifecycle evidence — discovery only, must not enforce
 false_positives:
   - description: Common words and phrases related to pre-release test result datasets appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: >-
-      In English (as the primary international business language), similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute
-      sensitive data collection.
+  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
@@ -73,86 +91,109 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Keyword_noise_exclusion
+      as: Evidence_template_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_pre_release_test_results
+    - confidence_level: 85
+      id_match: Pattern_prerelease_test_rows
       matches:
-        - ref: Keyword_pre_release_test_results
+        - ref: Evidence_pre_release_test_results
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Keyword_noise_exclusion
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_prerelease_test_rows
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_pre_release_test_results
+      id_match: Pattern_pre_release_test_results
       matches:
-        - ref: Keyword_pre_release_test_results
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+        - ref: Evidence_pre_release_test_results
   regexes:
-    - id: Regex_pre_release_test_results
+    - id: Pattern_pre_release_test_results
       pattern: >-
-        (?is)\b(?:pre[\s-]+release\s+test\s+result\s+datasets|pre[\s-]+release\s+test|test\s+results|test\s+dataset|product\s+quality|safety\s+testing|validation\s+results|verification\s+testing|regression\s+test|acceptance\s+test)\b
-    - id: Pattern_global_top500_224_pre_release_test_result_datasets_label_context
+        (?is)\b(?:pre[\s-]+release\s+test\s+results|test\s+dataset|test\s+results|quality\s+assurance|regression\s+testing|validation\s+results|pre[\s-]+release\s+testing|test\s+report|acceptance\s+testing|performance\s+testing)\b
+    - id: Pattern_au_top500_224_pre_release_test_result_datasets_label_context
       pattern: (?i)\b(?:pre\-release\s+test\s+result\s+datasets)\b
+    - id: Pattern_prerelease_test_rows
+      pattern: >-
+        (?is)\b(?:TEST|TC)[-_ ]?\d{2,8}\s*[,|:]\s*(?:PASS|FAIL|BLOCKED)[\s\S]{0,160}\b(?:build|candidate|RC|pre-release|unreleased)\b
   keywords:
-    - id: Keyword_pre_release_test_results
+    - id: Evidence_pre_release_test_results
+      groups:
+        - match_style: word
+          terms:
+            - pre-release test results
+            - test dataset
+            - test results
+            - quality assurance
+            - regression testing
+            - validation results
+            - pre-release testing
+            - test report
+            - acceptance testing
+            - performance testing
+    - id: Keyword_au_top500_224_pre_release_test_result_datasets_domain_context
       groups:
         - match_style: word
           terms:
             - pre-release test result datasets
-            - pre-release test
-            - test results
-            - test dataset
-            - product quality
-            - safety testing
-            - validation results
-            - verification testing
-            - regression test
-            - acceptance test
-      strength: specific
+            - pre
+            - release
+            - test
+            - result
+            - datasets
 risk_description: >-
-  The detector recognizes pre-release tests, test-result datasets, validation or verification results, regression and acceptance tests, safety testing, and product-quality material. A genuine dataset can expose unreleased performance, failed cases, defect patterns, readiness gaps, and safety evidence, allowing competitors or attackers to focus on weaknesses and undermining launch or regulatory decisions. The normal unit is one pre-release test corpus rather than an entire product evidence repository, so the resulting harm is serious but contained. Risk 8 and SENSITIVE are appropriate; PROTECTED would require a critical safety failure, exploitable essential-service weakness, or disclosure causing significant public or operational damage.
+  The regex identifies pre-release test-result or test-dataset references with quality and test context, representing an unreleased body of performance evidence rather than public AI or technology terminology. A genuine dataset can reveal product capabilities, defects, acceptance thresholds, experimental outcomes, and launch readiness to a competitor or counterparty. The normal unit affects one development or assurance program and may contain no personal data, while broad phrases such as test results and quality assurance also occur in templates and training. Risk 7 and SENSITIVE InfoTech reflect credible proprietary harm; risk 8 or PROTECTED requires decisive strategic results, large linked datasets, safety-critical failure evidence, or significant market or operational damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
-  qgiscf_dlm: SENSITIVE Personal-Privacy
+  qgiscf_dlm: SENSITIVE InfoTech
   us_gov: CUI
-  uk_gov: OFFICIAL-SENSITIVE
+  uk_gov: OFFICIAL
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-07-18'
 changelog:
-  - version: 1.2.1
+  - version: 1.4.1
+    date: '2026-07-18'
+    description: >-
+      Adversarial accuracy pass: correct data_categories from ['pii'] to ['intellectual-property'] so package routing and workbook category claims match the detector content (description may already have been fixed in wave1).
+  - version: 1.4.0
+    date: '2026-07-16'
+    description: 'SIT alignment wave1 (TP-00350): enforcement (75/85) now anchors on executed test-result rows tied to a candidate/RC/unreleased build (Pattern_prerelease_test_rows; line anchor from the approved candidate replaced with \b + bounded gap because ^/$ anchors are Purview-banned in this catalog — quoted-training negative remains suppressed by the template exclusion); QA/testing topic tier demoted to 65 discovery_only; adversarial test cases added.'
+  - version: 1.3.1
     date: '2026-07-14'
-    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1783 without changing detector or package metadata.'
-  - version: 1.2.0
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 825 without changing detector or package metadata.'
+  - version: 1.3.0
     date: '2026-07-09'
     description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
-  - version: 1.1.1
+  - version: 1.2.1
     date: '2026-07-09'
-    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change); remove dead strength:noise keyword group(s) Keyword_global_top500_224_pre_release_test_result_datasets_domain_context — referenced by no tier, and the terms collide with the pattern''s own positive vocabulary so wiring them as a NOT-gate would suppress genuine matches'
+    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.2.0
+    date: '2026-03-14'
+    description: Standardise to 3-tier 65/75/85 gating with progressive evidence
   - version: 1.1.0
-    date: '2026-07-04'
-    description: Mapped non-canonical confidence 80 to 75.; Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
+    date: '2026-03-06'
+    description: Embed topic-specific phrase regex, wire domain keyword lists
+  - version: 1.0.0
+    date: '2026-02-08'
+    description: Initial release
 author: testpattern-community
 license: MIT
 references:
   - https://www.productsafety.gov.au/product-safety-laws
   - https://www.safeworkaustralia.gov.au/doc/model-code-practice-how-manage-work-health-and-safety-risks
-remediation:
-  catalog_quality_2026_06_02:
-    status: applied
-    changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.'
-      - 'Collapsed 2 duplicate 65-confidence tier(s) into the strictest canonical tier.'
 
-risk_rating: 8
+risk_rating: 7

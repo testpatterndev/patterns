@@ -1,0 +1,173 @@
+schema: testpattern/v1
+name: PayID (New Payments Platform)
+slug: global-payid
+version: 1.2.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects Australian PayID payment addresses used on the New Payments Platform (NPP). A PayID is an
+  email address, mobile phone number (+61 / 04xx format), ABN or organisation identifier registered as
+  a real-time payment alias, detected when it appears near an explicit PayID label in a payment context.
+operation: >-
+  Regex pattern (boost_regex engine). Pattern_au_payid anchors on the PayID label and uses a bounded
+  proximity lookahead requiring a payment-address value (email, +61/04xx mobile, or 11-digit ABN) within
+  80 characters. The labelled alias is discovery-only at 65, payment-action context enforces at 75,
+  and independent NPP/Osko/bank context raises it to 85. Enforcing tiers reject explicit templates.
+pattern: (?i)\bpay[\s-]?id\b\s*(?:number|address|is)?\s*[:=#-]?\s*(?=[\s\S]{0,80}?(?:[A-Za-z0-9._%+-]{1,40}@[A-Za-z0-9.-]{1,40}\.[A-Za-z]{2,10}|\+61[\s-]?4\d{2}[\s-]?\d{3}[\s-]?\d{3}|\b04\d{2}[\s-]?\d{3}[\s-]?\d{3}\b|\bABN[:\s]*\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b))
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the PayID label plus a co-located payment-address value (email, +61/04xx mobile, or
+  ABN) is a strong signal, but a PayID reuses common identifier shapes, so corroborating NPP/Osko payment
+  keywords are required to separate real payment instructions from generic contact details.
+jurisdictions:
+- global
+regulations:
+- AML/CTF Act (Cth)
+- NDB Scheme (Cth)
+- Privacy Act 1988 (Cth)
+frameworks:
+- ISO 27001
+- ISO 27701
+data_categories:
+- financial
+- pii
+corroborative_evidence:
+  keywords:
+  - PayID
+  - New Payments Platform
+  - NPP
+  - Osko
+  - Osko payment
+  - payment address
+  - pay anyone
+  - real-time payment
+  - PayID registration
+  - PayID name
+  - financial institution
+  - faster payments
+  - BSB
+  - beneficiary account
+  - transfer funds
+  - send payment
+  proximity: 300
+test_cases:
+  should_match:
+  - value: 'PayID: accounts@agency.gov.au'
+    description: Low-tier probe - labelled alias without transaction context
+  - value: 'Please pay the invoice via PayID: accounts@agency.gov.au'
+    description: Medium-tier probe - labelled alias with payment-action context
+  - value: Send the funds to PayID +61 412 345 678 registered with NAB via Osko
+    description: High-tier probe - payment action with independent bank/network context
+  - value: Business PayID ABN 51 824 753 556 for the invoice payment
+    description: Medium-tier ABN alias with payment context
+  should_not_match:
+  - value: PayID lets you send money using just a mobile number or email address
+  - value: Employee ID 12345 recorded in the payroll system this morning
+  - value: Your payment reference is INV-2024-0087 for this transaction
+  - value: PayID number 51 824 753 556 noted in the shared spreadsheet
+  - value: 'Tutorial example: send payment to PayID +61 412 345 678 via Osko'
+    description: Structurally complete but explicitly framed tutorial content
+false_positives:
+- description: A PayID label followed by a contact email or phone that is not actually a registered payment alias may match.
+  mitigation: Require corroborating NPP/Osko payment keywords within the proximity window before treating a match as a payment instruction.
+- description: Sample or tutorial payment instructions in onboarding material can contain the PayID label and a value.
+  mitigation: The high and medium tiers apply the template-exclusion NOT-group to suppress sample and training content.
+exports:
+- purview_xml
+- yaml
+- regex_copy
+scope: narrow
+risk_rating: 4
+risk_description: >-
+  The detector finds an Australian PayID label with a nearby email address, mobile number, or ABN and corroborating NPP or Osko payment context. A PayID identifies a payment destination and can support unwanted payment requests, phishing, or correlation of contact and banking relationships, but it does not authenticate a transfer or grant account access. The likely impact is low and reversible for one person or business because the alias is often intentionally shared to receive funds. Risk 4 and OFFICIAL are appropriate, while a PayID combined with account-holder records, transaction history, or authentication material would warrant SENSITIVE.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+  qgiscf_dlm: OFFICIAL
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+  - dict: template-exclusion
+    as: Evidence_template_exclusion
+    match_style: word
+  pattern_tiers:
+  - confidence_level: 85
+    id_match: Pattern_au_payid
+    matches:
+    - ref: Evidence_payment_action
+    - ref: Evidence_npp_network
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Evidence_template_exclusion
+  - confidence_level: 75
+    id_match: Pattern_au_payid
+    matches:
+    - ref: Evidence_payment_action
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Evidence_template_exclusion
+  - confidence_level: 65
+    discovery_only: true
+    id_match: Pattern_au_payid
+  regexes:
+  - id: Pattern_au_payid
+    pattern: (?i)\bpay[\s-]?id\b\s*(?:number|address|is)?\s*[:=#-]?\s*(?=[\s\S]{0,80}?(?:[A-Za-z0-9._%+-]{1,40}@[A-Za-z0-9.-]{1,40}\.[A-Za-z]{2,10}|\+61[\s-]?4\d{2}[\s-]?\d{3}[\s-]?\d{3}|\b04\d{2}[\s-]?\d{3}[\s-]?\d{3}\b|\bABN[:\s]*\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b))
+  keywords:
+  - id: Evidence_payment_action
+    groups:
+    - match_style: word
+      terms:
+      - payment address
+      - pay anyone
+      - beneficiary account
+      - transfer funds
+      - send payment
+      - send the funds
+      - settle the invoice
+      - invoice payment
+      - pay the invoice
+    strength: specific
+  - id: Evidence_npp_network
+    groups:
+    - match_style: word
+      terms:
+      - New Payments Platform
+      - text: NPP
+        case_sensitive: true
+      - Osko
+      - Osko payment
+      - PayID registration
+      - financial institution
+      - registered with
+      - bank
+      - faster payments
+    strength: domain
+created: '2026-07-07'
+updated: '2026-07-18'
+changelog:
+  - version: 1.2.0
+    date: '2026-07-18'
+    description: 'Profile quality: replace self-corroborating PayID terms with payment-action and NPP/network evidence; add discovery-only low, cumulative high, template rejection, and exact-tier tests.'
+  - version: 1.1.1
+    date: '2026-07-14'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 2084 without changing detector or package metadata.'
+  - version: 1.1.0
+    date: '2026-07-09'
+    description: 'C1 verdict-model: add pattern_class: identifier — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
+author: testpattern-community
+license: MIT
+references:
+- url: https://payid.com.au/
+  title: PayID - Australian Payments Plus
+- url: https://www.anz.com.au/support/online-banking/payments/pay-id/
+  title: PayID | ANZ
