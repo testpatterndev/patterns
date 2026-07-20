@@ -78,6 +78,13 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
       const msg = `${p.slug}: ${id} Purview-banned construct — ${bad}`
       if (p.purview) errors.push(msg); else warns.push(msg)
     }
+    // Purview hard limit, enforced at tenant rule-package upload ("Patterns cannot exceed a
+    // maximum length of 1024 characters") — purviewBanned() covers constructs, not length.
+    // Observed live: global-bip39-seed-phrase 1.3.2's flat branch expansion (8427 chars).
+    if (src.length > 1024) {
+      const msg = `${p.slug}: ${id} regex is ${src.length} chars — Purview rejects patterns over 1024`
+      if (p.purview) errors.push(msg); else warns.push(msg)
+    }
   }
   for (const kl of p.corroborative_evidence?.keyword_lists ?? []) if (!kwSlugs.has(kl)) errors.push(`${p.slug}: missing keyword_list '${kl}'`)
   for (const sk of p.purview?.shared_keywords ?? []) if (sk.dict && !kwSlugs.has(sk.dict)) errors.push(`${p.slug}: missing shared dict '${sk.dict}'`)
