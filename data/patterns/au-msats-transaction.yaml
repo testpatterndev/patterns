@@ -1,0 +1,92 @@
+schema: testpattern/v1
+name: MSATS / B2B Retail Market Transaction
+slug: au-msats-transaction
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Detects AEMO MSATS retail-market transaction content - aseXML transaction names
+  (CATSChangeRequest, NMIDiscoveryRequest/Response, ServiceOrderRequest/Response,
+  MeterDataNotification), CATS change-request codes (e.g. CR1000/CR1060, CR4050/1,
+  CR5050/1), and role-coded NMI standing data (FRMP/LNSP/MDP with an NMI). These
+  artefacts carry customer transfer, metering and consumption context regulated
+  under the retail market procedures.
+operation: >-
+  Matches aseXML transaction type names, CATS change request identifiers of the form
+  CR + 4 digits when labelled, or retail role acronyms (FRMP, LNSP, MDP, ENM, RoLR)
+  in proximity phrasing with NMI. aseXML element vocabulary is distinctive to
+  MSATS/B2B payloads and participant system extracts.
+pattern: >-
+  \b(?:aseXML|CATSChangeRequest|CATSNotification|NMIDiscoveryRequest|NMIDiscoveryResponse|ServiceOrderRequest|ServiceOrderResponse|MeterDataNotification|MeterDataHistoryRequest)\b|\bCATS\s+(?:CR|change\s+request)\s*#?\s*[0-9]{4}\b|\b(?:FRMP|LNSP|MDP|ENM|RoLR)\b[\s\S]{0,80}\bNMI\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: aseXML transaction names are near-unique to AEMO retail market
+  messaging; the role-acronym+NMI arm is looser and relies on proximity. Procedure
+  documents legitimately use the same vocabulary, so enforcement needs volume
+  thresholds or data-bearing corroboration.
+jurisdictions:
+  - au
+regulations:
+  - "National Energy Retail Rules / NER Ch 7 (metering)"
+  - "Privacy Act 1988 (Cth)"
+frameworks:
+  - ISO 27001
+data_categories:
+  - energy-market
+  - personal
+  - business
+corroborative_evidence:
+  keywords:
+    - MSATS
+    - change request
+    - meter data
+    - datastream
+    - retail transfer
+    - standing data
+    - B2B
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '<ase:Transaction><CATSChangeRequest><NMI>3120000000</NMI></CATSChangeRequest>'
+      description: aseXML CATS change request payload
+    - value: 'lodge a ServiceOrderRequest so the FRMP is allocated in MSATS'
+      description: B2B service order transaction name
+    - value: 'CATS CR 1060 raised to correct the standing data'
+      description: Labelled CATS change request code
+    - value: 'the FRMP for this NMI transfers on the next business day'
+      description: Role acronym in proximity to NMI
+  should_not_match:
+    - value: the CR 1060 form is in the HR folder
+      description: CR code without CATS labelling
+    - value: send the service order to the plumber tomorrow
+      description: Generic service-order prose
+    - value: FRMP is one of several market roles
+      description: Role acronym without NMI proximity or transaction vocabulary
+false_positives:
+  - description: AEMO procedure documents, participant training packs and vendor
+      integration guides quote transaction names and CR codes without customer data.
+    mitigation: Require corroborative keywords, use count thresholds in DLP rules,
+      and exclude published procedure repositories by location scoping.
+exports:
+  - yaml
+scope: narrow
+risk_rating: 6
+risk_description: >-
+  MSATS/B2B payloads link NMIs, customer transfers, metering identifiers and
+  consumption context - customer-attributable energy data subject to privacy and
+  retail market conduct obligations.
+sensitivity_labels:
+  - SENSITIVE
+references:
+  - "AEMO B2B Procedure: Service Order Process v3.8"
+  - "AEMO MSATS technical guides - change requests, CATS and NMI discovery"
+created: 2026-07-24
+updated: 2026-07-24
+changelog:
+  - version: 1.0.0
+    date: 2026-07-24
+    note: Initial draft from public MSATS/B2B procedure vocabulary.
+author: Compl8 (draft)
+source: compl8-energy-pack
+license: CC-BY-4.0
