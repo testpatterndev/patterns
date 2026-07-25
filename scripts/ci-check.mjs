@@ -53,6 +53,7 @@ for (const kf of readdirSync(kwDir).filter(f => f.endsWith('.yaml'))) {
   let d
   try { d = yaml.load(readFileSync(join(kwDir, kf), 'utf-8')) }
   catch (e) { errors.push(`${kf}: YAML parse — ${e.message.split('\n')[0]}`); continue }
+  if (!d || typeof d !== 'object' || Array.isArray(d)) { errors.push(`${kf}: dictionary must be a YAML mapping`); continue }
   for (const msg of validateCustomisations(d, { isDictionary: true })) errors.push(`${d.slug ?? kf}: ${msg}`)
 }
 
