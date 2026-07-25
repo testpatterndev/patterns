@@ -18,6 +18,7 @@ import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
 import { purviewBanned } from './lib/purview-banned.mjs'
+import { validateCustomisations } from './lib/customisation.mjs'
 
 const BASE = fileURLToPath(new URL('..', import.meta.url))
 const patDir = join(BASE, 'data', 'patterns')
@@ -36,12 +37,24 @@ const PACKAGE_DEPLOYMENT_PRIORITIES = new Set(['starter', 'standard', 'expanded'
 // MS functions documented as "Is a validator: yes" (sit-functions, 2025-11-18)
 const MS_VALIDATORS = new Set(['Func_aba_routing','Func_australian_tax_file_number','Func_brazil_cnpj','Func_brazil_cpf','Func_canadian_sin','Func_credit_card','Func_dea_number','Func_formatted_itin','Func_iban','Func_india_aadhaar','Func_japanese_my_number_corporate','Func_japanese_my_number_personal','Func_randomized_formatted_ssn','Func_randomized_unformatted_ssn','Func_south_africa_identification_number','Func_ssn','Func_swedish_national_identifier','Func_Turkish_National_Id','Func_uk_nhs_number','Func_unformatted_itin','Func_unformatted_ssn','Func_usa_uk_passport'])
 
-const kwSlugs = new Set(readdirSync(kwDir).filter(f => f.endsWith('.yaml')).map(f => f.replace('.yaml', '')))
+const kwSlugs = new Set()
 const patternSlugs = new Set()
 const deprecatedSlugs = new Set()
 const errors = [], warns = []
 
 const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(b, fl) }
+
+// Build kwSlugs (used by the pattern loop below for keyword_list/shared-dict reference
+// checks) and validate each dictionary's own {{CUSTOMISE:*}} declarations. This must run
+// BEFORE the pattern loop so kwSlugs is fully populated when validateCustomisations checks
+// pattern-side dictionary-subset targets against it.
+for (const kf of readdirSync(kwDir).filter(f => f.endsWith('.yaml'))) {
+  kwSlugs.add(kf.replace('.yaml', ''))
+  let d
+  try { d = yaml.load(readFileSync(join(kwDir, kf), 'utf-8')) }
+  catch (e) { errors.push(`${kf}: YAML parse — ${e.message.split('\n')[0]}`); continue }
+  for (const msg of validateCustomisations(d, { isDictionary: true })) errors.push(`${d.slug ?? kf}: ${msg}`)
+}
 
 // Purview (Boost.RegEx) banned constructs — patterns with a purview block fail CI; others
 // warn. Implementation and the live upload evidence behind each rule live in
@@ -56,6 +69,7 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   if ('status' in p && !['active', 'deprecated'].includes(p.status)) errors.push(`${f}: status must be active|deprecated, got '${p.status}'`)
   if (p.status === 'deprecated' && !(typeof p.deprecation_reason === 'string' && p.deprecation_reason.trim())) errors.push(`${f}: deprecated pattern requires a non-empty deprecation_reason`)
   if ('deprecation_reason' in p && p.status !== 'deprecated') errors.push(`${f}: deprecation_reason present but status is not 'deprecated'`)
+  for (const msg of validateCustomisations(p, { kwSlugs, isDictionary: false })) errors.push(`${p.slug ?? f}: ${msg}`)
   if (typeof p.slug === 'string') patternSlugs.add(p.slug)
   if (typeof p.slug === 'string' && p.status === 'deprecated') deprecatedSlugs.add(p.slug)
 
