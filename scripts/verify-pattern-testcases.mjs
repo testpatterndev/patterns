@@ -48,6 +48,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import yaml from 'js-yaml'
+import { resolveCustomisationFallbacks } from './lib/customisation.mjs'
 
 const ROOT = join(import.meta.dirname, '..')
 const PAT_DIR = join(ROOT, 'data', 'patterns')
@@ -111,7 +112,7 @@ function loadDict(slug) {
   const file = join(KW_DIR, `${slug}.yaml`)
   let terms = null
   if (existsSync(file)) {
-    try { terms = yaml.load(readFileSync(file, 'utf-8'))?.keywords ?? [] } catch { terms = null }
+    try { const d = yaml.load(readFileSync(file, 'utf-8')); terms = resolveCustomisationFallbacks(d ?? {}, true).keywords ?? [] } catch { terms = null }
   }
   dictCache.set(slug, terms)
   return terms
@@ -349,7 +350,7 @@ function shouldMatchFailReason(v, tiers, reg, filters) {
 function verifyPattern(slug) {
   const file = join(PAT_DIR, `${slug}.yaml`)
   let p
-  try { p = yaml.load(readFileSync(file, 'utf-8')) }
+  try { p = yaml.load(readFileSync(file, 'utf-8')); p = resolveCustomisationFallbacks(p, false) }
   catch (e) { failures++; console.log(`  MISSING/UNREADABLE ${slug}: ${e.message}`); return }
 
   const { reg, divergent } = buildRegistry(p, slug)
