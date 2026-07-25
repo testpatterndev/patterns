@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from '
 import { join, relative } from 'path'
 import { fileURLToPath } from 'url'
 import yaml from 'js-yaml'
+import { resolveCustomisationFallbacks, TOKEN_LITERAL } from './lib/customisation.mjs'
 
 const DATA_DIR = fileURLToPath(new URL('../data', import.meta.url))
 const OUT_FILE = fileURLToPath(new URL('../patterns.json', import.meta.url))
@@ -73,10 +74,11 @@ const keywordMap = new Map() // slug → keywords array
 
 for (const file of keywordFiles) {
   const raw = readFileSync(file, 'utf-8')
-  const data = yaml.load(raw)
-  if (validate(data, REQUIRED_KEYWORD_FIELDS, file)) {
-    keywordDicts.push(data)
-    keywordMap.set(data.slug, data.keywords)
+  const parsedDict = yaml.load(raw)
+  if (validate(parsedDict, REQUIRED_KEYWORD_FIELDS, file)) {
+    const resolvedDict = resolveCustomisationFallbacks(parsedDict, true)
+    keywordDicts.push(resolvedDict)
+    keywordMap.set(resolvedDict.slug, resolvedDict.keywords)
   }
 }
 
@@ -88,7 +90,8 @@ let unresolvedKeywordRefs = 0
 
 for (const file of patternFiles) {
   const raw = readFileSync(file, 'utf-8')
-  const data = yaml.load(raw)
+  let data = yaml.load(raw)
+  data = resolveCustomisationFallbacks(data, false)
 
   // keyword_dictionary patterns don't need a 'pattern' field
   const reqFields = data.type === 'keyword_dictionary' || data.type === 'keyword_list'
@@ -246,7 +249,12 @@ const output = {
 
 // Pretty-print for readable diffs and safe downstream processing. Catalog
 // size is controlled by excluding deprecated classifiers, not by minifying.
-writeFileSync(OUT_FILE, JSON.stringify(output, null, 2))
+const outString = JSON.stringify(output, null, 2)
+if (outString.includes(TOKEN_LITERAL)) {
+  console.error('FATAL: unresolved {{CUSTOMISE:*}} token in compiled output — declaration/fallback mismatch upstream')
+  process.exit(1)
+}
+writeFileSync(OUT_FILE, outString)
 
 console.log(`Done: ${publishedPatterns.length} patterns (${deprecatedCount} deprecated excluded), ${collections.length} collections, ${keywordDicts.length} keyword dictionaries → patterns.json`)
 if (resolvedCount > 0) {
