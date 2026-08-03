@@ -30,7 +30,7 @@ const CLASSIFIER_ID_SCHEMA = 'testpattern.classifier-ids.v1'
 const CLASSIFIER_ID_PATTERN = /^TP-\d{5}$/
 const PACKAGE_COMPONENT_TIERS = new Set(['small', 'medium', 'large'])
 const PACKAGE_SECTORS = new Set(['generic-enterprise', 'public-sector', 'legal-investigations', 'healthcare', 'financial-services', 'education', 'critical-infrastructure'])
-const PACKAGE_ADDONS = new Set(['ai-readiness', 'payment-card-pci', 'credentials-secrets', 'health-phi', 'legal-privilege', 'critical-infrastructure', 'student-child-data'])
+const PACKAGE_ADDONS = new Set(['ai-readiness', 'payment-card-pci', 'credentials-secrets', 'health-phi', 'legal-privilege', 'critical-infrastructure', 'student-child-data', 'qld-government-full'])
 const PACKAGE_LABEL_DOMAINS = new Set(['privacy', 'financial', 'health', 'legal', 'security', 'government', 'education', 'children', 'infrastructure', 'ai', 'business', 'investigations', 'privilege', 'payment', 'fraud', 'credentials', 'clinical', 'operational-technology'])
 const PACKAGE_DEPLOYMENT_PRIORITIES = new Set(['starter', 'standard', 'expanded', 'discovery'])
 
