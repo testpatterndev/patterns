@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Home address
 slug: au-top500-041-home-address
-version: 2.0.1
+version: 2.1.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -13,8 +13,9 @@ operation: >-
   Pattern_au_home_street_address matches a populated street number, street name, and Australian road type.
   The 65 tier is discovery-only. The 75 tier requires home/residential context plus at least one state,
   major-locality, or postcode signal. The 85 tier requires home/residential context, a labelled person,
-  an Australian state or territory, and a postcode. Template and example content is excluded from the
-  enforcing tiers.
+  an Australian state or territory, a postcode, an explicit residential-address field label, and locality
+  evidence from either the major-city list or the consolidated suburbs and localities registry.
+  Template and example content is excluded from the enforcing tiers.
 pattern: >-
   (?i)\b\d{1,5}[A-Z]?(?:\s*[-/]\s*\d{1,5}[A-Z]?)?\s+[A-Z][A-Z'-]{1,30}(?:\s+[A-Z][A-Z'-]{0,30}){0,5}\s+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Place|Pl|Court|Ct|Crescent|Cres|Close|Cl|Lane|La|Way|Parade|Pde|Boulevard|Blvd|Terrace|Tce|Circuit|Cct|Highway|Hwy|Grove|Gv|Square|Sq|Esplanade|Esp|Rise|View|Gardens|Loop|Trail|Track|Pass|Heights)\b
 confidence: medium
@@ -52,6 +53,7 @@ corroborative_evidence:
   keyword_lists:
     - au-road-classification-extended
     - au-major-cities
+    - au-suburbs-localities
     - au-states-full
     - au-states-abbreviations
     - au-unit-types
@@ -65,6 +67,8 @@ test_cases:
       description: Exact 75 probe - blank-form person placeholder must not elevate the address to 85
     - value: 'Resident: Mia Chen; residential address: Unit 4, 12 Ocean Rise, Redcliffe QLD 4020'
       description: Exact 85 probe - populated residential address with person, state, and postcode
+    - value: 'Resident: Priya Sharma; residential address: 18 Boronia Street, Abbeywood QLD 4613'
+      description: Exact 85 registry-locality probe - non-major suburb corroborated by the consolidated suburbs and localities registry
     - value: 'Principal place of residence: 91 King Street, Melbourne VIC 3000'
       description: Populated residence with an explicit residential relationship
   should_not_match:
@@ -95,6 +99,9 @@ purview:
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
+    - dict: au-suburbs-localities
+      as: Evidence_au_home_locality_registry
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_au_home_street_address
@@ -102,7 +109,11 @@ purview:
         - ref: Evidence_au_home_residential_context
         - ref: Pattern_au_home_labelled_person
         - ref: Evidence_au_home_state_territory
-        - ref: Evidence_au_home_major_locality
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_au_home_major_locality
+            - Evidence_au_home_locality_registry
         - ref: Pattern_au_home_postcode
         - ref: Pattern_au_home_address_label
         - type: any
@@ -229,8 +240,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-19'
+updated: '2026-09-08'
 changelog:
+  - version: 2.1.0
+    date: '2026-09-08'
+    description: 'Accept the consolidated au-suburbs-localities registry as 85-tier locality evidence alongside the major-city list so complete person-linked addresses in non-major suburbs reach high confidence. Leave 75 on state, major-city, or postcode only.'
   - version: 2.0.1
     date: '2026-07-19'
     description: 'Make the 85 tier demonstrably cumulative by requiring an explicit residential-address field label and major-locality evidence in addition to person, state, and postcode corroboration.'
