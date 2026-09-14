@@ -208,6 +208,10 @@ from [TestPattern package resources](https://testpattern.dev/about#package-resou
 These resources are regenerated from sealed Compl8DLPDeploy packages using
 `scripts/sync-public-package-resources.py`; its `--check` mode detects stale copies.
 Package exclusions do not remove classifiers from the full source catalogue.
+QGISCF label schema v2 adds SENSITIVE/PROTECTED Cabinet-in-Confidence and
+SENSITIVE Commercial-in-Confidence while retaining Government. Three Cabinet
+classifiers retain PROTECTED handling under the new Cabinet category; two
+confidential procurement pricing classifiers move to SENSITIVE Commercial-in-Confidence.
 
 ## License
 
