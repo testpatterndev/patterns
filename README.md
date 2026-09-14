@@ -14,6 +14,10 @@ Fetch the pre-compiled `patterns.json` for direct consumption:
 curl -sL https://raw.githubusercontent.com/testpatterndev/patterns/main/patterns.json -o patterns.json
 ```
 
+Use that raw GitHub artifact for deployment tooling. The website's public
+`/patterns.json` response intentionally omits the dictionary manifest and
+classification results because those are served by separate API routes.
+
 Or clone and compile from YAML sources:
 
 ```bash
@@ -192,6 +196,18 @@ The script detects emails, credit cards, IBANs, IP addresses, UUIDs, AWS keys, S
 ### From sample data (AI-assisted)
 
 Use the prompt in `prompts/generate-from-sample.md` as context for any AI assistant, then paste your sample data. The AI will analyze the data, identify all sensitive types, and generate complete pattern YAML files.
+
+## Curated package resources
+
+Exact Queensland Government, Critical Infrastructure and Education membership is in
+[data/curated-packages/catalog.json](data/curated-packages/catalog.json).
+Custom classifier counts are 397, 373 and 334 respectively. QG and Education each
+also reference two Microsoft built-ins. Formatted package spreadsheets are available
+from [TestPattern package resources](https://testpattern.dev/about#package-resources).
+
+These resources are regenerated from sealed Compl8DLPDeploy packages using
+`scripts/sync-public-package-resources.py`; its `--check` mode detects stale copies.
+Package exclusions do not remove classifiers from the full source catalogue.
 
 ## License
 

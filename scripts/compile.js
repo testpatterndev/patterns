@@ -216,11 +216,24 @@ for (const file of collectionFiles) {
   }
 }
 
-// ── Load dictionary manifest (if present) ──
-let dictionaryManifest = null
+// ── Load dictionary manifest ──
+// The checked-in catalog is also consumed directly by deployment tooling. A
+// catalog without this manifest still looks valid, but dictionary-backed
+// exports then inline the same large dictionaries into every classifier.
+// Treat the manifest as required source data instead of silently publishing a
+// degraded catalog when the file is missing or malformed.
+let dictionaryManifest
 const manifestPath = join(DATA_DIR, 'dictionary-manifest.json')
-if (existsSync(manifestPath)) {
-  try { dictionaryManifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) } catch { /* skip */ }
+if (!existsSync(manifestPath)) {
+  throw new Error(`${relative(DATA_DIR, manifestPath)} is required; run npm run build-manifest`)
+}
+try {
+  dictionaryManifest = JSON.parse(readFileSync(manifestPath, 'utf-8'))
+} catch (error) {
+  throw new Error(`Invalid ${relative(DATA_DIR, manifestPath)}: ${error.message}`)
+}
+if (!Array.isArray(dictionaryManifest?.dictionaries) || dictionaryManifest.dictionaries.length === 0) {
+  throw new Error(`${relative(DATA_DIR, manifestPath)} must contain a non-empty dictionaries array; run npm run build-manifest`)
 }
 
 // ── Load classification results (if present) ──
