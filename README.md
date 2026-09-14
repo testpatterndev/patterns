@@ -220,3 +220,8 @@ MIT. See [LICENSE](LICENSE).
 ## Sponsored by
 
 [Compl8](https://aairii.com) — TestPattern is a community project, not a Compl8 product.
+
+Mapping version 2.0.1 adds Government Insurance and Indemnity Schedule, Pre-Release
+Earnings Guidance with Financials, and State Borrowing and Debt Issuance Strategy
+to SENSITIVE Commercial-in-Confidence: five QG/CI assignments, one EDU assignment.
+Classification levels, package membership and detection logic are unchanged.
