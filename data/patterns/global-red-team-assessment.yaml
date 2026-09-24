@@ -1,17 +1,28 @@
 schema: testpattern/v1
 name: Red Team Assessment
 slug: global-red-team-assessment
-version: 1.6.0
+version: 1.7.0
 type: regex
 pattern_class: concept
-description: Detects red team assessment reports revealing proven attack paths and security blind spots.
+description: >-
+  Detects red team assessment reports and red team findings records revealing proven attack paths and
+  security blind spots. A red-team / purple-team / adversary-simulation / threat-emulation title is
+  discovery-only; enforcement requires attack-technique, ATT&CK technique ID, offensive-tool, or
+  populated finding-record evidence, and high confidence requires a populated finding record (finding
+  ID, severity, affected host) plus independent attack-path/TTP evidence.
 operation: >-
-  A red-team, purple-team, adversary-simulation, or attack-simulation title is discovery-only at 65.
-  Attack-path, initial-access, persistence, lateral-movement, exfiltration, or ATT&CK evidence raises it
-  to 75. The 85 tier additionally requires assessment findings, risk summary, security evaluation, or
-  vulnerability results. Enforcing tiers reject templates and examples.
+  A red team assessment/report/exercise/engagement/findings/debrief, purple team assessment/exercise,
+  adversary simulation, attack simulation report, or threat emulation exercise/report/engagement/plan
+  title is discovery-only at 65, as is the title with attack-technique phrasing or tool names alone. A
+  populated finding field (finding ID, severity value, or labelled affected/compromised host) or a MITRE
+  ATT&CK technique/tactic ID (T1234, T1234.001, TA0008) raises it to 75. The 85 tier requires a populated
+  finding field plus an independent attack-technique phrase (attack path, initial access, lateral
+  movement, persistence, exfiltration, C2), ATT&CK ID, or offensive-tool hit. Enforcing tiers reject
+  templates and examples.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium confidence: title phrases are discovery-only; enforcement needs technique, ATT&CK ID, tool, or
+  populated finding evidence, and 85 needs a populated finding record plus independent TTP evidence.
 jurisdictions:
   - global
 regulations:
@@ -29,9 +40,19 @@ test_cases:
     - value: 'Red team assessment'
       description: Low-tier probe - assessment title without technique or finding content
     - value: 'Red team assessment: attack path through initial access and lateral movement.'
-      description: Medium-tier probe - adversary techniques without assessment findings
-    - value: 'Red team report: attack path through lateral movement; findings summary and risk summary identify a security control gap.'
-      description: High-tier probe - adversary technique plus assessed findings
+      description: Discovery probe (65) - adversary technique wording without a finding record or ATT&CK ID
+    - value: |-
+        Red team findings - Operation KESTREL (internal engagement RT-2026-03)
+        Finding ID: RT-03-007
+        Severity: Critical
+        Affected host: FIN-APP-02.corp.local
+        Attack path: phishing payload (T1566.001) -> Kerberoasting of svc_backup (T1558.003) -> lateral movement over SMB (T1021.002) to FIN-APP-02
+        Detection: no EDR alert raised; SOC did not triage within the exercise window
+      description: High-tier probe - populated finding record (finding ID, severity, affected host) with ATT&CK attack path (rewritten from global-top500-253-red-team-findings)
+    - value: 'Purple team exercise debrief: Finding 4 (severity: high) - compromised account: jsmith-adm; persistence via scheduled task T1053.005 was not detected by the SIEM.'
+      description: High-tier probe - inline finding record with severity, compromised account and ATT&CK persistence technique
+    - value: 'Threat emulation report for the payments platform: operators used Cobalt Strike beacons for command and control.'
+      description: Discovery probe (65) - threat-emulation prose naming tooling and C2 technique but no populated finding record (merged title from global-top500-253-red-team-findings)
   should_not_match:
     - value: Red team won the competition
       description: Sports-team sibling
@@ -41,9 +62,17 @@ test_cases:
       description: Public programme mentions only the assessment title
     - value: 'Template example: red team assessment with an attack path, lateral movement, findings summary, and risk summary.'
       description: Template contains otherwise high-tier evidence
+    - value: 'Red team engagement policy: each engagement is approved by the CISO, and the report must record a finding ID, severity and affected host for every issue raised.'
+      description: Policy prescribing finding fields without populated values or techniques stays discovery-only
+    - value: 'News: the agency announced a red team exercise for its new digital licence app next quarter, run by an external provider.'
+      description: News announcement of an exercise without findings stays discovery-only
+    - value: 'Training example: red team findings - Finding ID: RT-03-007, Severity: Critical, Affected host: FIN-APP-02, lateral movement via T1021.002.'
+      description: Training material with an otherwise high-tier finding record must not enforce
 false_positives:
   - description: Sports or team references.
     mitigation: Require security-specific terms like adversary simulation, MITRE ATT&CK, or attack path.
+  - description: Security policies, engagement rules of engagement, vendor marketing, and conference agendas name red team exercises and list report fields (finding ID, severity, affected host) without containing findings.
+    mitigation: Title phrases stay discovery-only; finding fields count only when populated with a value, and template/training framing is excluded.
 exports:
   - yaml
 scope: narrow
@@ -69,8 +98,13 @@ purview:
     - confidence_level: 85
       id_match: Regex_red_team
       matches:
-        - ref: Keyword_attack_techniques
-        - ref: Keyword_security_assessment
+        - ref: Evidence_red_team_finding_record
+        - type: any
+          min_matches: 1
+          refs:
+            - Keyword_attack_techniques
+            - Evidence_attack_technique_id
+            - Keyword_pentest_tools
         - type: any
           min_matches: 0
           max_matches: 0
@@ -79,7 +113,11 @@ purview:
     - confidence_level: 75
       id_match: Regex_red_team
       matches:
-        - ref: Keyword_attack_techniques
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_attack_technique_id
+            - Evidence_red_team_finding_record
         - type: any
           min_matches: 0
           max_matches: 0
@@ -91,7 +129,13 @@ purview:
   regexes:
     - id: Regex_red_team
       pattern: >-
-        (?i)\b(?:red\s+team\s+(?:assessment|report|exercise|engagement)|purple\s+team\s+(?:assessment|exercise)|adversary\s+simulation|attack\s+simulation\s+report)\b
+        (?i)\b(?:red\s+team\s+(?:assessment|report|exercise|engagement|findings|debrief)|purple\s+team\s+(?:assessment|exercise|report)|adversary\s+simulation|attack\s+simulation\s+report|threat\s+emulation\s+(?:exercise|report|engagement|plan))\b
+    - id: Evidence_red_team_finding_record
+      pattern: >-
+        (?i)\b(?:(?:finding|issue)\s{0,3}(?:ID|ref|no\.?|#)?\s{0,3}[:#]?\s{0,3}(?:[A-Z]{1,6}-){0,2}\d{1,4}\b|severity\s{0,3}[:=-]\s{0,3}(?:critical|high|medium|moderate|low)\b|(?:affected|target|compromised)\s{1,3}(?:host|hostname|system|server|asset|account)s?\s{0,3}[:=-]\s{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9._$-]{1,62})
+    - id: Evidence_attack_technique_id
+      pattern: >-
+        (?i)\b(?:T1\d{3}(?:\.\d{3})?|TA00\d{2})\b
   keywords:
     - id: Keyword_attack_techniques
       groups:
@@ -124,30 +168,12 @@ purview:
             - Mimikatz
             - hashcat
       strength: domain
-    - id: Keyword_security_assessment
-      groups:
-        - match_style: word
-          terms:
-            - security assessment
-            - security audit
-            - security review
-            - security testing
-            - security evaluation
-            - executive summary
-            - findings summary
-            - risk summary
-            - CVSS
-            - text: CWE
-              case_sensitive: true
-            - vulnerability scan
-            - Nessus
-            - Qualys
-            - Nmap
-            - attack surface
-      strength: specific
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.7.0
+    date: '2026-09-24'
+    description: 'Merge global-top500-253-red-team-findings into this classifier (Qld government classifier review 2026-09-24): red team findings/debrief, purple team report, and threat emulation exercise/report/engagement/plan titles added to the discovery primary (the absorbed pattern''s bare "security assessment", "blue team", "offensive security" and single-word "red"/"team"/"findings" evidence were not imported - self-corroborating or too generic). New populated finding-record evidence (Evidence_red_team_finding_record: finding/issue IDs, severity values, labelled affected/target/compromised host or account with placeholder guard) and MITRE ATT&CK technique/tactic IDs (Evidence_attack_technique_id); the previously dead Keyword_pentest_tools group is wired in. 75 = title + any attack technique, ATT&CK ID, tool, or populated finding field; 85 = title + populated finding field + independent technique/ATT&CK ID/tool (replaces the bare-keyword findings-summary/risk-summary 85 path; Keyword_security_assessment removed). Bare-phrase high probe replaced with populated finding records; policy, news, and training decoys added. Risk 8 unchanged (absorbed pattern was risk 7). 75 now requires a populated finding record or an ATT&CK technique ID; technique phrases and tool names only add to 85, so exercise policies naming lateral movement or Cobalt Strike stay at 65 discovery.'
   - version: 1.6.0
     date: '2026-07-19'
     description: 'Profile quality: align the regex-backed detector type; replace duplicate high paths with title discovery, attack-technique medium, and findings-corroborated high tiers; add public/template adversarial probes.'
@@ -185,6 +211,11 @@ keywords:
   - lateral movement
   - privilege escalation
   - initial access
+  - red team findings
+  - threat emulation
+references:
+  - https://attack.mitre.org/
+  - https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/ism
 remediation:
   catalog_quality_2026_06_02:
     status: applied

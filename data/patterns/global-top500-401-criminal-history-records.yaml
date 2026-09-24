@@ -1,16 +1,21 @@
 schema: testpattern/v1
-name: Criminal history records
+name: Criminal history and police identifying particulars records
 slug: global-top500-401-criminal-history-records
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies documents containing references to criminal history records in international contexts. This information
-  type is classified as personally identifiable information under applicable data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 1 keywords within 240 characters. Keyword lists: industry-hr. Uses additional domain-context
-  evidence and explicit exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:criminal\s+history|criminal\s+record|prior\s+convictions|criminal\s+background|rap\s+sheet|offense\s+history|felony\s+record|misdemeanor\s+record|sentencing\s+history|criminal\s+check|background\s+check|criminal\s+database)\b
+description: Identifies criminal history records and police identifying-particulars records (custody / booking photographs,
+  photograph index numbers, fingerprints and other identifying particulars taken, linked to a named person, date of birth
+  and police person numbers). Absorbs the former mugshot-image-repositories classifier. This information is personally
+  identifiable law-enforcement information under applicable privacy regulations.
+operation: 'Pattern type: regex (boost_regex engine). Primary: criminal-history phrases (criminal history/record, prior convictions,
+  rap sheet, background check ...) and identifying-particulars phrases (identifying particulars, mugshot, booking / arrest
+  / custody / detainee photograph). 65 = primary phrase only (discovery). 75 = primary plus one populated record field within
+  240 characters (name, DOB, offender/accused/detainee, CNI / QPRIME / person / offender number, photograph or image number,
+  fingerprints / photographs / identifying particulars taken, case/reference numbers). 85 = two distinct populated record
+  fields. Placeholder values (n/a, TBC, blank lines, [brackets]) do not count. Template/sample text is excluded.'
+pattern: (?is)\b(?:criminal\s+history|criminal\s+record|prior\s+convictions|criminal\s+background|rap\s+sheet|offense\s+history|felony\s+record|misdemeanor\s+record|sentencing\s+history|criminal\s+check|background\s+check|criminal\s+database|identifying\s+particulars|mug\s?shots?|booking\s+(?:photo(?:graph)?s?|images?)|arrest\s+photo(?:graph)?s?|custody\s+photo(?:graph)?s?|(?:inmate|detainee|prisoner)\s+photo(?:graph)?s?)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
   Added context gating and exclusion rules improve precision and reduce incidental matches.
@@ -27,6 +32,11 @@ data_categories:
 corroborative_evidence:
   keywords:
   - criminal history records
+  - identifying particulars
+  - fingerprints taken
+  - photograph index number
+  - CNI
+  - QPRIME
   proximity: 240
   keyword_lists:
   - industry-hr
@@ -34,14 +44,18 @@ corroborative_evidence:
   - generic-data-labels
 test_cases:
   should_match:
-  - value: criminal history
-    description: Primary topic phrase match
-  - value: criminal record
-    description: Case-insensitive topic phrase match
-  - value: prior convictions
-    description: Alternative topic phrase match
-  - value: criminal background
-    description: Additional topic phrase match
+  - value: "Identifying particulars record\nCNI number: 4471902\nQPRIME person number: 8837261\nName: Jordan Pellow\nDate of birth: 11/08/1987\nPhotograph index number: 0457122\nFingerprints taken: Yes - 14/03/2026, Brisbane City Watchhouse\nReason: charged with assault occasioning bodily harm"
+    description: Police identifying-particulars record (photo index number, fingerprints, CNI / person number, name + DOB) reaching 85
+    synthetic: true
+  - value: "Criminal history - Queensland Police Service\nSurname: HARLOW\nGiven names: Mia Jane\nDOB: 02/05/1994\nCNI: 5520193\nConvictions: 12/01/2019 Brisbane Magistrates Court - Stealing - fined $400"
+    description: Criminal history printout with name, DOB and CNI (85)
+    synthetic: true
+  - value: "Custody photograph taken on reception.\nPhoto number: 26004417\nDetainee: Samuel Okafor\nDate of birth: 23/09/1990\nWatchhouse: Southport"
+    description: Custody photograph register entry linking photo number to a named detainee (85, absorbed from mugshot classifier)
+    synthetic: true
+  - value: "Booking photo attached to the brief. Offender ID: 7712093. Photo to be retained with the charge file."
+    description: Booking photo reference with a single labelled offender number (75)
+    synthetic: true
   - value: "criminal history\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: criminal history recorded against the subject; handling restricted."
     description: Populated justice record reaching the 75/85 structure gate
     synthetic: true
@@ -50,10 +64,15 @@ test_cases:
     description: No relevant topic phrases present
   - value: placeholder value 12345
     description: Random text should not match topic-specific regex
-  - value: mugshot victim
-    description: Generic word pair from old broad template should not match
   - value: "Policy guidance: this procedure explains how records about criminal history are handled, who may access them and how long they are kept. It contains no records about any person or system."
     description: Policy guidance naming the topic without any record (discovery only)
+  - value: Police have released a booking photo of a 34-year-old Logan man charged over the armed robbery. He is due to appear
+      in Beenleigh Magistrates Court on Monday.
+    description: News item mentioning a booking photo without record fields (discovery only, must not enforce)
+  - value: "National Police Check consent form. I consent to a criminal history check.\nName: ____________________\nDate of birth: ____________\nSignature: ____________"
+    description: Blank police-check consent form - placeholder fields must not count as record structure
+  - value: "Training module 4: when identifying particulars are taken, officers must record the photographs and fingerprints in QPRIME and explain the destruction provisions to the person."
+    description: Training text about identifying particulars with no populated record (discovery only)
 false_positives:
 - description: Common words and phrases related to criminal history records appearing in policy documents, training materials,
     HR templates, or compliance guidelines without actual personal data.
@@ -67,6 +86,10 @@ false_positives:
     significantly higher than specific identifier patterns.
   mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary
     validation.
+- description: Media reports that a booking photo or mugshot was released, and training material about taking identifying
+    particulars.
+  mitigation: These match the primary phrase only and stay at the 65 discovery tier; enforce tiers need populated record
+    fields (person number, photograph number, name / DOB) within 240 characters.
 exports:
 - purview_xml
 - yaml
@@ -111,12 +134,13 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_criminal_history
-      pattern: (?is)\b(?:criminal\s+history|criminal\s+record|prior\s+convictions|criminal\s+background|rap\s+sheet|offense\s+history|felony\s+record|misdemeanor\s+record|sentencing\s+history|criminal\s+check|background\s+check|criminal\s+database)\b
+      pattern: (?is)\b(?:criminal\s+history|criminal\s+record|prior\s+convictions|criminal\s+background|rap\s+sheet|offense\s+history|felony\s+record|misdemeanor\s+record|sentencing\s+history|criminal\s+check|background\s+check|criminal\s+database|identifying\s+particulars|mug\s?shots?|booking\s+(?:photo(?:graph)?s?|images?)|arrest\s+photo(?:graph)?s?|custody\s+photo(?:graph)?s?|(?:inmate|detainee|prisoner)\s+photo(?:graph)?s?)\b
     - id: Regex_global_top500_401_criminal_history_records_record_structure
       pattern: >-
-        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:fingerprints?|palm\s*prints?|photographs?|identifying\s+particulars)\s+(?:taken|obtained)|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence|CNI|QPRIME|person|offender|photo(?:graph)?(?:\s+index)?|image|fingerprint(?:\s+form)?)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 risk_description: This regex identifies criminal histories, prior convictions, criminal records, and criminal-background material
-  with nearby record context. An actual history links an individual to allegations or convictions and can drive employment
+  with nearby record context, and police identifying-particulars records (custody or booking photographs, photograph index
+  numbers, fingerprints taken) linked to a named person or police person number. An actual history links an individual to allegations or convictions and can drive employment
   exclusion, stigma, harassment, or unfair decision-making if disclosed outside lawful purposes. The normal record presents
   serious legal and personal harm but is usually limited to one subject and does not reveal an active protected operation.
   Risk 8 remains SENSITIVE, with Law-Enforcement as the correct DLM; PROTECTED would require covert intelligence, protected
@@ -132,6 +156,17 @@ sensitivity_labels:
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: 'Merge global-top500-403-mugshot-image-repositories into this classifier (Qld government classifier review
+    2026-09-24): rebuilt as police identifying-particulars records inside criminal history. Primary gains identifying particulars,
+    mugshot, booking / arrest / custody / inmate / detainee / prisoner photograph phrases; record-structure regex gains generic
+    labelled fields for photograph / photo index / image numbers, fingerprint form numbers, CNI / QPRIME / person / offender
+    numbers and "fingerprints / photographs / identifying particulars taken". No person-number formats were invented (labelled
+    fields only). Not imported: facial image, image repository, biometric image, photo lineup and identification photo (generic
+    photo / biometrics vocabulary), and the absorbed self-corroborating label/domain keyword tiers. Replaced the bare-phrase
+    positives with populated records (3 at 85, 1 at 75) and added news, blank consent form and training decoys; dropped the
+    legacy "mugshot victim" negative (mugshot is now a legitimate discovery phrase). Risk unchanged at 8.'
 - version: 1.3.0
   date: '2026-09-24'
   description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent justice record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."

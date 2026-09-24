@@ -1,13 +1,13 @@
 schema: testpattern/v1
-name: Settlement Authority and Negotiation Mandate
+name: Settlement Authority, Negotiation Mandate and Draft Settlement Deeds
 slug: settlement-authority-and-negotiation-mandate
-version: 1.5.0
+version: 1.6.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
-description: Detects documents authorising settlement ranges, negotiation floors/ceilings, and approved concession parameters. Disclosure reveals the State's maximum position, destroying negotiation leverage and potentially costing tens of millions in lost bargaining position.
-operation: 'Primary detection: keyword proximity matching settlement/negotiation authority terms within 200 characters of approval indicators (''approved'', ''authorised'') or currency amounts. Regex detection: dollar amounts ($X,XXX,XXX or $X.XM format) near settlement/authority keywords. Corroborative evidence: 3 keywords within 300 characters.'
-pattern: (?i)\b(?:settlement\s+(?:authority|mandate|range)|negotiation\s+(?:authority|mandate)|authority\s+to\s+settle)\b
+description: Detects documents authorising settlement ranges, negotiation floors/ceilings, and approved concession parameters, and unexecuted draft settlement instruments (draft deeds of settlement/release, settlement agreements, terms of settlement) carrying a proposed settlement sum. Disclosure reveals the State's maximum position or proposed terms, destroying negotiation leverage and potentially costing tens of millions in lost bargaining position. Absorbed global-top500-166-settlement-agreement-drafts (2026-09-24).
+operation: 'Two primaries within a 300-character window. Authority route: settlement/negotiation authority, mandate or range, or authority to settle; 65 discovery on the phrase alone; 75 with populated document header fields or hand-authored corroboration (approved, authorised, delegate, ceiling, floor, maximum, privileged, PROTECTED, without prejudice, LPP, instructing solicitor); 85 with 3 header fields plus corroboration plus a dollar amount. Draft-instrument route: deed of settlement/release, settlement deed/agreement or terms of settlement; 65 discovery; 75 with independent draft-settlement terms (without prejudice, draft, settlement sum, release and discharge, without/no admission of liability, full and final settlement, subject to execution) plus a dollar amount; 85 adds 2 header fields. Published-outcome, handbook/guideline and media wording and template text veto every enforcing tier.'
+pattern: (?i)\b(?:settlement\s+(?:authority|mandate|range)|negotiation\s+(?:authority|mandate)|authority\s+to\s+settle|deed\s+of\s+(?:settlement|release)|settlement\s+(?:deed|agreement)|terms\s+of\s+settlement)\b
 confidence: medium
 confidence_justification: 'Medium confidence: Settlement authority terminology is highly specific to legal practice authorisation workflows. Combined with dollar amounts and approval language, detection precisely targets actual authorisation documents rather than general discussion.'
 jurisdictions:
@@ -36,6 +36,11 @@ corroborative_evidence:
     - PROTECTED
     - without prejudice
     - LPP
+    - draft
+    - settlement sum
+    - release and discharge
+    - without admission of liability
+    - full and final settlement
   proximity: 300
   keyword_lists:
 
@@ -65,6 +70,30 @@ test_cases:
     - value: "To: Director-General\nFrom: Principal Legal Officer\nDate: 12/08/2026\nSubject: Settlement Authority\nOur ref: LS2026-0412\nThis briefing sets out the Settlement Authority for decision."
       description: Populated doc record reaching the 75/85 structure gate
       synthetic: true
+    - value: |-
+        PROTECTED — LEGAL PROFESSIONAL PRIVILEGE
+        To: Director-General
+        From: Principal Lawyer, Litigation Branch
+        Date: 2 September 2026
+        Matter no: LIT-2026-0419
+        Subject: Settlement authority — Harris v State of Queensland
+        The Director-General has approved a settlement range of $1,150,000 to $1,600,000 inclusive of costs. The instructing solicitor may offer up to the ceiling at the mediation on 18 September without further reference.
+      description: Populated settlement authority brief (85 via header fields + corroboration + dollar range)
+      synthetic: true
+    - value: |-
+        WITHOUT PREJUDICE — DRAFT FOR DISCUSSION
+        Deed of Settlement and Release
+        Matter no: SC 2211/25
+        Version: Draft 3 (State comments 12/09/2026)
+        Parties: State of Queensland and Coastline Builders Pty Ltd
+        3.1 The State will pay the Settlement Sum of $785,000 within 28 days after execution of this deed.
+        4.1 The Contractor releases the State from all claims arising from the Northgate depot contract.
+        6.1 This deed is entered into without admission of liability by either party.
+      description: Draft deed of settlement carried over from the absorbed drafts scope (85 via draft terms + dollar + header fields)
+      synthetic: true
+    - value: Please find attached our client's marked-up settlement deed. The settlement sum remains $240,000 but the release is now limited to the 2024 claims. This letter is without prejudice save as to costs.
+      description: Solicitor's covering email on a draft settlement deed (75 via draft terms + dollar amount)
+      synthetic: true
   should_not_match:
     - value: The parties reached a settlement of $3.2 million after mediation. The terms of settlement were recorded in consent orders filed with the court.
       description: Published settlement outcome in court records
@@ -74,6 +103,10 @@ test_cases:
       description: Published mediation outcome report
     - value: "Policy guidance: this procedure explains how records about Settlement Authority are handled, who may access them and how long they are kept. It contains no records about any person or system."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: 'Legal training module: a deed of settlement usually records the settlement sum, a release and discharge clause and a without admission of liability clause. For example, "Settlement Sum means $[amount] payable within [number] days after execution".'
+      description: Training material describing a deed of settlement with placeholder amounts (discovery only)
+    - value: The council announced it had signed a deed of settlement with the developer, paying a settlement sum of $2.4 million without admission of liability.
+      description: News-style report of an executed settlement (publication wording vetoes enforcement)
 false_positives:
   - description: Published settlement outcomes in court records or consent orders
     mitigation: Negative match on 'consent orders', 'terms of settlement filed', 'court approved'. Focus on pre-settlement authority not post-settlement record
@@ -81,6 +114,8 @@ false_positives:
     mitigation: Negative match on 'handbook', 'guidelines', 'policy', 'procedure'. Require specific dollar amounts or matter references
   - description: Media reports of settlements achieved
     mitigation: Negative match on 'media release', 'announced', 'reported', 'published'
+  - description: Model settlement clauses, legal training and precedent deeds describe deeds of settlement, settlement sums and release clauses without a live draft.
+    mitigation: The draft-instrument route needs a real dollar amount (placeholder amounts such as $[amount] do not match) plus independent draft-settlement terms; template wording vetoes enforcement.
 exports:
   - purview_xml
   - yaml
@@ -99,10 +134,8 @@ purview:
         - ref: Regex_settlement_authority_and_negotiation_mandate_record_structure
           min_count: 3
           unique_results: true
-        - ref: Evidence_settlement_authority_and_negotiation_mandate_primary
         - ref: Evidence_settlement_authority_and_negotiation_mandate_corroborative
         - ref: Pattern_settlement_authority_and_negotiation_mandate_dollar_amount_format
-        - ref: Pattern_settlement_authority_and_negotiation_mandate_authority_to_settle_phrase
         - type: any
           min_matches: 0
           max_matches: 0
@@ -114,6 +147,21 @@ purview:
           refs:
             - Keyword_noise_exclusion
             - Filter_settlement_authority_and_negotiation_mandate_exclusion
+    - confidence_level: 85
+      id_match: Pattern_settlement_authority_and_negotiation_mandate_draft_settlement_instrument
+      matches:
+        - ref: Regex_settlement_authority_and_negotiation_mandate_record_structure
+          min_count: 2
+          unique_results: true
+        - ref: Evidence_settlement_authority_and_negotiation_mandate_draft_terms
+        - ref: Pattern_settlement_authority_and_negotiation_mandate_dollar_amount_format
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_settlement_authority_and_negotiation_mandate_exclusion
+            - Evidence_settlement_authority_and_negotiation_mandate_exclusion
     - confidence_level: 75
       id_match: Pattern_settlement_authority_and_negotiation_mandate_settlement_negotiation_authority_phrase
       matches:
@@ -121,6 +169,18 @@ purview:
           refs:
             - Regex_settlement_authority_and_negotiation_mandate_record_structure
             - Evidence_settlement_authority_and_negotiation_mandate_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_settlement_authority_and_negotiation_mandate_exclusion
+            - Evidence_settlement_authority_and_negotiation_mandate_exclusion
+    - confidence_level: 75
+      id_match: Pattern_settlement_authority_and_negotiation_mandate_draft_settlement_instrument
+      matches:
+        - ref: Evidence_settlement_authority_and_negotiation_mandate_draft_terms
+        - ref: Pattern_settlement_authority_and_negotiation_mandate_dollar_amount_format
         - type: any
           min_matches: 0
           max_matches: 0
@@ -138,27 +198,39 @@ purview:
           refs:
             - Keyword_noise_exclusion
             - Filter_settlement_authority_and_negotiation_mandate_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_settlement_authority_and_negotiation_mandate_draft_settlement_instrument
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_settlement_authority_and_negotiation_mandate_exclusion
   regexes:
     - id: Pattern_settlement_authority_and_negotiation_mandate_settlement_negotiation_authority_phrase
-      pattern: (?i)\b(?:settlement|negotiation)\s+(?:authority|mandate|range)\b
+      pattern: (?i)\b(?:(?:settlement|negotiation)\s+(?:authority|mandate|range)|authority\s+to\s+settle)\b
+    - id: Pattern_settlement_authority_and_negotiation_mandate_draft_settlement_instrument
+      pattern: (?i)\b(?:deed\s+of\s+(?:settlement|release)|settlement\s+(?:deed|agreement)|terms\s+of\s+settlement)\b
     - id: Pattern_settlement_authority_and_negotiation_mandate_dollar_amount_format
       pattern: \$[\d,]+\.\d{1,2}\s*[MmBb](?:illion)?|\$[\d,]+\s*[MmBb](?:illion)?|\$[\d,]+\.\d{1,2}|\$[\d,]+
-    - id: Pattern_settlement_authority_and_negotiation_mandate_authority_to_settle_phrase
-      pattern: (?i)\bauthority\s+to\s+settle\b
     - id: Regex_settlement_authority_and_negotiation_mandate_record_structure
       pattern: >-
         (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!_{2,}|\[|<)[A-Za-z0-9]
   keywords:
-    - id: Evidence_settlement_authority_and_negotiation_mandate_primary
+    - id: Evidence_settlement_authority_and_negotiation_mandate_draft_terms
       groups:
         - match_style: word
           terms:
-            - settlement authority
-            - settlement mandate
-            - negotiation authority
-            - negotiation mandate
-            - settlement range
-            - authority to settle
+            - without prejudice
+            - draft
+            - settlement sum
+            - release and discharge
+            - without admission of liability
+            - no admission of liability
+            - full and final settlement
+            - subject to execution
       strength: specific
     - id: Evidence_settlement_authority_and_negotiation_mandate_corroborative
       groups:
@@ -200,7 +272,7 @@ purview:
       strength: noise
 risk_rating: 8
 risk_description: >-
-  The detector targets documents that authorise settlement ranges, negotiation floors or ceilings, and concession limits, often corroborated by approval terms and monetary amounts. Disclosure tells the opposing party the State's maximum or minimum position, removes bargaining uncertainty, and can cause avoidable financial loss or undermine resolution strategy. The normal true positive is a live mandate for one matter, not a published settlement outcome or general policy describing delegations. Risk 8 supports SENSITIVE Legal; PROTECTED would require an exceptionally large whole-of-government exposure, Cabinet-level mandate, or systemic compromise causing significant damage.
+  The detector targets documents that authorise settlement ranges, negotiation floors or ceilings, and concession limits, often corroborated by approval terms and monetary amounts. Disclosure tells the opposing party the State's maximum or minimum position, removes bargaining uncertainty, and can cause avoidable financial loss or undermine resolution strategy. The normal true positive is a live mandate for one matter, or an unexecuted draft deed or settlement agreement whose proposed settlement sum, release scope and admissions language expose the same negotiating position, not a published settlement outcome, model clause or general policy describing delegations. Risk 8 supports SENSITIVE Legal; PROTECTED would require an exceptionally large whole-of-government exposure, Cabinet-level mandate, or systemic compromise causing significant damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -209,6 +281,9 @@ references: []
 created: '2026-02-20'
 updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: 'Merge global-top500-166-settlement-agreement-drafts into this classifier (Qld government classifier review 2026-09-24): added a draft-settlement-instrument primary (deed of settlement/release, settlement deed/agreement, terms of settlement) with independent draft-settlement evidence (without prejudice, draft, settlement sum, release and discharge, without/no admission of liability, full and final settlement, subject to execution); 65 discovery on the instrument phrase, 75 with draft terms plus a dollar amount, 85 adding 2 populated header fields; all enforcing draft tiers carry the existing published-outcome/handbook/media and template exclusions. Authority route: "authority to settle" moved into the authority primary (it was only in the top-level pattern), and the 85 tier no longer requires the same-span Evidence_primary list or a literal "authority to settle" phrase (which made 85 practically unreachable) - it now requires 3 header fields plus corroboration plus a dollar amount; Evidence_primary and the standalone authority-to-settle regex were removed as unreferenced. Not imported: bare dispute resolution, mediation outcome, compromise agreement and mutual release phrases (too generic or already covered) and the absorbed self-corroborating topic tiers. Added populated 85 authority and draft-deed positives, a 75 covering-email positive, and training and news decoys. Name/description/operation updated for the merged scope; risk 8 and labels unchanged.'
   - version: 1.5.0
     date: '2026-09-24'
     description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent doc record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 3 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
