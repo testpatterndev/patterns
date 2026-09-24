@@ -1,0 +1,47 @@
+schema: testpattern/identifier-v1
+key: generator-outage-work-order
+name: Generator outage work order / reference
+issuer: The generator's maintenance system (e.g. SAP PM, Maximo)
+description: Work order and outage reference numbers raised in the generator maintenance system for planned unit outages and overhauls.
+appears_in:
+- Unit outage plans
+- Overhaul schedules
+- Maintenance work orders
+labels:
+- Work order
+- Outage reference
+- Outage number
+public_format:
+  status: customer-defined
+  notes: Entirely customer-specific (maintenance system numbering).
+fallback:
+  pattern: (?i)\b(?:work\s+order(?:\s+(?:no\.?|number))?|outage\s+(?:ref(?:erence)?|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+  precision: low
+  rationale: Work order labels are common; the outage plan classifier also needs unit, date and MW structure.
+  samples:
+  - 'Work order: 40044718'
+  - 'Outage reference: OUT-2047'
+replacement:
+  customer_supplies:
+  - A description of the work order number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+  - The label text used on documents and exports (for example the exact field heading).
+  - 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+  - Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+  steps:
+  - Collect the customer inputs listed above during the engagement discovery session.
+  - Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+  - If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+  - Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+  - Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+  validation:
+  - Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+  - The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+  - The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+  - Overlay values never appear in build logs or readiness output (counts and keys only).
+  example_overlay:
+    pattern: (?i)\bwork\s+order\s*[:#]?\s*4\d{7}\b
+    samples:
+    - 'Work order: 40044718'
+    - work order 40007193
+    - Work Order 40020471
+sensitivity: Links an internal plan to a specific unit outage before it is public.
