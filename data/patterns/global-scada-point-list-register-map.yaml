@@ -1,0 +1,351 @@
+schema: testpattern/v1
+name: SCADA Point List / Register Map
+slug: global-scada-point-list-register-map
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  SCADA and telemetry point lists and register maps for a live system: Modbus register maps (rows pairing an address with a holding register, input register, coil or discrete input type, plus function codes), DNP3 Device Profile XML data-point lists (binaryInputPoints / analogInputPoints with populated index and name), and OPC UA NodeId lists (ns=n;i= / s= / g= / b= identifiers). Enforcement requires repetition of the row or point structure so tutorials and specifications that show one or two examples do not fire.
+operation: >-
+  Proximity 1000 characters. Modbus - 85: a register row (address + register type, either order) repeated at least 10 times with distinct values + a function-code value (FC03, function code 16, 0x10...) + site evidence (IPv4 address or an RTU / outstation / slave ID / unit ID / pump station / substation term); 75: register row repeated at least 5 times + a function code or a register-map heading (Register Address, Register Type, Modbus Address, Slave ID, Unit ID). DNP3 - 85: a DNP3 point-section element (binaryInputPoints, analogInputPoints...) + at least 5 distinct populated points (index + non-spare name) + analog scaling (scaleFactor or units) + site evidence; 75: point section + at least 3 distinct populated points. OPC UA - 85: at least 10 distinct NodeIds + an opc.tcp:// endpoint + site evidence; 75: at least 10 distinct NodeIds. 65 (discovery-only): a register-map / point-list phrase, the DNP3 Device Profile root or namespace, a point section, a single register row or NodeId. All enforce tiers exclude template/noise text and protocol specification framing (Modbus Application Protocol, OPC 10000-6).
+pattern: >-
+  (?i)\b(?:Modbus\s+(?:register|address|memory|point)\s+(?:map|list|table)|register\s+map|DNP3?\s+(?:point\s+(?:list|map)|device\s+profile)|OPC\s+UA\s+(?:node|tag)\s+(?:list|export|map)|SCADA\s+point\s+(?:list|schedule|database))\b
+confidence: medium
+confidence_justification: >-
+  Medium: the DNP3 Device Profile XML elements and OPC UA NodeId grammar are verified machine formats, but register rows and NodeIds are short shapes that tutorials and SDK docs also show, so enforce tiers depend on repetition (min_count with unique results) and 85 adds a distinct structure plus site evidence. The 4xxxx/3xxxx Modicon notation is a convention, not the Modbus specification, so it is not relied on. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic.
+jurisdictions:
+  - global
+regulations:
+  - SOCI Act 2018 (Cth)
+  - NIS2
+frameworks:
+  - IEC 62443
+  - NIST CSF
+  - AESCSF
+data_categories:
+  - infrastructure
+  - technology
+corroborative_evidence:
+  keywords:
+    - RTU
+    - outstation
+    - slave ID
+    - unit ID
+    - pump station
+    - substation
+    - feeder
+    - telemetry
+  proximity: 1000
+test_cases:
+  should_match:
+    - value: |-
+        Register Address,Register Type,Function Code,Tag,Data Type,Units
+        40001,Holding Register,FC03,PS07_P1_SPEED_SP,UINT16,rpm
+        40002,Holding Register,FC03,PS07_P2_SPEED_SP,UINT16,rpm
+        40003,Holding Register,FC06,PS07_WW_LEVEL_HI_SP,UINT16,mm
+        40004,Holding Register,FC06,PS07_WW_LEVEL_LO_SP,UINT16,mm
+        40005,Holding Register,FC16,PS07_DUTY_SELECT,UINT16,-
+        30001,Input Register,FC04,PS07_WW_LEVEL,UINT16,mm
+        30002,Input Register,FC04,PS07_FLOW,UINT16,L/s
+        30003,Input Register,FC04,PS07_P1_AMPS,UINT16,A
+        30004,Input Register,FC04,PS07_P2_AMPS,UINT16,A
+        10001,Discrete Input,FC02,PS07_P1_RUNNING,BOOL,-
+        RTU PS07 Kingfisher Rd, slave ID 7, 10.42.7.21:502
+      description: 85 - Modbus register map, 10 rows, function codes, RTU and IP
+      synthetic: true
+    - value: |-
+        Modbus Address | Register Type | Description
+        0x0000 | Coil | Chlorine dosing pump 1 enable
+        0x0001 | Coil | Chlorine dosing pump 2 enable
+        0x0010 | Holding Register | Dose rate setpoint mg/L x100
+        0x0011 | Holding Register | Residual alarm high x100
+        0x0012 | Holding Register | Residual alarm low x100
+      description: 75 - Modbus register map with 5 rows and a register-map heading
+      synthetic: true
+    - value: |-
+        <analogInputPoints>
+          <dataPoints>
+            <analogInput><index>0</index><name>Feeder 3 Phase A Current</name><changeEventClass>2</changeEventClass><scaleFactor>0.1</scaleFactor><units>A</units></analogInput>
+            <analogInput><index>1</index><name>Feeder 3 Phase B Current</name><changeEventClass>2</changeEventClass><scaleFactor>0.1</scaleFactor><units>A</units></analogInput>
+            <analogInput><index>2</index><name>Feeder 3 Phase C Current</name><changeEventClass>2</changeEventClass><scaleFactor>0.1</scaleFactor><units>A</units></analogInput>
+            <analogInput><index>3</index><name>Bus 2 Voltage AB</name><changeEventClass>2</changeEventClass><scaleFactor>0.01</scaleFactor><units>kV</units></analogInput>
+            <analogInput><index>4</index><name>TX1 Winding Temperature</name><changeEventClass>3</changeEventClass><scaleFactor>1</scaleFactor><units>degC</units></analogInput>
+      description: 85 - DNP3 Device Profile XML analog points with names, scaling and feeder names
+      synthetic: true
+    - value: |-
+        <binaryInputPoints>
+          <dataPoints>
+            <binaryInput><index>0</index><name>CB 3 Closed</name><changeEventClass>1</changeEventClass></binaryInput>
+            <binaryInput><index>1</index><name>CB 3 Tripped</name><changeEventClass>1</changeEventClass></binaryInput>
+            <binaryInput><index>2</index><name>Battery Charger Fail</name><changeEventClass>1</changeEventClass></binaryInput>
+      description: 75 - DNP3 binary input point list with 3 populated points
+      synthetic: true
+    - value: |-
+        Endpoint: opc.tcp://wtp-scada-01.plant.local:4840 (RTU gateway)
+        ns=2;s=WTP.Filter1.Turbidity
+        ns=2;s=WTP.Filter1.HeadLoss
+        ns=2;s=WTP.Filter1.FlowRate
+        ns=2;s=WTP.Filter2.Turbidity
+        ns=2;s=WTP.Filter2.HeadLoss
+        ns=2;s=WTP.Filter2.FlowRate
+        ns=2;s=WTP.Clearwell.Level
+        ns=2;s=WTP.Clearwell.ChlorineResidual
+        ns=3;i=5001
+        ns=3;i=5002
+      description: 85 - OPC UA NodeId list (10 distinct) with opc.tcp endpoint and site term
+      synthetic: true
+    - value: |-
+        ns=4;i=1001, ns=4;i=1002, ns=4;i=1003, ns=4;i=1004, ns=4;i=1005,
+        ns=4;i=1006, ns=4;i=1007, ns=4;i=1008, ns=4;i=1009, ns=4;i=1010
+      description: 75 - bare list of 10 distinct OPC UA NodeIds
+      synthetic: true
+  should_not_match:
+    - value: >-
+        MODBUS Application Protocol Specification V1.1b3. Function codes: 01 (0x01) Read Coils; 02 (0x02) Read Discrete Inputs; 03 (0x03) Read Holding Registers; 04 (0x04) Read Input Registers; 05 (0x05) Write Single Coil; 06 (0x06) Write Single Register; 15 (0x0F) Write Multiple Coils; 16 (0x10) Write Multiple Registers.
+      description: Modbus specification text (published standard)
+    - value: |-
+        Register Address | Register Type | Function Code | Description
+        ________ | ________ | ________ | ________
+        ________ | ________ | ________ | ________
+        (Modbus register map template - complete one row per point)
+      description: Blank register map template
+    - value: |-
+        Modbus tutorial: a register map example might read
+        40001, Holding Register - setpoint
+        40002, Holding Register - mode
+        30001, Input Register - temperature
+      description: Tutorial / training example with three rows
+    - value: >-
+        OPC UA Part 6, 5.1.12: a NodeId is encoded as ns=<namespaceindex>;<type>=<value>, for example ns=10;i=12345 or ns=1;s=Hello.
+      description: OPC UA specification text with a single example NodeId
+    - value: >-
+        The DNP3 Device Profile documents the capabilities of an outstation, including the binary input points, analog input points and counter points it supports, in XML or PDF form.
+      description: DNP3 device profile guidance text (no populated point markup)
+    - value: >-
+        Gateway vendor adds automatic Modbus register map import and OPC UA tag browsing to its SCADA suite, the company announced.
+      description: News / marketing text
+false_positives:
+  - description: Modbus, DNP3 and OPC UA specifications, SDK documentation and tutorials show register rows and NodeIds.
+    mitigation: Enforce tiers need repeated distinct rows or NodeIds (min_count 5 or 10 with unique results); specification titles and tutorial / template wording are excluded.
+  - description: Published vendor DNP3 device profiles describe device capabilities, not a site configuration.
+    mitigation: PDF capability tables do not match the XML point markup; XML profiles with generic point names can reach 75 but 85 also needs analog scaling and site evidence.
+  - description: Free-form CSV / Excel point lists without register type words (headings such as Point Index, Class, Deadband) have no primary standard.
+    mitigation: Not detected beyond the 65 phrase tier; customers can extend with their own point-list headings.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 1000
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_global_scada_point_list_modbus_row
+      matches:
+        - ref: Regex_global_scada_point_list_modbus_row
+          min_count: 10
+          unique_results: true
+        - ref: Regex_global_scada_point_list_function_code
+        - type: any
+          refs:
+            - Regex_global_scada_point_list_ipv4
+            - Keyword_global_scada_point_list_site_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_scada_point_list_exclusion
+    - confidence_level: 85
+      id_match: Regex_global_scada_point_list_dnp3_section
+      matches:
+        - ref: Regex_global_scada_point_list_dnp3_point
+          min_count: 5
+          unique_results: true
+        - ref: Regex_global_scada_point_list_dnp3_scaling
+        - type: any
+          refs:
+            - Regex_global_scada_point_list_ipv4
+            - Keyword_global_scada_point_list_site_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_scada_point_list_exclusion
+    - confidence_level: 85
+      id_match: Regex_global_scada_point_list_opcua_nodeid
+      matches:
+        - ref: Regex_global_scada_point_list_opcua_nodeid
+          min_count: 10
+          unique_results: true
+        - ref: Regex_global_scada_point_list_opcua_endpoint
+        - type: any
+          refs:
+            - Regex_global_scada_point_list_ipv4
+            - Keyword_global_scada_point_list_site_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_scada_point_list_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_scada_point_list_modbus_row
+      matches:
+        - ref: Regex_global_scada_point_list_modbus_row
+          min_count: 5
+          unique_results: true
+        - type: any
+          refs:
+            - Regex_global_scada_point_list_function_code
+            - Regex_global_scada_point_list_modbus_heading
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_scada_point_list_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_scada_point_list_dnp3_section
+      matches:
+        - ref: Regex_global_scada_point_list_dnp3_point
+          min_count: 3
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_scada_point_list_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_scada_point_list_opcua_nodeid
+      matches:
+        - ref: Regex_global_scada_point_list_opcua_nodeid
+          min_count: 10
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_scada_point_list_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_global_scada_point_list_phrase
+          - Regex_global_scada_point_list_dnp3_root
+          - Regex_global_scada_point_list_dnp3_section
+          - Regex_global_scada_point_list_modbus_row
+          - Regex_global_scada_point_list_opcua_nodeid
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_global_scada_point_list_phrase
+      pattern: >-
+        (?i)\b(?:Modbus\s+(?:register|address|memory|point)\s+(?:map|list|table)|register\s+map|DNP3?\s+(?:point\s+(?:list|map)|device\s+profile)|OPC\s+UA\s+(?:node|tag)\s+(?:list|export|map)|SCADA\s+point\s+(?:list|schedule|database))\b
+    - id: Regex_global_scada_point_list_modbus_row
+      pattern: >-
+        (?i)\b(?:0x[0-9A-F]{4}|[0-9]{1,6})[ \t]{0,4}[,;|\t][ \t]{0,4}(?:holding\s+registers?|input\s+registers?|discrete\s+inputs?|coils?)\b|\b(?:holding|input)\s+registers?[ \t]{0,4}[,;|\t:][ \t]{0,4}(?:0x[0-9A-F]{4}|[0-9]{1,6})\b
+    - id: Regex_global_scada_point_list_function_code
+      pattern: >-
+        (?i)\bFC[ \t]?0?(?:[1-6]|15|16|23)\b|\bfunction\s+code\s*[:=]?\s*(?:0?[1-6]|15|16|23|0x(?:0[1-6]|0F|10|17))\b
+    - id: Regex_global_scada_point_list_modbus_heading
+      pattern: >-
+        (?i)\b(?:register\s+(?:address|type|number)|modbus\s+(?:address|register)|slave\s+(?:id|address)|unit\s+id)\b
+    - id: Regex_global_scada_point_list_dnp3_root
+      pattern: >-
+        <DNP3DeviceProfileDocument\b|xmlns="http://www\.dnp3\.org/DNP3/DeviceProfile/Jan2010"
+    - id: Regex_global_scada_point_list_dnp3_section
+      pattern: >-
+        <(?:dnp:)?(?:binaryInputPoints|doubleBitInputPoints|binaryOutputPoints|counterPoints|analogInputPoints|analogOutputPoints)>
+    - id: Regex_global_scada_point_list_dnp3_point
+      pattern: >-
+        <(?:dnp:)?index>\d{1,5}</(?:dnp:)?index>\s{0,20}<(?:dnp:)?name>(?!(?:spare|unused|reserved|n/?a)\s{0,3}<)[^<]{2,80}</(?:dnp:)?name>
+    - id: Regex_global_scada_point_list_dnp3_scaling
+      pattern: >-
+        <(?:dnp:)?scaleFactor>-?\d{1,9}(?:\.\d{1,9})?</(?:dnp:)?scaleFactor>|<(?:dnp:)?units>[^<]{1,20}</(?:dnp:)?units>
+    - id: Regex_global_scada_point_list_opcua_nodeid
+      pattern: >-
+        \bns=\d{1,5};[isgb]=[^\s,;"<]{1,200}
+    - id: Regex_global_scada_point_list_opcua_endpoint
+      pattern: >-
+        (?i)\bopc\.tcp://[A-Za-z0-9.-]{1,100}:\d{2,5}\b
+    - id: Regex_global_scada_point_list_ipv4
+      pattern: >-
+        \b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b
+  keywords:
+    - id: Keyword_global_scada_point_list_site_context
+      groups:
+        - match_style: word
+          terms:
+            - text: RTU
+              case_sensitive: true
+            - outstation
+            - slave ID
+            - unit ID
+            - pump station
+            - substation
+            - zone substation
+            - feeder
+            - reservoir
+            - telemetry
+            - water treatment plant
+            - sewage pumping station
+            - text: WTP
+              case_sensitive: true
+            - text: STP
+              case_sensitive: true
+      strength: specific
+    - id: Keyword_global_scada_point_list_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - Modbus Application Protocol
+            - MODBUS over Serial Line
+            - Modbus Organization
+            - OPC 10000-6
+            - OPC UA Part 6
+            - Modbus tutorial
+            - Modbus 101
+            - register map example
+      strength: specific
+risk_rating: 9
+risk_description: >-
+  A populated point list or register map is the address book of a control system: which register or point index reads or writes each pump, breaker, valve, setpoint and alarm at a named site, often with the RTU address or endpoint. With network access, an attacker can use it to issue writes (setpoints, coil commands, breaker operations) to the right addresses without reverse engineering, with consequences for supply and safety. Point lists for critical infrastructure assets can be SOCI protected information. Specifications, tutorials, templates and marketing are excluded from enforce tiers. Risk 9 supports SENSITIVE InfoTech.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - title: Modbus Application Protocol Specification V1.1b3
+    url: https://www.modbus.org/file/secure/modbusprotocolspecification.pdf
+  - title: OPC UA Part 6 - 5.1.12 NodeId string encoding
+    url: https://reference.opcfoundation.org/Core/Part6/v105/docs/5.1.12
+  - title: DNP3 Device Profile XML sample (open_dnp3_slave.xml)
+    url: https://raw.githubusercontent.com/gec/dnp3/master/profile/open_dnp3_slave.xml
+  - title: FieldServer DNP3 device profile (vendor capability document)
+    url: https://cdn.chipkin.com/articles/wp-content/uploads/2012/05/FieldServer_DNP3_Cap.pdf
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - Modbus register rows, DNP3 Device Profile XML data points and OPC UA NodeIds with repetition-gated 75 and 85 tiers; 85 adds a distinct structure (function code, analog scaling, opc.tcp endpoint) and site evidence.
+author: testpattern-community
+license: MIT

@@ -1,0 +1,207 @@
+schema: testpattern/v1
+name: ASIC / MSIC Security Identification Card Register or Holder Record
+slug: au-aviation-maritime-security-card-register
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Issuing-body records about Aviation Security Identification Card (ASIC) and Maritime Security Identification Card (MSIC) holders and applicants: the Register of ASICs (Aviation Transport Security Regulations 2005 reg 6.23) and Register of MSICs (Maritime Transport and Offshore Facilities Security Regulations 2003 reg 6.08T), which hold the holder's name, residential address, card colour/type, the unique number of the card, issue, expiry and cancellation dates and operational need, plus AusCheck background check outcomes and cancellation notices. The card number format is not public (issuer-specific, Secretary-approved), so the card number is matched only by its label.
+operation: >-
+  Primary: "Aviation / Maritime Security Identification Card", "Register of ASICs / MSICs", a coloured card ("red / grey / white ASIC", "blue / white MSIC"), "(temporary) ASIC holder / issuing body / application / card" or "MSIC". Bare "ASIC" is never a primary because it collides with the Australian Securities and Investments Commission. 65 is discovery-only (primary alone) and will surface Home Affairs / AusCheck guidance, job ads and training. 75 requires one populated register field within 300 characters: holder / applicant / full name with a name, residential address with a street number, card colour or type with a colour value, an ASIC / MSIC / card number by label with a non-placeholder value, a dated issue / expiry / cancellation field, date of birth, operational need with a value, or an AusCheck / background check outcome with a value. 85 requires two distinct register fields plus an independent corroborative term (AusCheck, background check, adverse criminal record, issuing body, operational need, cancelled). Every tier excludes template/fixture text; enforce tiers also exclude ASIC-the-regulator text, auscheck.gov.au / homeaffairs.gov.au / legislation.gov.au guidance, job ads ("must hold a valid MSIC", "apply now") and courses.
+pattern: (?i)\b(?:Aviation\s+Security\s+Identification\s+Cards?|Maritime\s+Security\s+Identification\s+Cards?|Register\s+of\s+(?:ASICs|MSICs)|(?:red|grey|gray|white)\s+ASICs?|(?:blue|white)\s+MSICs?|(?:temporary\s+)?ASIC\s+(?:holder|issuing\s+body|application|card)s?|MSICs?)\b
+confidence: medium
+confidence_justification: >-
+  Medium: the card names and register terms are specific, but there is no public card-number format or checksum, and ASIC is ambiguous with the securities regulator. Enforcement depends on populated register fields next to an unambiguous card term. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic.
+jurisdictions:
+  - au
+regulations:
+  - Aviation Transport Security Regulations 2005 (Cth) reg 6.23
+  - Maritime Transport and Offshore Facilities Security Regulations 2003 (Cth) regs 6.08B, 6.08CA, 6.08I, 6.08T
+frameworks:
+  - PSPF
+  - QGISCF
+data_categories:
+  - pii
+  - security
+  - transport
+corroborative_evidence:
+  keywords:
+    - AusCheck
+    - background check
+    - adverse criminal record
+    - issuing body
+    - operational need
+    - cancelled
+  proximity: 300
+customisation:
+  - key: asic-msic-card-number
+    kind: identifier-format
+    identifier: asic-msic-card-number
+    target: purview.regexes/Regex_au_aviation_maritime_security_card_register_holder_card_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's asic / msic card number format (see docs/identifiers.md#asic-msic-card-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Register of ASICs - extract, issuing body Carrow Regional Airport\nHolder name: Dylan Farrow-Teston | Card colour: Red | ASIC number: AX-448192 | Date of issue: 02/03/2025 | Expiry date: 02/03/2027\nHolder name: Mei Teston | Card colour: Grey | ASIC number: AX-448207 | Date of issue: 11/04/2025 | Expiry date: 11/04/2027\nOperational need: baggage handling, airside apron"
+      description: 85 tier - register extract with two holder rows (name, colour, number, dates) plus issuing body / operational need
+      synthetic: true
+    - value: "MSIC holder record\nMSIC number: MB-20391"
+      description: 75 tier - MSIC record with the card number by label only
+      synthetic: true
+    - value: "Blue MSIC - cancellation notice\nCard holder name: Rowan Teston\nCancellation date: 15/09/2026\nAusCheck outcome: Adverse criminal record\nThe issuing body has cancelled the card and requested its return."
+      description: 85 tier - MSIC cancellation with holder name, cancellation date and AusCheck outcome plus issuing body
+      synthetic: true
+    - value: "Temporary ASIC application\nApplicant name: Noor Teston"
+      description: 75 tier - temporary ASIC application with a named applicant
+      synthetic: true
+  should_not_match:
+    - value: "The issuing body must keep a register of ASICs recording each holder's name, residential address, the unique number of the ASIC and the date of issue and expiry (Aviation Transport Security Regulations 2005 reg 6.23). See legislation.gov.au."
+      description: Legislation / guidance text
+    - value: "MSIC application form\nApplicant name: ____________\nResidential address: ____________\nMSIC number (if renewing): ____________\nDate of birth: __/__/____"
+      description: Blank application form
+    - value: "Wharf hand - Port of Carrow Bay. You must hold a valid MSIC or be eligible to obtain one. Apply now."
+      description: Job advertisement
+    - value: "ASIC has fined the company after a review of its register; the Australian Securities and Investments Commission said the card issuer breached its licence."
+      description: Securities regulator (ASIC collision)
+    - value: "An Aviation Security Identification Card is a red or grey card issued after an AusCheck background check. This course explains how to apply for an ASIC."
+      description: Training course / explainer
+false_positives:
+  - description: ASIC is also the Australian Securities and Investments Commission.
+    mitigation: Bare ASIC is not a primary; only card phrases (Register of ASICs, red/grey/white ASIC, ASIC holder/card/issuing body) are, and the regulator's full name excludes enforce tiers.
+  - description: Home Affairs, AusCheck and legislation pages list the register fields; job ads and RTO courses mention ASIC/MSIC requirements.
+    mitigation: Guidance stays at 65 discovery; enforce tiers need populated fields and exclude auscheck.gov.au / homeaffairs.gov.au / legislation.gov.au, "must hold a valid ASIC/MSIC", "apply now" and course wording.
+  - description: Blank application forms.
+    mitigation: Blank lines, bracket placeholders and n/a/tbc values are rejected; template wording is excluded by the shared template-exclusion dictionary.
+  - description: Card numbers are issuer-specific with no public format.
+    mitigation: Matched only by label (ASIC / MSIC / card number); no standalone card-number regex is shipped.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_aviation_maritime_security_card_register_primary
+      matches:
+        - ref: Regex_au_aviation_maritime_security_card_register_holder_card_field
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_au_aviation_maritime_security_card_register_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_aviation_maritime_security_card_register_exclusion
+    - confidence_level: 85
+      id_match: Regex_au_aviation_maritime_security_card_register_primary
+      matches:
+        - ref: Regex_au_aviation_maritime_security_card_register_holder_card_field
+        - ref: Regex_au_aviation_maritime_security_card_register_status_field
+        - ref: Keyword_au_aviation_maritime_security_card_register_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_aviation_maritime_security_card_register_exclusion
+    - confidence_level: 85
+      id_match: Regex_au_aviation_maritime_security_card_register_primary
+      matches:
+        - ref: Regex_au_aviation_maritime_security_card_register_status_field
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_au_aviation_maritime_security_card_register_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_aviation_maritime_security_card_register_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_aviation_maritime_security_card_register_primary
+      matches:
+        - type: any
+          refs:
+            - Regex_au_aviation_maritime_security_card_register_holder_card_field
+            - Regex_au_aviation_maritime_security_card_register_status_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_aviation_maritime_security_card_register_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_aviation_maritime_security_card_register_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_aviation_maritime_security_card_register_primary
+      pattern: >-
+        (?i)\b(?:Aviation\s+Security\s+Identification\s+Cards?|Maritime\s+Security\s+Identification\s+Cards?|Register\s+of\s+(?:ASICs|MSICs)|(?:red|grey|gray|white)\s+ASICs?|(?:blue|white)\s+MSICs?|(?:temporary\s+)?ASIC\s+(?:holder|issuing\s+body|application|card)s?|MSICs?)\b
+    - id: Regex_au_aviation_maritime_security_card_register_holder_card_field
+      pattern: >-
+        (?i)(?:\b(?:(?:card\s*holder|holder|applicant|full)\s+name|name\s+of\s+(?:holder|applicant)|surname|given\s+names?)\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'.-]{1,30}(?:[ \t]+[A-Z][A-Za-z'.-]{1,30}){0,3}|\bresidential\s+address\s*[:#]\s*\d{1,5}[A-Za-z]?\s+[A-Z][A-Za-z'.-]{1,30}(?:[ \t]+[A-Za-z0-9'.,-]{1,30}){0,6}|\b(?:card|ASIC|MSIC)\s+(?:colour|color|type|kind)\s*[:#]\s*(?:red|grey|gray|white|blue|temporary|permanent)\b|\b(?:ASIC|MSIC|card)\s+(?:unique\s+)?(?:number|no\.?|serial)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9-]{3,19}\b)
+    - id: Regex_au_aviation_maritime_security_card_register_status_field
+      pattern: >-
+        (?i)(?:\b(?:date\s+of\s+(?:issue|expiry|cancellation)|(?:issue|expiry|cancellation)\s+date)\s*[:#]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-](?:20)?\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\.?\s+20\d{2}|20\d{2}-\d{2}-\d{2})|\b(?:date\s+of\s+birth|DOB)\s*[:#]\s*(?:\d{1,2}[/.-]\d{1,2}[/.-](?:19|20)?\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\.?\s+(?:19|20)\d{2})|\boperational\s+need(?:\s+reason)?\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|the|a|an|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'.,/-]{1,40}(?:[ \t]+[A-Za-z0-9'.,/-]{1,30}){0,6}|\b(?:AusCheck|background\s+check)\s+(?:outcome|result|status|advice)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|pending|the|a|an|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'.-]{1,30}(?:[ \t]+[A-Za-z'.-]{1,30}){0,3})
+    - id: Regex_au_aviation_maritime_security_card_register_exclusion
+      pattern: >-
+        (?i)(?:\bAustralian\s+Securities\s+(?:and|&)\s+Investments\s+Commission\b|\bauscheck\.gov\.au|\bhomeaffairs\.gov\.au|\blegislation\.gov\.au|\bFederal\s+Register\s+of\s+Legislation|\bCivil\s+penalty\s*:|\bmust\s+(?:hold|have|obtain)\s+(?:or\s+be\s+(?:able|eligible)\s+to\s+obtain\s+)?an?\s+(?:valid\s+)?(?:ASIC|MSIC)\b|\bhow\s+to\s+apply\s+for\s+an?\s+(?:ASIC|MSIC)\b|\bapply\s+now\b|\b(?:job|position)\s+description\b|\bthis\s+(?:article|course|fact\s?sheet|guidance|module)\b|\bWikipedia\b)
+  keywords:
+    - id: Keyword_au_aviation_maritime_security_card_register_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - AusCheck
+            - background check
+            - adverse criminal record
+            - issuing body
+            - operational need
+            - cancelled
+            - cancellation
+            - temporary ASIC
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  The classifier identifies ASIC / MSIC issuing-body register entries and holder records, gated on populated register fields: a named person with residential address, date of birth, card colour and number, validity dates, operational need and AusCheck background check outcome. Disclosure exposes personal information and criminal-record-based eligibility decisions, and lets an attacker clone or impersonate a valid card holder to reach secure airside or maritime zones. Guidance, blank forms, job ads and ASIC-the-regulator text are excluded from enforce tiers. Risk 8 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Aviation Transport Security Regulations 2005 (F2005L00366) - reg 6.23 Register of ASICs
+    url: https://www.legislation.gov.au/F2005L00366/latest/text
+  - title: Maritime Transport and Offshore Facilities Security Regulations 2003 (F2003B00383) - regs 6.08B, 6.08CA, 6.08I, 6.08T
+    url: https://www.legislation.gov.au/F2003B00383/latest/text
+  - title: AusCheck - critical infrastructure background checking programs
+    url: https://www.auscheck.gov.au/about/programs/critical-infrastructure-risk-management-programs
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - anchored on ASIC / MSIC card terms (never bare ASIC) and the reg 6.23 / 6.08T register fields; 75 gated on one populated register field, 85 on two distinct fields plus AusCheck / issuing body / operational need evidence. Card number matched by label only because the format is not public.
+author: testpattern-community
+license: MIT

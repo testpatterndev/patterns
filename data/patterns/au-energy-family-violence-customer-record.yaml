@@ -1,0 +1,201 @@
+schema: testpattern/v1
+name: Energy Retailer Family Violence Affected Customer Record
+slug: au-energy-family-violence-customer-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Energy retailer account records that identify a customer as affected by family violence under Part 3A of the National Energy Retail Rules (rules 76A-76M): the account identification made under rule 76C, the preferred or safe method of communication the retailer must record under rule 76H(4), instructions not to disclose affected customer information (rule 76G) to a current or former joint account holder, and assistance notes such as fee or debt waivers, payment plans, hardship program entries and disconnection holds considered under rule 111(2A). Complements the sector-neutral au-dfv-* classifiers with energy account structure (NMI, MIRN, customer/account number, supply address).
+operation: >-
+  Primary: an affected-customer or family-violence account phrase (affected customer, customer affected by / experiencing family violence, family violence or DFV/FV flag, indicator, alert, marker, customer, account, note or case). 75 tier requires, within 300 characters, one populated structure: an account field (NMI/MIRN label with an NMI-shaped value, a customer/account number containing a digit, an account holder name, or a supply/service/premises address with a street number) or a protection-action field (preferred/safe contact or communication method with a value, a "do not disclose/discuss ... to/with the joint account holder/former partner" instruction or a named joint account holder, a fee/debt waiver with an amount or status, a disconnection hold with a status or date, a payment plan with an amount, or a hardship program status). 85 tier requires an account field AND a protection-action field AND an independent energy-account term (electricity, gas, retailer, bill, meter, concession). All enforce tiers AND NOT the shared template-exclusion dictionary and a policy/guidance exclusion (published on our website, this policy, National Energy Retail Rules, Australian Energy Regulator, Guidance for Energy Retailers, AEMC, rule change). 65 is discovery-only (primary phrase alone) and will surface published family violence policies and guidance.
+pattern: >-
+  (?i)\b(?:affected\s+customers?|(?:affected\s+by|experiencing|impacted\s+by|victim(?:-survivor)?\s+of)\s+(?:domestic\s+(?:and\s+family\s+)?|family\s+)violence|(?:domestic\s+(?:and\s+family\s+)?|family\s+)violence\s+(?:flag|indicator|alert|marker|customer|account|note|case)|(?:DFV|FV)\s+(?:flag|indicator|alert|marker|customer|account|note|case))\b
+confidence: medium
+confidence_justification: >-
+  Medium: "affected customer" is the defined Part 3A term, but every retailer must publish a family violence policy (rule 76A) and the AER and AEMC publish guidance using the same words, so enforce tiers need populated account or protection-action fields and a policy/guidance exclusion. Retailer CRM field labels (for example the wording of an internal family violence flag) are not published and are unverified, so the account and action fields are generic labelled-value shapes. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic.
+jurisdictions:
+  - au
+regulations:
+  - National Energy Retail Rules Part 3A (rr 76A-76M)
+  - National Energy Retail Rules r 111(2A)
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - energy
+corroborative_evidence:
+  keywords:
+    - affected customer
+    - family violence
+    - preferred method of communication
+    - joint account holder
+    - hardship
+    - payment plan
+    - disconnection
+    - NMI
+  proximity: 300
+  keyword_lists:
+    - au-dfv-terminology
+customisation:
+  - key: utility-account-number
+    kind: identifier-format
+    identifier: utility-account-number
+    target: purview.regexes/Regex_au_energy_fv_account_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's utility customer account number format (see docs/identifiers.md#utility-account-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Account note - affected customer (family violence)\nCustomer number: 7704412893\nNMI: 3120987654\nSafe contact method: SMS to mobile only\nDo not disclose any account details to joint account holder Jordan Teston.\nLate payment fees waived: $48.50\nDisconnection hold: applied until 30/11/2026. Electricity retailer hardship team notified."
+      description: Flagged account with customer number, NMI, safe contact, joint-holder instruction and waiver (85 tier)
+      synthetic: true
+    - value: "Customer affected by family violence\nAccount holder: Casey Teston\nSupply address: 8 Sandpiper Court, Mackay QLD 4740\nPayment plan: $20 per fortnight\nDo not discuss the account with the former partner. Gas and electricity accounts both updated."
+      description: Account holder, supply address and payment plan on gas and electricity accounts (85 tier)
+      synthetic: true
+    - value: "FV flag set on account - customer experiencing family violence.\nPreferred method of communication: email to personal address only"
+      description: Flag with recorded preferred communication method under 76H(4), no account field (75 tier)
+      synthetic: true
+    - value: "Affected customer identified 12/09/2026. Account number: AC-5581-2207. Customer asked that she not have to repeat her story."
+      description: Account identification under 76C with an account number only (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: "Our family violence policy is published on our website. If you are an affected customer we will not disclose your information to a joint account holder, and we will agree a safe method of communication with you."
+      description: Retailer's published family violence policy (rule 76A decoy, 65 only)
+    - value: "Family Violence Rules: Guidance for Energy Retailers. Under the National Energy Retail Rules a retailer must keep a record of the preferred method of communication for an affected customer. Preferred contact method: SMS"
+      description: AER guidance with an illustrative field, suppressed by the guidance exclusion
+    - value: "Affected customer: [Y/N]\nAccount number: __________\nPreferred contact method: <select>\nJoint account holder: __________"
+      description: Blank CRM template (65 only)
+    - value: The AEMC's 2022 rule requires energy retailers to protect customers affected by family violence, including waiving late payment fees and not requiring documentary evidence.
+      description: Rule-change news (65 only)
+    - value: "If you are experiencing family violence, support is available 24 hours a day from 1800RESPECT and your local DV service. Your energy retailer can also help."
+      description: Support-services information (rule 76J decoy, 65 only)
+false_positives:
+  - description: Published retailer family violence policies (required by rule 76A) and support-service lists (rule 76J).
+    mitigation: Policies describe protections without populated fields; the exclusion group also suppresses text containing "published on our website" or "this policy".
+  - description: AER guidance, AEMC rule papers and the National Energy Retail Rules.
+    mitigation: Guidance exclusion group; enforce tiers require populated account or protection-action fields.
+  - description: Sector-neutral DFV case notes (housing, health, police) that mention an address.
+    mitigation: Those can reach 75 through the address field; the 85 tier needs energy-account evidence. The au-dfv-confidential-address and au-dfv-case-record-disclosure classifiers cover the non-energy cases.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_energy_fv_primary
+      matches:
+        - ref: Regex_au_energy_fv_account_field
+        - ref: Regex_au_energy_fv_protection_action
+        - ref: Keyword_au_energy_fv_energy_account
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_energy_fv_policy_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_energy_fv_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_energy_fv_account_field
+            - Regex_au_energy_fv_protection_action
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_energy_fv_policy_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_energy_fv_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_energy_fv_primary
+      pattern: >-
+        (?i)\b(?:affected\s+customers?|(?:affected\s+by|experiencing|impacted\s+by|victim(?:-survivor)?\s+of)\s+(?:domestic\s+(?:and\s+family\s+)?|family\s+)violence|(?:domestic\s+(?:and\s+family\s+)?|family\s+)violence\s+(?:flag|indicator|alert|marker|customer|account|note|case)|(?:DFV|FV)\s+(?:flag|indicator|alert|marker|customer|account|note|case))\b
+    - id: Regex_au_energy_fv_account_field
+      pattern: >-
+        (?i)\b(?:(?:NMI|MIRN|National\s+Metering\s+Identifier)\s*[:#-]?\s*(?:\d{10,11}|[A-HJ-NP-Z]{2}[0-9A-HJ-NP-Z]{2}\d{6,7})\b|(?:customer|account)\s+(?:no\.?|number|ID)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba)\b|_{2,}|\[|<)(?=[A-Z-]{0,5}\d)[A-Z0-9][A-Z0-9-]{4,15}\b|account\s+holder(?:\s+name)?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{1,30}[ \t]+[A-Z][A-Za-z'-]{1,30}|(?:service|supply|property|premises|site)\s+address\s*[:#]\s*(?:(?:Unit|Lot|Apt|Flat)\s+)?\d{1,5}[A-Za-z]?(?:/\d{1,5}[A-Za-z]?)?\s+[A-Z][A-Za-z'-]{1,30})
+    - id: Regex_au_energy_fv_protection_action
+      pattern: >-
+        (?i)\b(?:(?:preferred|safe)\s+(?:method\s+of\s+)?(?:contact|communication)(?:\s+(?:method|details|channel))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer|select)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9@.'-]{1,40}|do\s+not\s+(?:disclose|discuss|release|share|provide)\s+[^.\n]{0,80}?\b(?:to|with)\s+(?:the\s+)?(?:joint|former|other|secondary)\s+(?:account\s+holder|partner)|(?:joint|secondary)\s+account\s+holder\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{1,30}[ \t]+[A-Z][A-Za-z'-]{1,30}|(?:late\s+payment\s+fees?|fees?|debt)\s+(?:waived|waiver)\s*[:#-]?\s*(?:\$\s?\d[\d,]{0,8}(?:\.\d{2})?|yes|approved|applied)|(?:disconnection|de-?energi[sz]ation)\s+(?:hold|block|suspended|on\s+hold)\s*[:#-]?\s*(?:yes|applied|active|placed|until|from|\d)|(?:payment\s+plan|instal(?:l)?ments?)\s*[:#]\s*\$\s?\d|hardship\s+(?:program(?:me)?|plan)\s*[:#-]?\s*(?:enrolled|active|approved|commenced|yes))
+  keywords:
+    - id: Keyword_au_energy_fv_energy_account
+      groups:
+        - match_style: word
+          terms:
+            - electricity
+            - gas
+            - energy
+            - retailer
+            - bill
+            - meter
+            - concession
+            - text: NMI
+              case_sensitive: true
+            - text: MIRN
+              case_sensitive: true
+      strength: domain
+    - id: Keyword_au_energy_fv_policy_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - published on our website
+            - this policy
+            - National Energy Retail Rules
+            - Retail Rules
+            - Australian Energy Regulator
+            - Guidance for Energy Retailers
+            - text: AEMC
+              case_sensitive: true
+            - Australian Energy Market Commission
+            - rule change
+            - Protecting customers affected by family violence
+      strength: specific
+risk_rating: 10
+risk_description: >-
+  The classifier identifies an energy account record that marks a customer as affected by family violence and carries the account, meter point or supply address together with how the retailer may safely contact them, what must be withheld from a joint account holder or former partner, and hardship or disconnection arrangements. Disclosure to a person using violence can reveal the victim-survivor's whereabouts, new contact details and financial circumstances, which rule 76G prohibits, with a credible risk of serious harm. This is the same harm the au-dfv-confidential-address classifier reserves PROTECTED for. Risk 10 supports PROTECTED Personal-Privacy; review against the organisation's own harm assessment before enforcement.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: SECRET
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - title: AEMC - National Energy Retail Rules v37 (full), Part 3A Assistance for customers affected by family violence and r 111(2A)
+    url: https://energy-rules.aemc.gov.au/storage/rules/ea1906d07927e4ba3bf5da59bf1d891308cfabda/assets/files/NERR%20-%20v37%20-%20Full.pdf
+  - title: AEMC - National Energy Retail Amendment (Protecting customers affected by family violence) Rule 2022 No. 1
+    url: https://www.aemc.gov.au/sites/default/files/2022-09/For%20publication_National%20Energy%20Retail%20Amendment%20(Protecting%20customers%20affected%20by%20family%20violence)%20Rule%202022%20No.%201%20(1).pdf
+  - title: AER - Family Violence Rules - Guidance for Energy Retailers (v1, February 2025; decoy source, content not reviewed)
+    url: https://www.aer.gov.au/system/files/2025-02/Family%20Violence%20Rules%20-%20Guidance%20for%20Energy%20Retailers.pdf
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - NERR Part 3A affected customer records; 75 gated on a populated account or protection-action field, 85 on both plus energy-account evidence; published policies, AER/AEMC guidance and templates excluded.
+author: testpattern-community
+license: MIT

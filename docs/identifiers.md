@@ -7,6 +7,7 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | Identifier | Issuer | Public format | Fallback precision | Classifiers |
 |---|---|---|---|---|
 | [Agency / provider client ID](#agency-client-id) | The customer's service, CRM or provider system | customer-defined | low | 3 |
+| [ASIC / MSIC card number](#asic-msic-card-number) | The aviation or maritime security identification card issuing body | unpublished | medium | 1 |
 | [Agency case / file / matter number](#case-reference-number) | The customer agency's case management or records system | customer-defined | low | 3 |
 | [Crime and Corruption Commission reference](#ccc-reference) | Crime and Corruption Commission (Queensland) | unpublished | medium | 1 |
 | [Council property / rate assessment number](#council-property-number) | Queensland local governments | customer-defined | low | 1 |
@@ -14,17 +15,21 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [Employee / staff ID](#employee-id) | The customer's payroll or HR system (e.g. Aurion, SAP, Workday) | customer-defined | low | 2 |
 | [Queensland housing client / application number](#housing-client-number) | Queensland Government housing services (Housing Service Centres) | unpublished | low | 2 |
 | [Queensland social housing tenancy / property reference](#housing-tenancy-number) | Queensland Government housing services | unpublished | low | 3 |
+| [NEM connection agreement number](#nem-connection-agreement-number) | The network service provider (e.g. Powerlink, Energex, Ergon Energy) and connecting generator | customer-defined | medium | 1 |
 | [Office of the Independent Assessor complaint reference](#oia-complaint-reference) | Office of the Independent Assessor (Queensland) | unpublished | medium | 1 |
 | [QCAT file number](#qcat-file-number) | Queensland Civil and Administrative Tribunal | unpublished | medium | 1 |
 | [Queensland Corrective Services IOMS number](#qcs-ioms-number) | Queensland Corrective Services (Integrated Offender Management System) | unpublished | medium | 3 |
 | [Queensland corrections order / parole reference](#qcs-order-reference) | Queensland Corrective Services and Parole Board Queensland | unpublished | low | 2 |
 | [Queensland court file / proceeding number](#qld-court-file-number) | Queensland courts (Magistrates, District, Supreme) | unpublished | medium | 1 |
 | [Education Queensland student ID (EQ ID)](#qld-eq-id) | Queensland Department of Education | partial | medium | 4 |
+| [Queensland explosives licence number](#qld-explosives-licence-number) | Resources Safety and Health Queensland (RSHQ), Explosives Inspectorate | unpublished | low | 1 |
+| [Queensland explosives security clearance number](#qld-explosives-security-clearance-number) | Resources Safety and Health Queensland (RSHQ), Explosives Inspectorate | unpublished | low | 1 |
 | [Queensland Police exhibit / property number](#qps-exhibit-number) | Queensland Police Service | unpublished | medium | 1 |
 | [QTAC application number](#qtac-application-number) | Queensland Tertiary Admissions Centre | unpublished | medium | 1 |
 | [Regulator prosecution / enforcement reference](#regulator-prosecution-reference) | Queensland regulators (e.g. Workplace Health and Safety Queensland) | unpublished | low | 1 |
 | [Surveillance device / warrant reference](#surveillance-warrant-reference) | Queensland law enforcement agencies and issuing courts | unpublished | medium | 1 |
 | [University / TAFE student number](#tertiary-student-number) | The customer university or TAFE | customer-defined | low | 4 |
+| [Utility customer account number](#utility-account-number) | The customer's energy or water retail billing / CRM system (e.g. SAP IS-U, Gentrack) | customer-defined | low | 2 |
 | [Queensland youth justice client / case reference](#youth-justice-reference) | Queensland youth justice services | unpublished | medium | 1 |
 
 ## agency-client-id
@@ -79,6 +84,59 @@ samples: ["Client ID: C4417820", "Client number C0071932", "Client no. C5520117"
 **Sensitivity:** Links a person to services they receive; sensitivity follows the service.
 
 **Used by:** `au-ndis-participant-plan-record`, `au-qld-restrictive-practice-behaviour-support`, `au-specialist-homelessness-services-record`
+
+## asic-msic-card-number
+
+**ASIC / MSIC card number** — issued by The aviation or maritime security identification card issuing body.
+
+The unique number recorded for an Aviation Security Identification Card (ASIC) or Maritime Security Identification Card (MSIC) on the issuing body register and card records.
+
+**Appears in:** Register of ASICs (ATSR reg 6.23); Register of MSICs (MTOFSR reg 6.08T); Card holder applications and cancellation records.
+
+**Labels:** `ASIC number`, `MSIC number`, `Card number`, `Card unique number`
+
+**Public format:** unpublished. The regulations require a "unique number" but the card layout is approved privately per issuing body and its details may be protected from disclosure; no public format.
+
+**Public fallback** (precision: medium):
+
+```
+(?i)\b(?:ASIC|MSIC|card)\s+(?:unique\s+)?(?:number|no\.?|serial)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9-]{3,19}\b
+```
+
+The fallback anchors on the card label; the register structure (holder, card colour, dates, AusCheck outcome) supplies the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the card number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\b(?:ASIC|MSIC)\s+(?:number|no\.?)\s*[:#]?\s*[A-Z]{2}\d{7}\b
+samples: ["ASIC number: RA0448213", "MSIC number BW0071932", "ASIC no. GR0552011"]
+```
+
+**Sensitivity:** Identifies a security-cleared aviation or maritime worker and their access entitlements.
+
+**Used by:** `au-aviation-maritime-security-card-register`
 
 ## case-reference-number
 
@@ -451,6 +509,59 @@ samples: ["Tenancy number: T20417733", "Tenancy ID T00719321", "Tenancy no. T552
 
 **Used by:** `au-qld-dfv-tenancy-exit-notice`, `au-qld-public-housing-tenancy-breach`, `au-qld-social-housing-application`
 
+## nem-connection-agreement-number
+
+**NEM connection agreement number** — issued by The network service provider (e.g. Powerlink, Energex, Ergon Energy) and connecting generator.
+
+Reference numbers for generator and large-load connection agreements between a network service provider and a connecting party in the National Electricity Market, printed on performance standards, data sheets and connection correspondence.
+
+**Appears in:** Generator performance standards; Power system design and setting data sheets; Connection agreements and correspondence.
+
+**Labels:** `Connection agreement number`, `Connection agreement no.`, `Connection agreement reference`
+
+**Public format:** customer-defined. Set by each network service provider; no public format.
+
+**Public fallback** (precision: medium):
+
+```
+(?i)\bconnection\s+agreement\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{3,24}\b
+```
+
+The label is specific to NEM connections; plant fields and model parameters supply further precision.
+
+**Customer supplies at engagement:**
+
+- A description of the connection agreement number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\bconnection\s+agreement\s+(?:no\.?|number)\s*[:#]?\s*PL-GEN-\d{4}\b
+samples: ["Connection agreement number: PL-GEN-0448", "connection agreement no. PL-GEN-2047", "Connection Agreement Number PL-GEN-0071"]
+```
+
+**Sensitivity:** Identifies a generating system connection and its confidential technical and commercial terms.
+
+**Used by:** `au-aemo-generator-performance-standards-model`
+
 ## oia-complaint-reference
 
 **Office of the Independent Assessor complaint reference** — issued by Office of the Independent Assessor (Queensland).
@@ -769,6 +880,112 @@ samples: ["EQ ID: 0048213772K", "EQID 0071932845L", "EQ ID 1122334455M"]
 
 **Used by:** `au-education-nccd-adjustment-record`, `au-qcaa-aara-illness-misadventure`, `au-qld-oneschool-student-support-plan`, `au-qld-school-suspension-exclusion-decision`
 
+## qld-explosives-licence-number
+
+**Queensland explosives licence number** — issued by Resources Safety and Health Queensland (RSHQ), Explosives Inspectorate.
+
+Licence numbers for explosives authorities in Queensland, including licences to use or store security sensitive ammonium nitrate (SSAN), recorded on security plans, access lists and receipts.
+
+**Appears in:** SSAN security plans; Explosives safety and security management systems; Receipts and chain-of-possession records.
+
+**Labels:** `Licence number`, `Licence no.`, `Explosives licence`
+
+**Public format:** unpublished. The chief inspector keeps a public register of authorities, but the licence number format is not published.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:explosives\s+)?licen[cs]e\s+(?:no\.?|number)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{3,19}\b
+```
+
+Licence labels are generic; the SSAN security-plan structure and UN numbers supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the licence number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\blicen[cs]e\s+(?:no\.?|number)\s*[:#]?\s*EX\d{7}\b
+samples: ["Licence number: EX0448213", "licence no. EX2047181", "Licence Number EX0071932"]
+```
+
+**Sensitivity:** Links a person or site to the storage or use of security sensitive explosives.
+
+**Used by:** `au-qld-ssan-security-plan`
+
+## qld-explosives-security-clearance-number
+
+**Queensland explosives security clearance number** — issued by Resources Safety and Health Queensland (RSHQ), Explosives Inspectorate.
+
+Security clearance numbers held by people with unsupervised access to security sensitive explosives in Queensland, listed in SSAN security plans and access registers.
+
+**Appears in:** SSAN security plan access lists; Unsupervised access registers.
+
+**Labels:** `Clearance number`, `Security clearance number`, `Clearance holder`
+
+**Public format:** unpublished. Clearances are required for unsupervised access (Explosives Regulation 2017 ss 18B-18C); the number format is not published.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:security\s+)?clearance\s+(?:no\.?|number|holder)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{3,19}\b
+```
+
+Clearance labels also appear in government security vetting; the SSAN plan structure supplies the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the clearance number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\bclearance\s+(?:no\.?|number)\s*[:#]?\s*SC\d{7}\b
+samples: ["Clearance number: SC0448213", "clearance no. SC2047181", "Security clearance number SC0071932"]
+```
+
+**Sensitivity:** Identifies people authorised for unsupervised access to security sensitive explosives.
+
+**Used by:** `au-qld-ssan-security-plan`
+
 ## qps-exhibit-number
 
 **Queensland Police exhibit / property number** — issued by Queensland Police Service.
@@ -1033,6 +1250,59 @@ samples: ["Student number: n11234567", "Student ID n10071932", "Student no. n095
 **Sensitivity:** Links a student to disability, integrity or hardship records.
 
 **Used by:** `au-tertiary-academic-misconduct-record`, `au-tertiary-academic-progression-show-cause`, `au-tertiary-disability-access-plan`, `au-tertiary-special-consideration-application`
+
+## utility-account-number
+
+**Utility customer account number** — issued by The customer's energy or water retail billing / CRM system (e.g. SAP IS-U, Gentrack).
+
+Customer and account numbers issued by an energy retailer, water utility or council billing system, printed on bills, hardship, life support and family violence customer records.
+
+**Appears in:** Energy and water bills; Life support registers; Hardship and family violence customer records; Collections and disconnection records.
+
+**Labels:** `Account number`, `Customer number`, `Customer ID`, `Account ID`
+
+**Public format:** customer-defined. Retailer- and utility-specific; no public format. NMIs and MIRNs are separate, public identifiers.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:customer|account)\s+(?:no\.?|number|ID)\s*[:#]?\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z]{0,3}\d{5,12}\b
+```
+
+Account and customer labels are common in business records; the fallback only supports utility-specific evidence (NMI, supply address, life support or family violence terms).
+
+**Customer supplies at engagement:**
+
+- A description of the customer / account number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\b(?:customer|account)\s+(?:no\.?|number)\s*[:#]?\s*40\d{8}\b
+samples: ["Account number: 4001882731", "Customer number 4000552011", "account no. 4007193245"]
+```
+
+**Sensitivity:** Links a named customer, supply address and sensitive circumstances (medical equipment, family violence, hardship) to a utility account.
+
+**Used by:** `au-energy-family-violence-customer-record`, `au-energy-life-support-register`
 
 ## youth-justice-reference
 

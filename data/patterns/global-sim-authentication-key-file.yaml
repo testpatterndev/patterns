@@ -1,0 +1,186 @@
+schema: testpattern/v1
+name: SIM Authentication Key File (Ki / OPc personalisation output)
+slug: global-sim-authentication-key-file
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  SIM / USIM personalisation and key files exchanged between SIM vendors, mobile network operators and HSS/AuC provisioning: a header row naming subscriber key columns (Ki, OPc, ADM1, KIC1/KID1/KIK1, EKI) next to ICCID or IMSI, followed by populated rows that pair an ICCID (ITU-T E.118, MII 89, e.g. Australian issuer prefixes 8961 and 8967210 on the ACMA register) and an IMSI (3GPP TS 23.003, MCC + MNC + MSIN, at most 15 digits; Australia MCC 505) with 128-bit key values (32 hex characters, per 3GPP TS 35.206 K and OPc). The file layout is vendor-proprietary; the pySim card-key CSV and pysim-perso column sets are used only as shapes. Excludes the published 3GPP TS 35.208 test-set values, "Test Set" / "35.208" text, test networks (MCC 001) and pySim / Open5GS tutorial or documentation text.
+operation: >-
+  Primary (65, discovery only): a header line where ICCID or IMSI and a key column name (Ki, OPc, ADM1, KIC1/KID1/KIK1, EKI) appear on the same line within 200 characters. 75: primary plus one populated key row on a single line: an ICCID (89 + 17-18 digits, optional F pad) adjacent to (or one field away from) a 15-digit IMSI with MCC 2xx-7xx, in either order, followed within 240 characters by a standalone 32-hex value (Ki / OPc). 85: primary plus two distinct populated key rows (min_count 2, unique) plus independent personalisation evidence (PIN1/PUK1/PIN2/PUK2, ADM1, transport key, batch, perso/personalisation, HSS/HLR/AuC, MSISDN). Every tier ANDs NOT template/noise exclusion (catches "tutorial", "demo", "template", "test data") and NOT a SIM test-material exclusion (3GPP TS 35.208 test-set K/OP/OPc values, "Test Set n", "35.205-35.208", "test vector", "conformance test", pySim card-key-provider documentation, pySim/Open5GS tutorial or guide text). Proximity is 1000 characters because vendor key files can have 20+ columns per row.
+pattern: (?i)(?:\b(?:ICCID|IMSI)\b[^\n]{0,200}?\b(?:Ki|OPc|ADM1|KI[CDK]\d|EKI)\b|\b(?:Ki|OPc|ADM1|KI[CDK]\d|EKI)\b[^\n]{0,200}?\b(?:ICCID|IMSI)\b)
+confidence: high
+confidence_justification: >-
+  High for 75/85: a single line pairing a 19-20 digit ICCID, a 15-digit IMSI and a standalone 32-hex value under a Ki/OPc header has no common benign explanation outside SIM test material, which is excluded explicitly. The ICCID Luhn check digit is not validated inside the row regex (Purview validators apply to whole matches), and the IMSI shape does not validate the MNC, so a malformed or non-issued ICCID/IMSI can still match. The 65 header tier also fires on vendor documentation and news about SIM key theft and is discovery-only. Test rows are synthetic; key values are random hex, not real keys and not 3GPP test vectors.
+jurisdictions:
+  - global
+regulations:
+  - GDPR
+  - SOCI Act 2018 (Cth)
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+data_categories:
+  - credentials
+  - security
+  - device-id
+corroborative_evidence:
+  keywords:
+    - PIN1
+    - PUK1
+    - PIN2
+    - PUK2
+    - ADM1
+    - transport key
+    - batch
+    - personalisation
+    - HSS
+    - AuC
+    - MSISDN
+  proximity: 1000
+test_cases:
+  should_match:
+    - value: "Perso output file - Batch 2609-QX, quantity 2, transport key TK02\nICCID,IMSI,PIN1,PUK1,PIN2,PUK2,KI,OPC,ADM1\n8961025100000000017,505021234500017,4829,71630495,9173,20586147,3F9A1C07D2E84B6590AC11F2E7B3D548,A07C5E91B2D4F63808E1C9A7B5D30F62,58302914\n8961025100000000025,505021234500025,1375,49281736,6624,85017394,7B2E90D4C1A8F3651E0DB4C92A6F7E13,D5C1A83F0E7B29C46A9D02F15B8E7C34,58302914"
+      description: 85 - Australian SIM vendor output file (8961 02 Optus-range ICCIDs, IMSI 505 02) with header, two populated key rows and PIN/PUK/batch/transport key evidence
+      synthetic: true
+    - value: "HSS bulk subscriber import (AuC keys) - order 7731\nIMSI            ICCID                 KI                                OPC\n530011000000471 8964011000000004718   9C2E4A71B08D35F6E12A7C90D4B3F851  2F81D0C7A94E3B6C15D8E07A9B4C2F63\n530011000000489 8964011000000004890   E47B1A0C92D5F83617A4C0E9B2D8F574  6A0D3C9F17E82B45D0C9A71E3F84B26D"
+      description: 85 - IMSI-first whitespace-aligned HSS/AuC import (non-AU MCC) with two populated key rows
+      synthetic: true
+    - value: "\"id\",\"imsi\",\"iccid\",\"acc\",\"pin1\",\"puk1\",\"pin2\",\"puk2\",\"ki\",\"opc\",\"adm1\"\n\"1\",\"505031000004821\",\"8961030100000048215\",\"0004\",\"2741\",\"98765431\",\"5068\",\"13572468\",\"8C1F3A6E9B0D247C5E1A9F3B6D0C8E27\",\"41E9C7A0B3D56F28E1C4A9D7B06F3E85\",\"77112233\""
+      description: 75 - card-key CSV (pySim column set) with one populated row (Vodafone-range 8961 03 ICCID, IMSI 505 03)
+      synthetic: true
+    - value: "ICCID;IMSI;KI;OPC;KIC1;KID1;KIK1\n8961230000000003157;505021100003157;B3E0A6C1D94F27851C3E9A0D7B62F4C8;19F4C2E7A0B85D63E91C4A7F0D2B86E3;5D0A7E3C91F2B84605C1E9D3A7F28B4E;C07E2B91A4D63F585E1A0C9D72B4F36E;2A9F6C0E3B7D14855F1C8A0E9D63B27C"
+      description: 75 - OTA key file (Ki/OPc plus KIC1/KID1/KIK1) with one populated row
+      synthetic: true
+  should_not_match:
+    - value: "ICCID,IMSI,KI,OPC\n8961025100000000033,505021234500033,465B5CE8B199B49FAA5F0A2EE238A6BC,CD63CB71954A9F4E48A5994E37A02BAF"
+      description: Lab card programmed with the 3GPP TS 35.208 test set 1 K and OPc values (explicitly excluded values)
+    - value: "3GPP TS 35.208 - 4.3 Test Set 1\nK: 465b5ce8 b199b49f aa5f0a2e e238a6bc\nRAND: 23553cbe 9637a89d 218ae64d ae47bf35\nOP: cdc202d5 123e20f6 2b6d676a c72cb318\nOPc: cd63cb71 954a9f4e 48a5994e 37a02baf"
+      description: 3GPP MILENAGE test-set text
+    - value: "The CSV card key provider reads a file whose first line is a header: \"id\",\"imsi\",\"iccid\",\"acc\",\"pin1\",\"puk1\",\"pin2\",\"puk2\",\"ki\",\"opc\",\"adm1\". Each following row supplies the keys for one card, looked up by ICCID or IMSI."
+      description: pySim card-key-provider documentation
+    - value: "ICCID,IMSI,PIN1,PUK1,KI,OPC,ADM1\n<iccid>,<imsi>,<pin1>,<puk1>,<ki>,<opc>,<adm1>"
+      description: Blank key-file template with placeholders
+    - value: "Open5GS tutorial: add a subscriber in the WebUI with IMSI 001010000000001, Ki 465B5CE8B199B49FAA5F0A2EE238A6BC and OPc CD63CB71954A9F4E48A5994E37A02BAF, then program the SIM with pySim-prog."
+      description: Open5GS / pySim tutorial using test network MCC 001 and TS 35.208 values
+    - value: "Investigators say the attackers stole Ki and OPc values for millions of SIM cards, which would let them decrypt calls if they could match each key to an ICCID."
+      description: News reporting on SIM key theft
+false_positives:
+  - description: SIM vendor, pySim and Open5GS documentation and news that name Ki/OPc next to ICCID/IMSI.
+    mitigation: The header alone is 65 discovery; enforce tiers need a populated ICCID + IMSI + 32-hex row. Documentation and tutorial text is also excluded.
+  - description: Lab and test SIMs programmed with the 3GPP TS 35.208 test sets, and test networks using MCC 001.
+    mitigation: The TS 35.208 test set 1 K/OP/OPc values and "Test Set" / "35.208" text are excluded; the IMSI shape requires MCC 2xx-7xx, so 001-01 test IMSIs never form a row.
+  - description: Real ICCID/IMSI inventory exports without key columns (activation lists, MVNO stock files).
+    mitigation: Not this classifier - no Ki/OPc header, so no primary. Those are covered by global-iccid and the IMSI/phone classifiers.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 1000
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_global_sim_key_file_header
+      matches:
+        - ref: Regex_global_sim_key_file_populated_row
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_global_sim_key_file_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_global_sim_key_file_test_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_sim_key_file_header
+      matches:
+        - ref: Regex_global_sim_key_file_populated_row
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_global_sim_key_file_test_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_global_sim_key_file_header
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_global_sim_key_file_test_exclusion
+  regexes:
+    - id: Regex_global_sim_key_file_header
+      pattern: >-
+        (?i)(?:\b(?:ICCID|IMSI)\b[^\n]{0,200}?\b(?:Ki|OPc|ADM1|KI[CDK]\d|EKI)\b|\b(?:Ki|OPc|ADM1|KI[CDK]\d|EKI)\b[^\n]{0,200}?\b(?:ICCID|IMSI)\b)
+    - id: Regex_global_sim_key_file_populated_row
+      pattern: >-
+        (?<![0-9A-Fa-f])(?:89\d{17,18}F?[ \t,;|"']{1,6}(?:[0-9A-Za-z+]{1,20}[ \t,;|"']{1,6})?[2-7]\d{14}|[2-7]\d{14}[ \t,;|"']{1,6}(?:[0-9A-Za-z+]{1,20}[ \t,;|"']{1,6})?89\d{17,18}F?)(?![0-9A-Fa-f])[^\n]{0,240}?(?<![0-9A-Fa-f])[0-9A-Fa-f]{32}(?![0-9A-Fa-f])
+    - id: Regex_global_sim_key_file_test_exclusion
+      pattern: >-
+        (?i)(?:\bTest\s+Set\s+\d{1,2}\b|\b35\.20[5-8]\b|\btest\s+vectors?\b|\bconformance\s+test|\bcard[\s_-]?key[\s_-]?provider\b|\b(?:pySim|Open5GS)\b[^\n]{0,80}?\b(?:tutorial|walkthrough|how\s+to|getting\s+started|guide|docs?|documentation)\b|465b5ce8\s?b199b49f\s?aa5f0a2e\s?e238a6bc|cdc202d5\s?123e20f6\s?2b6d676a\s?c72cb318|cd63cb71\s?954a9f4e\s?48a5994e\s?37a02baf)
+  keywords:
+    - id: Keyword_global_sim_key_file_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - PIN1
+            - PUK1
+            - PIN2
+            - PUK2
+            - ADM1
+            - transport key
+            - batch
+            - personalisation
+            - personalization
+            - perso
+            - text: HSS
+              case_sensitive: true
+            - text: HLR
+              case_sensitive: true
+            - AuC
+            - authentication centre
+            - MSISDN
+      strength: specific
+risk_rating: 10
+risk_description: >-
+  The classifier identifies SIM authentication key files: rows that bind a card's ICCID and a subscriber IMSI to its 128-bit Ki and OPc (and, where present, OTA keys KIC/KID/KIK and ADM codes). Anyone holding these values can clone the SIM, impersonate the subscriber on the network and derive the session keys that protect calls, SMS and data, so a leaked batch file compromises every card in it and undermines interception safeguards for a whole operator. Header-only documentation, the published 3GPP test sets and tutorials are excluded from enforce tiers. Risk 10 supports PROTECTED InfoTech handling.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED InfoTech
+  us_gov: CUI Specified
+  uk_gov: SECRET
+  nz_gov: SECRET
+  ca_gov: Confidential
+references:
+  - title: 3GPP TS 35.206 (ETSI TS 135 206) - MILENAGE algorithm specification (K and OPc)
+    url: https://www.etsi.org/deliver/etsi_ts/135200_135299/135206/17.00.00_60/ts_135206v170000p.pdf
+  - title: 3GPP TS 35.208 (ETSI TS 135 208) - MILENAGE test data (excluded test sets)
+    url: https://www.etsi.org/deliver/etsi_ts/135200_135299/135208/17.00.00_60/ts_135208v170000p.pdf
+  - title: ETSI TS 102 221 - UICC-Terminal interface (EF ICCID)
+    url: https://www.etsi.org/deliver/etsi_ts/102200_102299/102221/17.01.00_60/ts_102221v170100p.pdf
+  - title: 3GPP TS 23.003 (ETSI TS 123 003) - Numbering, addressing and identification (IMSI)
+    url: https://www.etsi.org/deliver/etsi_ts/123000_123099/123003/17.09.00_60/ts_123003v170900p.pdf
+  - title: ACMA - Register of other numbers (ICCID issuer identifiers, MNCs)
+    url: https://www.acma.gov.au/publications/2019-11/data/register-other-numbers
+  - title: pySim - card key provider (CSV key file columns)
+    url: https://downloads.osmocom.org/docs/pysim/master/html/card-key-provider.html
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - header row (Ki/OPc/ADM1/KIC/KID/KIK with ICCID/IMSI) as discovery primary; 75 on one populated ICCID + IMSI + 32-hex row; 85 on two rows plus personalisation evidence; 3GPP TS 35.208 test sets, test networks and pySim/Open5GS tutorial text excluded.
+author: testpattern-community
+license: MIT
