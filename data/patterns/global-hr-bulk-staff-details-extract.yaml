@@ -1,0 +1,229 @@
+schema: testpattern/v1
+name: Bulk Staff Personal Details Extract
+slug: global-hr-bulk-staff-details-extract
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Tabular HRIS, payroll or reporting exports of staff personal details that do not carry TFNs: a
+  CSV, spreadsheet or pipe/tab-delimited header row of HR column labels (employee / staff ID, name,
+  date of birth, home address, position / classification, commencement or termination date,
+  employment status) followed by populated staff rows. Detected from the extract's own structure, so
+  it fires wherever the file lands (code repositories, reporting databases, file shares, test data
+  folders), not only in HR-branded systems.
+operation: >-
+  Primary: a header row with at least 4 HR column labels in a row, separated by commas, semicolons,
+  pipes, tabs or runs of spaces (employee / staff / payroll ID, first / last / given / family name,
+  surname, DOB / date of birth, home / residential / postal address, suburb, postcode, position title
+  / number, job title, classification, level, commencement / start / termination / end date, employment
+  status / type, cost centre, department, work unit, gender, phone, email). 65 is discovery-only (header
+  alone) and will surface blank import templates and column lists. 75 requires, within 300 characters,
+  an employee ID column label, a date of birth or home address column label, a position,
+  classification, commencement/termination date or employment status column label, and at least one
+  populated data row (an ID-like value followed on the same line by a date). 85 requires the same
+  column labels plus 2 or more distinct populated rows whose date is a date-of-birth-like value
+  (a day/month/year date with a year from 1940 to 2009). Every enforce tier excludes template/fixture
+  text and data dictionary / file specification wording.
+pattern: >-
+  (?i)\b(?:"?(?:(?:employee|staff|emp|payroll)[ _.]?(?:id|no\.?|num(?:ber)?|code)|(?:first|given|last|family|full)[ _]?names?|surname|d\.?o\.?b\.?|date[ _]of[ _]birth|birth[ _]?date|(?:home|residential|postal)[ _]address|address|suburb|postcode|position(?:[ _](?:title|number|no\.?))?|job[ _]title|classification|level|(?:commencement|start|hire|termination|end|cessation)[ _]date|employment[ _](?:status|type)|cost[ _]centre|department|work[ _]unit|gender|mobile|phone|email)"?(?:[ \t]{0,3}[,;|\t][ \t]{0,3}|[ \t]{2,6})){3,24}"?(?:(?:employee|staff|emp|payroll)[ _.]?(?:id|no\.?|num(?:ber)?|code)|(?:first|given|last|family|full)[ _]?names?|surname|d\.?o\.?b\.?|date[ _]of[ _]birth|birth[ _]?date|(?:home|residential|postal)[ _]address|address|suburb|postcode|position(?:[ _](?:title|number|no\.?))?|job[ _]title|classification|level|(?:commencement|start|hire|termination|end|cessation)[ _]date|employment[ _](?:status|type)|cost[ _]centre|department|work[ _]unit|gender|mobile|phone|email)
+confidence: medium
+confidence_justification: >-
+  Medium: a header of HR column labels followed by rows that pair an ID with a birth-year date is
+  distinctive of a staff extract, and blank import templates, data dictionaries and org-chart role
+  lists lack either the personal-detail column or populated rows. Some non-HR person extracts (member,
+  student or volunteer lists that use "staff" or "employee" style ID columns) will also match, and
+  extracts whose cells are split onto separate lines by the text extractor lose the header-row
+  structure and fall below 65. The 85/75 tiers are heuristic evidence tiers, not measured accuracy;
+  tests are synthetic extracts.
+jurisdictions:
+  - global
+  - au
+regulations:
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - Fair Work Regulations 2009 (Cth)
+  - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - QGISCF
+data_categories:
+  - pii
+  - employment
+corroborative_evidence:
+  keywords:
+    - employee ID
+    - date of birth
+    - home address
+    - commencement date
+    - termination date
+    - employment status
+    - position title
+    - classification
+  proximity: 300
+customisation:
+  - key: employee-id
+    kind: identifier-format
+    identifier: employee-id
+    target: purview.regexes/Regex_bulk_staff_data_row
+    mode: extend
+    affects_tiers:
+      - 75
+    required_for_enforcement: false
+    note: >-
+      Extend the populated-field evidence with the customer's employee ID / payroll number format (see docs/identifiers.md#employee-id). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Employee ID,Surname,Given Names,Date of Birth,Home Address,Position Title,Commencement Date,Employment Status\nE10442,Teston,Riley,14/03/1988,12 Wattle St Toowong QLD 4066,Plant Operator,03/02/2019,Permanent Full-time\nE10517,Examplar,Jordan,02/11/1979,4/88 Kent Rd Wooloowin QLD 4030,Team Leader Networks,17/08/2015,Permanent Full-time\nE11203,Staffson,Casey,21/06/1996,7 Ash Ct Logan Central QLD 4114,Graduate Engineer,30/01/2024,Fixed Term"
+      description: 85 - CSV staff extract with ID, DOB, address, position and commencement columns and three populated rows with birth dates
+      synthetic: true
+    - value: "EMPLID | NAME | Staff No | DOB | Residential Address | Job Title | Hire Date | Cost Centre\n2004187 | Teston, Morgan | 2004187 | 1983-07-09 | 21 Ridge Rd Ipswich QLD 4305 | Payroll Officer | 2012-04-16 | CC4410\n2004211 | Examplar, Avery | 2004211 | 1991-12-30 | 5 Lake St Cairns QLD 4870 | HR Business Partner | 2020-09-07 | CC4410"
+      description: 85 - pipe-delimited HCM export with ISO dates of birth on two rows
+      synthetic: true
+    - value: "Staff ID\tFirst Name\tLast Name\tDOB\tPosition\tStart Date\tTermination Date\nS40218\tQuinn\tTeston\t\t\tLecturer\t01/03/2021\t30/06/2026"
+      description: 75 - tab-delimited leaver extract with one populated row (commencement and termination dates, DOB cell empty)
+      synthetic: true
+    - value: "Payroll No;Family Name;Given Name;Postal Address;Classification;Employment Type\nP77120;Teston;Harper;PO Box 412 Toowoomba QLD 4350;AO5;Permanent Part-time;Commenced 12/05/2017"
+      description: 75 - semicolon-delimited extract with one populated row, no date-of-birth values
+      synthetic: true
+  should_not_match:
+    - value: "Employee ID,Surname,Given Names,Date of Birth,Home Address,Position Title,Commencement Date,Employment Status\n,,,,,,,\n,,,,,,,\nImport template - enter one row per new starter before uploading to the HRIS"
+      description: Blank HR import template - header with no populated rows (65 discovery at most)
+    - value: "HRIS data dictionary\nField name | Data type | Format | Description\nEmployee_ID | Text(8) | E + 5 digits | Unique staff number assigned at hire\nDate_of_birth | Date | DD/MM/YYYY | Employee's date of birth\nHome_address | Text(120) | Free text | Residential address\nCommencement_date | Date | DD/MM/YYYY | First day of service"
+      description: Data dictionary describing the extract columns
+    - value: "Organisation chart - Networks Division\nPosition Number | Position Title | Classification | Department | Reports To\n30012345 | Manager Networks | SO1 | Networks | 30010001\n30012346 | Senior Engineer | PO5 | Networks | 30012345\n30012347 | Engineer | PO3 | Networks | 30012346"
+      description: Org-chart role list with position numbers and classifications but no personal-detail columns
+    - value: "Payroll tax summary 2025-26\nMonth | Taxable wages | Exempt wages | Payroll tax payable | Due date\nJuly | $4,812,300 | $212,000 | $219,400 | 07/08/2025\nAugust | $4,799,150 | $208,500 | $218,700 | 07/09/2025"
+      description: Payroll tax summary with monthly totals and no staff rows
+    - value: "The file exported from the HR system contained each employee's ID, name, date of birth, home address, job title and employment dates for about 22,000 current and former staff."
+      description: Breach news report describing the columns in prose
+false_positives:
+  - description: Blank HR import templates and onboarding spreadsheets with the header row only.
+    mitigation: No populated rows, so they stay at 65 discovery; template fixture phrases are excluded.
+  - description: Data dictionaries, interface specifications and ETL column mappings that list the same column names.
+    mitigation: Column names appear one per line rather than as a delimited header, and data dictionary / field definition wording is excluded from enforce tiers.
+  - description: Org charts, position registers and establishment lists (position number, title, classification) with no personal columns.
+    mitigation: 75 requires a date-of-birth or home-address column label; 85 requires rows with birth-year dates.
+  - description: Non-staff person extracts (members, students, volunteers, customers) that use staff-style ID and DOB columns.
+    mitigation: Still personal data; accept, or narrow the ID column label and row regex with the customer's employee ID format.
+exports:
+  - purview_xml
+  - yaml
+scope: wide
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_bulk_staff_header
+      matches:
+        - ref: Regex_bulk_staff_col_id
+        - ref: Regex_bulk_staff_col_personal
+        - ref: Regex_bulk_staff_col_role
+        - ref: Regex_bulk_staff_row_dob
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_bulk_staff_exclusion
+    - confidence_level: 75
+      id_match: Regex_bulk_staff_header
+      matches:
+        - ref: Regex_bulk_staff_col_id
+        - ref: Regex_bulk_staff_col_personal
+        - ref: Regex_bulk_staff_col_role
+        - ref: Regex_bulk_staff_data_row
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_bulk_staff_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_bulk_staff_header
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_bulk_staff_header
+      pattern: >-
+        (?i)\b(?:"?(?:(?:employee|staff|emp|payroll)[ _.]?(?:id|no\.?|num(?:ber)?|code)|(?:first|given|last|family|full)[ _]?names?|surname|d\.?o\.?b\.?|date[ _]of[ _]birth|birth[ _]?date|(?:home|residential|postal)[ _]address|address|suburb|postcode|position(?:[ _](?:title|number|no\.?))?|job[ _]title|classification|level|(?:commencement|start|hire|termination|end|cessation)[ _]date|employment[ _](?:status|type)|cost[ _]centre|department|work[ _]unit|gender|mobile|phone|email)"?(?:[ \t]{0,3}[,;|\t][ \t]{0,3}|[ \t]{2,6})){3,24}"?(?:(?:employee|staff|emp|payroll)[ _.]?(?:id|no\.?|num(?:ber)?|code)|(?:first|given|last|family|full)[ _]?names?|surname|d\.?o\.?b\.?|date[ _]of[ _]birth|birth[ _]?date|(?:home|residential|postal)[ _]address|address|suburb|postcode|position(?:[ _](?:title|number|no\.?))?|job[ _]title|classification|level|(?:commencement|start|hire|termination|end|cessation)[ _]date|employment[ _](?:status|type)|cost[ _]centre|department|work[ _]unit|gender|mobile|phone|email)
+    - id: Regex_bulk_staff_col_id
+      pattern: >-
+        (?i)\b(?:employee|staff|emp|personnel|payroll)[ _.]?(?:id|no\.?|num(?:ber)?|#|code)|\bEMPLID\b
+    - id: Regex_bulk_staff_col_personal
+      pattern: >-
+        (?i)\b(?:d\.?o\.?b\b|date[ _]of[ _]birth|birth[ _]?date|(?:home|residential|street|postal)[ _]address|address[ _]?line[ _]?1)
+    - id: Regex_bulk_staff_col_role
+      pattern: >-
+        (?i)\b(?:position(?:[ _](?:title|number|no\.?|id))?|job[ _]title|classification|(?:commencement|start|hire|termination|cessation|separation)[ _]date|date[ _](?:commenced|started|hired|terminated|ceased)|employment[ _](?:status|type|basis))\b
+    - id: Regex_bulk_staff_data_row
+      pattern: >-
+        (?i)\b[A-Z]{0,3}\d{3,8}"?(?:[ \t]{0,3}[,;|\t][ \t]{0,3}|[ \t]{2,6})[^\n]{0,160}?\b(?:(?:0?[1-9]|[12]\d|3[01])[/.-](?:0?[1-9]|1[0-2])[/.-](?:19|20)\d{2}|(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))\b
+    - id: Regex_bulk_staff_row_dob
+      pattern: >-
+        (?i)\b[A-Z]{0,3}\d{3,8}"?(?:[ \t]{0,3}[,;|\t][ \t]{0,3}|[ \t]{2,6})[^\n]{0,120}?\b(?:(?:0?[1-9]|[12]\d|3[01])[/.-](?:0?[1-9]|1[0-2])[/.-](?:19[4-9]\d|200\d)|(?:19[4-9]\d|200\d)-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))\b
+  keywords:
+    - id: Keyword_bulk_staff_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - data dictionary
+            - field definition
+            - field definitions
+            - data type
+            - field length
+            - file specification
+            - interface specification
+            - column mapping
+            - import template
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  A bulk staff extract ties hundreds or thousands of identified people to their date of birth, home
+  address, job and employment dates in one file. That combination is enough for identity fraud,
+  targeted phishing and locating a specific worker at home, including staff with protective orders.
+  Recent breach notifications in the university and HR-SaaS sectors involved exactly this record class:
+  staff and former-staff extracts held as test data in code repositories, in reporting databases and
+  in bulk HCM exports rather than in the HR system itself. Payroll master files that add TFNs and bank
+  details are covered at the same risk by payroll-master-file-with-tax-file-numbers. Risk 8 supports
+  OFFICIAL: Sensitive / SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - title: Fair Work Regulations 2009 (Cth) - regs 3.31-3.44 (employee records)
+    url: https://www.legislation.gov.au/F2009L02356/latest/text
+  - title: OAIC - Employee records exemption
+    url: https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/organisations/employee-records-exemption
+  - title: OAIC - Data breach notifications increase to all-time high in 2025 (NDB statistics)
+    url: https://www.oaic.gov.au/news/media-centre/data-breach-notifications-increase-to-all-time-high-in-2025,-new-ndb-stats-show
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: >-
+      Initial release - bulk staff personal-details extract detected from a delimited HR header row
+      (ID, DOB/address and position/employment-date columns) plus populated rows; 85 needs two rows
+      with birth-year dates. Closes the breach-derived gap for staff extracts without TFNs.
+author: testpattern-community
+license: MIT

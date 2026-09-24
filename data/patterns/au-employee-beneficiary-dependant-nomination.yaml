@@ -1,0 +1,246 @@
+schema: testpattern/v1
+name: Beneficiary, Dependant or Next-of-Kin Nomination Record
+slug: au-employee-beneficiary-dependant-nomination
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Populated beneficiary and dependant nominations held by superannuation funds and employers: binding
+  and non-binding (including lapsing and non-lapsing) death benefit nominations under Superannuation
+  Industry (Supervision) Regulations 1994 reg 6.17A (made for SIS Act 1993 s 59(1A)), employer group
+  life insurance beneficiary nominations, and HR dependant, next-of-kin and emergency contact records.
+  Each record ties an identified member or employee to named family members, their relationship to the
+  member and, on death benefit forms, the share each person receives, witness details and dates of
+  birth. Bulk member extracts with TFNs and balances belong to superannuation-fund-member-statement-bulk,
+  and super identifiers (USI, member number) on their own belong to
+  global-top500-096-superannuation-identifiers.
+operation: >-
+  Primary: a nomination or dependant record phrase (binding / non-binding / lapsing / non-lapsing
+  (death benefit) nomination, death benefit nomination, nomination of beneficiaries / dependants,
+  beneficiary nomination / designation, preferred or reversionary beneficiary, life insurance / group
+  life / death benefit beneficiary, dependant details / declaration / information / record / form, next
+  of kin details / record / form / nomination, emergency contact details / information / record /
+  form). 65 is discovery-only (phrase alone) and surfaces fund PDS text, blank forms and HR policies. 75
+  requires a populated member or employee field (member / employee / staff member / insured person /
+  policy holder name or number, staff or payroll number, with a non-placeholder value; a "relationship
+  to member" label does not count) AND a populated beneficiary or dependant entry that gives a name and
+  a relationship (a beneficiary / nominee / dependant / next of kin / emergency contact field with a
+  name followed within 120 characters by a relationship label or a bracketed or dashed relationship
+  such as spouse, partner, child, parent or legal personal representative, or a pipe / tab table row
+  of name then relationship). 85 additionally requires a nomination detail structure: a share,
+  proportion or percentage value, a relationship cell followed by a percentage, a populated date of
+  birth (beneficiary or member), a named witness, or a date witnessed. Every enforce tier excludes
+  template/fixture text and PDS, guide, fact sheet, policy and legislation wording.
+pattern: >-
+  (?i)\b(?:(?:binding|non-binding|non-lapsing|lapsing)\s+(?:death\s+benefit\s+)?nomination|death\s+benefit\s+nomination|nomination\s+of\s+(?:beneficiar(?:y|ies)|dependa[en]ts?)|beneficiary\s+(?:nomination|designation)|(?:preferred|reversionary)\s+beneficiar(?:y|ies)|(?:life\s+insurance|group\s+life|death\s+benefit)\s+beneficiar(?:y|ies)|dependa[en]t(?:s|['’]s)?\s+(?:details|declaration|information|record|form)|next\s+of\s+kin\s+(?:details|information|record|form|nomination)|emergency\s+contact\s+(?:details|information|record|form))\b
+confidence: medium
+confidence_justification: >-
+  Medium: nomination forms and dependant records are dense labelled forms, and the enforce tiers need a
+  populated member field plus a named beneficiary with a relationship, which PDS text, policies and
+  blank forms do not carry. Name and relationship shapes are loose, so HR contact lists and insurance
+  correspondence with the same labels can reach 75, and a member date of birth can lift an emergency
+  contact record to 85. 85/75 are heuristic evidence tiers, not measured accuracy; test values are
+  synthetic records laid out like fund nomination forms and HR dependant records.
+jurisdictions:
+  - au
+regulations:
+  - Superannuation Industry (Supervision) Act 1993 (Cth) s 59(1A)
+  - Superannuation Industry (Supervision) Regulations 1994 (Cth) reg 6.17A
+  - Privacy Act 1988 (Cth)
+  - Information Privacy Act 2009 (Qld)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - QGISCF
+data_categories:
+  - pii
+  - financial
+  - employment
+corroborative_evidence:
+  keywords:
+    - trustee
+    - superannuation
+    - death benefit
+    - legal personal representative
+    - witness
+    - lapse
+    - group life
+    - insured
+    - relationship to member
+    - dependant
+  proximity: 300
+customisation:
+  - key: super-member-number
+    kind: identifier-format
+    identifier: super-member-number
+    target: purview.regexes/Regex_au_employee_beneficiary_nomination_member_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the populated-field evidence with the customer's superannuation member number format (see docs/identifiers.md#super-member-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+  - key: employee-id
+    kind: identifier-format
+    identifier: employee-id
+    target: purview.regexes/Regex_au_employee_beneficiary_nomination_member_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the populated-field evidence with the customer's employee ID / payroll number format (see docs/identifiers.md#employee-id). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Binding death benefit nomination\nMember name: Casey Teston\nMember number: 40017382\nBeneficiary 1 full name: Alex Teston\nRelationship to member: spouse\nShare of benefit: 70%\nBeneficiary 2 full name: Jamie Teston\nRelationship to member: son\nShare of benefit: 30%\nWitness 1 full name: Robin Carrowby\nDate witnessed: 12/09/2026"
+      description: 85 tier - binding nomination with member name and number, two named beneficiaries with relationships, shares and witness details
+      synthetic: true
+    - value: "Group life insurance - beneficiary nomination\nEmployee number: 204511\nEmployee name: Morgan Teston\nName\tRelationship\tDate of birth\tShare\nAlex Teston\tSpouse\t12/03/1985\t60%\nAri Teston\tDaughter\t02/05/2015\t40%"
+      description: 85 tier - employer group life nomination with employee fields and a tab table of beneficiaries with relationship, date of birth and share
+      synthetic: true
+    - value: "Next of kin details\nEmployee: Riley Teston\nEmployee number: 700231\nNext of kin: Dana Teston (partner)\nPhone: 07 5550 1234"
+      description: 75 tier - HR next of kin record with a populated employee and a named next of kin with relationship, no share or date of birth
+      synthetic: true
+    - value: "Non-binding nomination\nMember: Sam Teston\nNominee: Jordan Teston, relationship: son\nThe trustee will consider this nomination when paying the death benefit."
+      description: 75 tier - non-binding nomination with member and nominee plus relationship
+      synthetic: true
+    - value: "Dependant details\nEmployee ID: 55120\nDependant 1 name: Ari Teston\nRelationship: daughter\nDOB: 02/05/2015"
+      description: 85 tier - HR dependant record with employee ID, named dependant, relationship and date of birth
+      synthetic: true
+  should_not_match:
+    - value: "Death benefit nominations. You can make a binding death benefit nomination directing the trustee to pay your benefit to your dependants or legal personal representative. The nomination must be signed and dated in the presence of two witnesses aged 18 or over who are not named in it, and it lapses after three years. See section 7 of this PDS."
+      description: Fund PDS text explaining nominations (65 at most)
+    - value: "Binding death benefit nomination\nMember name: ______________\nMember number: ______________\nBeneficiary 1 full name: ______________ Relationship to member: ______________ Share: ___%\nWitness declaration: We declare that this notice was signed by the member in our presence."
+      description: Blank nomination form (65 at most)
+    - value: "Emergency contact details policy. This policy applies to all staff. Employees must keep their emergency contact details and next of kin information up to date in the HR portal, for example a spouse, partner or parent who can be reached during work hours."
+      description: HR policy on emergency contacts (65 at most)
+    - value: "Super funds urged members to review their binding death benefit nominations after a court found a lapsed nomination invalid, leaving the benefit to the trustee's discretion."
+      description: News article
+    - value: "Emergency contact form - use this template for new starters.\nEmployee: Riley Teston\nEmergency contact: Dana Teston (partner)"
+      description: Fixture wording (template exclusion)
+false_positives:
+  - description: Superannuation fund PDS documents, member guides and fact sheets that explain binding and non-binding nominations, witness rules and lapsing.
+    mitigation: Guidance names the fields without values and stays at 65 discovery; "this PDS / guide / fact sheet" wording and legislation markers are excluded from enforce tiers.
+  - description: Blank nomination forms and dependant / next of kin forms.
+    mitigation: Member and beneficiary fields reject blank lines, bracket placeholders and n/a / tbc values; fixture wording is excluded by the shared template-exclusion dictionary.
+  - description: HR policies and onboarding instructions about emergency contacts.
+    mitigation: No populated employee field and named contact with relationship, so these stay at 65; "this policy applies" wording is excluded.
+  - description: HR contact lists and insurance correspondence that name a member and a relative with the same labels.
+    mitigation: These are still personal information about family relationships; accept at 75 or tune the relationship list locally.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_employee_beneficiary_nomination_primary
+      matches:
+        - ref: Regex_au_employee_beneficiary_nomination_member_field
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_employee_beneficiary_nomination_beneficiary_field
+            - Regex_au_employee_beneficiary_nomination_beneficiary_row
+        - ref: Regex_au_employee_beneficiary_nomination_detail
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_employee_beneficiary_nomination_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_employee_beneficiary_nomination_primary
+      matches:
+        - ref: Regex_au_employee_beneficiary_nomination_member_field
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_employee_beneficiary_nomination_beneficiary_field
+            - Regex_au_employee_beneficiary_nomination_beneficiary_row
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_employee_beneficiary_nomination_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_employee_beneficiary_nomination_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_employee_beneficiary_nomination_primary
+      pattern: >-
+        (?i)\b(?:(?:binding|non-binding|non-lapsing|lapsing)\s+(?:death\s+benefit\s+)?nomination|death\s+benefit\s+nomination|nomination\s+of\s+(?:beneficiar(?:y|ies)|dependa[en]ts?)|beneficiary\s+(?:nomination|designation)|(?:preferred|reversionary)\s+beneficiar(?:y|ies)|(?:life\s+insurance|group\s+life|death\s+benefit)\s+beneficiar(?:y|ies)|dependa[en]t(?:s|['’]s)?\s+(?:details|declaration|information|record|form)|next\s+of\s+kin\s+(?:details|information|record|form|nomination)|emergency\s+contact\s+(?:details|information|record|form))\b
+    - id: Regex_au_employee_beneficiary_nomination_member_field
+      pattern: >-
+        (?i)(?<!to\s)\b(?:member|employee|staff\s+member|insured(?:\s+(?:person|member|life))?|policy\s*holder|(?:staff|payroll)\s+(?:no\.?|number|ID))(?:['’]s)?(?:\s+(?:full\s+)?(?:name|no\.?|number|ID))?\s*[:#]\s*(?:(?:Mr|Mrs|Ms|Miss|Mx|Dr)\.?\s+)?(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{1,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_au_employee_beneficiary_nomination_beneficiary_field
+      pattern: >-
+        (?i)\b(?:beneficiary|nominee|nominated\s+(?:beneficiary|dependa[en]t|person)|dependa[en]t|next\s+of\s+kin|emergency\s+contact)(?:\s+(?:\d|one|two|three))?(?:\s+(?:full\s+)?name|\s+surname)?\s*[:#]\s*(?:(?:Mr|Mrs|Ms|Miss|Mx|Dr)\.?\s+)?(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer|your|my|his|her|their)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{1,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}[\s\S]{0,120}?(?:\brelationship(?:\s+to\s+(?:the\s+)?(?:member|employee|staff\s+member|insured|you))?\s*[:#]?\s*|[ \t]*[(,–-][ \t]*)(?:spouse|de\s+facto(?:\s+partner)?|partner|husband|wife|step-?(?:son|daughter|child)|son|daughter|child(?:ren)?|mother|father|parent|brother|sister|sibling|grand(?:son|daughter|child|mother|father|parent)|legal\s+personal\s+representative|estate|interdependen(?:t|cy)(?:\s+relationship)?|financial(?:ly)?\s+dependa[en]t|friend|guardian|aunt|uncle|niece|nephew|cousin)\b
+    - id: Regex_au_employee_beneficiary_nomination_beneficiary_row
+      pattern: >-
+        (?i)\b[A-Z][A-Za-z'-]{1,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){1,3}[ \t]*[|\t][ \t]*(?:spouse|de\s+facto(?:\s+partner)?|partner|husband|wife|step-?(?:son|daughter|child)|son|daughter|child|mother|father|parent|brother|sister|sibling|grand(?:son|daughter|child|mother|father|parent)|legal\s+personal\s+representative|estate|interdependent|financial(?:ly)?\s+dependa[en]t|friend|guardian)[ \t]*[|\t]
+    - id: Regex_au_employee_beneficiary_nomination_detail
+      pattern: >-
+        (?i)\b(?:share|proportion|percentage|portion|allocation)(?:\s+of\s+(?:the\s+)?(?:death\s+)?benefit)?(?:\s*\(%\))?\s*[:#=]?\s*\d{1,3}(?:\.\d{1,2})?\s?%|\b(?:spouse|partner|husband|wife|son|daughter|child|mother|father|parent|brother|sister|sibling|estate|legal\s+personal\s+representative)[ \t]*[|\t,;:–-][ \t]*(?:\d{1,2}[/.-]\d{1,2}[/.-](?:19|20)\d{2}[ \t]*[|\t,;][ \t]*)?\d{1,3}(?:\.\d{1,2})?\s?%|\b(?:date\s+of\s+birth|DOB|D\.O\.B\.?)\s*[:#]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-](?:19|20)\d{2}|(?:19|20)\d{2}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+(?:19|20)\d{2})|\bwitness(?:\s+(?:1|2|one|two))?(?:['’]s)?\s+(?:full\s+)?name\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|the|a|an|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{1,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){1,3}|\bdate\s+witnessed\s*[:#]?\s*\d{1,2}[/.-]\d{1,2}[/.-](?:19|20)?\d{2}
+    - id: Regex_au_employee_beneficiary_nomination_exclusion
+      pattern: >-
+        (?i)\bthis\s+(?:PDS|Product\s+Disclosure\s+Statement|guide|fact\s?sheet|booklet|brochure|article|page|procedure)\b|\bthis\s+policy\s+applies\b|\blegislation\.gov\.au\b|\bMaximum\s+penalty\b|\bgeneral\s+information\s+only\b
+risk_rating: 7
+risk_description: >-
+  The classifier identifies populated beneficiary, dependant and next-of-kin nominations: an identified
+  member or employee linked to named family members, their relationships and, on death benefit forms,
+  each person's share, dates of birth and witnesses. Breach evidence shows why this matters: the 2026
+  Oracle PeopleSoft HCM campaign exposed employee dependant and beneficiary details alongside payroll
+  data, and the 2025 credential-stuffing attacks on Australian super fund member portals exposed
+  beneficiary details used in fraudulent withdrawals. The records map family structures (including
+  children and de facto or interdependency relationships), help an attacker impersonate a member or a
+  nominated beneficiary, and reveal who benefits on the member's death. Risk 7 reflects personal and
+  financial-fraud harm across a household; bulk member extracts with TFNs and balances stay at risk 9
+  under superannuation-fund-member-statement-bulk.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - title: Superannuation Industry (Supervision) Regulations 1994 (Cth) reg 6.17A - Payment of benefit on or after death of member (Act, s 59(1A)), compilation in force 1 July 2024
+    url: https://www.legislation.gov.au/F1996B00580/2024-07-01/2024-07-01/text/original/epub/OEBPS/document_1/document_1.html
+  - title: Superannuation Industry (Supervision) Act 1993 (Cth)
+    url: https://www.legislation.gov.au/Series/C2004A04633
+  - title: The Hacker News - ShinyHunters exploits Oracle PeopleSoft (HCM dependant and beneficiary details exposed)
+    url: https://thehackernews.com/2026/06/shinyhunters-exploits-oracle-peoplesoft.html
+  - title: BleepingComputer - Australian pension funds hit by wave of credential stuffing attacks
+    url: https://www.bleepingcomputer.com/news/security/australian-pension-funds-hit-by-wave-of-credential-stuffing-attacks/
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: >-
+      Initial release - binding / non-binding death benefit nominations (SIS Regulations reg 6.17A),
+      employer group life beneficiary nominations and HR dependant / next of kin / emergency contact
+      records. 65 phrase only; 75 needs a populated member / employee field plus a named beneficiary or
+      dependant with a relationship; 85 adds a share / percentage, date of birth or witness detail. PDS,
+      guide, policy and legislation wording excluded. Member and employee numbers matched by label
+      only (identifier slots super-member-number and employee-id).
+author: testpattern-community
+license: MIT

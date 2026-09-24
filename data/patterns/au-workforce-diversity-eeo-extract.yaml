@@ -1,0 +1,239 @@
+schema: testpattern/v1
+name: Workforce Diversity or EEO Row-Level Extract
+slug: au-workforce-diversity-eeo-extract
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Row-level workforce diversity and equal employment opportunity (EEO) extracts: HRIS or payroll
+  exports prepared for Workplace Gender Equality Agency (WGEA) reporting, Queensland public sector
+  MOHRI workforce data and the workforce diversity census, equity and diversity audits under the Public
+  Sector Act 2022 (Qld) ss 27-29, and internal diversity dashboards' source data. Each row ties an
+  employee identifier to diversity attributes such as Aboriginal and / or Torres Strait Islander
+  status, disability, culturally and linguistically diverse (CALD) or non-English speaking background,
+  language spoken at home, country of birth, gender and, where collected, sexuality. Aggregate reports,
+  published workforce statistics and survey questionnaires are out of scope.
+operation: >-
+  Primary: a delimited header row (comma, pipe, tab or semicolon separated) that contains an employee
+  identifier column (employee / staff / payroll / personnel ID, number or code, EmpID, AGS number) and
+  at least two diversity attribute columns (ATSI / Indigenous / Aboriginal and / or Torres Strait
+  Islander / First Nations status, disability, CALD, NESB, non-English speaking background, language
+  spoken at home, main language, country of birth, ethnicity, cultural background, gender / gender
+  identity, sex, sexuality / sexual orientation, LGBTIQ+), in any column order. 65 is discovery-only
+  (header row alone) and surfaces data dictionaries, extract specifications and empty exports. 75
+  requires one populated data row within 300 characters: an ID-like value (0-3 letters then 3-10
+  digits) followed on the same line by two delimited diversity values (female, male, woman, man,
+  non-binary, gender diverse, F, M, X, Y, N, yes, no, Aboriginal, Torres Strait Islander, both,
+  neither, Indigenous, non-Indigenous, not stated, prefer not to say, declined, CALD, NESB,
+  heterosexual, gay, lesbian, bisexual, queer, asexual and similar). 85 requires at least two distinct
+  populated data rows. Every enforce tier excludes template/fixture text and data dictionary, valid
+  values, policy, survey and guide wording. Space-aligned tables (for example PDF text without
+  delimiters) and rows whose employee ID follows the diversity values are not matched.
+pattern: >-
+  (?i)\b(?:(?:employee|staff|payroll|personnel|person|emp)[ _.-]?(?:id|no\.?|number|num|code|#)|EmpID|AGS[ _]?(?:no|number)?)[ \t]*[,|\t;](?:[^\r\n,|\t;]{0,60}[,|\t;]){0,12}[ \t]*\b(?:ATSI|indigenous|aboriginal|torres[ _]strait|first[ _]nations|disability|CALD|NESB|non[ _-]english|language[ _](?:spoken|at|other)|main[ _]language|country[ _]of[ _]birth|ethnicity|cultural[ _]background|gender|sexual[ _]orientation|sexuality|sex|LGBTIQ)\b[^\r\n,|\t;]{0,50}[,|\t;](?:[^\r\n,|\t;]{0,60}[,|\t;]){0,12}[ \t]*\b(?:ATSI|indigenous|aboriginal|torres[ _]strait|first[ _]nations|disability|CALD|NESB|non[ _-]english|language[ _](?:spoken|at|other)|main[ _]language|country[ _]of[ _]birth|ethnicity|cultural[ _]background|gender|sexual[ _]orientation|sexuality|sex|LGBTIQ)\b
+confidence: medium
+confidence_justification: >-
+  Medium: a delimited header row that joins an employee identifier to two or more diversity columns,
+  followed by rows of ID-plus-attribute values, is distinctive of a row-level extract, and aggregate
+  reports, questionnaires and policies do not carry it. Row values such as Y / N and F / M are
+  generic, so a header-gated HR extract with unrelated yes / no columns can reach 75, and extracts
+  with unusual column names or space-aligned layouts are missed. 85/75 are heuristic evidence tiers,
+  not measured accuracy; test values are synthetic extracts laid out like WGEA and MOHRI source files.
+jurisdictions:
+  - au
+  - au-qld
+regulations:
+  - Privacy Act 1988 (Cth) - sensitive information
+  - Workplace Gender Equality Act 2012 (Cth)
+  - Public Sector Act 2022 (Qld) ss 27-29
+  - Information Privacy Act 2009 (Qld)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - QGISCF
+data_categories:
+  - pii
+  - employment
+  - sensitive-data
+corroborative_evidence:
+  keywords:
+    - WGEA
+    - MOHRI
+    - workforce diversity census
+    - equity and diversity audit
+    - workplace profile
+    - EEO
+    - diversity data
+    - Aboriginal and Torres Strait Islander
+    - CALD
+    - disability
+  proximity: 300
+customisation:
+  - key: employee-id
+    kind: identifier-format
+    identifier: employee-id
+    target: purview.regexes/Regex_au_workforce_diversity_data_row
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the populated-field evidence with the customer's employee ID / payroll number format (see docs/identifiers.md#employee-id). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Employee ID,Surname,Given name,Gender,ATSI status,Disability,CALD,Classification\nE100231,Teston,Riley,F,Y,N,N,AO5\nE100232,Teston,Jordan,M,N,Y,Y,AO3\nE100233,Carrowby,Sam,X,N,N,Y,PO4"
+      description: 85 tier - CSV diversity census extract with employee ID, four diversity columns and three populated rows
+      synthetic: true
+    - value: "Staff No | Gender | Aboriginal and/or Torres Strait Islander | Disability | Language spoken at home\n400512 | Female | Aboriginal | No | English"
+      description: 75 tier - pipe table header with staff number and diversity columns plus one populated row
+      synthetic: true
+    - value: "MOHRI quarterly extract - equity and diversity\nPayroll number\tSex\tIndigenous status\tNESB\tDisability\n770415\tFemale\tNon-Indigenous\tYes\tNo\n770416\tMale\tTorres Strait Islander\tNo\tNo"
+      description: 85 tier - tab-separated MOHRI-style extract with two populated rows
+      synthetic: true
+    - value: "Emp_ID;Gender;Manager category;Disability;Sexuality\nW22910;Woman;Key management personnel;No;Bisexual"
+      description: 75 tier - semicolon WGEA-style workplace profile source row with gender, disability and sexuality
+      synthetic: true
+    - value: "Surname,Gender,Staff number,ATSI,Disability,Country of birth\nTeston,Female,300118,Y,N,Viet Nam"
+      description: 75 tier - header with a diversity column before the staff number column, one populated row
+      synthetic: true
+  should_not_match:
+    - value: "WGEA workplace profile summary 2026\nManager category | Women | Men | Total\nCEO | 0 | 1 | 1\nKey management personnel | 4 | 6 | 10\nAboriginal and Torres Strait Islander employees: 3.2% of the workforce; employees with disability: 4.1%."
+      description: Aggregate WGEA report / published workforce statistics
+    - value: "Workforce diversity census 2026\nQ3. Do you identify as Aboriginal and/or Torres Strait Islander? [ ] Yes [ ] No [ ] Prefer not to say\nQ4. Do you have a disability? [ ] Yes [ ] No\nQ5. What is your gender? [ ] Woman [ ] Man [ ] Non-binary [ ] I use a different term"
+      description: Diversity survey question set
+    - value: "Equity and diversity policy. This policy applies to all employees. The agency will collect gender, disability, Aboriginal and Torres Strait Islander and CALD status on a voluntary basis to meet targets of 4% Aboriginal and Torres Strait Islander and 12% CALD representation."
+      description: Diversity policy
+    - value: "HR data dictionary - diversity extract\nEmployee ID,Gender,ATSI status,Disability,CALD\nValid values: Gender F / M / X; ATSI status Y / N / not stated"
+      description: Header row in a data dictionary with no populated rows (65 at most)
+    - value: "The public sector's latest workforce diversity census found CALD representation rose to 11.8 per cent and Aboriginal and Torres Strait Islander employment to 2.9 per cent."
+      description: News / published statistics
+false_positives:
+  - description: Aggregate WGEA reports, annual report workforce tables and published diversity statistics.
+    mitigation: No employee identifier column or ID-bearing rows, so the primary header row never matches.
+  - description: Diversity census questionnaires and survey question sets.
+    mitigation: Questions are not delimited header rows with an employee ID column; they never reach the primary.
+  - description: Data dictionaries, extract specifications and empty exports that carry the header row.
+    mitigation: Header alone is discovery only (65); data dictionary, valid values and field definition wording is excluded from enforce tiers.
+  - description: HR extracts with an employee ID and diversity columns plus unrelated Y / N or F / M columns.
+    mitigation: Still gated on the diversity header; accept, or tune the row value list locally.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match:
+        type: any
+        ids:
+          - Regex_au_workforce_diversity_header_row
+          - Regex_au_workforce_diversity_header_row_id_middle
+          - Regex_au_workforce_diversity_header_row_id_last
+      matches:
+        - ref: Regex_au_workforce_diversity_data_row
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_workforce_diversity_exclusion
+    - confidence_level: 75
+      id_match:
+        type: any
+        ids:
+          - Regex_au_workforce_diversity_header_row
+          - Regex_au_workforce_diversity_header_row_id_middle
+          - Regex_au_workforce_diversity_header_row_id_last
+      matches:
+        - ref: Regex_au_workforce_diversity_data_row
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_workforce_diversity_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_au_workforce_diversity_header_row
+          - Regex_au_workforce_diversity_header_row_id_middle
+          - Regex_au_workforce_diversity_header_row_id_last
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_workforce_diversity_header_row
+      pattern: >-
+        (?i)\b(?:(?:employee|staff|payroll|personnel|person|emp)[ _.-]?(?:id|no\.?|number|num|code|#)|EmpID|AGS[ _]?(?:no|number)?)[ \t]*[,|\t;](?:[^\r\n,|\t;]{0,60}[,|\t;]){0,12}[ \t]*\b(?:ATSI|indigenous|aboriginal|torres[ _]strait|first[ _]nations|disability|CALD|NESB|non[ _-]english|language[ _](?:spoken|at|other)|main[ _]language|country[ _]of[ _]birth|ethnicity|cultural[ _]background|gender|sexual[ _]orientation|sexuality|sex|LGBTIQ)\b[^\r\n,|\t;]{0,50}[,|\t;](?:[^\r\n,|\t;]{0,60}[,|\t;]){0,12}[ \t]*\b(?:ATSI|indigenous|aboriginal|torres[ _]strait|first[ _]nations|disability|CALD|NESB|non[ _-]english|language[ _](?:spoken|at|other)|main[ _]language|country[ _]of[ _]birth|ethnicity|cultural[ _]background|gender|sexual[ _]orientation|sexuality|sex|LGBTIQ)\b
+    - id: Regex_au_workforce_diversity_header_row_id_middle
+      pattern: >-
+        (?i)\b(?:ATSI|indigenous|aboriginal|torres[ _]strait|first[ _]nations|disability|CALD|NESB|non[ _-]english|language[ _](?:spoken|at|other)|main[ _]language|country[ _]of[ _]birth|ethnicity|cultural[ _]background|gender|sexual[ _]orientation|sexuality|sex|LGBTIQ)\b[^\r\n,|\t;]{0,50}[,|\t;](?:[^\r\n,|\t;]{0,60}[,|\t;]){0,12}[ \t]*(?:(?:employee|staff|payroll|personnel|person|emp)[ _.-]?(?:id|no\.?|number|num|code|#)|EmpID|AGS[ _]?(?:no|number)?)[ \t]*[,|\t;](?:[^\r\n,|\t;]{0,60}[,|\t;]){0,12}[ \t]*\b(?:ATSI|indigenous|aboriginal|torres[ _]strait|first[ _]nations|disability|CALD|NESB|non[ _-]english|language[ _](?:spoken|at|other)|main[ _]language|country[ _]of[ _]birth|ethnicity|cultural[ _]background|gender|sexual[ _]orientation|sexuality|sex|LGBTIQ)\b
+    - id: Regex_au_workforce_diversity_header_row_id_last
+      pattern: >-
+        (?i)\b(?:ATSI|indigenous|aboriginal|torres[ _]strait|first[ _]nations|disability|CALD|NESB|non[ _-]english|language[ _](?:spoken|at|other)|main[ _]language|country[ _]of[ _]birth|ethnicity|cultural[ _]background|gender|sexual[ _]orientation|sexuality|sex|LGBTIQ)\b[^\r\n,|\t;]{0,50}[,|\t;](?:[^\r\n,|\t;]{0,60}[,|\t;]){0,12}[ \t]*\b(?:ATSI|indigenous|aboriginal|torres[ _]strait|first[ _]nations|disability|CALD|NESB|non[ _-]english|language[ _](?:spoken|at|other)|main[ _]language|country[ _]of[ _]birth|ethnicity|cultural[ _]background|gender|sexual[ _]orientation|sexuality|sex|LGBTIQ)\b[^\r\n,|\t;]{0,50}[,|\t;](?:[^\r\n,|\t;]{0,60}[,|\t;]){0,12}[ \t]*(?:(?:employee|staff|payroll|personnel|person|emp)[ _.-]?(?:id|no\.?|number|num|code|#)|EmpID|AGS[ _]?(?:no|number)?)(?![A-Za-z0-9_])
+    - id: Regex_au_workforce_diversity_data_row
+      pattern: >-
+        (?i)\b[A-Z]{0,3}\d{3,10}\b[^\r\n]{0,120}?[,|\t;][ \t]*(?:female|male|woman|man|non-?binary|gender\s+diverse|aboriginal(?:\s+and\s+torres\s+strait\s+islander)?|torres\s+strait\s+islander|non-?indigenous|indigenous|both|neither|not\s+stated|prefer\s+not\s+to\s+say|declined|undisclosed|CALD|NESB|ESB|heterosexual|straight|gay|lesbian|bisexual|queer|asexual|pansexual|yes|no|X|F|M|Y|N)[ \t]*[,|\t;](?:[^\r\n,|\t;]{0,60}[,|\t;]){0,6}[ \t]*(?:female|male|woman|man|non-?binary|gender\s+diverse|aboriginal(?:\s+and\s+torres\s+strait\s+islander)?|torres\s+strait\s+islander|non-?indigenous|indigenous|both|neither|not\s+stated|prefer\s+not\s+to\s+say|declined|undisclosed|CALD|NESB|ESB|heterosexual|straight|gay|lesbian|bisexual|queer|asexual|pansexual|yes|no|X|F|M|Y|N)\b
+    - id: Regex_au_workforce_diversity_exclusion
+      pattern: >-
+        (?i)\bdata\s+dictionary\b|\bvalid\s+values\b|\bfield\s+definitions?\b|\bextract\s+specification\b|\bthis\s+(?:policy|survey|questionnaire|guide|fact\s?sheet|report\s+template)\b|\bthis\s+policy\s+applies\b
+risk_rating: 8
+risk_description: >-
+  The classifier identifies row-level diversity and EEO extracts: an employee identifier joined to
+  Aboriginal and Torres Strait Islander status, disability, CALD / language, gender and sometimes
+  sexuality, for each employee in the file. Those attributes are sensitive information under the
+  Privacy Act 1988 (racial or ethnic origin, sexual orientation, health) and are collected by agencies
+  on a voluntary, confidential basis for WGEA reporting, MOHRI and the Queensland workforce diversity
+  census. Breach evidence shows HR extracts leaking from non-HR systems: the 2025 Western Sydney
+  University incident exposed ethnicity, citizenship and disability data, and the 2026 PeopleSoft
+  campaign exposed ethnicity and disability fields from student and HR records. A leaked extract
+  exposes many people's identity attributes at once, invites discrimination and harassment, and
+  undermines voluntary disclosure. Risk 8 aligns with the bulk sensitive-person-attribute classifiers
+  (global-top500-015-sexual-orientation, global-top500-387-disability-assessment-records) one band
+  above the single-attribute phrase classifiers (global-racial-ethnic-origin, risk 7), with the same
+  SENSITIVE Personal-Privacy marking.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Public Sector Act 2022 (Qld) ss 27-29 - equity and diversity duty, plan, audit and report
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2022-034
+  - title: WGEA - Reporting guide, privacy and data handling
+    url: https://www.wgea.gov.au/reporting-guide/privacy/data-handling
+  - title: Queensland Government - Workforce diversity census
+    url: https://www.forgov.qld.gov.au/recruitment-performance-and-career/workforce-planning/workforce-statistics-and-tools/workforce-diversity-census
+  - title: Western Sydney University - cyber incident details (ethnicity, citizenship, disability exposed)
+    url: https://www.westernsydney.edu.au/news/cyber-details/october-23-2025
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: >-
+      Initial release - row-level WGEA / MOHRI / diversity census / EEO extracts detected from a
+      delimited header row joining an employee ID column to two or more diversity columns (65), plus
+      one populated ID-and-attribute row (75) or two distinct rows (85). Aggregate reports, survey
+      questions, policies and data dictionaries do not reach enforce tiers. Employee ID value matched by
+      a loose shape (identifier slot employee-id).
+author: testpattern-community
+license: MIT
