@@ -1,63 +1,69 @@
 schema: testpattern/v1
 name: Payroll system access logs
 slug: global-top500-100-payroll-system-access-logs
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to payroll system access logs in financial and compliance documents. Commonly found in international regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects exported payroll system access and audit logs: timestamped log lines showing a user logging in, viewing, changing or exporting payroll records, with a populated user field. Operational security data, capped at 75.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 7 keywords within 300 characters. Keyword lists: industry-hr.
-  Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: \bpayroll\s+system\s+access\s+logs\b
+  Primary: a payroll access-log phrase (payroll system access/audit/activity log or trail, access log for the payroll system, payroll audit trail, payroll login history). The single enforce tier (75) requires two distinct populated structures within 300 characters: an ISO-style timestamped event line with an action verb (logged in, login, viewed, updated, changed, exported, downloaded, approved, failed login) AND a populated user field (user, username, user ID, actor, account). Capped at 75 because access logs are operational metadata. Enforce tier excludes template/fixture text and logging-policy framing; 65 is discovery-only.
+pattern: >-
+  (?i)\b(?:payroll\s+(?:system\s+)?(?:access|audit|activity|user\s+activity)\s+(?:logs?|trails?|reports?)|(?:access|audit)\s+(?:logs?|trail)\s+(?:for|-|of)\s+(?:the\s+)?payroll(?:\s+system)?|payroll\s+audit\s+trail(?:\s+export)?|payroll\s+(?:user\s+)?(?:login|logon)\s+(?:history|report))\b
 confidence: low
 confidence_justification: >-
-  Low confidence marker: phrase-based artifact detection to bootstrap line-by-line coverage. Requires corroborative evidence and later hardening to high-confidence structural patterns. Added context
-  gating and exclusion rules improve precision and reduce incidental matches.
+  Low: payroll system access logs are operational security records (timestamps, user IDs, actions) rather than payroll content; they identify system users and what they touched but not pay details. The pattern is capped at 75: it needs a timestamped event line with an action verb plus a populated user field near a payroll access-log phrase. It never claims 85 because the record is low sensitivity on its own; pair with security monitoring rather than DLP blocking.
 jurisdictions:
   - global
 regulations:
-  - GDPR
-  - AML/CTF Act (Cth)
-  - IPA 2009 (Qld)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - ISO 27001
+  - ISM
+  - PSPF
 data_categories:
-  - financial
+  - security
 corroborative_evidence:
   keywords:
-    - payroll system access logs
-    - payroll
-    - system
-    - access
-    - logs
-    - tax
-    - operations
+    - timestamp
+    - user ID
+    - viewed
+    - exported
+    - bank details
+    - failed login
   proximity: 300
-  keyword_lists:
-    - industry-hr
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: 'Payroll system access logs'
-      description: Topic phrase present
-    - value: 'payroll system access logs'
-      description: Topic phrase, lowercase
-    - value: 'this record references the payroll system access logs held on file'
-      description: Topic phrase within surrounding text
+    - value: "Payroll system access log\n2026-09-18 09:14:22 user=jteston action=viewed employee=4471820 screen=Bank details\n2026-09-18 09:15:03 user=jteston action=exported report=Pay run 2026-19"
+      description: "75: key=value payroll access log with viewed/exported events (capped at 75)"
+      synthetic: true
+    - value: "Payroll audit trail export\n2026-09-20 22:41 | User ID: svc_payroll_admin | Event: failed login"
+      description: "75: payroll audit trail export with failed login (capped at 75)"
+      synthetic: true
+    - value: "Access logs for the payroll system, week 38\n2026-09-21T07:02:11Z  username: mstaffson  logged in\n2026-09-21T07:05:40Z  username: mstaffson  modified super fund details"
+      description: "75: access logs for the payroll system with login and modify events (capped at 75)"
+      synthetic: true
+    - value: "payroll system access logs"
+      description: "65: bare phrase only - discovery tier"
+      synthetic: true
   should_not_match:
-    - value: unrelated generic text
-      description: No relevant phrase context
-    - value: placeholder value 12345
-      description: Random text should not match phrase marker
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: "Access to payroll systems should be logged, and payroll system access logs should be reviewed monthly. This policy statement sets out logging requirements."
+      description: "Logging policy - must stay at or below 65"
+    - value: "Payroll system access log\nTimestamp: __________\nUser ID: __________\nAction: __________"
+      description: "Blank log template - must stay at or below 65"
+    - value: "2026-09-18 09:14:22 user=admin action=viewed page=/home"
+      description: "Generic web log without a payroll phrase - must not match"
+    - value: "unrelated generic text without domain phrases"
+      description: "No relevant topic phrases present"
 false_positives:
-  - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
-    mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
-  - description: In English (as the primary international business language), standard business terminology overlapping with financial detection keywords in routine correspondence and documentation.
-    mitigation: Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for higher precision.
+  - description: "Security policies and audit standards that require payroll access logging."
+    mitigation: "Enforce requires timestamped event lines and populated user fields; logging-policy framing is excluded."
+  - description: "Blank forms, templates and system configuration screens."
+    mitigation: "Blank lines, bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded by template-exclusion."
+  - description: "Application logs from other systems that mention payroll in a free-text message."
+    mitigation: "Accepted; the pattern is capped at 75 and its sensitivity is low."
 exports:
   - purview_xml
   - yaml
@@ -72,27 +78,19 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 75
-      id_match: Regex_payroll_access_logs
+      id_match: Regex_top500_100_payroll_system_access_logs_primary
       matches:
-        - ref: Pattern_global_top500_100_payroll_system_access_logs_label_context
-        - ref: Keyword_global_top500_100_payroll_system_access_logs_domain_context
+        - ref: Regex_top500_100_payroll_system_access_logs_log_event_line
+        - ref: Regex_top500_100_payroll_system_access_logs_log_user_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_payroll_access_logs
-      matches:
-        - ref: Keyword_payroll_access_logs
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
+            - Keyword_top500_100_payroll_system_access_logs_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_payroll_access_logs
+      id_match: Regex_top500_100_payroll_system_access_logs_primary
       matches:
         - type: any
           min_matches: 0
@@ -100,39 +98,40 @@ purview:
           refs:
             - Keyword_noise_exclusion
   regexes:
-    - id: Regex_payroll_access_logs
-      pattern: \bpayroll\s+system\s+access\s+logs\b
-    - id: Pattern_global_top500_100_payroll_system_access_logs_label_context
-      pattern: (?i)\b(?:payroll\s+system\s+access\s+logs)\b
+    - id: Regex_top500_100_payroll_system_access_logs_primary
+      pattern: >-
+        (?i)\b(?:payroll\s+(?:system\s+)?(?:access|audit|activity|user\s+activity)\s+(?:logs?|trails?|reports?)|(?:access|audit)\s+(?:logs?|trail)\s+(?:for|-|of)\s+(?:the\s+)?payroll(?:\s+system)?|payroll\s+audit\s+trail(?:\s+export)?|payroll\s+(?:user\s+)?(?:login|logon)\s+(?:history|report))\b
+    - id: Regex_top500_100_payroll_system_access_logs_log_event_line
+      pattern: >-
+        (?i)\b20\d{2}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?[^\n]{0,100}\b(?:log(?:ged)?[\s-]?(?:in|on|off|out)|login|logon|viewed|updated|changed|modified|exported|downloaded|approved|deleted|failed\s+login|access(?:ed)?|read)\b
+    - id: Regex_top500_100_payroll_system_access_logs_log_user_field
+      pattern: >-
+        (?i)\b(?:user(?:name|\s+ID|id)?|actor|login\s+ID|account)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Za-z0-9._\\-]{2,40}
   keywords:
-    - id: Keyword_payroll_access_logs
+    - id: Keyword_top500_100_payroll_system_access_logs_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - payroll system access logs
-            - payroll access log
-            - system access log
-            - audit trail
-            - login history
-            - user activity log
-            - payroll system audit
-            - access record
-            - authentication log
-            - session log
-            - privilege escalation
-      strength: specific
-    - id: Keyword_global_top500_100_payroll_system_access_logs_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - payroll system access logs
-            - payroll
-            - system
-            - access
-            - logs
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
+            - should be logged
+            - should be reviewed
+            - logging requirements
+            - must be retained
+            - book a demo
       strength: domain
 risk_description: >-
-  The low-confidence detector matches only the phrase payroll system access logs and requires nearby payroll or record context; it does not parse a username, event, timestamp, or access result. Disclosure of the phrase can reveal that logging exists, but meaningful surveillance, evasion, or employee profiling requires the actual log entries. A normal match therefore creates low operational harm for the employer and little direct harm to a user. Risk 4 and OFFICIAL fit the detector, while a populated access-log export showing identities, privileged activity, or anomalous sessions would warrant SENSITIVE classification.
+  The classifier identifies exported payroll system access logs (timestamped user events), capped at 75. The logs identify system users and which payroll records they accessed but carry little payroll content themselves; their main value is to attackers mapping privileged accounts. Policies and blank templates stay at 65. Risk 4 supports OFFICIAL.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -141,15 +140,24 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
-frameworks:
-  - ISO 27001
-  - ISO 27701
+references:
+  - title: "Privacy Act 1988 (Cth)"
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
+  - title: "OAIC - Australian Privacy Principles"
+    url: https://www.oaic.gov.au/privacy/australian-privacy-principles
+  - title: "ASD - Information Security Manual"
+    url: https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/ism
+  - title: "Protective Security Policy Framework"
+    url: https://www.protectivesecurity.gov.au/
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'HR quality pass (2026-09-24): rebuilt tiers and capped at 75 (record type is aggregate/operational, not person-level) - 65 primary phrase (discovery), 75 requires two distinct populated structures; removed the self-corroborating phrase evidence; added template-exclusion and guidance/policy NOT-groups; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys. Replaced the single-phrase primary with payroll access/audit-log phrases and added timestamped event-line and user-field structures; data category changed from financial to security. Regulations now cite the Privacy Act 1988 (Cth) (APP 11) and IPA 2009 (Qld); frameworks add ISM and PSPF.'
   - version: 1.3.2
     date: '2026-09-24'
-    description: "Metadata quality pass (2026-09-24): removed regulation tags that do not apply (SOCI Act 2018 (Cth)); added 3 verified legislation/regulator references; filled empty frameworks (ISO 27001, ISO 27701)."
+    description: 'Metadata quality pass (2026-09-24): removed regulation tags that do not apply (SOCI Act 2018 (Cth)); added 3 verified legislation/regulator references; filled empty frameworks (ISO 27001, ISO 27701).'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1661 without changing detector or package metadata.'
@@ -167,18 +175,10 @@ changelog:
     description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
-references:
-  - title: "Anti-Money Laundering and Counter-Terrorism Financing Act 2006 (Cth)"
-    url: https://www.legislation.gov.au/C2006A00169/latest/text
-  - title: "Information Privacy Act 2009 (Qld)"
-    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
-  - title: "Privacy Act 1988 (Cth)"
-    url: https://www.legislation.gov.au/C2004A03712/latest/text
 remediation:
   catalog_quality_2026_06_02:
     status: applied
     changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
-
+      - Mapped non-canonical confidence 80 to 75.
+      - Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 risk_rating: 4

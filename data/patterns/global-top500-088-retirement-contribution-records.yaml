@@ -1,61 +1,79 @@
 schema: testpattern/v1
 name: Retirement contribution records
 slug: global-top500-088-retirement-contribution-records
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to retirement contribution records in financial and compliance documents. Commonly found in international regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects superannuation / retirement contribution records for an identified employee or member: SG and salary sacrifice contribution reports, SuperStream contribution files, employer pension contribution schedules and 401(k) contribution records, with contribution amounts.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
-  lists: financial-deposit-terms, industry-hr. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Primary: a contribution record phrase (superannuation contribution record/report/schedule/remittance, SG contributions, concessional or salary sacrifice contributions, employer super/pension contributions, SuperStream contributions, 401(k) contributions). Generic "defined benefit", "retirement fund", "vesting schedule" and "employer match" were removed. 75 tier requires a populated person field (employee/staff name or number, payroll number, member name/number) with a non-placeholder value within 300 characters. 85 tier additionally requires a populated contribution amount (SG/employer/employee/salary sacrifice/concessional contribution, contribution amount, total contributions) and an independent corroborative term (USI, fund ABN, SuperStream, clearing house, pay period, payday super, member number). Enforce tiers exclude template/fixture text (template-exclusion) and policy, guidance, training and media-release framing; 65 is discovery-only (primary alone, template-excluded) and will surface policies, guidance, blank forms and statistics.
 pattern: >-
-  (?is)\b(?:retirement\s+contribution\s+records|retirement\s+contribution|pension\s+contribution|employer\s+match|salary\s+sacrifice|defined\s+contribution|defined\s+benefit|retirement\s+fund|vesting\s+schedule)\b
+  (?i)\b(?:retirement\s+contribution\s+records?|super(?:annuation)?\s+(?:guarantee\s+)?contributions?\s+(?:records?|reports?|schedules?|statements?|files?|summary|remittances?)|SG\s+contributions?|concessional\s+contributions?|salary\s+sacrifice\s+(?:super(?:annuation)?\s+)?contributions?|employer\s+(?:super(?:annuation)?|pension|retirement)\s+contributions?|pension\s+contributions?\s+(?:schedules?|records?|reports?)|contribution\s+(?:remittance|schedule)|SuperStream\s+contributions?|401\(k\)\s+contributions?)\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated field with a non-placeholder value and 85 adds a record-specific populated detail plus independent corroboration. Person and record values are customer-defined, so the field regexes use labelled loose values with a placeholder guard. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
+  - au
   - global
 regulations:
-  - GDPR
+  - Superannuation Guarantee (Administration) Act 1992 (Cth)
+  - Fair Work Regulations 2009 (Cth) reg 3.37
+  - Industrial Relations Act 2016 (Qld)
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - financial
+  - employment
+  - pii
 corroborative_evidence:
   keywords:
-    - retirement contribution records
-    - retirement
-    - contribution
-    - records
-    - payroll
-    - tax
-    - operations
+    - USI
+    - fund ABN
+    - SuperStream
+    - clearing house
+    - pay period
+    - payday super
+    - member number
+    - pension scheme
+    - fund name
   proximity: 300
-  keyword_lists:
-    - financial-deposit-terms
-    - industry-hr
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: retirement contribution records
-      description: Primary topic phrase match
-    - value: retirement contribution
-      description: Case-insensitive topic phrase match
-    - value: pension contribution
-      description: Alternative topic phrase match
-    - value: employer match
-      description: Additional topic phrase match
+    - value: "Superannuation contribution report - pay period ending 26/09/2026\nEmployee name: Avery Teston\nMember number: 70442198\nFund: Coastline Super\nSG contribution: $987.45\nSalary sacrifice contribution: $250.00\nSent via SuperStream clearing house."
+      description: "85: super contribution report with employee, member number, SG and salary sacrifice amounts"
+      synthetic: true
+    - value: "Employer pension contributions schedule\nEmployee ID: 55120\nEmployer contribution: £312.40\nEmployee contribution: £156.20\nPension scheme reference PS-99812, pay period September 2026"
+      description: "85: employer pension contributions schedule with employee ID and amounts"
+      synthetic: true
+    - value: "Retirement contribution records\nStaff number: 30219\nCopies requested by the employee for their personal files."
+      description: "75: retirement contribution records request naming the employee, no amounts"
+      synthetic: true
+    - value: "SG contributions"
+      description: "65: bare phrase only - discovery tier"
+      synthetic: true
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: payroll reimbursement
-      description: Generic word pair from old broad template should not match
+    - value: "Employers must pay SG contributions for eligible workers into their chosen fund. This fact sheet explains payday super and contribution due dates."
+      description: "ATO-style guidance - must stay at or below 65"
+    - value: "Superannuation contribution report\nEmployee name: __________\nMember number: __________\nSG contribution: $______"
+      description: "Blank contribution report - must stay at or below 65"
+    - value: "Employer super contributions reached a record high, according to a media release from the regulator."
+      description: "News - must stay at or below 65"
+    - value: "unrelated generic text without domain phrases"
+      description: "No relevant topic phrases present"
 false_positives:
-  - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
-    mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
-  - description: In English (as the primary international business language), standard business terminology overlapping with financial detection keywords in routine correspondence and documentation.
-    mitigation: Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for higher precision.
+  - description: "Policies, procedures, regulator guidance, fact sheets and training material that name the record type."
+    mitigation: "Enforce tiers require populated fields; guidance has labels without values, and policy/guidance/training/media-release framing is excluded by the NOT-group."
+  - description: "Blank forms, templates and system configuration screens."
+    mitigation: "Blank lines, bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded by template-exclusion."
+  - description: "News, statistics and vendor marketing."
+    mitigation: "No populated person or record fields, so these stay at 65 discovery."
+  - description: "Member statements and fund reports overlap with superannuation-fund-member-statement-bulk."
+    mitigation: "This pattern targets employer-side contribution records; bulk member statements are covered by the dedicated bulk classifier."
 exports:
   - purview_xml
   - yaml
@@ -69,59 +87,87 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_retirement_contribution
+    - confidence_level: 85
+      id_match: Regex_top500_088_retirement_contribution_records_primary
       matches:
-        - ref: Pattern_global_top500_088_retirement_contribution_records_label_context
-        - ref: Keyword_global_top500_088_retirement_contribution_records_domain_context
+        - ref: Regex_top500_088_retirement_contribution_records_person_field
+        - ref: Regex_top500_088_retirement_contribution_records_contribution_detail
+        - ref: Keyword_top500_088_retirement_contribution_records_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_top500_088_retirement_contribution_records_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_top500_088_retirement_contribution_records_primary
+      matches:
+        - ref: Regex_top500_088_retirement_contribution_records_person_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_top500_088_retirement_contribution_records_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_retirement_contribution
+      id_match: Regex_top500_088_retirement_contribution_records_primary
       matches:
-        - ref: Keyword_retirement_contribution
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
   regexes:
-    - id: Regex_retirement_contribution
+    - id: Regex_top500_088_retirement_contribution_records_primary
       pattern: >-
-        (?is)\b(?:retirement\s+contribution\s+records|retirement\s+contribution|pension\s+contribution|employer\s+match|salary\s+sacrifice|defined\s+contribution|defined\s+benefit|retirement\s+fund|vesting\s+schedule)\b
-    - id: Pattern_global_top500_088_retirement_contribution_records_label_context
-      pattern: (?i)\b(?:retirement\s+contribution\s+records)\b
+        (?i)\b(?:retirement\s+contribution\s+records?|super(?:annuation)?\s+(?:guarantee\s+)?contributions?\s+(?:records?|reports?|schedules?|statements?|files?|summary|remittances?)|SG\s+contributions?|concessional\s+contributions?|salary\s+sacrifice\s+(?:super(?:annuation)?\s+)?contributions?|employer\s+(?:super(?:annuation)?|pension|retirement)\s+contributions?|pension\s+contributions?\s+(?:schedules?|records?|reports?)|contribution\s+(?:remittance|schedule)|SuperStream\s+contributions?|401\(k\)\s+contributions?)\b
+    - id: Regex_top500_088_retirement_contribution_records_person_field
+      pattern: >-
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number)|payee(?:\s+name)?|member\s+(?:name|number|no\.?|ID)|fund\s+member\s+(?:number|ID))(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_top500_088_retirement_contribution_records_contribution_detail
+      pattern: >-
+        (?i)\b(?:(?:SG|super(?:annuation)?\s+guarantee|employer|employee|salary\s+sacrifice|concessional|non-concessional|voluntary|member|after-tax|pre-tax|personal)\s+contributions?|contribution\s+amount|super(?:annuation)?\s+(?:amount|paid)|amount\s+contributed|total\s+contributions?)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:=\-]?[ \t]{0,3}-?(?:AUD|A\$|US\$|NZ\$|\$|£|€)[ \t]?\d{1,3}(?:,?\d{3}){0,3}(?:\.\d{2})?
   keywords:
-    - id: Keyword_retirement_contribution
+    - id: Keyword_top500_088_retirement_contribution_records_corroborative
       groups:
         - match_style: word
           terms:
-            - retirement contribution records
-            - retirement contribution
-            - 401k
-            - pension contribution
-            - superannuation
-            - employer match
-            - salary sacrifice
-            - defined contribution
-            - defined benefit
-            - retirement fund
-            - vesting schedule
+            - text: USI
+              case_sensitive: true
+            - fund ABN
+            - SuperStream
+            - clearing house
+            - pay period
+            - payday super
+            - member number
+            - pension scheme
+            - fund name
       strength: specific
-    - id: Keyword_global_top500_088_retirement_contribution_records_domain_context
+    - id: Keyword_top500_088_retirement_contribution_records_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - retirement contribution records
-            - retirement
-            - contribution
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
+            - employers must
+            - you must pay
+            - payroll software
+            - book a demo
+            - free trial
       strength: domain
 risk_description: >-
-  This medium-confidence regex finds references to retirement, pension, or superannuation contribution records in financial and human-resources context. Actual employee-level records can disclose remuneration, benefit participation, employer payments, and account information, but the topic pattern does not require any person, amount, balance, fund, or member number. Routine policy, accounting, regulatory, and template material can therefore satisfy the surrounding vocabulary without exposing a private benefit record. Risk 4 OFFICIAL fits the normal phrase-level match; SENSITIVE requires attributable contribution amounts, balances, account identifiers, or a populated employee record.
+  The classifier identifies superannuation or pension contribution records for an identified employee (75) with contribution amounts (85). These reveal remuneration, salary sacrifice choices and fund membership. Guidance, blank forms and news stay at 65. Risk 4 supports OFFICIAL.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -131,17 +177,27 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 references:
-  - title: "Regulation (EU) 2016/679 (General Data Protection Regulation)"
-    url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
-frameworks:
-  - ISO 27001
-  - ISO 27701
+  - title: "Superannuation Guarantee (Administration) Act 1992 (Cth)"
+    url: https://www.legislation.gov.au/C2004A04402/latest/text
+  - title: "ATO - Super for employers"
+    url: https://www.ato.gov.au/businesses-and-organisations/super-for-employers
+  - title: "ATO - Payday Super"
+    url: https://www.ato.gov.au/businesses-and-organisations/super-for-employers/payday-super
+  - title: "ATO - Paying electronically through SuperStream"
+    url: https://www.ato.gov.au/businesses-and-organisations/super-for-employers/paying-electronically-through-superstream
+  - title: "Fair Work Regulations 2009 (Cth) - regs 3.31-3.46 employee records and pay slips"
+    url: https://www.legislation.gov.au/F2009L02356/latest/text
+  - title: "Privacy Act 1988 (Cth)"
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+  - version: 1.3.0
+    date: '2026-09-24'
+    description: 'HR quality pass (2026-09-24): rebuilt tiers - 65 primary phrase (discovery), 75 primary + populated person/party field, 85 adds a distinct populated record-detail regex plus an independent corroborative keyword group; removed the self-corroborating Evidence_* phrase list so a single phrase no longer reaches 75/85; added template-exclusion and guidance/policy/media-release NOT-groups to enforce tiers; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys. Primary narrowed to contribution records. Regulations now cite the Superannuation Guarantee (Administration) Act 1992 (Cth), Fair Work Regulations 2009 (Cth) reg 3.37 (superannuation records) and Industrial Relations Act 2016 (Qld) with the privacy statutes; references cite ATO super-for-employers, Payday Super and SuperStream pages.'
   - version: 1.2.2
     date: '2026-09-24'
-    description: "Metadata quality pass (2026-09-24): added 1 verified legislation/regulator references; filled empty frameworks (ISO 27001, ISO 27701)."
+    description: 'Metadata quality pass (2026-09-24): added 1 verified legislation/regulator references; filled empty frameworks (ISO 27001, ISO 27701).'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1649 without changing detector or package metadata.'
@@ -160,7 +216,6 @@ remediation:
   catalog_quality_2026_06_02:
     status: applied
     changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
-
+      - Mapped non-canonical confidence 80 to 75.
+      - Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 risk_rating: 4

@@ -1,60 +1,75 @@
 schema: testpattern/v1
 name: Pension account identifiers
 slug: global-top500-089-pension-account-identifiers
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to pension account identifiers in financial and compliance documents. Commonly found in international regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects pension, annuity and retirement income stream account identifiers: a labelled pension/annuity/policy/member number with a populated value, optionally with the account holder name or date of birth.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Keyword
-  lists: financial-deposit-terms, industry-hr. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?i)\b(?:pension\s+account\s+identifiers?)\b
+  Primary: a pension account phrase (pension/annuity/retirement income/account-based pension/income stream account, member, policy, scheme or reference number). 75 tier requires a populated account identifier field (pension/annuity/account/member/policy/scheme number, ID or reference with a value that contains a digit, or a spaced ABN-style number) within 300 characters. 85 tier additionally requires a populated holder field (member/account holder/pensioner/annuitant/policyholder name, employee name/ID, or date of birth) and an independent corroborative term (income stream, drawdown, nominated bank account, payment frequency, rollover, fund, annuity). Enforce tiers exclude template/fixture text and guidance/scam-warning framing; 65 is discovery-only.
+pattern: >-
+  (?i)\b(?:pension\s+account\s+identifiers?|(?:pension|annuity|retirement\s+income|account[\s-]based\s+pension|income\s+stream)\s+(?:account|member(?:ship)?|policy|scheme|plan|reference)(?:\s+(?:number|no\.?|ID|identifier|reference))?|pension\s+(?:number|reference\s+number))\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: pension and annuity account numbers are customer-defined with no public format, so the classifier anchors on a labelled account/member/policy number containing a digit (placeholder-guarded) near a pension phrase for 75, and adds a populated holder name or date of birth plus independent corroboration for 85. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
   - global
 regulations:
+  - Superannuation Industry (Supervision) Act 1993 (Cth)
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - financial
+  - pii
 corroborative_evidence:
   keywords:
-    - pension account identifiers
-    - pension
-    - account
-    - identifiers
-    - payroll
-    - tax
-    - operations
+    - income stream
+    - drawdown
+    - nominated bank account
+    - payment frequency
+    - rollover
+    - fund
+    - annuity
+    - preservation
   proximity: 300
-  keyword_lists:
-    - financial-deposit-terms
-    - industry-hr
-    - generic-data-labels
-    - data-record-context
 test_cases:
   should_match:
-    - value: 'Pension account identifiers'
-      description: Topic phrase present
-    - value: 'pension account identifiers'
-      description: Topic phrase, lowercase
-    - value: 'this record references the pension account identifiers held on file'
-      description: Topic phrase within surrounding text
+    - value: "Account-based pension account details\nMember name: Avery Teston\nDate of birth: 14/03/1958\nPension account number: AP-7730412\nPayment frequency: monthly to the nominated bank account."
+      description: "85: account-based pension details with member name, DOB, account number and payment frequency"
+      synthetic: true
+    - value: "Annuity policy number: ANN-0048812\nPolicyholder: Morgan Teston\nIncome stream commenced 01/07/2024; annual drawdown confirmed."
+      description: "85: annuity policy number with policyholder and drawdown"
+      synthetic: true
+    - value: "Pension scheme reference: PSR-551902\nPlease quote this reference in all correspondence."
+      description: "75: pension scheme reference with populated value, no holder"
+      synthetic: true
+    - value: "pension account identifier"
+      description: "65: bare phrase only - discovery tier"
+      synthetic: true
   should_not_match:
-    - value: unrelated generic text
-      description: No relevant phrase context
-    - value: placeholder value 12345
-      description: Random text should not match phrase marker
-    - value: generic narrative without identifier/document anchors
-      description: Should not match plain mention
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: "Keep your pension account number safe and never share it. This fact sheet explains how to find your member number."
+      description: "Consumer guidance - must stay at or below 65"
+    - value: "Pension account number: __________\nMember name: __________\nDate of birth: __/__/____"
+      description: "Blank form - must stay at or below 65"
+    - value: "Pension account number: N/A\nPolicyholder: TBC"
+      description: "Placeholder values - must stay at or below 65"
+    - value: "unrelated generic text without domain phrases"
+      description: "No relevant topic phrases present"
 false_positives:
-  - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
-    mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
-  - description: In English (as the primary international business language), standard business terminology overlapping with financial detection keywords in routine correspondence and documentation.
-    mitigation: Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for higher precision.
+  - description: "Policies, procedures, regulator guidance, fact sheets and training material that name the record type."
+    mitigation: "Enforce tiers require populated fields; guidance has labels without values, and policy/guidance/training/media-release framing is excluded by the NOT-group."
+  - description: "Blank forms, templates and system configuration screens."
+    mitigation: "Blank lines, bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded by template-exclusion."
+  - description: "Generic \"account number\" or \"reference number\" labels near an unrelated pension mention."
+    mitigation: "The pension phrase must be within 300 characters and the value must contain a digit; 85 needs a populated holder and corroboration."
+  - description: "Overlap with superannuation identifiers (global-top500-096) and au-superannuation-fund-number."
+    mitigation: "This pattern covers pension/annuity/income stream accounts; super fund identifiers (USI, fund ABN, SMSF ESA) are handled by global-top500-096."
 exports:
   - purview_xml
   - yaml
@@ -62,67 +77,91 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
-    - dict: generic-data-labels
-      as: Evidence_generic_data_labels
-      match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_pension_account_id
+      id_match: Regex_top500_089_pension_account_identifiers_primary
       matches:
-        - ref: Keyword_pension_account_id
-        - ref: Evidence_generic_data_labels
+        - ref: Regex_top500_089_pension_account_identifiers_account_number_field
+        - ref: Regex_top500_089_pension_account_identifiers_holder_field
+        - ref: Keyword_top500_089_pension_account_identifiers_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_top500_089_pension_account_identifiers_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_top500_089_pension_account_identifiers_primary
+      matches:
+        - ref: Regex_top500_089_pension_account_identifiers_account_number_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_top500_089_pension_account_identifiers_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_pension_account_id
+      id_match: Regex_top500_089_pension_account_identifiers_primary
       matches:
-        - ref: Evidence_generic_data_labels
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
   regexes:
-    - id: Regex_pension_account_id
-      pattern: (?i)\b(?:pension\s+account\s+identifiers?)\b
-    - id: Pattern_global_top500_089_pension_account_identifiers_label_context
-      pattern: (?i)\b(?:pension\s+account\s+identifiers)\b
+    - id: Regex_top500_089_pension_account_identifiers_primary
+      pattern: >-
+        (?i)\b(?:pension\s+account\s+identifiers?|(?:pension|annuity|retirement\s+income|account[\s-]based\s+pension|income\s+stream)\s+(?:account|member(?:ship)?|policy|scheme|plan|reference)(?:\s+(?:number|no\.?|ID|identifier|reference))?|pension\s+(?:number|reference\s+number))\b
+    - id: Regex_top500_089_pension_account_identifiers_account_number_field
+      pattern: >-
+        (?i)\b(?:(?:pension|annuity|account|member(?:ship)?|policy|scheme|plan|client)\s+(?:number|no\.?|ID|identifier|reference)|reference\s+number)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})(?:\d{2}(?:[ ]?\d{3}){3}|(?=[A-Za-z0-9-]{0,20}\d)[A-Za-z0-9][A-Za-z0-9-]{3,20})\b
+    - id: Regex_top500_089_pension_account_identifiers_holder_field
+      pattern: >-
+        (?i)\b(?:member|account\s+holder|pensioner|annuitant|beneficiary|policy\s*holder|client)(?:\s+(?:name|full\s+name))?(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}|\b(?:employee|staff)\s+(?:name|ID|number)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}|\b(?:date\s+of\s+birth|DOB)[ \t]{0,3}[:\-]?[ \t]{0,3}(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})
   keywords:
-    - id: Keyword_pension_account_id
+    - id: Keyword_top500_089_pension_account_identifiers_corroborative
       groups:
         - match_style: word
           terms:
-            - pension account identifiers
-            - pension account
-            - pension number
-            - pension fund
-            - member number
-            - pension scheme
-            - retirement account
-            - annuity number
-            - pension reference
-            - fund member ID
-            - pension identifier
+            - income stream
+            - drawdown
+            - nominated bank account
+            - payment frequency
+            - rollover
+            - fund
+            - annuity
+            - preservation
       strength: specific
-    - id: Keyword_global_top500_089_pension_account_identifiers_domain_context
+    - id: Keyword_top500_089_pension_account_identifiers_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - pension account identifiers
-            - pension
-            - identifiers
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
+            - keep your
+            - never share
+            - how to find
+            - where to find
+            - scam
       strength: domain
 risk_description: >-
-  The detector uses structural and proximity cues around pension and financial-deposit terms to find references to pension account identifiers, but it does not validate a jurisdiction-specific account number. A genuine identifier can help link a person to a retirement provider and support impersonation or targeted fraud when combined with name, balance, and authentication information. Public pension guidance, forms, accounting material, and unrelated account references can match, and the atomic identifier alone does not reveal a balance or authorise withdrawal. Risk 4 OFFICIAL reflects low standalone confidentiality harm; SENSITIVE would require a linked member statement, private balance, or access credential.
+  The classifier identifies a populated pension or annuity account identifier (75), and with the holder name or date of birth (85). Combined, these enable account enquiries, social engineering and fraud against retirees. Guidance and blank forms stay at 65. Risk 4 supports OFFICIAL; handle bulk account listings as SENSITIVE.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -132,17 +171,23 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 references:
-  - title: "Regulation (EU) 2016/679 (General Data Protection Regulation)"
-    url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
-frameworks:
-  - ISO 27001
-  - ISO 27701
+  - title: "Privacy Act 1988 (Cth)"
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
+  - title: "OAIC - Australian Privacy Principles"
+    url: https://www.oaic.gov.au/privacy/australian-privacy-principles
+  - title: "Information Privacy Act 2009 (Qld)"
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+  - title: "ATO - Super for employers"
+    url: https://www.ato.gov.au/businesses-and-organisations/super-for-employers
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'HR quality pass (2026-09-24): rebuilt tiers - 65 pension phrase (discovery), 75 adds a populated account/member/policy number field (placeholder-guarded, must contain a digit), 85 adds a populated holder name or date of birth plus independent corroboration; removed the unused label-context regex, generic-data-labels evidence and the domain keyword list that repeated the primary phrase; widened the primary from the single phrase "pension account identifiers" to pension/annuity/income stream account labels; replaced bare-phrase tests with populated records and guidance/blank/placeholder decoys; regulations now cite the Superannuation Industry (Supervision) Act 1993 (Cth) with the privacy statutes (removed AML/CTF boilerplate).'
   - version: 1.3.2
     date: '2026-09-24'
-    description: "Metadata quality pass (2026-09-24): added 1 verified legislation/regulator references; filled empty frameworks (ISO 27001, ISO 27701)."
+    description: 'Metadata quality pass (2026-09-24): added 1 verified legislation/regulator references; filled empty frameworks (ISO 27001, ISO 27701).'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1650 without changing detector or package metadata.'
@@ -167,8 +212,7 @@ remediation:
   catalog_quality_2026_06_02:
     status: applied
     changes:
-      - 'Mapped non-canonical confidence 90 to 85.'
-      - 'Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.'
-      - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
-
+      - Mapped non-canonical confidence 90 to 85.
+      - Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
+      - Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.
 risk_rating: 4

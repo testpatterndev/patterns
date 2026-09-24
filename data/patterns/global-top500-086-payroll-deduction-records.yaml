@@ -1,66 +1,80 @@
 schema: testpattern/v1
 name: Payroll deduction records
 slug: global-top500-086-payroll-deduction-records
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to payroll deduction records in financial and compliance documents. Commonly found in Australian regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects payroll deduction records for an identified employee: deduction authorisations, salary sacrifice agreements, union fee, child support, health fund, workplace giving and novated lease deductions, with the deduction amount.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Keyword
-  lists: industry-hr.
+  Primary: a payroll deduction phrase (payroll deduction record/authorisation/form/schedule, authority to deduct, salary sacrifice agreement/arrangement, voluntary deduction, child support deduction, union fees deduction, payroll/workplace giving, pre/post-tax deduction). Generic "health insurance", "net pay" and "superannuation contribution" were removed. 75 tier requires a populated person field (employee/staff name or number, payroll number, position number, payee) with a non-placeholder value within 300 characters. 85 tier additionally requires a populated deduction line with a currency amount (deduction amount, amount per pay, salary sacrifice, union fees, child support, health fund, novated lease, HELP repayment) and an independent corroborative term (signed, written authority, authorised, approved, commencing, per pay, payroll). Enforce tiers exclude template/fixture text (template-exclusion) and policy, guidance, training and media-release framing; 65 is discovery-only (primary alone, template-excluded) and will surface policies, guidance, blank forms and statistics.
 pattern: >-
-  (?is)\b(?:payroll\s+deduction\s+records|salary\s+sacrifice|superannuation\s+contribution|union\s+fees|health\s+insurance|pre[\s-]+tax\s+deduction|post[\s-]+tax\s+deduction|HECS\s+repayment|child\s+support\s+deduction|payroll\s+withholding|net\s+pay)\b
+  (?i)\b(?:payroll\s+deductions?\s+(?:records?|authori[sz]ations?|forms?|schedules?|registers?|reports?)|deduction\s+authori[sz]ations?|authority\s+to\s+deduct|salary\s+sacrifice\s+(?:agreements?|arrangements?|elections?)|voluntary\s+(?:payroll\s+)?deductions?|child\s+support\s+deductions?|union\s+(?:fees|dues)\s+deductions?|payroll\s+giving|workplace\s+giving\s+deductions?|(?:pre|post)[\s-]tax\s+deductions?)\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection.
+confidence_justification: >-
+  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated field with a non-placeholder value and 85 adds a record-specific populated detail plus independent corroboration. Person and record values are customer-defined, so the field regexes use labelled loose values with a placeholder guard. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
+  - au
   - global
 regulations:
-  - AML/CTF Act (Cth)
-  - IPA 2009 (Qld)
-  - NDB Scheme (Cth)
+  - Fair Work Act 2009 (Cth)
+  - Fair Work Regulations 2009 (Cth)
+  - Industrial Relations Act 2016 (Qld)
+  - Taxation Administration Act 1953 (Cth)
   - Privacy Act 1988 (Cth)
-  - GDPR
+  - IPA 2009 (Qld)
 frameworks:
   - ISO 27001
   - ISO 27701
-  - PCI-DSS
-  - SOC 2
 data_categories:
   - financial
+  - employment
+  - pii
 corroborative_evidence:
   keywords:
-    - payroll deduction records
+    - signed
+    - written authority
+    - authorised
+    - approved
+    - commencing
+    - per pay
+    - per fortnight
     - payroll
-    - deduction
-    - records
-    - tax
-    - operations
+    - cease
   proximity: 300
-  keyword_lists:
-    - industry-hr
 test_cases:
   should_match:
-    - value: payroll deduction records
-      description: Primary topic phrase match
-    - value: salary sacrifice
-      description: Case-insensitive topic phrase match
-    - value: superannuation contribution
-      description: Alternative topic phrase match
-    - value: union fees
-      description: Additional topic phrase match
+    - value: "Payroll deduction authorisation\nEmployee name: Avery Teston\nEmployee ID: 4471820\nDeduction type: Union fees\nAmount per pay: $18.50\nCommencing pay period ending 10/10/2026\nSigned by the employee; written authority held on file."
+      description: "85: deduction authorisation with employee, amount per pay and signed written authority"
+      synthetic: true
+    - value: "Salary sacrifice agreement\nStaff member: Morgan Teston\nNovated lease: $412.30 per fortnight\nHealth fund: $96.20\nApproved by payroll on 02/09/2026."
+      description: "85: salary sacrifice agreement with novated lease and health fund amounts"
+      synthetic: true
+    - value: "Child support deduction\nEmployee: Jordan Staffson\nPlease action the attached notice from the next pay run."
+      description: "75: child support deduction naming the employee, no amount"
+      synthetic: true
+    - value: "salary sacrifice agreement"
+      description: "65: bare phrase only - discovery tier"
+      synthetic: true
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: payroll reimbursement
-      description: Generic word pair from old broad template should not match
+    - value: "An employer can only deduct money from an employee's pay if the employee agrees in writing and it is principally for their benefit. This fact sheet also covers salary sacrifice arrangements."
+      description: "FWO-style guidance - must stay at or below 65"
+    - value: "Payroll deduction authorisation form\nEmployee name: __________\nDeduction type: __________\nAmount per pay: $______"
+      description: "Blank deduction form - must stay at or below 65"
+    - value: "Workplace giving deductions rose sharply last year, according to a news release from the charity sector."
+      description: "News - must stay at or below 65"
+    - value: "unrelated generic text without domain phrases"
+      description: "No relevant topic phrases present"
 false_positives:
-  - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
-    mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
-  - description: In Australian English, standard business terminology overlapping with financial detection keywords in routine correspondence and documentation.
-    mitigation: Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for higher precision.
+  - description: "Policies, procedures, regulator guidance, fact sheets and training material that name the record type."
+    mitigation: "Enforce tiers require populated fields; guidance has labels without values, and policy/guidance/training/media-release framing is excluded by the NOT-group."
+  - description: "Blank forms, templates and system configuration screens."
+    mitigation: "Blank lines, bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded by template-exclusion."
+  - description: "News, statistics and vendor marketing."
+    mitigation: "No populated person or record fields, so these stay at 65 discovery."
+  - description: "Deduction records that identify the employee only in free text fall to 65."
+    mitigation: "Accepted precision trade-off; extend the person-field regex with the customer employee-ID format."
 exports:
   - purview_xml
   - yaml
@@ -71,57 +85,90 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_payroll_deduction_records
+      id_match: Regex_top500_086_payroll_deduction_records_primary
       matches:
-        - ref: Evidence_payroll_deduction_records
-          min_count: 2
-          unique_results: true
+        - ref: Regex_top500_086_payroll_deduction_records_person_field
+        - ref: Regex_top500_086_payroll_deduction_records_deduction_detail
+        - ref: Keyword_top500_086_payroll_deduction_records_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_086_payroll_deduction_records_guidance_exclusion
     - confidence_level: 75
-      id_match: Pattern_payroll_deduction_records
+      id_match: Regex_top500_086_payroll_deduction_records_primary
       matches:
-        - ref: Evidence_payroll_deduction_records
+        - ref: Regex_top500_086_payroll_deduction_records_person_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_086_payroll_deduction_records_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_payroll_deduction_records
+      id_match: Regex_top500_086_payroll_deduction_records_primary
       matches:
-        - ref: Evidence_payroll_deduction_records
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-    - id: Pattern_payroll_deduction_records
+    - id: Regex_top500_086_payroll_deduction_records_primary
       pattern: >-
-        (?is)\b(?:payroll\s+deduction\s+records|salary\s+sacrifice|superannuation\s+contribution|union\s+fees|health\s+insurance|pre[\s-]+tax\s+deduction|post[\s-]+tax\s+deduction|HECS\s+repayment|child\s+support\s+deduction|payroll\s+withholding|net\s+pay)\b
+        (?i)\b(?:payroll\s+deductions?\s+(?:records?|authori[sz]ations?|forms?|schedules?|registers?|reports?)|deduction\s+authori[sz]ations?|authority\s+to\s+deduct|salary\s+sacrifice\s+(?:agreements?|arrangements?|elections?)|voluntary\s+(?:payroll\s+)?deductions?|child\s+support\s+deductions?|union\s+(?:fees|dues)\s+deductions?|payroll\s+giving|workplace\s+giving\s+deductions?|(?:pre|post)[\s-]tax\s+deductions?)\b
+    - id: Regex_top500_086_payroll_deduction_records_person_field
+      pattern: >-
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number)|payee(?:\s+name)?)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_top500_086_payroll_deduction_records_deduction_detail
+      pattern: >-
+        (?i)\b(?:deduction(?:\s+amount)?|amount\s+per\s+(?:pay|fortnight|week|month)|salary\s+sacrifice|union\s+(?:fees|dues)|child\s+support|health\s+(?:fund|insurance)|workplace\s+giving|payroll\s+giving|novated\s+lease|HELP\s+repayment|(?:pre|post)[\s-]tax\s+deduction|total\s+deductions)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:=\-]?[ \t]{0,3}-?(?:AUD|A\$|US\$|NZ\$|\$|£|€)[ \t]?\d{1,3}(?:,?\d{3}){0,3}(?:\.\d{2})?
   keywords:
-    - id: Evidence_payroll_deduction_records
+    - id: Keyword_top500_086_payroll_deduction_records_corroborative
       groups:
         - match_style: word
           terms:
-            - payroll deduction records
-            - deduction
-            - salary sacrifice
-            - superannuation contribution
-            - union fees
-            - health insurance
-            - pre-tax deduction
-            - post-tax deduction
-            - HECS repayment
-            - child support deduction
-            - payroll withholding
-            - net pay
+            - signed
+            - written authority
+            - authorised
+            - approved
+            - commencing
+            - per pay
+            - per fortnight
+            - payroll
+            - cease
+      strength: specific
+    - id: Keyword_top500_086_payroll_deduction_records_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
+            - only deduct
+            - can deduct
+            - can only
+            - payroll software
+            - book a demo
+            - free trial
+      strength: domain
 risk_description: >-
-  The regex identifies payroll-deduction topics including salary sacrifice, super contributions, union fees, health insurance, HECS repayment, child support, withholding, and net pay. Some of those subjects can expose private employee circumstances, but the detector does not require a named worker, selected deduction, amount, or pay record. Misuse therefore needs populated payroll context, while policy explanations and benefit guidance can match the same phrases. Risk 4 OFFICIAL reflects low standalone harm from the concept signal; SENSITIVE would require an attributable deduction history or detailed payslip.
+  The classifier identifies payroll deduction records for an identified employee (75) with deduction amounts (85). Deductions can reveal union membership, child support obligations, health cover and debts. Policies, guidance and blank forms stay at 65. Risk 4 supports OFFICIAL; union membership or child support detail in bulk would warrant handling as SENSITIVE.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -131,18 +178,27 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 references:
-  - title: "Anti-Money Laundering and Counter-Terrorism Financing Act 2006 (Cth)"
-    url: https://www.legislation.gov.au/C2006A00169/latest/text
-  - title: "Information Privacy Act 2009 (Qld)"
-    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+  - title: "Fair Work Ombudsman - Deducting pay"
+    url: https://www.fairwork.gov.au/pay-and-wages/deductions-and-related-issues/deducting-pay
+  - title: "Fair Work Act 2009 (Cth)"
+    url: https://www.legislation.gov.au/C2009A00028/latest/text
+  - title: "Fair Work Regulations 2009 (Cth) - regs 3.31-3.46 employee records and pay slips"
+    url: https://www.legislation.gov.au/F2009L02356/latest/text
+  - title: "Industrial Relations Act 2016 (Qld) - ss 339-340 time and wages records"
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2016-063
+  - title: "ATO - Fringe benefits tax"
+    url: https://www.ato.gov.au/businesses-and-organisations/hiring-and-paying-your-workers/fringe-benefits-tax
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'HR quality pass (2026-09-24): rebuilt tiers - 65 primary phrase (discovery), 75 primary + populated person/party field, 85 adds a distinct populated record-detail regex plus an independent corroborative keyword group; removed the self-corroborating Evidence_* phrase list so a single phrase no longer reaches 75/85; added template-exclusion and guidance/policy/media-release NOT-groups to enforce tiers; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys. Primary narrowed to deduction records. Regulations now cite the Fair Work Act 2009 (Cth) (s 324 permitted deductions), Fair Work Regulations 2009 (Cth), Industrial Relations Act 2016 (Qld) and Taxation Administration Act 1953 (Cth) with the privacy statutes (removed AML/CTF Act and GDPR boilerplate); frameworks drop PCI-DSS and SOC 2.'
   - version: 1.3.2
     date: '2026-09-24'
-    description: "Metadata quality pass (2026-09-24): removed regulation tags that do not apply (SOCI Act 2018 (Cth)); added 3 verified legislation/regulator references."
+    description: 'Metadata quality pass (2026-09-24): removed regulation tags that do not apply (SOCI Act 2018 (Cth)); added 3 verified legislation/regulator references.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 689 without changing detector or package metadata.'
@@ -160,5 +216,4 @@ changelog:
     description: Initial release
 author: testpattern-community
 license: MIT
-
 risk_rating: 4

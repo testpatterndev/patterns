@@ -1,0 +1,243 @@
+schema: testpattern/v1
+name: Medical Certificate or Fitness-for-Work Clearance
+slug: au-medical-certificate-fitness-for-work
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Populated medical certificates and fitness-for-work clearances held by employers: practitioner
+  certificates given as evidence for personal / sick leave (Fair Work Act 2009 s 107(3) lets an
+  employer require evidence that would satisfy a reasonable person), certificates of fitness or
+  capacity issued outside a workers' compensation claim, fitness-for-duty assessments, pre-employment
+  medical clearances and return-to-work clearances. The records name the employee or patient, state a
+  practitioner's opinion that the person is unfit, or fit for normal, restricted or modified duties
+  over a stated period, and often carry a diagnosis, work restrictions and the practitioner's name and
+  provider or registration number. Boundary: workers' compensation claim records, Form 132M work
+  capacity certificates and Comcare certificates of capacity belong to au-qld-workers-compensation-claim;
+  statutory WHS health monitoring reports (Schedule 14 chemicals, lead, asbestos, audiometry) belong to
+  au-whs-health-monitoring-record. Both are excluded from this classifier's enforce tiers.
+operation: >-
+  Primary: medical certificate, certificate of fitness / illness / incapacity / capacity, fitness for
+  work / duty or return to work certificate or clearance, medical clearance, fitness for duty
+  assessment, pre-employment medical certificate / clearance / declaration, or practitioner
+  certification wording ("unfit for work / duty", "fit for normal / restricted / modified / light /
+  alternative duties"). 65 is discovery-only (primary alone) and surfaces leave policies, blank
+  certificates and Fair Work guidance. 75 requires a populated employee / patient field (patient,
+  employee, worker, staff member, candidate or applicant name or number with a non-placeholder value,
+  or "this is to certify that" / "I have examined" followed by a person's name) AND a dated fitness
+  outcome: unfit / fit / unable for work or duties from a date (to a date), a period of incapacity or
+  absence as a date range, a condition preventing work between two dates, or a labelled outcome (fit,
+  unfit, fit with restrictions, cleared) followed by a date. 85 additionally requires a medical detail
+  or practitioner structure: a populated diagnosis / condition / restrictions / treatment field, a
+  concrete restriction (no lifting, no driving, no work at heights, maximum kg or hours), a named
+  treating / examining doctor or practitioner, a provider / AHPRA / registration number by label, or
+  a populated practice or clinic name. Every enforce tier excludes template/fixture text, workers'
+  compensation and WHS health monitoring context, Fair Work Ombudsman guidance, legislation and policy
+  wording.
+pattern: >-
+  (?i)\b(?:medical\s+certificate|certificate\s+of\s+(?:fitness|illness|incapacity|capacity)|(?:fitness[\s-]+for[\s-]+(?:work|duty)|return[\s-]+to[\s-]+work|medical)\s+(?:certificate|clearance)|fitness\s+for\s+duty\s+assessment|pre-?employment\s+medical\s+(?:certificate|clearance|declaration)|(?:unfit|not\s+fit)\s+for\s+(?:work|duty|duties)|fit\s+for\s+(?:normal|full|restricted|modified|light|alternative|pre-injury|usual)\s+duties)\b
+confidence: medium
+confidence_justification: >-
+  Medium: certificate wording is standardised and the enforce tiers need a named employee or patient
+  plus a dated fitness outcome, which leave policies, guidance and blank certificates do not carry.
+  Provider and registration numbers are matched by label only (no public-format validation), and
+  clinic letters or rehabilitation notes that follow the same layout will also match. 85/75 are
+  heuristic evidence tiers, not measured accuracy; test values are synthetic certificates laid out like
+  GP certificates and employer return-to-work clearances.
+jurisdictions:
+  - au
+regulations:
+  - Fair Work Act 2009 (Cth) s 107
+  - Privacy Act 1988 (Cth) - health information
+  - Information Privacy Act 2009 (Qld)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - QGISCF
+data_categories:
+  - health
+  - pii
+  - employment
+corroborative_evidence:
+  keywords:
+    - practitioner
+    - provider number
+    - AHPRA
+    - medical centre
+    - restrictions
+    - diagnosis
+    - personal leave
+    - sick leave
+    - modified duties
+    - review appointment
+  proximity: 300
+customisation:
+  - key: employee-id
+    kind: identifier-format
+    identifier: employee-id
+    target: purview.regexes/Regex_au_medical_certificate_person_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the populated-field evidence with the customer's employee ID / payroll number format (see docs/identifiers.md#employee-id). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Medical certificate\nPatient: Jordan Teston\nI certify that I examined the above patient on 14/09/2026 and in my opinion they are unfit for work from 14/09/2026 to 18/09/2026 inclusive.\nCondition: acute gastroenteritis\nDoctor: Dr Priya Teston\nProvider number: 9999999Z\nPractice name: Carrow Street Medical Centre"
+      description: 85 tier - GP certificate with patient, unfit-for-work date range, condition, doctor and provider number by label
+      synthetic: true
+    - value: "Return to work clearance\nEmployee: Sam Teston\nEmployee number: 300912\nFit for restricted duties from 22/09/2026 to 06/10/2026\nRestrictions: no lifting over 10 kg and no night shifts\nReview appointment: 06/10/2026"
+      description: 85 tier - return to work clearance with employee fields, restricted duties period and restrictions
+      synthetic: true
+    - value: "Certificate of fitness\nName of employee: Alex Teston\nFit to return to normal duties on 28/09/2026."
+      description: 75 tier - fitness certificate with a named employee and a dated return to duties, no medical detail
+      synthetic: true
+    - value: "Medical certificate\nThis is to certify that Riley Teston has a medical condition which will prevent them from working from 3 September 2026 to 5 September 2026."
+      description: 75 tier - certifying wording with the patient's name and a date range, no practitioner block
+      synthetic: true
+    - value: "Fitness for duty assessment - electrical fitter\nCandidate: Kai Teston\nOutcome: fit with restrictions, effective 15/09/2026\nExamining doctor: Dr Lee Teston\nLimitations: no work at heights above 2 m pending vestibular review"
+      description: 85 tier - fitness for duty assessment with candidate, dated outcome, examining doctor and limitations
+      synthetic: true
+  should_not_match:
+    - value: "Sick leave policy. This policy applies to all employees. Employees must provide a medical certificate for any absence of more than two consecutive days stating that the employee was unfit for work for the period of the absence."
+      description: Sick / personal leave policy (65 at most)
+    - value: "Medical certificate\nPatient name: ______________\nThis is to certify that ______________ is unfit for work from __/__/____ to __/__/____\nDoctor: ______________\nProvider number: ______________"
+      description: Blank certificate (65 at most)
+    - value: "Evidence for sick and carer's leave. An employer can ask for evidence that would satisfy a reasonable person, such as a medical certificate or a statutory declaration. A medical certificate might say the employee was unfit for work from 1 July to 3 July. More at fairwork.gov.au."
+      description: Fair Work Ombudsman evidence guidance page
+    - value: "Work capacity certificate - workers' compensation (Form 132M)\nWorker name: Jordan Teston\nClaim number: 25Q/448193\nCapacity for work: fit for suitable duties from 02/09/2026 to 30/09/2026\nDiagnosis: right shoulder strain\nTreating practitioner: Dr Priya Teston"
+      description: WorkCover work capacity certificate - belongs to au-qld-workers-compensation-claim, excluded here
+    - value: "GPs say demand for medical certificates spikes every winter, and telehealth services now issue many of them online, the college said."
+      description: News article
+false_positives:
+  - description: Sick leave and personal leave policies, enterprise agreement clauses and Fair Work Ombudsman guidance describing what a medical certificate should say.
+    mitigation: No populated employee / patient field with a dated outcome, so these stay at 65; policy, guidance, fairwork.gov.au and "satisfy a reasonable person" wording are excluded from enforce tiers.
+  - description: Blank certificate pads and practice letterhead.
+    mitigation: Person fields reject blank lines and placeholders, and the outcome needs a real date; fixture wording is excluded by the shared template-exclusion dictionary.
+  - description: Workers' compensation certificates and WHS health monitoring reports that use the same fitness language.
+    mitigation: Form 132M, work capacity certificate, workers' compensation, WorkCover, Comcare, claim number, date of injury, health monitoring report and Schedule 14 wording exclude the record from this classifier's enforce tiers so it is handled by the dedicated classifiers.
+  - description: Clinic correspondence and rehabilitation notes that name a patient and a dated fitness opinion.
+    mitigation: These are health information about an identified person and are acceptable matches.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_medical_certificate_primary
+      matches:
+        - ref: Regex_au_medical_certificate_person_field
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_medical_certificate_fitness_outcome
+            - Regex_au_medical_certificate_absence_period
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_medical_certificate_medical_detail
+            - Regex_au_medical_certificate_practitioner_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_medical_certificate_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_medical_certificate_primary
+      matches:
+        - ref: Regex_au_medical_certificate_person_field
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_medical_certificate_fitness_outcome
+            - Regex_au_medical_certificate_absence_period
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_medical_certificate_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_medical_certificate_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_medical_certificate_primary
+      pattern: >-
+        (?i)\b(?:medical\s+certificate|certificate\s+of\s+(?:fitness|illness|incapacity|capacity)|(?:fitness[\s-]+for[\s-]+(?:work|duty)|return[\s-]+to[\s-]+work|medical)\s+(?:certificate|clearance)|fitness\s+for\s+duty\s+assessment|pre-?employment\s+medical\s+(?:certificate|clearance|declaration)|(?:unfit|not\s+fit)\s+for\s+(?:work|duty|duties)|fit\s+for\s+(?:normal|full|restricted|modified|light|alternative|pre-injury|usual)\s+duties)\b
+    - id: Regex_au_medical_certificate_person_field
+      pattern: >-
+        (?i)\b(?:(?:name\s+of\s+)?(?:patient|employee|worker|staff\s+member|candidate|applicant|examinee)(?:['’]s)?(?:\s+(?:full\s+)?(?:name|no\.?|number|ID))?\s*[:#]\s*(?:(?:Mr|Mrs|Ms|Miss|Mx)\.?\s+)?(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{1,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}|(?:this\s+is\s+to\s+certify\s+that|I\s+(?:hereby\s+)?certify\s+that|I\s+have\s+(?:examined|assessed|seen))\s+(?:(?:Mr|Mrs|Ms|Miss|Mx)\.?\s+)?(?!(?:the|this|that|my|your|he|she|they|his|her|their|patient|employee|worker|above|named|we|on)\b|_{2,}|\[|<)[A-Z][a-z'-]{1,30}[ \t]+[A-Z][A-Za-z'-]{1,30})
+    - id: Regex_au_medical_certificate_fitness_outcome
+      pattern: >-
+        (?i)\b(?:(?:unfit|not\s+fit|fit|unable)\s+(?:for|to\s+(?:return\s+to|resume|perform|attend|undertake))\s+(?:(?:his|her|their|normal|full|usual|pre-injury|restricted|modified|light|alternative|suitable|any|all|regular)[ \t]{1,3}){0,2}(?:work|duties|duty|employment)\b[\s\S]{0,40}?\b(?:from|on|as\s+of|effective)\s+(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s\d{4}|20\d{2}-\d{2}-\d{2})|(?:outcome|result|fitness|clearance|medical\s+clearance|assessment\s+outcome)\s*[:#]\s*(?:fit\s+with\s+restrictions|fit\s+for\s+(?:restricted|modified|normal|full)\s+duties|temporarily\s+unfit|unfit|cleared|fit)\b[\s\S]{0,60}?(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s\d{4}|20\d{2}-\d{2}-\d{2}))
+    - id: Regex_au_medical_certificate_absence_period
+      pattern: >-
+        (?i)\b(?:(?:period\s+of\s+(?:incapacity|absence|unfitness)|dates?\s+of\s+(?:absence|incapacity)|absent\s+from\s+work)\s*[:#]?\s*(?:from\s+)?(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s\d{4}|20\d{2}-\d{2}-\d{2})[ \t]*(?:to|until|-|–)[ \t]*(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s\d{4}|20\d{2}-\d{2}-\d{2})|(?:prevent|prevents|prevented)\s+(?:him|her|them|the\s+(?:patient|employee))\s+from\s+(?:working|attending\s+work)\s+from\s+(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s\d{4}|20\d{2}-\d{2}-\d{2})\s+(?:to|until)\s+(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s\d{4}|20\d{2}-\d{2}-\d{2}))
+    - id: Regex_au_medical_certificate_medical_detail
+      pattern: >-
+        (?i)\b(?:(?:diagnosis|medical\s+condition|condition|nature\s+of\s+(?:illness|condition)|restrictions?|limitations?|work\s+restrictions|duties\s+restricted\s+to|recommended\s+(?:duties|adjustments)|treatment|medication)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|nil|none|withheld|the|a|an|see|refer)\b|_{2,}|\[|<)[A-Za-z][A-Za-z0-9/'.,;-]{1,40}(?:[ \t]+[A-Za-z0-9/'.,;-]{1,30}){0,8}|no\s+(?:lifting|bending|driving|climbing|kneeling|prolonged\s+(?:standing|sitting)|operating\s+(?:machinery|plant)|work(?:ing)?\s+at\s+heights?|night\s+shifts?|overtime)\b|(?:max(?:imum)?|up\s+to)\s+\d{1,2}\s*(?:kg|hours?\s+per\s+(?:day|shift|week))\b)
+    - id: Regex_au_medical_certificate_practitioner_field
+      pattern: >-
+        (?i)\b(?:(?:(?:treating|examining|registered|certifying)\s+)?(?:doctor|medical\s+practitioner|practitioner|GP|physician|nurse\s+practitioner|psychologist|dentist)(?:['’]s)?(?:\s+name)?\s*[:#]\s*(?:Dr\.?\s+)?(?!(?:n/?a|name|unknown|tbc|tba|the|a|an|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'.-]{1,30}(?:[ \t]+[A-Z][A-Za-z'.-]{1,30}){0,3}|(?:provider|prescriber|AHPRA(?:\s+registration)?|practitioner\s+registration|registration)\s+(?:no\.?|number|ID)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9-]{4,14}\b|(?:medical\s+(?:centre|center|practice|clinic)|practice\s+(?:name|address)|clinic)\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|the|a|an|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'.&-]{1,30}(?:[ \t]+[A-Za-z0-9'.&-]{1,30}){0,5})
+    - id: Regex_au_medical_certificate_exclusion
+      pattern: >-
+        (?i)\bForm\s+132M\b|\bwork\s+capacity\s+certificate\b|\bworkers?['’]?\s+compensation\b|\bWorkCover\b|\bComcare\b|\bdate\s+of\s+injury\b|\bclaim\s+(?:no\.?|number)\b|\bhealth\s+monitoring\s+(?:report|record)\b|\bSchedule\s+14\b|\bfairwork\.gov\.au\b|\bFair\s+Work\s+Ombudsman\b|\blegislation\.gov\.au\b|\bMaximum\s+penalty\b|\bthis\s+(?:policy|procedure|guide|guidance|fact\s?sheet|page|article)\b|\bemployees\s+(?:must|should|may|are\s+required\s+to)\s+(?:provide|supply|give)\b|\bsatisfy\s+a\s+reasonable\s+person\b|\bapply\s+now\b
+risk_rating: 8
+risk_description: >-
+  The classifier identifies medical certificates and fitness-for-work clearances about a named employee
+  or patient, gated on a dated fitness outcome, with 85 also requiring diagnosis, restriction or
+  practitioner detail. These are health information under the Privacy Act and IPA 2009: they reveal
+  illness, injury, mental health or pregnancy-related absences and work restrictions, and they sit in
+  HR inboxes, leave systems and manager folders well outside clinical systems. Breach evidence points to
+  occupational health records as a target: the claimed 2026 PeopleSoft intrusion listed occupational
+  health (Medlink) records, and the 2025 Western Sydney University incident exposed staff health and
+  disability information. Leakage can drive discrimination in rostering, promotion and termination
+  decisions. Workers' compensation certificates and WHS health monitoring reports are handled by their
+  own classifiers. Risk 8 matches au-whs-health-monitoring-record and au-drug-alcohol-test-result.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Fair Work Act 2009 (Cth) s 107 - Notice and evidence requirements (compilation in force 7 November 2025)
+    url: https://www.legislation.gov.au/C2009A00028/2025-11-07/2025-11-07/text/original/epub/OEBPS/document_1/document_1.html
+  - title: WorkSafe Queensland - Form 132M Work capacity certificate (boundary with au-qld-workers-compensation-claim)
+    url: https://www.worksafe.qld.gov.au/__data/assets/pdf_file/0014/25214/form-132m-work-capacity-certificate-workers-compensation.pdf
+  - title: Western Sydney University - cyber incident details (staff health and disability information)
+    url: https://www.westernsydney.edu.au/news/cyber-details/october-23-2025
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: >-
+      Initial release - medical certificates, certificates of fitness / capacity outside a workers'
+      compensation claim, fitness-for-duty assessments, pre-employment medical clearances and
+      return-to-work clearances. 65 phrase only; 75 needs a populated employee / patient field and a
+      dated fitness outcome; 85 adds diagnosis / restriction or practitioner detail. Workers'
+      compensation and WHS health monitoring context excluded (handled by
+      au-qld-workers-compensation-claim and au-whs-health-monitoring-record). Provider and registration
+      numbers matched by label only.
+author: testpattern-community
+license: MIT

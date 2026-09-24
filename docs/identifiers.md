@@ -14,13 +14,13 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [ASIC / MSIC card number](#asic-msic-card-number) | The aviation or maritime security identification card issuing body | unpublished | medium | 1 |
 | [Asset number / functional location](#asset-functional-location) | The customer's asset management system (e.g. SAP PM functional locations, Maximo assets) | customer-defined | low | 1 |
 | [Cabinet / CBRC submission number](#cabinet-submission-number) | Queensland Cabinet Secretariat (Department of the Premier and Cabinet) | unpublished | low | 1 |
-| [Agency case / file / matter number](#case-reference-number) | The customer agency's case management or records system | customer-defined | low | 17 |
+| [Agency case / file / matter number](#case-reference-number) | The customer agency's case management or records system | customer-defined | low | 18 |
 | [Crime and Corruption Commission reference](#ccc-reference) | Crime and Corruption Commission (Queensland) | unpublished | medium | 1 |
 | [Cemetery interment right / plot reference](#cemetery-interment-right-number) | The council cemetery service | customer-defined | low | 1 |
 | [Council development / building application number](#council-development-application-number) | Queensland local governments (assessment managers) and private building certifiers | customer-defined | low | 3 |
 | [Council property / rate assessment number](#council-property-number) | Queensland local governments | customer-defined | low | 6 |
 | [Records management (eDRMS) record number](#edrms-record-number) | The customer's records management system (e.g. Content Manager, RecFind, Objective) | customer-defined | medium | 1 |
-| [Employee / staff ID](#employee-id) | The customer's payroll or HR system (e.g. Aurion, SAP, Workday) | customer-defined | low | 5 |
+| [Employee / staff ID](#employee-id) | The customer's payroll or HR system (e.g. Aurion, SAP, Workday) | customer-defined | low | 11 |
 | [Environmental incident / notification reference](#environmental-incident-reference) | The operator's incident system or the administering authority | customer-defined | low | 1 |
 | [Electrical Safety Office notification reference](#eso-incident-notification-reference) | Electrical Safety Office / WHSQ (Qld) | unpublished | low | 1 |
 | [Fertility clinic donor code](#fertility-donor-code) | Assisted reproductive technology (ART) providers | customer-defined | medium | 1 |
@@ -52,14 +52,14 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [QTAC application number](#qtac-application-number) | Queensland Tertiary Admissions Centre | unpublished | medium | 1 |
 | [Regulator prosecution / enforcement reference](#regulator-prosecution-reference) | Queensland regulators (e.g. Workplace Health and Safety Queensland) | unpublished | low | 1 |
 | [Worker screening / background check reference](#screening-check-reference) | AusCheck, NDIS Worker Screening Unit, police or AGSVA | unpublished | low | 1 |
-| [Superannuation member number](#super-member-number) | The superannuation fund | customer-defined | low | 1 |
+| [Superannuation member number](#super-member-number) | The superannuation fund | customer-defined | low | 2 |
 | [Surveillance device / warrant reference](#surveillance-warrant-reference) | Queensland law enforcement agencies and issuing courts | unpublished | medium | 3 |
 | [Switching sheet number](#switching-sheet-number) | The network or plant operator (switching program system) | customer-defined | medium | 1 |
 | [Telco account / service number](#telco-account-number) | The customer's telecommunications billing / CRM system | customer-defined | low | 1 |
 | [Tender / contract reference number](#tender-reference-number) | The customer agency's procurement system (QTenders, agency contract register or e-tendering platform) | customer-defined | low | 2 |
 | [University / TAFE student number](#tertiary-student-number) | The customer university or TAFE | customer-defined | low | 4 |
 | [Trade waste approval number](#trade-waste-approval-number) | The water service provider (council or distributor-retailer) | customer-defined | medium | 1 |
-| [Utility customer account number](#utility-account-number) | The customer's energy or water retail billing / CRM system (e.g. SAP IS-U, Gentrack) | customer-defined | low | 6 |
+| [Utility customer account number](#utility-account-number) | The customer's energy or water retail billing / CRM system (e.g. SAP IS-U, Gentrack) | customer-defined | low | 7 |
 | [Victim Assist Queensland claim reference](#victim-assist-claim-reference) | Victim Assist Queensland | unpublished | low | 1 |
 | [Workers compensation claim number](#workcover-claim-number) | WorkCover Queensland, a self-insurer or Comcare | unpublished | low | 1 |
 | [Queensland youth justice client / case reference](#youth-justice-reference) | Queensland youth justice services | unpublished | medium | 1 |
@@ -539,7 +539,7 @@ samples: ["Case number: HC20264471", "File no. PI20251827", "Case number CR20260
 
 **Sensitivity:** Links a person to the customer's case records; sensitivity follows the case type.
 
-**Used by:** `adoption-records-pre-release`, `au-fwc-qirc-employment-application`, `au-ndis-reportable-incident`, `au-qld-building-plumbing-planning-enforcement-file`, `au-qld-drinking-water-incident-notice`, `au-qld-mandatory-data-breach-notification`, `au-qld-public-interest-disclosure`, `au-tertiary-academic-misconduct-record`, `child-exploitation-investigation-file`, `child-safety-investigation-file`, `counter-terrorism-assessment-file`, `crown-solicitor-legal-opinion`, `cybercrime-technical-evidence-package`, `police-use-of-force-investigation-internal`, `surrogacy-arrangement-record`, `terrorism-watchlist-entry`, `witness-protection-program-record`
+**Used by:** `adoption-records-pre-release`, `au-fwc-qirc-employment-application`, `au-ndis-reportable-incident`, `au-psychosocial-risk-register`, `au-qld-building-plumbing-planning-enforcement-file`, `au-qld-drinking-water-incident-notice`, `au-qld-mandatory-data-breach-notification`, `au-qld-public-interest-disclosure`, `au-tertiary-academic-misconduct-record`, `child-exploitation-investigation-file`, `child-safety-investigation-file`, `counter-terrorism-assessment-file`, `crown-solicitor-legal-opinion`, `cybercrime-technical-evidence-package`, `police-use-of-force-investigation-internal`, `surrogacy-arrangement-record`, `terrorism-watchlist-entry`, `witness-protection-program-record`
 
 ## ccc-reference
 
@@ -857,7 +857,7 @@ samples: ["Employee ID: 00447182", "Staff number 00552011", "Employee no. 000719
 
 **Sensitivity:** Links an employee to integrity, disclosure or HR matters.
 
-**Used by:** `au-conflict-of-interest-declaration`, `au-payslip-wages-record`, `au-qld-ccc-corrupt-conduct-notification`, `au-qld-public-interest-disclosure`, `au-qld-public-sector-discipline-record`
+**Used by:** `au-conflict-of-interest-declaration`, `au-employee-beneficiary-dependant-nomination`, `au-medical-certificate-fitness-for-work`, `au-payslip-wages-record`, `au-psychosocial-risk-register`, `au-qld-ccc-corrupt-conduct-notification`, `au-qld-public-interest-disclosure`, `au-qld-public-sector-discipline-record`, `au-workforce-diversity-eeo-extract`, `global-hr-bulk-staff-details-extract`, `global-top500-067-right-to-work-verification-documents`
 
 ## environmental-incident-reference
 
@@ -2553,7 +2553,7 @@ samples: ["Member number: 40017382", "membership number 40007193", "Member no. 4
 
 **Sensitivity:** Links a person to their superannuation account.
 
-**Used by:** `au-tfn-declaration-super-choice-form`
+**Used by:** `au-employee-beneficiary-dependant-nomination`, `au-tfn-declaration-super-choice-form`
 
 ## surveillance-warrant-reference
 
@@ -2924,7 +2924,7 @@ samples: ["Account number: 4001882731", "Customer number 4000552011", "account n
 
 **Sensitivity:** Links a named customer, supply address and sensitive circumstances (medical equipment, family violence, hardship) to a utility account.
 
-**Used by:** `au-energy-family-violence-customer-record`, `au-energy-life-support-register`, `au-qld-council-water-rates-dfv-customer-record`, `au-qld-water-customer-hardship-restriction-record`, `au-qld-water-special-needs-supply-register`, `council-customer-reference`
+**Used by:** `au-energy-customer-hardship-concession-record`, `au-energy-family-violence-customer-record`, `au-energy-life-support-register`, `au-qld-council-water-rates-dfv-customer-record`, `au-qld-water-customer-hardship-restriction-record`, `au-qld-water-special-needs-supply-register`, `council-customer-reference`
 
 ## victim-assist-claim-reference
 

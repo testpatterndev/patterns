@@ -1,23 +1,25 @@
 schema: testpattern/v1
 name: Right-to-work verification documents
 slug: global-top500-067-right-to-work-verification-documents
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Detects right-to-work and visa entitlement verification records (VEVO checks, work entitlement checks, US Form I-9) for an identified employee or candidate, with visa subclass, expiry or grant details or visa work conditions.
+  Detects right-to-work and visa entitlement verification records for an identified employee or candidate: Visa Entitlement Verification Online (VEVO) check results and printouts, work entitlement checks and US Form I-9 records, carrying the holder plus visa fields such as the visa subclass, the 13-digit visa grant number, transaction reference number (TRN) or visa evidence number, grant / expiry / must-not-arrive-after dates, period of stay, and Migration Regulations 1994 Schedule 8 visa conditions (for example 8101, 8104, 8105, 8107, 8547, 8607, 8608).
 operation: >-
-  Primary: a right-to-work phrase (right to work check, work entitlement check, visa verification, VEVO, employment eligibility verification, Form I-9). 75 tier requires a populated person field (employee/staff name or number, candidate, applicant, visa holder, family/given name, passport number, date of birth, position number or title) with a non-placeholder value within 300 characters. 85 tier additionally requires a populated visa detail (visa subclass, grant/expiry/check date, visa grant number, or visa work condition) and an independent corroborative term (passport, citizenship, Home Affairs, work permit, residency). All tiers exclude template/fixture text (template-exclusion); enforce tiers also exclude guidance, policy, training and media-release framing. 65 is discovery-only (primary alone) and will surface policies, guidance, blank forms and statistics.
+  Primary: a right-to-work phrase (right to work check, work entitlement check, visa verification, Visa Entitlement Verification Online, VEVO check / result, work rights check, employment eligibility verification, Form I-9). 65 is discovery-only (primary alone) and surfaces policies, guidance, blank forms and statistics. 75 requires, within 300 characters, a populated holder field (employee / staff / payroll name or number, candidate, applicant, visa holder, holder / family / given / full name, passport number or date of birth, with a non-placeholder value) plus a populated visa field from at least one of four distinct groups: (a) visa subclass / class / type with a 3-digit subclass; (b) a labelled 13-digit visa grant number, transaction reference number (TRN) or visa evidence number; (c) a visa grant, expiry / expiration or must-not-arrive-after date with a date value, or a period of stay value; (d) a labelled visa / work conditions field with a Schedule 8 condition number (81xx-86xx). 85 requires the holder field plus populated fields from at least two of the four groups. All tiers exclude template/fixture text (template-exclusion); enforce tiers also exclude guidance, policy, training and media-release framing. A bare visa grant number is detected by global-top500-032-visa-grant-number; here it is only one VEVO field among four.
 pattern: >-
-  (?i)\b(?:right\s+to\s+work(?:\s+check)?|work\s+entitlement(?:\s+check)?|visa\s+(?:entitlement\s+)?verification|VEVO(?:\s+check)?|work\s+rights\s+check|employment\s+eligibility(?:\s+verification)?|Form\s+I-9)\b
+  (?i)\b(?:right\s+to\s+work(?:\s+check)?|work\s+entitlement(?:\s+check)?|visa\s+(?:entitlement\s+)?verification(?:\s+online)?|VEVO(?:\s+(?:check|result))?|work\s+rights\s+check|employment\s+eligibility(?:\s+verification)?|Form\s+I-9)\b
 confidence: medium
 confidence_justification: >-
-  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated person field and 85 adds a record-specific populated detail plus independent corroboration. Person values are customer-defined (employee IDs, position numbers), so the field regexes use labelled loose values with a placeholder guard. 85/75 are heuristic evidence tiers, not measured accuracy.
+  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated holder field plus at least one populated VEVO / visa field, and 85 needs fields from two distinct groups (subclass, grant or reference number, visa dates, Schedule 8 conditions). Holder values are customer-defined (employee IDs), so the holder regex uses labelled loose values with a placeholder guard. VEVO work-entitlement wording such as "no limitations" was not verified against a Home Affairs source, so it is corroborative only and not part of any tier. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
   - global
+  - au
 regulations:
   - Migration Act 1958 (Cth)
+  - Migration Regulations 1994 (Cth)
   - Fair Work Act 2009 (Cth)
   - Privacy Act 1988 (Cth)
   - IPA 2009 (Qld)
@@ -34,31 +36,56 @@ corroborative_evidence:
     - passport
     - citizenship
     - Home Affairs
+    - ImmiAccount
+    - Visa Grant Notification
+    - work entitlements
+    - no limitations
+    - unlimited right to work
     - work permit
     - residency
-    - birth certificate
     - sighted
     - sponsor
     - bridging visa
   proximity: 300
+customisation:
+  - key: employee-id
+    kind: identifier-format
+    identifier: employee-id
+    target: purview.regexes/Regex_top500_067_right_to_work_verification_documents_person_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the populated-field evidence with the customer's employee ID / payroll number format (see docs/identifiers.md#employee-id). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
 test_cases:
   should_match:
+    - value: "Visa Entitlement Verification Online (VEVO) - organisation enquiry\nVisa holder: Quinn Teston\nDate of birth: 02/05/1997\nVisa class/subclass: 500\nVisa grant number: 4172039581164\nGrant date: 11/01/2025\nExpiry date: 15/03/2027\nVisa conditions: 8105, 8202, 8501"
+      description: '85: VEVO result with holder, subclass, grant number, grant/expiry dates and Schedule 8 conditions'
+      synthetic: true
     - value: "Right to work check\nCandidate: Avery Teston\nPassport number: PA1234567\nVisa subclass: 482\nVisa expiry date: 14/03/2028\nVEVO result sighted by HR; sponsor: Harbour Logistics Pty Ltd."
-      description: '85: VEVO check with candidate, passport, subclass and expiry'
+      description: '85: right to work check with candidate, subclass and visa expiry date'
+      synthetic: true
+    - value: "VEVO check\nEmployee name: Jordan Staffson\nVisa conditions: 8547\nOutcome recorded on the onboarding checklist; copy filed."
+      description: '75: VEVO check naming the employee with one visa field (Schedule 8 condition)'
+      synthetic: true
+    - value: "Right to work check - new starter\nApplicant: Harper Teston\nTransaction reference number: EGOB7K2M9QX\nWork entitlements to be confirmed with the applicant before the start date."
+      description: '75: right to work check with applicant and a transaction reference number'
       synthetic: true
     - value: "Employment eligibility verification (Form I-9)\nEmployee: Morgan Teston\nDocument: US passport card\nExpiration date: 2029-05-31\nVerified by HR on 2026-09-01; citizenship attestation completed."
-      description: '85: Form I-9 record with employee and document expiry'
-      synthetic: true
-    - value: "VEVO check\nEmployee name: Jordan Staffson\nOutcome recorded on the onboarding checklist; copy filed."
-      description: '75: VEVO check naming the employee, no visa detail'
-      synthetic: true
-    - value: 'Employer VEVO check completed: work rights verified on 16 July.'
-      description: '65 discovery only: verification sentence without a populated person field'
+      description: '75: Form I-9 record with employee and one dated field (document expiration)'
       synthetic: true
   should_not_match:
+    - value: "VEVO check\nEmployee name: Jordan Staffson\nOutcome recorded on the onboarding checklist; copy filed."
+      description: Holder field without any visa field - stays at 65 discovery
+    - value: 'Employer VEVO check completed: work rights verified on 16 July.'
+      description: Verification sentence without a holder or visa field - 65 discovery only
     - value: Employers should complete a right to work check before an employee starts. Use VEVO to confirm visa conditions and keep a record.
       description: Guidance text - must stay below 75
-    - value: "Right to work check\nCandidate: __________\nPassport number: __________\nVisa subclass: ___"
+    - value: "Visa Entitlement Verification Online (VEVO) tells you which visa you hold, the expiry date, the must not arrive after date, the period of stay and your conditions. Condition 8105 limits student visa holders to 48 hours of work a fortnight while their course is in session."
+      description: Home Affairs style VEVO guidance with dates and condition numbers but no holder - must stay below 75
+    - value: "Right to work check\nCandidate: __________\nPassport number: __________\nVisa subclass: ___\nVisa grant number: _____________"
       description: Blank checklist - must stay below 75
     - value: 'Checklist template: perform right to work check.'
       description: Template text (noise exclusion) - must stay below 75
@@ -66,23 +93,19 @@ test_cases:
       description: News / media release - must stay below 75
     - value: Visa holder status updated for tourism.
       description: Generic visa-holder wording, no verification anchor - must stay below 75
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: employee interview
-      description: Generic word pair from old broad template should not match
     - value: Immigration policy changed this month.
       description: General immigration topic language contains no status/verification phrase
 false_positives:
-  - description: Policies, directives, fact sheets, guidance and training material that name the record type.
-    mitigation: Enforce tiers require a populated person field; guidance text has labels without values and guidance/training/media-release framing is excluded.
+  - description: Policies, directives, fact sheets, guidance and training material that name the record type and describe VEVO fields and visa conditions.
+    mitigation: Enforce tiers require a populated holder field plus a populated visa field; guidance names the fields without values, and guidance/training/media-release framing is excluded.
   - description: Blank forms, templates and HR system configuration.
     mitigation: Blank lines, square- and angle-bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded.
   - description: Aggregate statistics and news reporting.
-    mitigation: No populated person field, so these stay at 65 discovery.
-  - description: Records that identify the person only in free text (no field label) fall to 65.
-    mitigation: Accepted precision trade-off; extend the person-field regex with the customer employee-id format to recover recall.
+    mitigation: No populated holder field, so these stay at 65 discovery.
+  - description: Records that identify the person only in free text (no field label), or that carry only the holder and an outcome with no visa field, fall to 65.
+    mitigation: Accepted precision trade-off; extend the holder-field regex with the customer employee-id format to recover recall.
+  - description: Visa grant notification letters and tourist or student visa records that are not employment checks.
+    mitigation: The primary requires a right-to-work / VEVO / work-entitlement phrase; a grant letter without one is left to global-top500-032-visa-grant-number.
 exports:
   - purview_xml
   - yaml
@@ -90,7 +113,7 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 75
+  recommended_confidence: 85
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -100,8 +123,13 @@ purview:
       id_match: Regex_top500_067_right_to_work_verification_documents_primary
       matches:
         - ref: Regex_top500_067_right_to_work_verification_documents_person_field
-        - ref: Regex_top500_067_right_to_work_verification_documents_record_detail
-        - ref: Keyword_top500_067_right_to_work_verification_documents_corroborative
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_top500_067_right_to_work_verification_documents_visa_subclass
+            - Regex_top500_067_right_to_work_verification_documents_visa_reference
+            - Regex_top500_067_right_to_work_verification_documents_visa_dates
+            - Regex_top500_067_right_to_work_verification_documents_visa_conditions
         - type: any
           min_matches: 0
           max_matches: 0
@@ -112,6 +140,13 @@ purview:
       id_match: Regex_top500_067_right_to_work_verification_documents_primary
       matches:
         - ref: Regex_top500_067_right_to_work_verification_documents_person_field
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_top500_067_right_to_work_verification_documents_visa_subclass
+            - Regex_top500_067_right_to_work_verification_documents_visa_reference
+            - Regex_top500_067_right_to_work_verification_documents_visa_dates
+            - Regex_top500_067_right_to_work_verification_documents_visa_conditions
         - type: any
           min_matches: 0
           max_matches: 0
@@ -130,28 +165,23 @@ purview:
   regexes:
     - id: Regex_top500_067_right_to_work_verification_documents_primary
       pattern: >-
-        (?i)\b(?:right\s+to\s+work(?:\s+check)?|work\s+entitlement(?:\s+check)?|visa\s+(?:entitlement\s+)?verification|VEVO(?:\s+check)?|work\s+rights\s+check|employment\s+eligibility(?:\s+verification)?|Form\s+I-9)\b
+        (?i)\b(?:right\s+to\s+work(?:\s+check)?|work\s+entitlement(?:\s+check)?|visa\s+(?:entitlement\s+)?verification(?:\s+online)?|VEVO(?:\s+(?:check|result))?|work\s+rights\s+check|employment\s+eligibility(?:\s+verification)?|Form\s+I-9)\b
     - id: Regex_top500_067_right_to_work_verification_documents_person_field
       pattern: >-
-        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number|title)|work\s+unit|business\s+unit|candidate|applicant|visa\s+holder|(?:holder|family|given)\s+names?|full\s+name|passport\s+(?:no\.?|number)|date\s+of\s+birth)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
-    - id: Regex_top500_067_right_to_work_verification_documents_record_detail
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|candidate(?:\s+name)?|applicant(?:\s+name)?|visa\s+holder(?:\s+name)?|(?:holder|family|given)\s+names?|full\s+name|passport\s+(?:no\.?|number)|date\s+of\s+birth)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_top500_067_right_to_work_verification_documents_visa_subclass
       pattern: >-
-        (?i)\bvisa\s+(?:subclass|type|class)\s*[:\-]?\s*(?:subclass\s+)?\d{3}\b|\b(?:visa\s+)?(?:grant|expiry|expiration|check|verification)\s+date\s*[:\-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})|\bvisa\s+grant\s+(?:no\.?|number)\s*[:#]?\s*\d{8,14}\b|\b(?:work|visa)\s+conditions?\s*[:\-]\s*(?:8\d{3}\b|no\s+work|unlimited|limited|nil)
+        (?i)\bvisa\s+(?:subclass|type|class)(?:\s*/\s*subclass)?\s*[:\-]?\s*(?:subclass\s+)?\d{3}\b|\bsubclass\s*[:#]\s*\d{3}\b
+    - id: Regex_top500_067_right_to_work_verification_documents_visa_reference
+      pattern: >-
+        (?i)\bvisa\s+grant\s+(?:no\.?|number)\s*[:#]?\s*\d{13}\b|\b(?:transaction\s+reference\s+(?:no\.?|number)|TRN)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba)\b|_{2,}|\[|<|x{3,})[A-Z0-9]{8,16}\b|\bvisa\s+evidence\s+(?:no\.?|number)\s*[:#]\s*[A-Z0-9]{10,12}\b
+    - id: Regex_top500_067_right_to_work_verification_documents_visa_dates
+      pattern: >-
+        (?i)\b(?:visa\s+)?(?:grant|expiry|expiration|must\s+not\s+arrive\s+after)(?:\s+date)?\s*[:\-]\s*(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})|\bperiod\s+of\s+stay\s*[:\-]\s*(?:indefinite(?:ly)?|until\s+\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{1,2}\s+(?:days?|months?|years?))
+    - id: Regex_top500_067_right_to_work_verification_documents_visa_conditions
+      pattern: >-
+        (?i)\b(?:visa|work)\s+conditions?(?:\s*\(s\))?\s*[:\-]\s*(?:conditions?\s+)?8[1-6]\d{2}\b|\bconditions?\s*:\s*8[1-6]\d{2}\b
   keywords:
-    - id: Keyword_top500_067_right_to_work_verification_documents_corroborative
-      groups:
-        - match_style: word
-          terms:
-            - passport
-            - citizenship
-            - Home Affairs
-            - work permit
-            - residency
-            - birth certificate
-            - sighted
-            - sponsor
-            - bridging visa
-      strength: specific
     - id: Keyword_top500_067_right_to_work_verification_documents_guidance_exclusion
       groups:
         - match_style: word
@@ -170,7 +200,7 @@ purview:
             - policy statement
       strength: domain
 risk_description: >-
-  The classifier identifies a right-to-work or visa entitlement verification record about an identified person, gated on a populated person field (75) plus a record-specific populated detail (85). Disclosure exposes an identifiable person's immigration status, passport and visa details, which can enable identity fraud or exploitation of migrant workers. Policies, guidance, blank forms, training and news stay at 65 discovery. Risk 8 supports SENSITIVE Personal-Privacy (OFFICIAL: Sensitive).
+  The classifier identifies a right-to-work or visa entitlement verification record about an identified person, gated on a populated holder field plus a populated VEVO / visa field (75) or fields from two distinct groups (85). Disclosure exposes an identifiable person's immigration status, visa subclass, grant number, conditions and passport details, which can enable identity fraud, visa-status scams or exploitation of migrant workers. Breach notifications in the university sector have listed staff and student visa documentation among the records taken. Policies, guidance, blank forms, training and news stay at 65 discovery. Risk 8 supports SENSITIVE Personal-Privacy (OFFICIAL: Sensitive).
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -182,6 +212,9 @@ sensitivity_labels:
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: 'VEVO result structure (breach gap 4): replaced the single record-detail regex with four distinct visa-field regexes - visa subclass; labelled 13-digit visa grant number / transaction reference number (TRN) / visa evidence number; grant, expiry, must-not-arrive-after dates and period of stay; labelled Migration Regulations Schedule 8 condition numbers (81xx-86xx). Retiered: 65 primary phrase; 75 holder field plus one visa field; 85 holder field plus fields from two distinct groups (the corroborative keyword group is no longer a tier requirement). Narrowed the holder field to person identity (dropped position number/title, work unit, business unit and check date). Added "Visa Entitlement Verification Online" and "VEVO result" to the primary. Unverified VEVO work-entitlement wording ("no limitations", "unlimited right to work") is corroborative only. Added a VEVO printout positive, a TRN positive, VEVO guidance and holder-only decoys; recommended_confidence 85. VEVO wording and grant number / TRN help text checked against Home Affairs pages; condition numbers checked against Migration Regulations 1994 Schedule 8.'
   - version: 1.5.0
     date: '2026-09-24'
     description: 'Quality pass (2026-09-24): merged the two primary regexes into one verification anchor (generic visa-holder/status wording dropped); rebuilt tiers - 65 primary phrase (discovery), 75 primary + populated person field (employee/staff name or number, position number/title, work unit), 85 adds a record-specific populated detail regex plus an independent corroborative keyword group; removed the self-corroborating Evidence/label-context groups so a single phrase no longer reaches 75/85; added guidance/training/media-release exclusion to enforce tiers; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys; regulations now cite Migration Act 1958 (Cth), Fair Work Act 2009 (Cth) with the privacy statutes (removed AML/CTF, TIA, My Health Records and HRIPA boilerplate); references now cite primary sources.'
@@ -221,8 +254,14 @@ changelog:
 author: testpattern-community
 license: MIT
 references:
-  - title: Department of Home Affairs - Check visa details and conditions (VEVO)
+  - title: Department of Home Affairs - Check visa details and conditions (Visa Entitlement Verification Online)
     url: https://immi.homeaffairs.gov.au/visas/already-have-a-visa/check-visa-details-and-conditions
+  - title: Department of Home Affairs - VEVO help text, Grant Number (13-digit visa grant number)
+    url: https://immi.homeaffairs.gov.au/help-text/migration/Pages/vevo_help_003.aspx
+  - title: Department of Home Affairs - VEVO help text, Transaction Reference Number (TRN)
+    url: https://immi.homeaffairs.gov.au/help-text/migration/pages/vevo_help_002.aspx
+  - title: Migration Regulations 1994 (Cth) - Schedule 8 visa conditions
+    url: https://www.legislation.gov.au/F1996B03551/latest/text
   - title: Fair Work Ombudsman - Visa holders and migrant workers fact sheet
     url: https://www.fairwork.gov.au/tools-and-resources/fact-sheets/rights-and-obligations/visa-holders-and-migrant-workers-workplace-rights-and-entitlements
   - title: OAIC - Employee records exemption
