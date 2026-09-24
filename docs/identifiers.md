@@ -8,15 +8,17 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 |---|---|---|---|---|
 | [Access / test permit number](#access-test-permit-number) | The network or plant operator | customer-defined | medium | 1 |
 | [Agency / provider client ID](#agency-client-id) | The customer's service, CRM or provider system | customer-defined | low | 3 |
+| [Council animal registration number / tag](#animal-registration-number) | The local government (council animal registry) | customer-defined | low | 3 |
 | [Asbestos removal licence number](#asbestos-removal-licence-number) | WorkSafe Queensland (Office of Industrial Relations) | unpublished | low | 1 |
 | [Asbestos sample reference](#asbestos-sample-reference) | The asbestos assessor or NATA-accredited laboratory | customer-defined | low | 1 |
 | [ASIC / MSIC card number](#asic-msic-card-number) | The aviation or maritime security identification card issuing body | unpublished | medium | 1 |
 | [Asset number / functional location](#asset-functional-location) | The customer's asset management system (e.g. SAP PM functional locations, Maximo assets) | customer-defined | low | 1 |
 | [Cabinet / CBRC submission number](#cabinet-submission-number) | Queensland Cabinet Secretariat (Department of the Premier and Cabinet) | unpublished | low | 1 |
-| [Agency case / file / matter number](#case-reference-number) | The customer agency's case management or records system | customer-defined | low | 15 |
+| [Agency case / file / matter number](#case-reference-number) | The customer agency's case management or records system | customer-defined | low | 17 |
 | [Crime and Corruption Commission reference](#ccc-reference) | Crime and Corruption Commission (Queensland) | unpublished | medium | 1 |
-| [Council development / building application number](#council-development-application-number) | Queensland local governments (assessment managers) and private building certifiers | customer-defined | low | 1 |
-| [Council property / rate assessment number](#council-property-number) | Queensland local governments | customer-defined | low | 1 |
+| [Cemetery interment right / plot reference](#cemetery-interment-right-number) | The council cemetery service | customer-defined | low | 1 |
+| [Council development / building application number](#council-development-application-number) | Queensland local governments (assessment managers) and private building certifiers | customer-defined | low | 3 |
+| [Council property / rate assessment number](#council-property-number) | Queensland local governments | customer-defined | low | 6 |
 | [Records management (eDRMS) record number](#edrms-record-number) | The customer's records management system (e.g. Content Manager, RecFind, Objective) | customer-defined | medium | 1 |
 | [Employee / staff ID](#employee-id) | The customer's payroll or HR system (e.g. Aurion, SAP, Workday) | customer-defined | low | 5 |
 | [Environmental incident / notification reference](#environmental-incident-reference) | The operator's incident system or the administering authority | customer-defined | low | 1 |
@@ -25,8 +27,10 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [Generator outage work order / reference](#generator-outage-work-order) | The generator's maintenance system (e.g. SAP PM, Maximo) | customer-defined | low | 1 |
 | [Queensland housing client / application number](#housing-client-number) | Queensland Government housing services (Housing Service Centres) | unpublished | low | 2 |
 | [Queensland social housing tenancy / property reference](#housing-tenancy-number) | Queensland Government housing services | unpublished | low | 3 |
-| [Infringement notice number](#infringement-notice-number) | Queensland Revenue Office / Department of Transport and Main Roads (camera-detected offences); issuing authorities for other penalty infringement notices | unpublished | medium | 1 |
+| [Infringement notice number](#infringement-notice-number) | Queensland Revenue Office / Department of Transport and Main Roads (camera-detected offences); issuing authorities for other penalty infringement notices | unpublished | medium | 3 |
 | [Law enforcement request / authorisation reference](#lea-request-reference) | The requesting enforcement agency or the carrier | unpublished | low | 1 |
+| [Library card / member number](#library-card-number) | The council library service (library management system) | customer-defined | low | 1 |
+| [My Aged Care ID](#my-aged-care-id) | My Aged Care (Australian Government Department of Health, Disability and Ageing) | unpublished | low | 1 |
 | [NEM connection agreement number](#nem-connection-agreement-number) | The network service provider (e.g. Powerlink, Energex, Ergon Energy) and connecting generator | customer-defined | medium | 1 |
 | [NGER facility identification number](#nger-facility-id) | Clean Energy Regulator | unpublished | low | 1 |
 | [Office of the Independent Assessor complaint reference](#oia-complaint-reference) | Office of the Independent Assessor (Queensland) | unpublished | medium | 1 |
@@ -44,6 +48,7 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [Queensland lot on plan / real property description](#qld-lot-on-plan) | Titles Queensland (DNRMMRRD) | unpublished | medium | 1 |
 | [RTI / IP application reference](#qld-rti-application-reference) | The Queensland agency receiving the application | customer-defined | low | 1 |
 | [Queensland Police exhibit / property number](#qps-exhibit-number) | Queensland Police Service | unpublished | medium | 1 |
+| [QPS occurrence / police reference number](#qps-occurrence-number) | Queensland Police Service (QPRIME) | unpublished | low | 1 |
 | [QTAC application number](#qtac-application-number) | Queensland Tertiary Admissions Centre | unpublished | medium | 1 |
 | [Regulator prosecution / enforcement reference](#regulator-prosecution-reference) | Queensland regulators (e.g. Workplace Health and Safety Queensland) | unpublished | low | 1 |
 | [Worker screening / background check reference](#screening-check-reference) | AusCheck, NDIS Worker Screening Unit, police or AGSVA | unpublished | low | 1 |
@@ -53,7 +58,8 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [Telco account / service number](#telco-account-number) | The customer's telecommunications billing / CRM system | customer-defined | low | 1 |
 | [Tender / contract reference number](#tender-reference-number) | The customer agency's procurement system (QTenders, agency contract register or e-tendering platform) | customer-defined | low | 2 |
 | [University / TAFE student number](#tertiary-student-number) | The customer university or TAFE | customer-defined | low | 4 |
-| [Utility customer account number](#utility-account-number) | The customer's energy or water retail billing / CRM system (e.g. SAP IS-U, Gentrack) | customer-defined | low | 2 |
+| [Trade waste approval number](#trade-waste-approval-number) | The water service provider (council or distributor-retailer) | customer-defined | medium | 1 |
+| [Utility customer account number](#utility-account-number) | The customer's energy or water retail billing / CRM system (e.g. SAP IS-U, Gentrack) | customer-defined | low | 6 |
 | [Victim Assist Queensland claim reference](#victim-assist-claim-reference) | Victim Assist Queensland | unpublished | low | 1 |
 | [Workers compensation claim number](#workcover-claim-number) | WorkCover Queensland, a self-insurer or Comcare | unpublished | low | 1 |
 | [Queensland youth justice client / case reference](#youth-justice-reference) | Queensland youth justice services | unpublished | medium | 1 |
@@ -163,6 +169,59 @@ samples: ["Client ID: C4417820", "Client number C0071932", "Client no. C5520117"
 **Sensitivity:** Links a person to services they receive; sensitivity follows the service.
 
 **Used by:** `au-ndis-participant-plan-record`, `au-qld-restrictive-practice-behaviour-support`, `au-specialist-homelessness-services-record`
+
+## animal-registration-number
+
+**Council animal registration number / tag** — issued by The local government (council animal registry).
+
+Dog and cat registration numbers and registration tag numbers issued by Queensland councils under the Animal Management (Cats and Dogs) Act 2008 and local laws.
+
+**Appears in:** Animal registration records; Regulated dog declarations; Impound and attack records.
+
+**Labels:** `Registration number`, `Registration tag number`, `Tag number`
+
+**Public format:** customer-defined. Each council sets its own registration and tag numbering.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:(?:animal\s+)?registration(?:\s+tag)?\s+(?:no\.?|number)|tag\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+```
+
+Registration labels are generic; owner and animal fields supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the registration number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\bregistration\s+(?:no\.?|number)\s*[:#]?\s*D\d{6}\b
+samples: ["Registration number: D204718", "registration no. D007193", "Registration Number D020471"]
+```
+
+**Sensitivity:** Links an owner and address to an animal and, for regulated dogs, to an enforcement history.
+
+**Used by:** `au-qld-animal-registration-record`, `au-qld-regulated-dog-declaration-attack-record`, `council-customer-reference`
 
 ## asbestos-removal-licence-number
 
@@ -480,7 +539,7 @@ samples: ["Case number: HC20264471", "File no. PI20251827", "Case number CR20260
 
 **Sensitivity:** Links a person to the customer's case records; sensitivity follows the case type.
 
-**Used by:** `adoption-records-pre-release`, `au-fwc-qirc-employment-application`, `au-ndis-reportable-incident`, `au-qld-mandatory-data-breach-notification`, `au-qld-public-interest-disclosure`, `au-tertiary-academic-misconduct-record`, `child-exploitation-investigation-file`, `child-safety-investigation-file`, `counter-terrorism-assessment-file`, `crown-solicitor-legal-opinion`, `cybercrime-technical-evidence-package`, `police-use-of-force-investigation-internal`, `surrogacy-arrangement-record`, `terrorism-watchlist-entry`, `witness-protection-program-record`
+**Used by:** `adoption-records-pre-release`, `au-fwc-qirc-employment-application`, `au-ndis-reportable-incident`, `au-qld-building-plumbing-planning-enforcement-file`, `au-qld-drinking-water-incident-notice`, `au-qld-mandatory-data-breach-notification`, `au-qld-public-interest-disclosure`, `au-tertiary-academic-misconduct-record`, `child-exploitation-investigation-file`, `child-safety-investigation-file`, `counter-terrorism-assessment-file`, `crown-solicitor-legal-opinion`, `cybercrime-technical-evidence-package`, `police-use-of-force-investigation-internal`, `surrogacy-arrangement-record`, `terrorism-watchlist-entry`, `witness-protection-program-record`
 
 ## ccc-reference
 
@@ -535,6 +594,59 @@ samples: ["CCC reference: CO-26-1187", "CCC ref CO-25-4471", "CCC reference CO-2
 
 **Used by:** `au-qld-ccc-corrupt-conduct-notification`
 
+## cemetery-interment-right-number
+
+**Cemetery interment right / plot reference** — issued by The council cemetery service.
+
+Right of interment (burial right) numbers and plot / niche references held in council cemetery registers.
+
+**Appears in:** Burial and exhumation records; Interment right grants.
+
+**Labels:** `Right of interment number`, `Plot reference`, `Niche reference`
+
+**Public format:** customer-defined. Cemetery numbering is council-specific.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:(?:right|grant|licen[cs]e)\s+(?:of\s+(?:burial|interment)\s+)?(?:no\.?|number)|(?:plot|niche|grave)\s+(?:ref(?:erence)?|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+```
+
+Plot and right labels are generic; deceased and next-of-kin fields supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the plot / right reference format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\bplot\s+reference\s*[:#]?\s*[A-Z]{2,6}-[A-Z]-\d{1,4}\b
+samples: ["Plot reference: LAWN-B-112", "plot reference MON-C-7", "Plot Reference GDN-A-2044"]
+```
+
+**Sensitivity:** Links a deceased person and next of kin to a burial location.
+
+**Used by:** `au-qld-cemetery-burial-exhumation-record`
+
 ## council-development-application-number
 
 **Council development / building application number** — issued by Queensland local governments (assessment managers) and private building certifiers.
@@ -586,7 +698,7 @@ samples: ["Application number: A006123456", "DA number A005998812", "application
 
 **Sensitivity:** Links an approval record to a property and its owner or applicant; building approvals for sensitive facilities can reveal security layouts.
 
-**Used by:** `au-qld-building-approval`
+**Used by:** `au-qld-building-approval`, `au-qld-building-plumbing-planning-enforcement-file`, `council-customer-reference`
 
 ## council-property-number
 
@@ -639,7 +751,7 @@ samples: ["Property number: 20441882", "Assessment no. 00719321", "Property numb
 
 **Sensitivity:** Links a ratepayer to a property and, in concession records, to pension or hardship status.
 
-**Used by:** `au-qld-council-closed-meeting-report`
+**Used by:** `au-qld-building-plumbing-planning-enforcement-file`, `au-qld-council-closed-meeting-report`, `au-qld-council-rates-arrears-sale-of-land`, `au-qld-council-rates-concession-hardship-application`, `au-qld-council-water-rates-dfv-customer-record`, `council-customer-reference`
 
 ## edrms-record-number
 
@@ -1116,7 +1228,7 @@ samples: ["Infringement notice number: 2026084291", "Notice no. 7004418273", "no
 
 **Sensitivity:** Links a vehicle and its registered operator or driver to an alleged offence, location and time.
 
-**Used by:** `traffic-camera-record`
+**Used by:** `au-qld-council-infringement-sper-record`, `council-customer-reference`, `traffic-camera-record`
 
 ## lea-request-reference
 
@@ -1170,6 +1282,112 @@ samples: ["Request reference: L2047181", "authorisation number L0071932", "Reque
 **Sensitivity:** Links a customer service to a law enforcement access request.
 
 **Used by:** `au-telco-law-enforcement-disclosure-record`
+
+## library-card-number
+
+**Library card / member number** — issued by The council library service (library management system).
+
+Library card, borrower and member numbers issued by council library services, printed on member records, loans and notices.
+
+**Appears in:** Library member records; Loan and overdue notices.
+
+**Labels:** `Library card number`, `Member number`, `Borrower number`
+
+**Public format:** customer-defined. Library card barcodes are system-specific; a common 14-digit barcode format was not verified.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:(?:library\s+)?(?:card|member(?:ship)?|borrower|patron)\s+(?:no\.?|number|ID|barcode))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+```
+
+Card and member labels are generic; library loan structure supplies the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the library card number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\blibrary\s+card\s+(?:no\.?|number)\s*[:#]?\s*2\d{13}\b
+samples: ["Library card number: 23058004471820", "library card no. 23058000719320", "Library Card Number 23058002047181"]
+```
+
+**Sensitivity:** Links a member (often a child) to contact details and reading / borrowing history.
+
+**Used by:** `au-qld-library-member-record`
+
+## my-aged-care-id
+
+**My Aged Care ID** — issued by My Aged Care (Australian Government Department of Health, Disability and Ageing).
+
+My Aged Care client identifiers recorded on aged care assessments, care plans and provider client records.
+
+**Appears in:** Aged care client records; Care plans; Serious incident notifications.
+
+**Labels:** `My Aged Care ID`, `MAC ID`, `Client ID`
+
+**Public format:** unpublished. The My Aged Care ID format was not verified from a primary source.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:my\s+aged\s+care\s+(?:ID|no\.?|number)|MAC\s+ID|client\s+(?:ID|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+```
+
+Client labels are generic; aged care program terms and care-need fields supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the My Aged Care ID format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\bmy\s+aged\s+care\s+ID\s*[:#]?\s*AC\d{8}\b
+samples: ["My Aged Care ID: AC20471820", "my aged care ID AC00719320", "My Aged Care ID AC44718201"]
+```
+
+**Sensitivity:** Links an older person to their assessed care needs and health information.
+
+**Used by:** `au-aged-care-client-record`
 
 ## nem-connection-agreement-number
 
@@ -2072,6 +2290,59 @@ samples: ["Exhibit number: 26EX004471", "Property tag 26PT118273", "Exhibit # 25
 
 **Used by:** `forensic-evidence-chain-of-custody-active`
 
+## qps-occurrence-number
+
+**QPS occurrence / police reference number** — issued by Queensland Police Service (QPRIME).
+
+Police occurrence, event and job reference numbers quoted on council CCTV footage requests, release registers and incident records.
+
+**Appears in:** CCTV footage access and release records; Incident and insurance correspondence.
+
+**Labels:** `QPS reference`, `Police reference`, `QPRIME reference`, `Occurrence number`, `Event number`
+
+**Public format:** unpublished. The QPRIME occurrence number format was not verified from a primary source.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:(?:QPS|police|QPRIME)\s+(?:ref(?:erence)?|no\.?|number)|occurrence\s+(?:no\.?|number)|(?:event|job)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+```
+
+Reference labels are generic; footage and requester fields supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the occurrence number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\bQPS\s+reference\s*[:#]?\s*QP\d{10}\b
+samples: ["QPS reference: QP2600447182", "QPS reference QP2600071932", "QPS Reference QP2602047181"]
+```
+
+**Sensitivity:** Links footage of identifiable people to a police matter.
+
+**Used by:** `au-qld-cctv-footage-access-request`
+
 ## qtac-application-number
 
 **QTAC application number** — issued by Queensland Tertiary Admissions Centre.
@@ -2549,6 +2820,59 @@ samples: ["Student number: n11234567", "Student ID n10071932", "Student no. n095
 
 **Used by:** `au-tertiary-academic-misconduct-record`, `au-tertiary-academic-progression-show-cause`, `au-tertiary-disability-access-plan`, `au-tertiary-special-consideration-application`
 
+## trade-waste-approval-number
+
+**Trade waste approval number** — issued by The water service provider (council or distributor-retailer).
+
+Trade waste and seepage water approval numbers issued under the Water Supply (Safety and Reliability) Act 2008 (ss 180-185).
+
+**Appears in:** Trade waste approvals; Compliance and sampling records.
+
+**Labels:** `Trade waste approval number`, `Trade waste permit number`
+
+**Public format:** customer-defined. Each water service provider sets its own approval numbering.
+
+**Public fallback** (precision: medium):
+
+```
+(?i)\b(?:(?:trade\s+waste|seepage\s+water)\s+(?:approval|permit|licen[cs]e|agreement)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+```
+
+The label is specific to trade waste; discharge limits and compliance terms supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the approval number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\btrade\s+waste\s+approval\s+(?:no\.?|number)\s*[:#]?\s*TW\d{5}\b
+samples: ["Trade waste approval number: TW20471", "trade waste approval no. TW00719", "Trade Waste Approval Number TW44718"]
+```
+
+**Sensitivity:** Links a business to its sewer discharge limits and compliance history.
+
+**Used by:** `au-qld-trade-waste-approval-record`
+
 ## utility-account-number
 
 **Utility customer account number** — issued by The customer's energy or water retail billing / CRM system (e.g. SAP IS-U, Gentrack).
@@ -2600,7 +2924,7 @@ samples: ["Account number: 4001882731", "Customer number 4000552011", "account n
 
 **Sensitivity:** Links a named customer, supply address and sensitive circumstances (medical equipment, family violence, hardship) to a utility account.
 
-**Used by:** `au-energy-family-violence-customer-record`, `au-energy-life-support-register`
+**Used by:** `au-energy-family-violence-customer-record`, `au-energy-life-support-register`, `au-qld-council-water-rates-dfv-customer-record`, `au-qld-water-customer-hardship-restriction-record`, `au-qld-water-special-needs-supply-register`, `council-customer-reference`
 
 ## victim-assist-claim-reference
 

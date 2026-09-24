@@ -1,0 +1,197 @@
+schema: testpattern/v1
+name: Queensland Council Rates Arrears and Sale of Land for Overdue Rates Record
+slug: au-qld-council-rates-arrears-sale-of-land
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Queensland local government records about overdue rates and charges and the sale of land to recover them under Local Government Regulation 2012 ch 4 pt 12: arrears ledgers and debt recovery referrals (s 132 overdue rates, s 133 interest on overdue rates), and notices of intention to sell land for overdue rates or charges (s 140), which must state the resolution date and terms, the land as shown in the land record, the overdue amount including the period unpaid, and the interest owing. Sale procedures follow in ss 141-146. These records tie a named owner, a rates assessment or property number and a land description to that owner's arrears. The auction notice that s 142 requires councils to publish is public and is a decoy.
+operation: >-
+  Primary: an overdue-rates or sale-of-land phrase (overdue / unpaid / outstanding rates (and charges), rates arrears, arrears of rates, notice of intention to sell (land), sale of land for overdue rates, rates debt recovery). 75 tier requires, within 300 characters, one populated structure: a property/owner field (assessment, property, rates account or valuation number with a value containing a digit; a lot on plan, land description or title reference with a value; a Qld lot-on-plan string such as Lot 14 on RP812334; a named registered owner, owner or ratepayer; or a property/land address with a street number) or an arrears field (amount overdue, arrears balance, total owing or interest owing/charged with a dollar amount; unpaid/overdue/in arrears since a date or year; a filled period unpaid; or a notice or resolution date). 85 tier requires a property/owner field AND an arrears field AND an independent council term (council, local government, ratepayer, rate notice, general rates, land record, chief executive officer, interested parties, mortgagee). All enforce tiers AND NOT the shared template-exclusion dictionary and a public-notice/policy exclusion (auction notice, offered for sale, bidders, auctioneer, conditions of sale, this policy, revenue statement, statutory "This section applies if" text). 65 is discovery-only (primary phrase alone) and will surface the Regulation, revenue policies and news.
+pattern: >-
+  (?i)\b(?:overdue\s+rates(?:\s+(?:and|or|&)\s+charges)?|(?:unpaid|outstanding)\s+rates(?:\s+(?:and|or|&)\s+charges)?|rates?\s+arrears|arrears\s+of\s+rates|notice\s+of\s+intention\s+to\s+sell(?:\s+(?:the\s+)?land)?|sale\s+of\s+land\s+for\s+(?:overdue|unpaid|arrears\s+of)\s+rates|rates?\s+debt\s+recovery)\b
+confidence: medium
+confidence_justification: >-
+  Medium: "notice of intention to sell land for overdue rates or charges" is the verified s 140 heading and "overdue rates or charges" is the statutory term, but the same words fill the Regulation, council revenue statements, debt recovery policies and the auction notices councils must publish (s 142(4)). Enforce tiers therefore need populated owner, property and arrears fields and a public-notice exclusion. Assessment and property number formats differ by council and are unverified, so values are loose and placeholder-guarded. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic.
+jurisdictions:
+  - au
+regulations:
+  - Local Government Regulation 2012 (Qld) ch 4 pt 12 (ss 132-133, 136-146)
+  - City of Brisbane Act 2010 (Qld) s 97
+  - Information Privacy Act 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - financial
+  - pii
+  - government
+corroborative_evidence:
+  keywords:
+    - notice of intention to sell
+    - overdue rates or charges
+    - interest owing
+    - land record
+    - interested parties
+    - ratepayer
+    - rate notice
+    - assessment number
+  proximity: 300
+customisation:
+  - key: council-property-number
+    kind: identifier-format
+    identifier: council-property-number
+    target: purview.regexes/Regex_au_qld_rates_arrears_property_owner_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's council property / rates assessment number format (see docs/identifiers.md#council-property-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "NOTICE OF INTENTION TO SELL LAND FOR OVERDUE RATES OR CHARGES\nRegistered owner: Casey Teston\nAssessment number: 40218877\nLand description: Lot 14 on RP812334\nDate of resolution: 18/08/2026\nOverdue rates and charges: $14,882.40\nUnpaid since: 2022\nInterest owing: $2,311.07\nThis notice is given to all interested parties, including the mortgagee."
+      description: Populated s 140 notice with owner, assessment number, land, resolution date, overdue amount, period and interest (85 tier)
+      synthetic: true
+    - value: "Rates arrears report - debt recovery referral\nProperty number: 1022875\nOwner: Jordan Testwell\nProperty address: 27 Ironbark Crescent, Emerald QLD 4720\nArrears balance: $6,420.15\nIn arrears since: Jul 2023\nInterest charged: $812.44\nRate notice reissued 01/09/2026. Council to consider sale of land under s 140."
+      description: Arrears ledger extract with property, owner, arrears and interest (85 tier)
+      synthetic: true
+    - value: "Overdue rates follow-up call. Ratepayer: Morgan Teston. Discussed options; ratepayer to call back next week."
+      description: Contact note with a named ratepayer only (75 tier)
+      synthetic: true
+    - value: "Unpaid rates and charges - amount outstanding: $3,105.60 as of today. Payment reminder letter to follow."
+      description: Arrears amount without a property or owner field (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: "SALE OF LAND FOR OVERDUE RATES - PUBLIC AUCTION\nThe following land will be offered for sale by public auction under section 142 of the Local Government Regulation 2012.\nLand description: Lot 3 on SP204411\nProperty address: 12 Mulga Street, Longreach QLD 4730\nAuction date: 14/11/2026, 10am, Council Chambers\nReserve price applies. Bidders must register before the auction."
+      description: Published s 142 auction notice (public by law), suppressed by the public-notice exclusion (65 only)
+    - value: "140 Notice of intention to sell land for overdue rates or charges (1) This section applies if there are overdue rates or charges on land and some or all of them have been overdue for at least 3 years. (4) A notice of intention to sell is a document, signed by the chief executive officer, stating details of the interest that is owing on the overdue rates or charges."
+      description: Local Government Regulation 2012 s 140 text (legislation, 65 only)
+    - value: "Notice of intention to sell land for overdue rates or charges - blank template\nRegistered owner: __________\nAssessment number: __________\nOverdue rates and charges: $________"
+      description: Blank notice form (65 only)
+    - value: "Council's debt recovery policy explains that overdue rates attract compound interest and that land may be sold where rates have been unpaid for three years."
+      description: Published revenue / debt recovery policy text (65 only)
+    - value: "Council will auction 12 properties over unpaid rates totalling $1.2 million, the mayor said on Tuesday."
+      description: News item about a rates auction (65 only)
+false_positives:
+  - description: Auction and sales notices that s 142 and s 144 require councils to publish on their website, in the council office and on the land.
+    mitigation: Public-notice exclusion group (auction notice, offered for sale, bidders, auctioneer, conditions of sale). A notice that uses none of these words and carries a lot on plan can reach 75.
+  - description: The Regulation itself, council revenue statements and debt recovery policies.
+    mitigation: Enforce tiers need populated owner, property or arrears fields; policy and revenue statement text is also excluded.
+  - description: Generic debt collection records from other sectors that use "outstanding rates".
+    mitigation: 85 needs council evidence as well as a property/owner field and an arrears field; au-top500-126-debt-collection-records covers generic debt files.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_qld_rates_arrears_primary
+      matches:
+        - ref: Regex_au_qld_rates_arrears_property_owner_field
+        - ref: Regex_au_qld_rates_arrears_amount_field
+        - ref: Keyword_au_qld_rates_arrears_council
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_rates_arrears_public_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_qld_rates_arrears_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_qld_rates_arrears_property_owner_field
+            - Regex_au_qld_rates_arrears_amount_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_rates_arrears_public_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_qld_rates_arrears_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_qld_rates_arrears_primary
+      pattern: >-
+        (?i)\b(?:overdue\s+rates(?:\s+(?:and|or|&)\s+charges)?|(?:unpaid|outstanding)\s+rates(?:\s+(?:and|or|&)\s+charges)?|rates?\s+arrears|arrears\s+of\s+rates|notice\s+of\s+intention\s+to\s+sell(?:\s+(?:the\s+)?land)?|sale\s+of\s+land\s+for\s+(?:overdue|unpaid|arrears\s+of)\s+rates|rates?\s+debt\s+recovery)\b
+    - id: Regex_au_qld_rates_arrears_property_owner_field
+      pattern: >-
+        (?i)\b(?:(?:property|assessment|rate\s+assessment|rates?\s+(?:account|assessment)|valuation)\s+(?:no\.?|number|ID)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)(?=[A-Z-]{0,5}\d)[A-Z0-9][A-Z0-9/-]{3,15}\b|(?:lot\s+on\s+plan|real\s+property\s+description|land\s+description|title\s+reference)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded|see|refer)\b|_{2,}|\[|<)(?=[A-Z .-]{0,12}\d)[A-Z0-9][A-Z0-9/. -]{2,30}|Lot\s+\d{1,5}\s+on\s+(?:RP|SP|CP|BUP|GTP|SL)\s?\d{1,7}\b|(?:registered\s+owner|owner(?:\(s\))?|ratepayer|land\s*owner)(?:\s+name)?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{1,30}[ \t]+[A-Z][A-Za-z'-]{1,30}|(?:property|land|rateable\s+land|site)\s+address\s*[:#]\s*(?:(?:Unit|Lot|Apt|Flat)\s+)?\d{1,5}[A-Za-z]?(?:/\d{1,5}[A-Za-z]?)?\s+[A-Z][A-Za-z'-]{1,30})
+    - id: Regex_au_qld_rates_arrears_amount_field
+      pattern: >-
+        (?i)\b(?:(?:amount\s+(?:overdue|outstanding|owing|in\s+arrears)|overdue\s+(?:amount|balance|rates(?:\s+(?:and|or|&)\s+charges)?)|arrears(?:\s+(?:balance|amount))?|balance\s+(?:owing|outstanding|overdue)|total\s+(?:amount\s+)?(?:owing|outstanding|overdue|due)|interest\s+(?:owing|accrued|charged|to\s+date|outstanding))\s*[:#=-]\s*\$\s?\d[\d,]{0,9}(?:\.\d{2})?|(?:unpaid|overdue|in\s+arrears)\s+since\s*[:#-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-](?:\d{4}|\d{2})|(?:\d{1,2}\s+)?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4}|(?:19|20)\d{2}\b)|period\s+(?:unpaid|of\s+arrears|overdue)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|see|refer)\b|_{2,}|\[|<)[0-9A-Z][A-Za-z0-9 /.-]{3,40}|(?:date\s+of\s+(?:notice|resolution)|resolution\s+date|notice\s+(?:issued|given|dated|date)|date\s+(?:notice\s+)?(?:issued|given))\s*[:#-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-](?:\d{4}|\d{2})|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4}))
+  keywords:
+    - id: Keyword_au_qld_rates_arrears_council
+      groups:
+        - match_style: word
+          terms:
+            - council
+            - local government
+            - ratepayer
+            - rate notice
+            - rates notice
+            - general rates
+            - land record
+            - chief executive officer
+            - interested parties
+            - mortgagee
+      strength: domain
+    - id: Keyword_au_qld_rates_arrears_public_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - auction notice
+            - offered for sale
+            - will be offered
+            - bidders
+            - bidder
+            - auctioneer
+            - conditions of sale
+            - this policy
+            - revenue statement
+            - revenue policy
+            - This section applies if
+            - In this section
+      strength: specific
+risk_rating: 6
+risk_description: >-
+  The classifier identifies council arrears ledgers, debt recovery referrals and notices of intention to sell that tie a named owner, a rates assessment or property number and a land description to overdue rates, the period unpaid and interest. These records expose a ratepayer's financial distress and the prospect of losing their land, sometimes alongside hardship or deceased-estate circumstances, and are sent to every interested party including mortgagees. The published auction notice is public by law and is excluded. Risk 6 supports OFFICIAL: Sensitive / SENSITIVE Financial.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Financial
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - title: Local Government Regulation 2012 (Qld) - ch 4 pt 12 overdue rates and charges (ss 132, 133, 136-146; s 140 Notice of intention to sell land for overdue rates or charges; s 142 auction notice)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/sl-2012-0236
+  - title: City of Brisbane Act 2010 (Qld) - s 97 overdue rates and charges are a charge over rateable land
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2010-023
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - LGR ch 4 pt 12 rates arrears and s 140 notices of intention to sell; 75 gated on a populated property/owner or arrears field, 85 on both plus council evidence; published s 142 auction notices, policies and the Regulation excluded.
+author: testpattern-community
+license: MIT

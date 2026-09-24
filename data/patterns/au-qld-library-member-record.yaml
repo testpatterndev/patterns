@@ -1,0 +1,192 @@
+schema: testpattern/v1
+name: Queensland Public Library Member and Borrowing Record
+slug: au-qld-library-member-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Public library member (borrower, patron) records held by Queensland councils, which may run library facilities as a local government function under the Libraries Act 1988 s 54: membership applications and registrations, member profiles and exports from the library management system, junior member records with parent or guardian consent, borrowing and loan histories, holds and reservations, and overdue notices. The Libraries Act has no member-privacy provision; confidentiality rests on the Information Privacy Act 2009 and council policy. Reading history can reveal political, religious, health and sexuality interests, and junior member records hold children's data. Library policies, conditions of membership, catalogue records and news are decoys.
+operation: >-
+  Primary: library member / membership / borrower / patron / card / account (optionally followed by record, details, profile, application, registration, form, number, ID, history, list, report or export); borrower record / details / profile / history / number / ID / barcode; patron record / details / history / barcode / ID; loan, borrowing or circulation history; items on loan, overdue or borrowed; or overdue items / notice / loans. 65 is discovery-only (primary alone) and surfaces policies and help pages. 75 requires, within 300 characters, one populated structure: a member field (member / borrower / patron / cardholder / account holder name with a two-word value, a library card / member / borrower / patron / card number, ID or barcode containing a digit, or a parent / guardian name for a junior member), a contact field (address with a street number and name, an email address, or an Australian phone or mobile number) or a loan field (dated due, borrowed, checked out, issued, renewed or returned date; an item title; an item barcode; fines or charges owing with a dollar amount; or counts of holds, reservations or items on loan). 85 requires a member field AND a contact or loan field AND an independent corroborative term (branch, overdue, renewal, holds, reservation, junior member, fines, due date, loans and similar). Library card numbers have no public format (vendor and council specific), so the value is a loose, digit-bearing label value. Blank lines, bracket placeholders and n/a/tbc are rejected. Every tier excludes template/fixture text; enforce tiers also exclude catalogue and policy wording (call number, place a hold, copies available, catalogue record, this policy/procedure/guide/fact sheet, conditions of membership or use, frequently asked questions, members are/must, legislation.qld.gov.au).
+pattern: >-
+  (?i)\b(?:library\s+(?:members?(?:hip)?|borrowers?|patrons?|cards?|accounts?)(?:\s+(?:records?|details|profiles?|applications?|registrations?|forms?|number|no\.?|ID|history|list|reports?|exports?))?|borrower\s+(?:records?|details|profiles?|history|number|no\.?|ID|barcode)|patron\s+(?:records?|details|history|barcode|ID)|(?:loan|borrowing|circulation)\s+history|items?\s+(?:on\s+loan|overdue|borrowed)|overdue\s+(?:items?|notices?|loans?))\b
+confidence: medium
+confidence_justification: >-
+  Medium: library member, borrower and loan-history wording is distinctive for library systems, but the same phrases appear in library policies, help pages and membership conditions, and library card number formats are vendor-specific (commonly 14-digit Codabar barcodes, unverified), so enforce tiers need populated member plus contact or loan fields. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic.
+jurisdictions:
+  - au
+  - au-qld
+regulations:
+  - Libraries Act 1988 (Qld) s 54
+  - Information Privacy Act 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - contact-information
+corroborative_evidence:
+  keywords:
+    - branch
+    - overdue
+    - renewal
+    - holds
+    - reservation
+    - junior member
+    - fines
+    - due date
+    - loans
+    - library
+  proximity: 300
+customisation:
+  - key: library-card-number
+    kind: identifier-format
+    identifier: library-card-number
+    target: purview.regexes/Regex_au_qld_library_member_record_member_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's library card / member number format (see docs/identifiers.md#library-card-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Library member record - Riverside Branch\nMember name: Priya Teston\nLibrary card number: 23401004517826\nAddress: 18 Jacaranda Street, Gympie QLD 4570\nMobile: 0413 555 207\nItems on loan: 4\nHolds: 2\nFines owing: $3.60"
+      description: Member profile with name, card number, address, mobile, loans, holds and fines (85 tier)
+      synthetic: true
+    - value: "Borrowing history export\nBorrower: Nathan Staffson\nTitle: Living with Crohn's Disease, due date: 02/10/2026\nTitle: Leaving a Violent Relationship, returned: 15/09/2026\nRenewal limit reached on one item."
+      description: Borrowing history showing sensitive reading topics (85 tier)
+      synthetic: true
+    - value: "Library membership application - junior member. Parent/guardian name: Kylie Teston. Consent given for internet access."
+      description: Junior membership with a populated guardian field (75 tier)
+      synthetic: true
+    - value: "Overdue notice: the following items are overdue. Item barcode: 30041002297154, due 12/09/2026."
+      description: Overdue notice with item barcode only (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: "Library membership is free for anyone who lives, works or studies in the region. Members are responsible for all items borrowed on their library card and must report a lost card promptly. See our conditions of membership."
+      description: Library membership policy
+    - value: "Title: The Great Barrier Reef: A Natural History\nCall number: 578.789 GRE\nCopies available: 3 of 5\nPlace a hold to be notified when an item is returned. Items on loan show their due date."
+      description: Catalogue record (catalogue exclusion)
+    - value: "Library Membership Application - blank template\nMember name: ____________\nAddress: ____________\nLibrary card number: ____________\nParent/guardian name: ____________"
+      description: Blank membership form
+    - value: "Council libraries issued 1.2 million loans in 2025-26 and cleared overdue fines for all library members under the new fine-free policy, the mayor announced."
+      description: News and statistics (65 only)
+false_positives:
+  - description: Library policies, help pages and conditions of membership name members, cards, loans and overdue items.
+    mitigation: Enforce tiers need populated member, contact or loan fields; a policy exclusion suppresses conditions of membership and policy wording.
+  - description: Catalogue records and search results with titles and due dates.
+    mitigation: A catalogue exclusion (call number, place a hold, copies available, catalogue record) suppresses them; catalogue pages also rarely carry a member primary.
+  - description: Overdue reminder emails that include only item titles.
+    mitigation: These reach 75 with a title or barcode. They are personal information about a borrower's reading and are in scope; deploy at 85 if volume is a concern.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_qld_library_member_record_primary
+      matches:
+        - ref: Regex_au_qld_library_member_record_member_field
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_qld_library_member_record_contact_field
+            - Regex_au_qld_library_member_record_loan_field
+        - ref: Keyword_au_qld_library_member_record_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_qld_library_member_record_policy_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_qld_library_member_record_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_qld_library_member_record_member_field
+            - Regex_au_qld_library_member_record_contact_field
+            - Regex_au_qld_library_member_record_loan_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_qld_library_member_record_policy_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_qld_library_member_record_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_qld_library_member_record_primary
+      pattern: >-
+        (?i)\b(?:library\s+(?:members?(?:hip)?|borrowers?|patrons?|cards?|accounts?)(?:\s+(?:records?|details|profiles?|applications?|registrations?|forms?|number|no\.?|ID|history|list|reports?|exports?))?|borrower\s+(?:records?|details|profiles?|history|number|no\.?|ID|barcode)|patron\s+(?:records?|details|history|barcode|ID)|(?:loan|borrowing|circulation)\s+history|items?\s+(?:on\s+loan|overdue|borrowed)|overdue\s+(?:items?|notices?|loans?))\b
+    - id: Regex_au_qld_library_member_record_member_field
+      pattern: >-
+        (?i)\b(?:(?:member|borrower|patron|card\s*holder|account\s+holder|library\s+member)(?:\s+(?:full\s+)?name)?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{1,30}[ \t]+[A-Z][A-Za-z'-]{1,30}|(?:library\s+card|member(?:ship)?|borrower|patron|card)\s+(?:no\.?|number|ID|barcode)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba)\b|_{2,}|\[|<)(?=[A-Z-]{0,5}\d)[A-Z0-9][A-Z0-9 -]{4,20}\b|(?:parent|guardian|parent\s*/\s*guardian)(?:\s+name)?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{1,30}[ \t]+[A-Z][A-Za-z'-]{1,30})
+    - id: Regex_au_qld_library_member_record_contact_field
+      pattern: >-
+        (?i)\b(?:(?:(?:home|postal|residential|street)\s+)?address\s*[:#]\s*(?:(?:Unit|Lot|Apt|Flat)\s+)?\d{1,5}[A-Za-z]?(?:/\d{1,5}[A-Za-z]?)?\s+[A-Z][A-Za-z'-]{1,30}|e-?mail(?:\s+address)?\s*[:#]\s*[A-Za-z0-9._%+-]{1,40}@[A-Za-z0-9.-]{1,60}\.[A-Za-z]{2,10}|(?:mobile|phone|telephone)(?:\s+(?:no\.?|number))?\s*[:#]\s*(?:\+?61\s?|0)[2-478](?:[ -]?\d){8})
+    - id: Regex_au_qld_library_member_record_loan_field
+      pattern: >-
+        (?i)\b(?:(?:due(?:\s+date)?|date\s+due|date\s+borrowed|borrowed|checked\s+out|issued|renewed|returned)\s*[:#-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-](?:\d{4}|\d{2})|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4}|20\d{2}-\d{2}-\d{2})|(?:item\s+)?title\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{1,30}|item\s+barcode\s*[:#]\s*\d{6,14}\b|(?:fines?|charges?|amount)\s+(?:owing|outstanding|due)\s*[:#]\s*\$\s?\d{1,4}(?:\.\d{2})?|(?:holds?|reservations?|items?\s+on\s+loan|loans?)\s*[:#]\s*\d{1,3}\b)
+    - id: Regex_au_qld_library_member_record_policy_exclusion
+      pattern: >-
+        (?i)(?:\bcall\s+(?:number|no\.?)\s*[:#]|\bplace\s+(?:a\s+)?hold\b|\bcopies\s+available\b|\bcatalogue\s+record\b|\bthis\s+(?:policy|procedure|guideline|guide|fact\s?sheet)\b|\bconditions\s+of\s+(?:membership|use)\b|\bfrequently\s+asked\s+questions\b|\bmembers\s+(?:are|must)\b|\blegislation\.qld\.gov\.au\b)
+  keywords:
+    - id: Keyword_au_qld_library_member_record_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - branch
+            - overdue
+            - renewal
+            - renewed
+            - holds
+            - reservation
+            - junior member
+            - fines
+            - due date
+            - loans
+            - borrowing
+            - library
+      strength: specific
+risk_rating: 5
+risk_description: >-
+  The classifier identifies a library member or borrowing record that ties a named borrower (card number, home address, phone or email) to their loans, holds and fines. Borrowing history can reveal health conditions, religious or political views, sexuality and family violence circumstances, and junior member records hold children's details and a guardian's contact information. Library policies, catalogue records, blank forms and news are excluded from enforce tiers. Risk 5 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Libraries Act 1988 (Qld) s 54 - library facilities a function of local government
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-1988-029
+  - title: Information Privacy Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - public library member, borrowing history and overdue records; 75 gated on a populated member, contact or loan field, 85 on member + contact/loan fields + corroboration; policies, catalogue records and blank forms excluded.
+author: testpattern-community
+license: MIT
