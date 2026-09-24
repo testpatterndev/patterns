@@ -1,0 +1,157 @@
+schema: testpattern/v1
+name: University Academic Progression Show Cause or Exclusion Record
+slug: au-tertiary-academic-progression-show-cause
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Academic progression records for a named student: unsatisfactory academic progress notices, show cause applications (often with personal, medical or family circumstances), notices of intention to exclude, exclusion outcomes and progression improvement plans.
+operation: >-
+  Primary: University Academic Progression Show Cause or Exclusion Record anchors taken from published forms, statutes and procedures. 75 tier requires a populated record field (person, identifier or reference label with a non-placeholder value) within 300 characters. 85 tier requires two distinct populated record fields plus an independent corroborative term. All tiers exclude template/fixture text. 65 is discovery-only (primary alone) and will surface guidance, blank forms and statistics.
+pattern: (?i)\b(?:show\s+cause\s+(?:application|notice|letter|submission|outcome)|unsatisfactory\s+academic\s+progress|notice\s+of\s+intention\s+to\s+exclude|academic\s+exclusion|progression\s+improvement\s+plan|academic\s+probation)\b
+confidence: medium
+confidence_justification: >-
+  Medium: primary anchors are distinctive form titles and statutory terms, but they also appear in guidance, blank forms and statistics, so enforce tiers require populated record structure. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic records laid out like the published forms.
+jurisdictions:
+  - au
+regulations:
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - education
+  - pii
+corroborative_evidence:
+  keywords:
+    - GPA
+    - grade point average
+    - failed
+    - exclusion
+    - readmission
+    - study period
+    - semester
+    - program
+  proximity: 300
+identifier_dependencies:
+  - type: student
+    name: Student ID / EQ ID
+    note: >-
+      University student number format
+    affects: precision at 75/85 (public fallback is the generic labelled-field regex)
+test_cases:
+  should_match:
+    - value: "Show Cause Application – Unsatisfactory Academic Progress\nStudent name: Jamie Teston\nStudent number: 45118273\nProgram: Bachelor of Engineering\nGPA: 2.1 over two semesters\nReasons: carer for a parent with cancer; will study part-time next semester."
+      description: Populated record 1
+      synthetic: true
+    - value: "Notice of Intention to Exclude\nStudent name: Alex Teston\nStudent ID: 0071932\nYou failed 50% of units in two consecutive study periods. You may submit a show cause response by 14/12/2026."
+      description: Populated record 2
+      synthetic: true
+    - value: "Academic progression — show cause outcome\nStudent number: n11234567\nOutcome: academic exclusion for 12 months; readmission requires an approved study plan."
+      description: Narrative record 3 without labelled fields (reaches 65 discovery only, by design)
+      synthetic: true
+  should_not_match:
+    - value: Students who fail half or more of their units in a study period may be placed on academic probation and asked to show cause why they should not be excluded.
+      description: Guidance or explainer text
+    - value: "Show cause application\nStudent name: __________\nStudent number: __________\nReasons for unsatisfactory progress: __________"
+      description: Blank form
+    - value: The university issued 1,850 notices of intention to exclude in 2025, down 12% on 2024.
+      description: Aggregate statistics or news
+false_positives:
+  - description: Guidance pages, fact sheets, policy and training text that name the record type.
+    mitigation: Enforce tiers require populated record fields; guidance uses the labels without values.
+  - description: Blank forms and form kits.
+    mitigation: Blank lines, square-bracket and angle-bracket placeholders and n/a/tbc values are rejected.
+  - description: Aggregate statistics and news reporting.
+    mitigation: No populated person or reference fields, so these stay at 65 discovery.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_tertiary_academic_progression_show_cause_primary
+      matches:
+        - ref: Regex_au_tertiary_academic_progression_show_cause_record_structure
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_au_tertiary_academic_progression_show_cause_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_tertiary_academic_progression_show_cause_primary
+      matches:
+        - ref: Regex_au_tertiary_academic_progression_show_cause_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_tertiary_academic_progression_show_cause_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_tertiary_academic_progression_show_cause_primary
+      pattern: >-
+        (?i)\b(?:show\s+cause\s+(?:application|notice|letter|submission|outcome)|unsatisfactory\s+academic\s+progress|notice\s+of\s+intention\s+to\s+exclude|academic\s+exclusion|progression\s+improvement\s+plan|academic\s+probation)\b
+    - id: Regex_au_tertiary_academic_progression_show_cause_record_structure
+      pattern: >-
+        (?i)\b(?:student\s+name|child(?:'s)?\s+name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|student|child|young\s+person|pupil|EQ\s*ID|LUI|USI|year\s+level|parent|guardian|carer|principal|school|(?:student|case|enrolment|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+  keywords:
+    - id: Keyword_au_tertiary_academic_progression_show_cause_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - text: GPA
+              case_sensitive: true
+            - grade point average
+            - failed
+            - exclusion
+            - readmission
+            - study period
+            - semester
+            - program
+            - academic progress
+            - support services
+            - study plan
+            - part-time
+      strength: specific
+risk_rating: 7
+risk_description: >-
+  The classifier identifies a university academic progression show cause or exclusion record about an identified person, gated on populated record fields. Academic progression records for a named student: unsatisfactory academic progress notices, show cause applications (often with personal, medical or family circumstances), notices of intention to exclude, exclusion outcomes and progression improvement plans. Unauthorised disclosure exposes highly personal circumstances and can cause harm, discrimination or retaliation. Guidance, blank forms and statistics are excluded from enforce tiers. Risk 7 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: UQ — Unsatisfactory academic progress (anchor confirmed from official-domain search results; page fetch blocked)
+    url: https://my.uq.edu.au/information-and-services/manage-my-program/academic-progress
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release — anchored on published Queensland forms and statutes; 75 gated on populated record structure; customer identifier slots recorded in identifier_dependencies.
+author: testpattern-community
+license: MIT

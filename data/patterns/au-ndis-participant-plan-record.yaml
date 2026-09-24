@@ -1,0 +1,160 @@
+schema: testpattern/v1
+name: NDIS Participant, Access or Plan Record
+slug: au-ndis-participant-plan-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  NDIS records for a named participant: access requests (Access Request Form, Supporting Evidence Form), NDIS plans and budgets (Core, Capacity Building, Capital supports), plan reassessments, service agreements, support coordination and plan management records.
+operation: >-
+  Primary: NDIS Participant, Access or Plan Record anchors taken from published forms, statutes and procedures. 75 tier requires a populated record field (person, identifier or reference label with a non-placeholder value) within 300 characters. 85 tier requires two distinct populated record fields plus an independent corroborative term. All tiers exclude template/fixture text. 65 is discovery-only (primary alone) and will surface guidance, blank forms and statistics.
+pattern: (?i)\b(?:NDIS\s+(?:plan|participant|number|access\s+request|service\s+agreement)|Access\s+Request\s+Form|Supporting\s+Evidence\s+Form|(?:Core|Capacity\s+Building)\s+supports?|plan\s+(?:reassessment|review)\s+(?:request|meeting)|support\s+needs\s+assessment)\b
+confidence: medium
+confidence_justification: >-
+  Medium: primary anchors are distinctive form titles and statutory terms, but they also appear in guidance, blank forms and statistics, so enforce tiers require populated record structure. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic records laid out like the published forms.
+jurisdictions:
+  - au
+regulations:
+  - National Disability Insurance Scheme Act 2013 (Cth)
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - QGISCF
+data_categories:
+  - health
+  - pii
+corroborative_evidence:
+  keywords:
+    - NDIA
+    - participant
+    - plan budget
+    - support coordination
+    - plan management
+    - assistive technology
+    - home modifications
+    - Supported Independent Living
+  proximity: 300
+identifier_dependencies:
+  - type: client
+    name: Client / customer ID
+    note: >-
+      Provider / agency client ID format
+    affects: precision at 75/85 (public fallback is the generic labelled-field regex)
+test_cases:
+  should_match:
+    - value: "NDIS plan\nParticipant: Avery Teston\nNDIS number: 430447182\nPlan start date: 01/07/2026\nCore supports: $84,200\nCapacity Building (support coordination): $6,400\nPrimary disability: autism."
+      description: Populated record 1
+      synthetic: true
+    - value: "Access Request Form — Section 2 (completed by treating professional)\nParticipant: Morgan Teston\nDate of birth: 19/03/2004\nDiagnosis: cerebral palsy (GMFCS III); requires assistance with mobility and self-care."
+      description: Populated record 2
+      synthetic: true
+    - value: "NDIS service agreement\nParticipant: Jamie Teston\nNDIS number: 431982045\nProvider: Harbour Support Services\nSupported Independent Living, 24/7 roster, 2:1 overnight."
+      description: Populated record 3
+      synthetic: true
+  should_not_match:
+    - value: The NDIS provides funding for reasonable and necessary supports. A plan can include Core supports, Capacity Building supports and Capital supports.
+      description: Guidance or explainer text
+    - value: "Access Request Form\nParticipant name: __________\nNDIS number (if known): __________\nSection 2 to be completed by your treating professional."
+      description: Blank form
+    - value: There were 715,000 NDIS participants in June 2026, including 138,000 in Queensland, the NDIA quarterly report shows.
+      description: Aggregate statistics or news
+false_positives:
+  - description: Guidance pages, fact sheets, policy and training text that name the record type.
+    mitigation: Enforce tiers require populated record fields; guidance uses the labels without values.
+  - description: Blank forms and form kits.
+    mitigation: Blank lines, square-bracket and angle-bracket placeholders and n/a/tbc values are rejected.
+  - description: Aggregate statistics and news reporting.
+    mitigation: No populated person or reference fields, so these stay at 65 discovery.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_ndis_participant_plan_record_primary
+      matches:
+        - ref: Regex_au_ndis_participant_plan_record_record_structure
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_au_ndis_participant_plan_record_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_ndis_participant_plan_record_primary
+      matches:
+        - ref: Regex_au_ndis_participant_plan_record_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_ndis_participant_plan_record_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_ndis_participant_plan_record_primary
+      pattern: >-
+        (?i)\b(?:NDIS\s+(?:plan|participant|number|access\s+request|service\s+agreement)|Access\s+Request\s+Form|Supporting\s+Evidence\s+Form|(?:Core|Capacity\s+Building)\s+supports?|plan\s+(?:reassessment|review)\s+(?:request|meeting)|support\s+needs\s+assessment)\b
+    - id: Regex_au_ndis_participant_plan_record_record_structure
+      pattern: >-
+        (?i)\b(?:participant|NDIS\s+(?:no\.?|number)|plan\s+(?:start|end|review)\s+date|plan\s+manager|support\s+coordinator|provider|registration\s+(?:no\.?|number)|worker|person\s+with\s+disability|adult|nominee|incident\s+date|date\s+of\s+incident|guardian|name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}|\bNDIS\s+(?:no\.?|number)\s*[:#]?\s*43\d{7}\b
+  keywords:
+    - id: Keyword_au_ndis_participant_plan_record_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - text: NDIA
+              case_sensitive: true
+            - participant
+            - plan budget
+            - support coordination
+            - plan management
+            - assistive technology
+            - home modifications
+            - Supported Independent Living
+            - text: SIL
+              case_sensitive: true
+            - Specialist Disability Accommodation
+            - text: SDA
+              case_sensitive: true
+            - functional capacity
+            - diagnosis
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  The classifier identifies a ndis participant, access or plan record about an identified person, gated on populated record fields. NDIS records for a named participant: access requests (Access Request Form, Supporting Evidence Form), NDIS plans and budgets (Core, Capacity Building, Capital supports), plan reassessments, service agreements, support coordination and plan management records. Unauthorised disclosure exposes highly personal circumstances and can cause harm, discrimination or retaliation. Guidance, blank forms and statistics are excluded from enforce tiers. Risk 8 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: NDIS — Access Request Form
+    url: https://www.ndis.gov.au/how-apply-ndis/what-access-request-form
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release — anchored on published Queensland forms and statutes; 75 gated on populated record structure; customer identifier slots recorded in identifier_dependencies.
+author: testpattern-community
+license: MIT

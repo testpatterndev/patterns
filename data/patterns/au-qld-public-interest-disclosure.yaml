@@ -1,0 +1,160 @@
+schema: testpattern/v1
+name: Queensland Public Interest Disclosure Record
+slug: au-qld-public-interest-disclosure
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Public interest disclosures under the Public Interest Disclosure Act 2010 (Qld) and the records that identify the discloser: assessments, reprisal risk assessments, referrals to a proper authority and investigation files. Disclosure of a discloser's identity is an offence and exposes them to reprisal.
+operation: >-
+  Primary: Queensland Public Interest Disclosure Record anchors taken from published forms, statutes and procedures. 75 tier requires a populated record field (person, identifier or reference label with a non-placeholder value) within 300 characters. 85 tier requires two distinct populated record fields plus an independent corroborative term. All tiers exclude template/fixture text. 65 is discovery-only (primary alone) and will surface guidance, blank forms and statistics.
+pattern: (?i)\b(?:public\s+interest\s+disclosure|PID\s+(?:assessment|register|coordinator|officer|file|reference|risk\s+assessment)|reprisal\s+(?:risk\s+)?assessment|Public\s+Interest\s+Disclosure\s+Act\s+2010)\b
+confidence: medium
+confidence_justification: >-
+  Medium: primary anchors are distinctive form titles and statutory terms, but they also appear in guidance, blank forms and statistics, so enforce tiers require populated record structure. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic records laid out like the published forms.
+jurisdictions:
+  - au
+regulations:
+  - Public Interest Disclosure Act 2010 (Qld)
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - government
+  - pii
+corroborative_evidence:
+  keywords:
+    - discloser
+    - reprisal
+    - proper authority
+    - confidentiality
+    - corrupt conduct
+    - maladministration
+    - substantial and specific danger
+    - subject officer
+  proximity: 300
+identifier_dependencies:
+  - type: case-file
+    name: Case / file / matter number
+    note: >-
+      Agency PID / complaint reference format
+    affects: precision at 75/85 (public fallback is the generic labelled-field regex)
+  - type: employee
+    name: Employee / staff ID
+    note: >-
+      Employee ID of discloser / subject officer
+    affects: precision at 75/85 (public fallback is the generic labelled-field regex)
+test_cases:
+  should_match:
+    - value: "PID assessment\nDate received: 04/09/2026\nDiscloser: Avery Teston (Senior Project Officer)\nSubject officer: Jordan Staffson, Manager Procurement\nAllegation: contract splitting to avoid tender thresholds. Assessed as a public interest disclosure (maladministration). Reprisal risk: high."
+      description: Populated record 1
+      synthetic: true
+    - value: 'Reprisal risk assessment for the discloser in PID file 2026-017: the discloser works in the same team as the subject officer, and the allegation details make the discloser readily identifiable.'
+      description: Narrative record 2 without labelled fields (reaches 65 discovery only, by design)
+      synthetic: true
+    - value: The public interest disclosure made by Morgan Teston about falsified inspection records was referred to the Crime and Corruption Commission as the proper authority on 11/09/2026.
+      description: Narrative record 3 without labelled fields (reaches 65 discovery only, by design)
+      synthetic: true
+  should_not_match:
+    - value: A public interest disclosure is a disclosure about wrongdoing in the public sector that serves the public interest. Disclosers are protected from reprisal under the Public Interest Disclosure Act 2010.
+      description: Guidance or explainer text
+    - value: "PID assessment form\nDate received: ____\nDiscloser: ____\nSubject officer: ____\nType of wrongdoing: ____"
+      description: Blank form
+    - value: Queensland agencies reported 1,684 public interest disclosures in 2024-25, according to the Queensland Ombudsman's annual report.
+      description: Aggregate statistics or news
+false_positives:
+  - description: Guidance pages, fact sheets, policy and training text that name the record type.
+    mitigation: Enforce tiers require populated record fields; guidance uses the labels without values.
+  - description: Blank forms and form kits.
+    mitigation: Blank lines, square-bracket and angle-bracket placeholders and n/a/tbc values are rejected.
+  - description: Aggregate statistics and news reporting.
+    mitigation: No populated person or reference fields, so these stay at 65 discovery.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_qld_public_interest_disclosure_primary
+      matches:
+        - ref: Regex_au_qld_public_interest_disclosure_record_structure
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_au_qld_public_interest_disclosure_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_qld_public_interest_disclosure_primary
+      matches:
+        - ref: Regex_au_qld_public_interest_disclosure_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_qld_public_interest_disclosure_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_qld_public_interest_disclosure_primary
+      pattern: >-
+        (?i)\b(?:public\s+interest\s+disclosure|PID\s+(?:assessment|register|coordinator|officer|file|reference|risk\s+assessment)|reprisal\s+(?:risk\s+)?assessment|Public\s+Interest\s+Disclosure\s+Act\s+2010)\b
+    - id: Regex_au_qld_public_interest_disclosure_record_structure
+      pattern: >-
+        (?i)\b(?:discloser|subject\s+officer|subject\s+person|complainant|witness|officer|employee\s+(?:no\.?|number|ID)|position|work\s+unit|allegation|CCC\s+ref(?:erence)?|file\s+(?:no\.?|number|ref)|reference\s+(?:no\.?|number)|case\s+(?:no\.?|number)|date\s+(?:received|of\s+disclosure|notified)|name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+  keywords:
+    - id: Keyword_au_qld_public_interest_disclosure_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - discloser
+            - reprisal
+            - proper authority
+            - confidentiality
+            - corrupt conduct
+            - maladministration
+            - substantial and specific danger
+            - subject officer
+            - protections
+            - anonymous
+            - referral
+      strength: specific
+risk_rating: 9
+risk_description: >-
+  The classifier identifies a queensland public interest disclosure record about an identified person, gated on populated record fields. Public interest disclosures under the Public Interest Disclosure Act 2010 (Qld) and the records that identify the discloser: assessments, reprisal risk assessments, referrals to a proper authority and investigation files. Unauthorised disclosure exposes highly personal circumstances and can cause harm, discrimination or retaliation. Guidance, blank forms and statistics are excluded from enforce tiers. Risk 9 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - title: Queensland Ombudsman — What is a public interest disclosure
+    url: https://www.ombudsman.qld.gov.au/improve-public-administration/public-interest-disclosures/what-is-a-public-interest-disclosure
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release — anchored on published Queensland forms and statutes; 75 gated on populated record structure; customer identifier slots recorded in identifier_dependencies.
+author: testpattern-community
+license: MIT

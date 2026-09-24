@@ -1,0 +1,161 @@
+schema: testpattern/v1
+name: Queensland Social Housing Application Record
+slug: au-qld-social-housing-application
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Applications for social housing and supporting records for a named household: Application for Social Housing, additional applicants, medical report (PH068), support statement (PH076), change of tenancy request (PH058), changes to household (PH127), transfer and mutual exchange applications, and Housing Service Centre assessments of housing need.
+operation: >-
+  Primary: Queensland Social Housing Application Record anchors taken from published forms, statutes and procedures. 75 tier requires a populated record field (person, identifier or reference label with a non-placeholder value) within 300 characters. 85 tier requires two distinct populated record fields plus an independent corroborative term. All tiers exclude template/fixture text. 65 is discovery-only (primary alone) and will surface guidance, blank forms and statistics.
+pattern: (?i)\b(?:Application\s+for\s+Social\s+Housing|Housing\s+assistance\s+application|application\s+for\s+(?:a\s+)?(?:transfer|mutual\s+exchange)|housing\s+register|assessed\s+housing\s+need|level\s+of\s+(?:assessed\s+)?housing\s+need|PH0(?:68|76|58)|PH127)\b
+confidence: medium
+confidence_justification: >-
+  Medium: primary anchors are distinctive form titles and statutory terms, but they also appear in guidance, blank forms and statistics, so enforce tiers require populated record structure. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic records laid out like the published forms.
+jurisdictions:
+  - au
+regulations:
+  - Housing Act 2003 (Qld)
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - government
+corroborative_evidence:
+  keywords:
+    - Housing Service Centre
+    - household
+    - income
+    - Centrelink
+    - medical report
+    - support statement
+    - homeless
+    - at risk of homelessness
+  proximity: 300
+identifier_dependencies:
+  - type: client
+    name: Client / customer ID
+    note: >-
+      Housing client / application number format
+    affects: precision at 75/85 (public fallback is the generic labelled-field regex)
+  - type: property
+    name: Property / tenancy reference
+    note: >-
+      Tenancy / property reference
+    affects: precision at 75/85 (public fallback is the generic labelled-field regex)
+test_cases:
+  should_match:
+    - value: "Application for Social Housing\nApplication number: 4471820\nApplicant: Avery Teston\nDate of birth: 02/08/1989\nHousehold member: Riley Teston (child, 6)\nCurrent address: 14 Wattlebird Street, Stafford QLD 4053\nReason: at risk of homelessness — domestic and family violence."
+      description: Populated record 1
+      synthetic: true
+    - value: "Medical report (PH068)\nApplicant: Morgan Teston\nClient number: C0071932\nThe applicant uses a wheelchair and requires ground-floor accommodation with a modified bathroom. Doctor: Dr Casey Staffson."
+      description: Populated record 2
+      synthetic: true
+    - value: "Housing Service Centre — assessment\nApplicant: Jamie Teston\nLevel of assessed housing need: very high. Household income $612 a week (Centrelink); sleeping in car since July."
+      description: Populated record 3
+      synthetic: true
+  should_not_match:
+    - value: To apply for social housing, complete the Application for Social Housing and provide proof of identity and income. Your Housing Service Centre will assess your housing need.
+      description: Guidance or explainer text
+    - value: "Application for Social Housing\nApplicant: __________\nDate of birth: __________\nApplication number: __________"
+      description: Blank form
+    - value: There were 45,600 households on the Queensland social housing register in June 2026, the department's quarterly data show.
+      description: Aggregate statistics or news
+false_positives:
+  - description: Guidance pages, fact sheets, policy and training text that name the record type.
+    mitigation: Enforce tiers require populated record fields; guidance uses the labels without values.
+  - description: Blank forms and form kits.
+    mitigation: Blank lines, square-bracket and angle-bracket placeholders and n/a/tbc values are rejected.
+  - description: Aggregate statistics and news reporting.
+    mitigation: No populated person or reference fields, so these stay at 65 discovery.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_qld_social_housing_application_primary
+      matches:
+        - ref: Regex_au_qld_social_housing_application_record_structure
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_au_qld_social_housing_application_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_qld_social_housing_application_primary
+      matches:
+        - ref: Regex_au_qld_social_housing_application_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_qld_social_housing_application_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_qld_social_housing_application_primary
+      pattern: >-
+        (?i)\b(?:Application\s+for\s+Social\s+Housing|Housing\s+assistance\s+application|application\s+for\s+(?:a\s+)?(?:transfer|mutual\s+exchange)|housing\s+register|assessed\s+housing\s+need|level\s+of\s+(?:assessed\s+)?housing\s+need|PH0(?:68|76|58)|PH127)\b
+    - id: Regex_au_qld_social_housing_application_record_structure
+      pattern: >-
+        (?i)\b(?:applicant|tenant|household\s+member|co-tenant|lessor|property\s+manager|premises|property\s+address|address\s+of\s+(?:the\s+)?(?:rental\s+)?premises|rental\s+premises|application\s+(?:no\.?|number)|tenancy\s+(?:no\.?|number|ID)|client\s+(?:no\.?|number|ID)|bond\s+(?:no\.?|number)|CRN|Housing\s+Service\s+Centre|SLK|client|name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+  keywords:
+    - id: Keyword_au_qld_social_housing_application_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - Housing Service Centre
+            - household
+            - income
+            - Centrelink
+            - medical report
+            - support statement
+            - homeless
+            - at risk of homelessness
+            - disability
+            - domestic and family violence
+            - rent
+            - priority
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  The classifier identifies a queensland social housing application record about an identified person, gated on populated record fields. Applications for social housing and supporting records for a named household: Application for Social Housing, additional applicants, medical report (PH068), support statement (PH076), change of tenancy request (PH058), changes to household (PH127), transfer and mutual exchange applications, and Housing Service Centre assessments of housing need. Unauthorised disclosure exposes highly personal circumstances and can cause harm, discrimination or retaliation. Guidance, blank forms and statistics are excluded from enforce tiers. Risk 8 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Qld Government — Public and community housing forms
+    url: https://www.qld.gov.au/housing/public-community-housing/forms
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release — anchored on published Queensland forms and statutes; 75 gated on populated record structure; customer identifier slots recorded in identifier_dependencies.
+author: testpattern-community
+license: MIT

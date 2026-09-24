@@ -1,0 +1,156 @@
+schema: testpattern/v1
+name: Specialist Homelessness Services Client Record
+slug: au-specialist-homelessness-services-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Specialist Homelessness Services (SHS) client records and SHS collection extracts for named or linkable clients: homelessness status, reasons for seeking assistance, services provided and the statistical linkage key (SLK-581) built from name, date of birth and sex.
+operation: >-
+  Primary: Specialist Homelessness Services Client Record anchors taken from published forms, statutes and procedures. 75 tier requires a populated record field (person, identifier or reference label with a non-placeholder value) within 300 characters. 85 tier requires two distinct populated record fields plus an independent corroborative term. All tiers exclude template/fixture text. 65 is discovery-only (primary alone) and will surface guidance, blank forms and statistics.
+pattern: (?i)\b(?:Specialist\s+Homelessness\s+Services?(?:\s+Collection)?|SHS\s+(?:support\s+period|client|intake)|SHSC|statistical\s+linkage\s+key|SLK[\s-]?581)\b
+confidence: medium
+confidence_justification: >-
+  Medium: primary anchors are distinctive form titles and statutory terms, but they also appear in guidance, blank forms and statistics, so enforce tiers require populated record structure. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic records laid out like the published forms.
+jurisdictions:
+  - au
+regulations:
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - government
+corroborative_evidence:
+  keywords:
+    - homeless
+    - rough sleeping
+    - couch surfing
+    - crisis accommodation
+    - at risk
+    - support period
+    - presenting unit
+    - domestic and family violence
+  proximity: 300
+identifier_dependencies:
+  - type: client
+    name: Client / customer ID
+    note: >-
+      Agency client ID format
+    affects: precision at 75/85 (public fallback is the generic labelled-field regex)
+test_cases:
+  should_match:
+    - value: "SHS support period\nClient: Riley Teston\nSLK: ESIIL020819892\nDate of birth: 02/08/1989\nHousing situation at presentation: rough sleeping. Main reason: domestic and family violence. Referred to crisis accommodation."
+      description: Populated record 1
+      synthetic: true
+    - value: "Specialist Homelessness Services Collection extract — agency 4471\nSLK, Sex, DOB, Reason\nOTEOR170619902, 2, 17/06/1990, Financial difficulties\nEAMJA040719881, 1, 04/07/1988, Housing crisis"
+      description: Narrative record 2 without labelled fields (reaches 65 discovery only, by design)
+      synthetic: true
+    - value: "Client name: Morgan Teston\nSpecialist homelessness service case note: couch surfing for 6 weeks, mental health support provided, applying for social housing."
+      description: Populated record 3
+      synthetic: true
+  should_not_match:
+    - value: The Specialist Homelessness Services Collection (SHSC) records information about people who seek assistance from homelessness agencies. Clients are linked using a statistical linkage key.
+      description: Guidance or explainer text
+    - value: "SHS client intake\nClient name: __________\nSLK: __________\nHousing situation: __________"
+      description: Blank form
+    - value: Specialist homelessness services helped 278,000 clients in 2024-25, according to AIHW.
+      description: Aggregate statistics or news
+false_positives:
+  - description: Guidance pages, fact sheets, policy and training text that name the record type.
+    mitigation: Enforce tiers require populated record fields; guidance uses the labels without values.
+  - description: Blank forms and form kits.
+    mitigation: Blank lines, square-bracket and angle-bracket placeholders and n/a/tbc values are rejected.
+  - description: Aggregate statistics and news reporting.
+    mitigation: No populated person or reference fields, so these stay at 65 discovery.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_specialist_homelessness_services_record_primary
+      matches:
+        - ref: Regex_au_specialist_homelessness_services_record_record_structure
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_au_specialist_homelessness_services_record_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_specialist_homelessness_services_record_primary
+      matches:
+        - ref: Regex_au_specialist_homelessness_services_record_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_specialist_homelessness_services_record_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_specialist_homelessness_services_record_primary
+      pattern: >-
+        (?i)\b(?:Specialist\s+Homelessness\s+Services?(?:\s+Collection)?|SHS\s+(?:support\s+period|client|intake)|SHSC|statistical\s+linkage\s+key|SLK[\s-]?581)\b
+    - id: Regex_au_specialist_homelessness_services_record_record_structure
+      pattern: >-
+        (?i)\b(?:applicant|tenant|household\s+member|co-tenant|lessor|property\s+manager|premises|property\s+address|address\s+of\s+(?:the\s+)?(?:rental\s+)?premises|rental\s+premises|application\s+(?:no\.?|number)|tenancy\s+(?:no\.?|number|ID)|client\s+(?:no\.?|number|ID)|bond\s+(?:no\.?|number)|CRN|Housing\s+Service\s+Centre|SLK|client|name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}|\b[A-Z29]{5}\d{8}[129]\b
+  keywords:
+    - id: Keyword_au_specialist_homelessness_services_record_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - homeless
+            - rough sleeping
+            - couch surfing
+            - crisis accommodation
+            - at risk
+            - support period
+            - presenting unit
+            - domestic and family violence
+            - mental health
+            - agency
+            - referral
+            - Housing Service Centre
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  The classifier identifies a specialist homelessness services client record about an identified person, gated on populated record fields. Specialist Homelessness Services (SHS) client records and SHS collection extracts for named or linkable clients: homelessness status, reasons for seeking assistance, services provided and the statistical linkage key (SLK-581) built from name, date of birth and sex. Unauthorised disclosure exposes highly personal circumstances and can cause harm, discrimination or retaliation. Guidance, blank forms and statistics are excluded from enforce tiers. Risk 8 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: AIHW — Specialist Homelessness Services Collection
+    url: https://www.aihw.gov.au/about-our-data/our-data-collections/specialist-homelessness-services-collection
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release — anchored on published Queensland forms and statutes; 75 gated on populated record structure; customer identifier slots recorded in identifier_dependencies.
+author: testpattern-community
+license: MIT
