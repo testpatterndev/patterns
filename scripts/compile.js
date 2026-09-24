@@ -3,6 +3,7 @@ import { join, relative } from 'path'
 import { fileURLToPath } from 'url'
 import yaml from 'js-yaml'
 import { resolveCustomisationFallbacks, TOKEN_LITERAL } from './lib/customisation.mjs'
+import { loadIdentifiers } from './lib/identifiers.mjs'
 
 const DATA_DIR = fileURLToPath(new URL('../data', import.meta.url))
 const OUT_FILE = fileURLToPath(new URL('../patterns.json', import.meta.url))
@@ -257,6 +258,9 @@ const output = {
   keywords: keywordDicts,
   packageTags: packageTags?.metadata ?? null,
   dictionaryManifest,
+  // Documented identifier types referenced by identifier-format customisation entries
+  // (definition, public-format evidence, fallback and replacement steps) for deploy tooling.
+  identifierTypes: Object.fromEntries([...loadIdentifiers(join(DATA_DIR, 'identifiers'))].map(([k, v]) => { const { __file, ...rest } = v; return [k, rest] })),
   classificationResults
 }
 

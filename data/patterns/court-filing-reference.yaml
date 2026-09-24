@@ -1,13 +1,13 @@
 schema: testpattern/v1
 name: Court Filing Reference
 slug: court-filing-reference
-version: 1.5.0
+version: 1.6.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects court filing references from Queensland courts (Magistrates Court, District Court, Supreme Court) containing proceeding numbers, party names, and registry details. Unpublished filings contain personal details of parties, allegations, and evidence that are not yet in the public domain.
 operation: 'Keyword proximity: primary keywords (court filing, proceeding number, registry, plaintiff, defendant, applicant, respondent, cause number) within 300 characters of Queensland court reference formats (MAG-NNNN-NN, DC-NNNN-NN, SC-NNNN-NN). Negative keyword exclusion for published judgments and court directories.'
-pattern: (?i)\b(court\s+filing|proceeding\s+number|cause\s+number|registry\s+(?:number|reference)|(?:MAG|DC|SC)-\d{4}-\d{2,6}|(?:plaintiff|defendant|applicant|respondent)\s+(?:name|details))\b
+pattern: (?i)\b(court\s+filing|proceeding\s+number|cause\s+number|registry\s+(?:number|reference)|(?:plaintiff|defendant|applicant|respondent)\s+(?:name|details))\b
 confidence: low
 confidence_justification: 'Medium confidence: requires co-occurrence of court filing terminology with Queensland court reference number formats. These formats and filing-specific terms rarely co-occur outside genuine court documents.'
 jurisdictions:
@@ -42,6 +42,15 @@ corroborative_evidence:
     - law-enforcement
 
     - government-services
+customisation:
+  - key: qld-court-file-number
+    kind: identifier-format
+    identifier: qld-court-file-number
+    target: purview.regexes/Pattern_court_filing_reference_qld_court_reference_number
+    mode: replace
+    affects_tiers: [85]
+    required_for_enforcement: false
+    note: "Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#qld-court-file-number). Earlier versions used the MAG-/DC-/SC-YYYY- court file format, which does not appear in any published source."
 test_cases:
   should_match:
     - value: 'SENSITIVE Legal. Court Filing — Queensland Magistrates Court. Proceeding Number: MAG-2026-04281. Registry: Brisbane. Plaintiff: State of Queensland. Defendant: [Name]. Charge: Criminal Code s.339 — Assault of a Public Officer. First appearance: 18 March 2026. Bail application to be heard. Filed by Office of the Director of Public Prosecutions.'
@@ -50,10 +59,13 @@ test_cases:
       description: Supreme Court child protection filing with cause number
     - value: 'District Court of Queensland — Statement of Claim. Proceeding Number: DC-2026-0392. Registry: Cairns. Plaintiff: [Name]. Defendant: Queensland Health. Claim for damages arising from medical negligence at Cairns Hospital. Particulars of negligence: failure to diagnose appendicitis on presentation 14 August 2025. Damages claimed: $485,000.'
       description: District Court civil claim filing against Queensland Health
-    - value: 'District Court of Queensland DC-2026-0392; Plaintiff M.L.; Defendant Queensland Health; statement of claim; damages $485,000.'
+    - value: 'District Court of Queensland, proceeding number 2026/0392; Plaintiff M.L.; Defendant Queensland Health; statement of claim; damages $485,000.'
       description: Court identity, reference, parties, document type, and claim detail enforce
     - value: "Court Filing\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Court Filing recorded against the subject; handling restricted."
       description: Populated justice record reaching the 75/85 structure gate
+      synthetic: true
+    - value: "District Court of Queensland — Brisbane registry\nProceeding number: BS4471/26\nApplicant: Avery Teston\nRespondent: Jordan Teston\nAffidavit of Avery Teston filed 12/09/2026."
+      description: Complete record with a labelled reference in the documented identifier form (reaches 85)
       synthetic: true
   should_not_match:
     - value: 'Published Judgment: Smith v State of Queensland [2025] QSC 184. The Supreme Court found the defendant liable for negligence. The full judgment is available on the Queensland Courts website.'
@@ -64,7 +76,7 @@ test_cases:
       description: Legal journal article discussing court statistics
     - value: 'Published Judgment: Smith v State [2025] QSC 184.'
       description: Published judgment citation — excluded and no filing primary present
-    - value: 'Law-school sample: MAG-2026-0001 plaintiff Example.'
+    - value: 'Law-school sample: court file plaintiff Example.'
       description: Academic/sample context is suppressed by the noise exclusion
     - value: Court filing proceeding number.
       description: Generic filing words without court identity or parties discover but must not enforce
@@ -131,9 +143,9 @@ purview:
             - Filter_qld_public_court
   regexes:
     - id: Pattern_qld_court_filing
-      pattern: (?i)\b(?:MAG-\d{4}-\d{2,6}|DC-\d{4}-\d{2,6}|SC-\d{4}-\d{2,6}|court\s+filing|proceeding\s+number|cause\s+number|initiating\s+application|originating\s+application|statement\s+of\s+claim)\b
+      pattern: (?i)\b(?:court\s+filing|proceeding\s+number|cause\s+number|initiating\s+application|originating\s+application|statement\s+of\s+claim)\b
     - id: Pattern_court_filing_reference_qld_court_reference_number
-      pattern: \b(?:MAG|DC|SC)-\d{4}-\d{2,6}\b
+      pattern: "(?i)\\b(?:court\\s+file|proceeding|cause|registry)\\s+(?:no\\.?|number)\\s*[:#]?\\s*[A-Z0-9][A-Z0-9/-]{3,20}\\b"
     - id: Regex_court_filing_reference_record_structure
       pattern: >-
         (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
@@ -187,6 +199,9 @@ references: []
 created: '2026-03-06'
 updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: "Replace the MAG-/DC-/SC-YYYY- court file format (not found in any published source) with the documented qld-court-file-number labelled-reference fallback and declare an identifier-format customisation slot (mode replace) so the customer's real format can be supplied at engagement. Test values updated to labelled references."
   - version: 1.5.0
     date: '2026-09-24'
     description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent justice record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."

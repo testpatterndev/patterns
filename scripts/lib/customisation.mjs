@@ -1,13 +1,18 @@
 // Customisation placeholders (testpattern/v1 extension).
 // Design: docs/superpowers/specs/2026-07-25-customisation-placeholders-design.md
-// Three kinds: dictionary-subset (full public dictionary IS the fallback),
+// Four kinds: dictionary-subset (full public dictionary IS the fallback),
 // keyword-set (in-file fictional terms ARE the fallback), value ({{CUSTOMISE:key}}
-// tokens substituted with the declared fallback string at compile time).
+// tokens substituted with the declared fallback string at compile time), and
+// identifier-format (v2: a whole target regex is the public fallback for a documented
+// identifier type in data/identifiers/; the deployment overlay extends or replaces it —
+// design: docs/superpowers/specs/2026-09-24-identifier-format-customisation-design.md).
+
+import { validateIdentifierFormatEntry } from './identifiers.mjs'
 
 export const TOKEN_LITERAL = '{{CUSTOMISE:'
 const TOKEN_RE = /\{\{CUSTOMISE:([a-z0-9-]{3,40})\}\}/g
 const KEY_RE = /^[a-z0-9-]{3,40}$/
-const KINDS = new Set(['dictionary-subset', 'keyword-set', 'value'])
+const KINDS = new Set(['dictionary-subset', 'keyword-set', 'value', 'identifier-format'])
 const MIN_NOTE = 40
 
 const termText = (t) => (typeof t === 'string' ? t : String(t?.text ?? ''))
@@ -32,7 +37,7 @@ function tokensInPermittedSites(doc, isDictionary) {
   return found
 }
 
-export function validateCustomisations(doc, { kwSlugs = new Set(), isDictionary = false } = {}) {
+export function validateCustomisations(doc, { kwSlugs = new Set(), isDictionary = false, identifiers = null } = {}) {
   const errs = []
   const raw = doc.customisation
   if (raw != null && !Array.isArray(raw)) return ['customisation must be a list']
@@ -45,9 +50,15 @@ export function validateCustomisations(doc, { kwSlugs = new Set(), isDictionary 
     if (!KEY_RE.test(key)) errs.push(`customisation key '${key}' must match [a-z0-9-]{3,40}`)
     if (byKey.has(key)) errs.push(`duplicate customisation key '${key}'`)
     byKey.set(key, d)
-    if (!KINDS.has(d.kind)) errs.push(`customisation '${key}': kind must be dictionary-subset|keyword-set|value`)
+    if (!KINDS.has(d.kind)) errs.push(`customisation '${key}': kind must be dictionary-subset|keyword-set|value|identifier-format`)
     if (typeof d.note !== 'string' || d.note.trim().length < MIN_NOTE) errs.push(`customisation '${key}': note must explain the localisation (>= ${MIN_NOTE} chars)`)
     if (typeof d.required_for_enforcement !== 'boolean') errs.push(`customisation '${key}': required_for_enforcement must be boolean`)
+
+    if (d.kind === 'identifier-format') {
+      if (isDictionary) { errs.push(`customisation '${key}': identifier-format is only valid on patterns`); continue }
+      errs.push(...validateIdentifierFormatEntry(doc, d, identifiers ?? new Map()))
+      continue
+    }
 
     if (d.kind === 'value') {
       if (typeof d.fallback !== 'string' || !d.fallback.trim()) errs.push(`customisation '${key}': value kind requires a non-empty string fallback`)
