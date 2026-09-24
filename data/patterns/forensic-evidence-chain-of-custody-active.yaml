@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Forensic Evidence and Chain-of-Custody Records
 slug: forensic-evidence-chain-of-custody-active
-version: 1.2.2
+version: 1.3.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -71,6 +71,9 @@ test_cases:
         packaging — latent print lifted from exhibit QPS-EX-2024-01294 matches accused. Toxicology results from seized
         substance: 78% purity methylamphetamine, 2.4 kg gross weight. Chain of custody documentation complete.
       description: Committal hearing forensic evidence summary with fingerprint and toxicology results
+    - value: "Forensic Evidence\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Forensic Evidence recorded against the subject; handling restricted."
+      description: Populated justice record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: >-
         The Queensland Health Forensic and Scientific Services published its annual report noting that 12,500 DNA
@@ -84,6 +87,8 @@ test_cases:
         The judge in the concluded murder trial noted that the chain of custody for the DNA evidence was properly
         maintained throughout. The accused was convicted and sentenced to life imprisonment.
       description: News report about concluded trial where evidence was admitted
+    - value: "Policy guidance: this procedure explains how records about Forensic Evidence are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Forensic laboratory annual reports with aggregate testing statistics
     mitigation: >-
@@ -108,7 +113,9 @@ purview:
     - confidence_level: 85
       id_match: Pattern_forensic_evidence_chain_of_custody_active_forensic_evidence_terms
       matches:
-        - ref: Evidence_forensic_evidence_chain_of_custody_active_primary_keywords
+        - ref: Regex_forensic_evidence_chain_of_custody_active_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_forensic_evidence_chain_of_custody_active_active_prosecution_markers
         - ref: Evidence_forensic_evidence_chain_of_custody_active_corroborative_terms
         - ref: Pattern_forensic_evidence_chain_of_custody_active_qps_exhibit_reference
@@ -122,7 +129,10 @@ purview:
     - confidence_level: 75
       id_match: Pattern_forensic_evidence_chain_of_custody_active_forensic_evidence_terms
       matches:
-        - ref: Evidence_forensic_evidence_chain_of_custody_active_primary_keywords
+        - type: any
+          refs:
+            - Regex_forensic_evidence_chain_of_custody_active_record_structure
+            - Evidence_forensic_evidence_chain_of_custody_active_corroborative_terms
         - type: any
           min_matches: 0
           max_matches: 0
@@ -147,21 +157,10 @@ purview:
       pattern: \bEV-\d{4,6}\b
     - id: Pattern_forensic_evidence_chain_of_custody_active_indictment_number
       pattern: \bIndictment\s+(?:No\.?|Number)\s*:?\s*\d{4}/\d{3,5}\b
+    - id: Regex_forensic_evidence_chain_of_custody_active_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_forensic_evidence_chain_of_custody_active_primary_keywords
-      groups:
-        - match_style: word
-          terms:
-            - chain of custody
-            - exhibit register
-            - forensic evidence
-            - DNA profile match
-            - fingerprint match
-            - ballistics match
-            - toxicology results
-            - forensic certificate
-            - evidence continuity
-      strength: specific
     - id: Evidence_forensic_evidence_chain_of_custody_active_active_prosecution_markers
       groups:
         - match_style: word
@@ -187,7 +186,6 @@ purview:
             - laboratory analysis
             - latent print
             - seized
-            - exhibit
       strength: specific
     - id: Filter_forensic_evidence_chain_of_custody_active_exclusion
       groups:
@@ -217,8 +215,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Legal
 references: []
 created: '2026-02-20'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.3.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.2.2
     date: '2026-07-19'
     description: >-

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Juvenile justice records
 slug: global-top500-415-juvenile-justice-records
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -38,6 +38,9 @@ test_cases:
     description: Alternative topic phrase match
   - value: juvenile court
     description: Additional topic phrase match
+  - value: "juvenile record\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: juvenile record recorded against the subject; handling restricted."
+    description: Populated justice record reaching the 75/85 structure gate
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -45,6 +48,8 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: mugshot victim
     description: Generic word pair from old broad template should not match
+  - value: "Policy guidance: this procedure explains how records about juvenile record are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Common words and phrases related to juvenile justice records appearing in policy documents, training materials,
     HR templates, or compliance guidelines without actual personal data.
@@ -67,71 +72,45 @@ purview:
   patterns_proximity: 240
   recommended_confidence: 85
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_juvenile_justice
-    matches:
-    - ref: Pattern_global_top500_415_juvenile_justice_records_label_context
-    - ref: Keyword_global_top500_415_juvenile_justice_records_domain_context
-    - ref: Keyword_juvenile_justice
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_juvenile_justice
-    matches:
-    - ref: Pattern_global_top500_415_juvenile_justice_records_label_context
-    - ref: Keyword_global_top500_415_juvenile_justice_records_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_juvenile_justice
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_juvenile_justice
+      matches:
+        - ref: Regex_global_top500_415_juvenile_justice_records_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_juvenile_justice
+      matches:
+        - ref: Regex_global_top500_415_juvenile_justice_records_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_juvenile_justice
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_juvenile_justice
-    pattern: (?is)\b(?:juvenile\s+record|juvenile\s+justice|youth\s+offender|juvenile\s+court|minor\s+offender|juvenile\s+detention|youth\s+court|juvenile\s+probation|sealed\s+juvenile|juvenile\s+adjudication|youth\s+diversion|juvenile\s+delinquency)\b
-  - id: Pattern_global_top500_415_juvenile_justice_records_label_context
-    pattern: (?i)\b(?:juvenile\s+justice\s+records)\b
-  keywords:
-  - id: Keyword_juvenile_justice
-    groups:
-    - match_style: word
-      terms:
-      - juvenile record
-      - juvenile justice
-      - youth offender
-      - juvenile court
-      - minor offender
-      - juvenile detention
-      - youth court
-      - juvenile probation
-      - sealed juvenile
-      - juvenile adjudication
-      - youth diversion
-      - juvenile delinquency
-    strength: specific
-  - id: Keyword_global_top500_415_juvenile_justice_records_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - juvenile justice records
-      - juvenile
-      - justice
-    strength: domain
+    - id: Regex_juvenile_justice
+      pattern: (?is)\b(?:juvenile\s+record|juvenile\s+justice|youth\s+offender|juvenile\s+court|minor\s+offender|juvenile\s+detention|youth\s+court|juvenile\s+probation|sealed\s+juvenile|juvenile\s+adjudication|youth\s+diversion|juvenile\s+delinquency)\b
+    - id: Regex_global_top500_415_juvenile_justice_records_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 risk_description: This regex identifies juvenile records, youth-offender material, juvenile-court records, and related justice
   context. A genuine file can expose a minor's allegations, court outcomes, family circumstances, assessments, and rehabilitation
   history, creating stigma and lasting education or employment harm if unlawfully disclosed. The affected person is especially
@@ -147,8 +126,11 @@ sensitivity_labels:
   nz_gov: CONFIDENTIAL
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent justice record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
 - version: 1.2.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1959 without changing

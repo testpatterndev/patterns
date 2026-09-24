@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Privileged account inventories
 slug: global-top500-309-privileged-account-inventories
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -40,6 +40,9 @@ test_cases:
     description: Alternative topic phrase match
   - value: admin account
     description: Additional topic phrase match
+  - value: "privileged account\nHost: fw01.corp 10.20.30.40\nRule 14: allow tcp/443 from 10.20.0.0/16\nFinding: CVE-2025-21298 unpatched on asset ID WS-004471."
+    description: Populated tech record reaching the 75/85 structure gate
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -47,6 +50,8 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: backup outage
     description: Generic word pair from old broad template should not match
+  - value: "Policy guidance: this procedure explains how records about privileged account are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Authentication-related terminology in software documentation, security training materials, or system architecture
     descriptions without actual credentials.
@@ -65,72 +70,45 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 85
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_privileged_accounts
-    matches:
-    - ref: Pattern_global_top500_309_privileged_account_inventories_label_context
-    - ref: Keyword_global_top500_309_privileged_account_inventories_domain_context
-    - ref: Keyword_privileged_accounts
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_privileged_accounts
-    matches:
-    - ref: Pattern_global_top500_309_privileged_account_inventories_label_context
-    - ref: Keyword_global_top500_309_privileged_account_inventories_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_privileged_accounts
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_privileged_accounts
+      matches:
+        - ref: Regex_global_top500_309_privileged_account_inventories_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_privileged_accounts
+      matches:
+        - ref: Regex_global_top500_309_privileged_account_inventories_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_privileged_accounts
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_privileged_accounts
-    pattern: (?is)\b(?:privileged\s+account|privileged\s+access|service\s+account|admin\s+account|privileged\s+identity|domain\s+admin|root\s+account|break\s+glass|credential\s+vault|access\s+review)\b
-  - id: Pattern_global_top500_309_privileged_account_inventories_label_context
-    pattern: (?i)\b(?:privileged\s+account\s+inventories)\b
-  keywords:
-  - id: Keyword_privileged_accounts
-    groups:
-    - match_style: word
-      terms:
-      - privileged account
-      - privileged access
-      - service account
-      - admin account
-      - text: PAM
-        case_sensitive: true
-      - privileged identity
-      - domain admin
-      - root account
-      - break glass
-      - credential vault
-      - access review
-      - entitlement
-    strength: specific
-  - id: Keyword_global_top500_309_privileged_account_inventories_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - privileged account inventories
-      - privileged
-      - inventories
-    strength: domain
+    - id: Regex_privileged_accounts
+      pattern: (?is)\b(?:privileged\s+account|privileged\s+access|service\s+account|admin\s+account|privileged\s+identity|domain\s+admin|root\s+account|break\s+glass|credential\s+vault|access\s+review)\b
+    - id: Regex_global_top500_309_privileged_account_inventories_record_structure
+      pattern: >-
+        (?i)\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:/\d{1,2})?\b|\bCVE-\d{4}-\d{4,7}\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:tcp|udp)\s*/?\s*\d{2,5}\b|\b(?:port|dport|sport)\s*[:=]?\s*\d{2,5}\b|\b(?:hostname|host|asset\s+ID|device\s+ID|sAMAccountName|UPN|username|account\s+name)\s*:\s*(?!_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9._\\@-]{2,63}
 risk_description: This concept pattern recognizes privileged, service, admin, domain-admin, root, break-glass, vault, and
   access-review terminology associated with a privileged-account inventory. A substantive inventory can identify powerful
   account names, owners, target systems, review status, and emergency-access arrangements, helping attackers choose identities
@@ -147,8 +125,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent tech record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
 - version: 1.2.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1859 without changing

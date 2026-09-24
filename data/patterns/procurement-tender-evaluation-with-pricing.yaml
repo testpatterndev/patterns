@@ -1,13 +1,13 @@
 schema: testpattern/v1
 name: Procurement Tender Evaluation with Pricing
 slug: procurement-tender-evaluation-with-pricing
-version: 1.3.3
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects weighted evaluation matrices scoring tender responses, including commercial pricing from multiple bidders in government procurement processes.
 operation: 'Keyword proximity: tender/procurement terms within 300 characters of evaluation/scoring terms and pricing/cost indicators. Requires co-occurrence with confidentiality or probity context. Optional regex for tender reference numbers.'
-pattern: QLD-\d{4}-\d{3,6}
+pattern: "(?i)\\b(?:tender\\s+evaluation|evaluation\\s+(?:report|matrix|panel\\s+report|committee\\s+report)|weighted\\s+scores?|value\\s+for\\s+money\\s+assessment|evaluation\\s+of\\s+(?:tenders|offers|responses))\\b"
 confidence: medium
 confidence_justification: 'Medium confidence: tender evaluation documents with commercial pricing and probity markers are highly distinctive. The combination of procurement terminology with pricing and confidentiality markers virtually eliminates false positives.'
 jurisdictions:
@@ -50,11 +50,16 @@ test_cases:
       description: Procurement evaluation with competitive pricing comparison
     - value: 'PROTECTED — Evaluation committee only. Tender evaluation summary for RFT QLD-2026-08842. Probity-cleared scoring: Tenderer A 86/100 at $9.7M, Tenderer B 79/100 at $11.2M. Value for money: Tenderer A recommended.'
       description: Tender evaluation summary with reference number, scores and pricing
+    - value: "Tender evaluation report — RFT 2026-0417\nHarbour Networks: technical 38.5/50, experience 17/20, weighted score 78.2/100, price $418,960\nCoastline Data: technical 31/50, experience 15/20, weighted score 69.4/100, price $397,500\nEvaluation committee only — commercial-in-confidence."
+      description: Populated record with price / score lines reaching 75 and 85
+      synthetic: true
   should_not_match:
     - value: 'Request for Tender: ICT Infrastructure Services. Submissions close 30 March 2026. Published on QTenders for open public response.'
       description: Published tender notice — public procurement advertisement
     - value: Procurement Policy Framework — How to evaluate tenders. Template scoring matrix with example criteria and weightings.
       description: Procurement policy template without real evaluation data
+    - value: "The evaluation panel will assess offers against the published criteria and weightings in the invitation to tender. How to evaluate tenders is explained in the procurement guide."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Published tender notices and procurement advertisements on QTenders
     mitigation: Exclude documents containing 'submissions close', 'published on QTenders', 'invitation to tender' without evaluation data
@@ -73,14 +78,13 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_procurement_tender_evaluation_with_pricing_queensland_tender_reference_number
+      id_match: Pattern_procurement_tender_evaluation_with_pricing_evaluation_terms
       matches:
-        - ref: Evidence_procurement_tender_evaluation_with_pricing_primary
-        - ref: Evidence_procurement_tender_evaluation_with_pricing_evaluation
-        - ref: Evidence_procurement_tender_evaluation_with_pricing_pricing
-        - ref: Evidence_procurement_tender_evaluation_with_pricing_markers
-        - ref: Pattern_procurement_tender_evaluation_with_pricing_dollar_amounts_with_optional_magnitude_s
         - ref: Pattern_procurement_tender_evaluation_with_pricing_score_format
+          min_count: 2
+          unique_results: true
+        - ref: Pattern_procurement_tender_evaluation_with_pricing_dollar_amounts_with_optional_magnitude_s
+        - ref: Evidence_procurement_tender_evaluation_with_pricing_markers
         - type: any
           min_matches: 0
           max_matches: 0
@@ -88,9 +92,11 @@ purview:
             - Keyword_noise_exclusion
             - Filter_procurement_tender_evaluation_with_pricing_exclusion
     - confidence_level: 75
-      id_match: Pattern_procurement_tender_evaluation_with_pricing_queensland_tender_reference_number
+      id_match: Pattern_procurement_tender_evaluation_with_pricing_evaluation_terms
       matches:
-        - ref: Evidence_procurement_tender_evaluation_with_pricing_primary
+        - ref: Pattern_procurement_tender_evaluation_with_pricing_score_format
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -99,7 +105,11 @@ purview:
             - Filter_procurement_tender_evaluation_with_pricing_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_procurement_tender_evaluation_with_pricing_queensland_tender_reference_number
+      id_match:
+        type: any
+        ids:
+          - Pattern_procurement_tender_evaluation_with_pricing_evaluation_terms
+          - Pattern_procurement_tender_evaluation_with_pricing_queensland_tender_reference_number
       matches:
         - type: any
           min_matches: 0
@@ -108,6 +118,9 @@ purview:
             - Keyword_noise_exclusion
             - Filter_procurement_tender_evaluation_with_pricing_exclusion
   regexes:
+    - id: Pattern_procurement_tender_evaluation_with_pricing_evaluation_terms
+      pattern: >-
+        (?i)\b(?:tender\s+evaluation|evaluation\s+(?:report|matrix|panel\s+report|committee\s+report)|weighted\s+scores?|value\s+for\s+money\s+assessment|evaluation\s+of\s+(?:tenders|offers|responses))\b
     - id: Pattern_procurement_tender_evaluation_with_pricing_queensland_tender_reference_number
       pattern: QLD-\d{4}-\d{3,6}
     - id: Pattern_procurement_tender_evaluation_with_pricing_dollar_amounts_with_optional_magnitude_s
@@ -115,44 +128,6 @@ purview:
     - id: Pattern_procurement_tender_evaluation_with_pricing_score_format
       pattern: \b\d{1,3}\.\d{1,2}\s*/\s*\d{1,3}\b|\b\d{1,3}\s*/\s*\d{1,3}\b
   keywords:
-    - id: Evidence_procurement_tender_evaluation_with_pricing_primary
-      groups:
-        - match_style: word
-          terms:
-            - tender
-            - procurement
-            - text: RFT
-              case_sensitive: true
-            - text: RFP
-              case_sensitive: true
-            - text: ITT
-              case_sensitive: true
-            - request for tender
-            - request for proposal
-      strength: domain
-    - id: Evidence_procurement_tender_evaluation_with_pricing_evaluation
-      groups:
-        - match_style: word
-          terms:
-            - evaluation
-            - assessment
-            - scoring
-            - evaluation committee
-            - evaluation panel
-            - value for money
-      strength: domain
-    - id: Evidence_procurement_tender_evaluation_with_pricing_pricing
-      groups:
-        - match_style: word
-          terms:
-            - price
-            - cost
-            - pricing schedule
-            - commercial
-            - lump sum
-            - unit rate
-            - schedule of rates
-      strength: domain
     - id: Evidence_procurement_tender_evaluation_with_pricing_markers
       groups:
         - match_style: word
@@ -185,8 +160,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Commercial-in-Confidence
 references: []
 created: '2026-02-20'
-updated: '2026-09-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Primary was the unpublished QLD-YYYY-NNNNN tender reference, so no genuine evaluation report could fire. Primary is now evaluation-report phrasing; 75 requires two distinct score entries (n/N); 85 adds dollar amounts and confidentiality markers. The tender reference regex is kept only as optional discovery."
   - version: 1.3.3
     date: '2026-09-14'
     description: 'Assign QGISCF category to SENSITIVE Commercial-in-Confidence; preserve classification tier and detection logic.'

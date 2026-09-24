@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Terrorism Watchlist Entry
 slug: terrorism-watchlist-entry
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -50,6 +50,9 @@ test_cases:
       description: POI register update with ASIO referral and no-fly nomination
     - value: 'Border alert notification. Subject: Fatima AL-RASHIDI. National security flag triggered at Brisbane International. Movement alert confirmed. ASIO assessment: elevated risk. Enhanced screening. AFP and ASIO notified. POI register entry active since March 2024.'
       description: Border alert triggered by watchlist at airport
+    - value: "Terrorism Watchlist\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Terrorism Watchlist recorded against the subject; handling restricted."
+      description: Populated justice record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: Home Affairs published a factsheet explaining Australia's border alert system, including alert types and review processes.
       description: Published government factsheet
@@ -57,6 +60,8 @@ test_cases:
       description: Civil liberties report on watchlists
     - value: A news article reported an Australian citizen was denied boarding due to a security watchlist. The lawyer would challenge in court.
       description: Media report about watchlist challenge
+    - value: "Policy guidance: this procedure explains how records about Terrorism Watchlist are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Government factsheets about border systems
     mitigation: 'Negative keyword exclusion: ''factsheet'', ''published'', ''explains'', ''public information'''
@@ -81,7 +86,9 @@ purview:
     - confidence_level: 85
       id_match: Pattern_terrorism_watchlist_entry_watchlist_terms
       matches:
-        - ref: Evidence_terrorism_watchlist_entry_primary_keywords
+        - ref: Regex_terrorism_watchlist_entry_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_terrorism_watchlist_entry_classification_markers
         - ref: Evidence_terrorism_watchlist_entry_corroborative_terms
         - ref: Pattern_terrorism_watchlist_entry_asio_reference
@@ -95,7 +102,10 @@ purview:
     - confidence_level: 75
       id_match: Pattern_terrorism_watchlist_entry_watchlist_terms
       matches:
-        - ref: Evidence_terrorism_watchlist_entry_primary_keywords
+        - type: any
+          refs:
+            - Regex_terrorism_watchlist_entry_record_structure
+            - Evidence_terrorism_watchlist_entry_corroborative_terms
         - type: any
           min_matches: 0
           max_matches: 0
@@ -119,22 +129,10 @@ purview:
       pattern: \bASA-\d{4}-\d{3,5}\b
     - id: Pattern_terrorism_watchlist_entry_passport_number
       pattern: \b(?:PA|P)[A-Z]?\d{7,8}\b
+    - id: Regex_terrorism_watchlist_entry_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_terrorism_watchlist_entry_primary_keywords
-      groups:
-        - match_style: word
-          terms:
-            - terrorism watchlist
-            - persons of interest register
-            - national security flag
-            - adverse security assessment
-            - security alert
-            - border alert
-            - movement alert
-            - no-fly list
-            - ASIO referral
-            - watchlist entry
-      strength: specific
     - id: Evidence_terrorism_watchlist_entry_classification_markers
       groups:
         - match_style: word
@@ -145,7 +143,6 @@ purview:
       groups:
         - match_style: word
           terms:
-            - ASIO
             - text: AFP
               case_sensitive: true
             - Australian Border Force
@@ -186,8 +183,11 @@ sensitivity_labels:
   qgiscf_dlm: PROTECTED Law-Enforcement
 references: []
 created: '2026-02-20'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1490 without changing detector or package metadata.'

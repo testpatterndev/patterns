@@ -1,13 +1,13 @@
 schema: testpattern/v1
 name: Government Procurement Pricing Schedule - Sealed
 slug: government-procurement-pricing-schedule-sealed
-version: 1.3.2
+version: 1.4.0
 type: document_marker
 pattern_class: marking
 engine: universal
 description: Detects sealed pricing schedules submitted by tenderers as part of government procurement processes, held in confidence until evaluation is complete.
 operation: 'Document marker: pricing schedule / price submission / financial offer / commercial submission in document headers or filenames. Keyword proximity: tender/procurement terms within 300 characters of pricing/rates and sealed/confidential markers. Regex for structured pricing tables with tender reference numbers.'
-pattern: null
+pattern: "(?i)\\b(?:pricing\\s+schedule|price\\s+schedule|schedule\\s+of\\s+rates|price\\s+submission|financial\\s+offer|commercial\\s+submission|sealed\\s+pricing|tender\\s+price|lump\\s+sum\\s+price|bill\\s+of\\s+quantities)\\b"
 confidence: high
 confidence_justification: 'High confidence: sealed procurement pricing with commercial-in-confidence markers and tender reference numbers is highly specific. Published contract prices and rate cards are excluded.'
 jurisdictions:
@@ -52,11 +52,16 @@ test_cases:
       description: IT services pricing schedule with hourly rates
     - value: 'PROTECTED. Sealed Commercial Submission — Major Infrastructure Procurement, RFT QLD-2025-11203. Tenderer pricing breakdown: Design phase $12.4M, Construction phase $234.5M, Commissioning $8.9M. This pricing is commercial-in-confidence and must remain sealed until evaluation committee review.'
       description: Major infrastructure sealed pricing with phase breakdown
+    - value: "Schedule of rates — RFT 2026-0417 Network cabling services\nTenderer: Harbour Networks Pty Ltd\nItem 1 Site survey: $1,250.00\nItem 2 Cat6A outlet installed: $185.00/ea\nItem 3 Project management: $142.00/hr\nTotal tender price: $418,960.00\nCommercial-in-confidence — sealed pricing."
+      description: Populated record with price / score lines reaching 75 and 85
+      synthetic: true
   should_not_match:
     - value: 'Standing offer arrangement: Government ICT Panel. Published rates for Panel Category 1: $120-$180/hour depending on skill level. Available at QTenders.'
       description: Published standing offer rates — public pricing
     - value: 'Procurement Policy: How to prepare a pricing schedule for government tenders. Template with example line items and unit rate format.'
       description: Procurement template with example pricing format
+    - value: "Tenderers must complete the pricing schedule in the approved format and submit it with their response. Late submissions will not be accepted. See QTenders for the invitation documents."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Published standing offer arrangement rates and panel pricing
     mitigation: Exclude documents containing 'standing offer', 'panel rates', 'published rates', 'available at QTenders'
@@ -75,14 +80,13 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_government_procurement_pricing_schedule_sealed_queensland_tender_reference_number
+      id_match: Pattern_government_procurement_pricing_schedule_sealed_pricing_schedule_terms
       matches:
-        - ref: Evidence_government_procurement_pricing_schedule_sealed_primary
-        - ref: Evidence_government_procurement_pricing_schedule_sealed_procurement
-        - ref: Evidence_government_procurement_pricing_schedule_sealed_pricing_detail
-        - ref: Evidence_government_procurement_pricing_schedule_sealed_markers
         - ref: Pattern_government_procurement_pricing_schedule_sealed_dollar_amounts_with_optional_unit_rates_
-        - ref: Pattern_government_procurement_pricing_schedule_sealed_tender_type_abbreviations
+          min_count: 3
+          unique_results: true
+        - ref: Evidence_government_procurement_pricing_schedule_sealed_procurement
+        - ref: Evidence_government_procurement_pricing_schedule_sealed_markers
         - type: any
           min_matches: 0
           max_matches: 0
@@ -90,9 +94,11 @@ purview:
             - Keyword_noise_exclusion
             - Filter_government_procurement_pricing_schedule_sealed_exclusion
     - confidence_level: 75
-      id_match: Pattern_government_procurement_pricing_schedule_sealed_queensland_tender_reference_number
+      id_match: Pattern_government_procurement_pricing_schedule_sealed_pricing_schedule_terms
       matches:
-        - ref: Evidence_government_procurement_pricing_schedule_sealed_primary
+        - ref: Pattern_government_procurement_pricing_schedule_sealed_dollar_amounts_with_optional_unit_rates_
+          min_count: 3
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -101,7 +107,11 @@ purview:
             - Filter_government_procurement_pricing_schedule_sealed_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_government_procurement_pricing_schedule_sealed_queensland_tender_reference_number
+      id_match:
+        type: any
+        ids:
+          - Pattern_government_procurement_pricing_schedule_sealed_pricing_schedule_terms
+          - Pattern_government_procurement_pricing_schedule_sealed_queensland_tender_reference_number
       matches:
         - type: any
           min_matches: 0
@@ -110,23 +120,14 @@ purview:
             - Keyword_noise_exclusion
             - Filter_government_procurement_pricing_schedule_sealed_exclusion
   regexes:
+    - id: Pattern_government_procurement_pricing_schedule_sealed_pricing_schedule_terms
+      pattern: >-
+        (?i)\b(?:pricing\s+schedule|price\s+schedule|schedule\s+of\s+rates|price\s+submission|financial\s+offer|commercial\s+submission|sealed\s+pricing|tender\s+price|lump\s+sum\s+price|bill\s+of\s+quantities)\b
     - id: Pattern_government_procurement_pricing_schedule_sealed_queensland_tender_reference_number
       pattern: QLD-\d{4}-\d{3,6}
     - id: Pattern_government_procurement_pricing_schedule_sealed_dollar_amounts_with_optional_unit_rates_
       pattern: \$[\d,.]+(?:/[a-zA-Z23]+)?
-    - id: Pattern_government_procurement_pricing_schedule_sealed_tender_type_abbreviations
-      pattern: RFT|RFP|ITT
   keywords:
-    - id: Evidence_government_procurement_pricing_schedule_sealed_primary
-      groups:
-        - match_style: word
-          terms:
-            - pricing schedule
-            - price submission
-            - financial offer
-            - commercial submission
-            - sealed pricing
-      strength: specific
     - id: Evidence_government_procurement_pricing_schedule_sealed_procurement
       groups:
         - match_style: word
@@ -139,19 +140,6 @@ purview:
               case_sensitive: true
             - tenderer
       strength: domain
-    - id: Evidence_government_procurement_pricing_schedule_sealed_pricing_detail
-      groups:
-        - match_style: word
-          terms:
-            - pricing
-            - rates
-            - schedule of rates
-            - lump sum
-            - unit rate
-            - hourly rate
-            - contract value
-            - tender price
-      strength: specific
     - id: Evidence_government_procurement_pricing_schedule_sealed_markers
       groups:
         - match_style: word
@@ -184,8 +172,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Commercial-in-Confidence
 references: []
 created: '2026-02-20'
-updated: '2026-09-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Primary was the unpublished QLD-YYYY-NNNNN tender reference, so no genuine pricing schedule could fire. Primary is now pricing-schedule phrasing; 75 requires three distinct dollar amounts (price lines); 85 adds procurement vocabulary and confidentiality markers. The tender reference regex is kept only as optional discovery."
   - version: 1.3.2
     date: '2026-09-14'
     description: 'Assign QGISCF category to SENSITIVE Commercial-in-Confidence; preserve classification tier and detection logic.'

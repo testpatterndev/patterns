@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Constituent service case notes
 slug: global-top500-400-constituent-service-case-notes
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -53,6 +53,9 @@ test_cases:
       description: Alternative topic phrase match
     - value: citizen services
       description: Additional topic phrase match
+    - value: "constituent service case notes\nClient name: Avery Teston\nCRN: 204889137K\nCase number: HC20264471\nAddress: 14 Wattlebird Street, Stafford QLD 4053\nNotes: constituent service case notes assessed on 12/08/2026."
+      description: Populated gov record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -60,6 +63,8 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: welfare registry
       description: Generic word pair from old broad template should not match
+    - value: "Policy guidance: this procedure explains how records about constituent service case notes are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to constituent service case notes appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -83,7 +88,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_constituent_service_case_notes
       matches:
-        - ref: Evidence_constituent_service_case_notes
+        - ref: Regex_global_top500_400_constituent_service_case_notes_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -94,7 +99,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_constituent_service_case_notes
       matches:
-        - ref: Evidence_constituent_service_case_notes
+        - ref: Regex_global_top500_400_constituent_service_case_notes_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -109,8 +114,9 @@ purview:
     - id: Pattern_constituent_service_case_notes
       pattern: >-
         (?is)\b(?:constituent\s+service\s+case\s+notes|case\s+notes|government\s+services|citizen\s+services|welfare\s+case|service\s+delivery|case\s+management|client\s+record|case\s+officer|service\s+request|constituent\s+file)\b
-    - id: Pattern_au_top500_400_constituent_service_case_notes_label_context
-      pattern: (?i)\b(?:constituent\s+service\s+case\s+notes)\b
+    - id: Regex_global_top500_400_constituent_service_case_notes_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_constituent_service_case_notes
       groups:
@@ -128,15 +134,6 @@ purview:
             - case officer
             - service request
             - constituent file
-    - id: Keyword_au_top500_400_constituent_service_case_notes_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - constituent service case notes
-            - constituent
-            - service
-            - case
-            - notes
 risk_description: >-
   The detector finds constituent service case notes, case notes, government services, and citizen services language when eight administrative terms appear nearby. A normal true positive may combine a person's complaint, identity, benefits, health, housing, immigration, or agency interactions into a caseworker narrative, creating privacy and procedural harm if disclosed. General service standards, training, and case-note templates remain plausible matches because the regex does not prove a populated constituent record. Risk 8 SENSITIVE fits a contained cross-agency case; PROTECTED requires protected-source information, acute safety circumstances, mass constituent dossiers, or credible significant damage.
 sensitivity_labels:
@@ -148,8 +145,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent gov record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 986 without changing detector or package metadata.'
