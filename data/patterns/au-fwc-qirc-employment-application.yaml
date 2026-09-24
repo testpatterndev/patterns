@@ -1,0 +1,196 @@
+schema: testpattern/v1
+name: Fair Work Commission or QIRC Employment Application / Case File
+slug: au-fwc-qirc-employment-application
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Applications and employer case files for Fair Work Commission matters (Form F2 unfair dismissal application, Form F3 employer response, Form F8 general protections application involving dismissal; matter numbers such as U2024/1234) and Queensland Industrial Relations Commission (QIRC) applications and appeals, where the record names the applicant, respondent or employer and carries matter and dismissal/decision particulars. Published FWC/QIRC decisions are public and are treated as decoys.
+operation: >-
+  Primary: a tribunal or application phrase (Fair Work Commission, Queensland Industrial Relations Commission, QIRC, Form F2/F3/F8, unfair dismissal application/claim/remedy/matter, general protections application/dispute/claim/matter, application for an unfair dismissal remedy). 75 tier requires, within 300 characters, a populated party field (applicant, respondent, appellant, employer, employee, former employee, representative, lodged by, with a non-placeholder value). 85 tier requires the party field AND a matter field (an FWC unfair dismissal matter number U20YY/NNNN, or a matter/case/file number or reference label with a value containing a digit) AND a dismissal/decision field (date the dismissal took effect, date of dismissal/termination/decision, employment start/end date with a date; reasons for the dismissal with text; remedy/outcome/orders sought with a value) AND an independent corroborative term (Fair Work Act 2009, Industrial Relations Act 2016, conciliation, reinstatement, compensation, jurisdictional objection, notice of listing, appeal, conference). All enforce tiers AND NOT the shared template-exclusion dictionary and a decision/guidance exclusion (a neutral citation such as [2026] FWC 1234 / FWCFB / QIRC, catchwords, appearances, fact sheet, frequently asked questions, practice note). 65 is discovery-only.
+pattern: >-
+  (?i)\b(?:Fair\s+Work\s+Commission|Queensland\s+Industrial\s+Relations\s+Commission|QIRC|Form\s+F[238]\b|unfair\s+dismissal\s+(?:application|claim|remedy|matter)s?|general\s+protections\s+(?:application|dispute|claim|matter)s?|application\s+for\s+(?:an\s+)?unfair\s+dismissal\s+remedy)
+confidence: medium
+confidence_justification: >-
+  Medium: tribunal names and form numbers are distinctive but saturate FWC/QIRC guidance and news, and published decisions carry the same parties, matter numbers and dismissal dates, so enforce tiers need populated party fields and a decision-citation exclusion. The U20YY/NNNN unfair dismissal matter number format is taken from published FWC decisions (secondary verification); QIRC matter numbers and form numbers were not verified, so QIRC records rely on labelled matter/file references. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic.
+jurisdictions:
+  - au
+regulations:
+  - Fair Work Act 2009 (Cth)
+  - Industrial Relations Act 2016 (Qld)
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - employment
+  - legal
+corroborative_evidence:
+  keywords:
+    - Form F2
+    - Form F8
+    - unfair dismissal application
+    - general protections
+    - applicant
+    - respondent
+    - date dismissal took effect
+    - reinstatement
+  proximity: 300
+customisation:
+  - key: case-reference-number
+    kind: identifier-format
+    identifier: case-reference-number
+    target: purview.regexes/Regex_au_fwc_qirc_application_matter_field
+    mode: extend
+    affects_tiers:
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's case / matter reference number format (see docs/identifiers.md#case-reference-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Form F2 - Unfair dismissal application\nFWC matter number: U2026/08812\nApplicant: Jordan Testwell\nEmployer: Testco Energy Pty Ltd\nDate dismissal took effect: 29/08/2026\nReason given for the dismissal: alleged breach of fatigue management procedure\nRemedy sought: reinstatement"
+      description: F2 application with matter number, parties, dismissal date and remedy (85 tier)
+      synthetic: true
+    - value: "Queensland Industrial Relations Commission - public service appeal\nAppellant: Casey Teston\nRespondent: Department of Testing\nFile reference: IR-2026-0412\nDate of decision: 12/08/2026\nThe appeal is listed for conference on 30/09/2026."
+      description: QIRC appeal case file with parties, file reference and decision date (85 tier)
+      synthetic: true
+    - value: "Fair Work Commission - general protections application (Form F8)\nApplicant: Riley Testwell\nPlease send the payroll history before the conciliation conference."
+      description: F8 case file note with a populated applicant (75 tier)
+      synthetic: true
+    - value: "Unfair dismissal claim - notice of listing received\nRespondent: Testville Water Pty Ltd\nHR to prepare the employer response."
+      description: Unfair dismissal claim with a populated respondent (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: "To make an unfair dismissal application, lodge Form F2 with the Fair Work Commission within 21 days after the dismissal took effect. The employer responds using Form F3."
+      description: FWC guidance text (65 only)
+    - value: "Form F2 - Unfair dismissal application\n1.1 Applicant's name: ____________\nEmployer: [legal name of employer]\nDate dismissal took effect: __/__/____"
+      description: Blank form (65 only)
+    - value: "[2026] FWC 1234\nDECISION - application for an unfair dismissal remedy\nApplicant: Jordan Testwell\nRespondent: Testco Pty Ltd\nMatter number: U2026/1234\nDate dismissal took effect: 01/05/2026\nThe application is dismissed; no reinstatement is ordered."
+      description: Published FWC decision header (excluded by the neutral citation)
+    - value: "The Fair Work Commission received 14,000 unfair dismissal applications in 2025-26, up 6% on the previous year."
+      description: News / statistics (65 only)
+false_positives:
+  - description: FWC and QIRC guidance, form instructions and practice notes.
+    mitigation: Enforce tiers need a populated party field; blank forms are rejected by the placeholder guard; fact sheets, FAQs and practice notes are excluded.
+  - description: Published FWC and QIRC decisions (public records) with parties, matter numbers and dismissal dates.
+    mitigation: A neutral citation ([YYYY] FWC / FWCFB / QIRC N), catchwords or appearances list suppresses enforce tiers. Side effect - legal submissions in a genuine case file that cite earlier decisions are also suppressed, so this classifier under-reports on submissions.
+  - description: News and statistics about unfair dismissal claims.
+    mitigation: No populated party fields, so these stay at 65.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_fwc_qirc_application_primary
+      matches:
+        - ref: Regex_au_fwc_qirc_application_party_field
+        - ref: Regex_au_fwc_qirc_application_matter_field
+        - ref: Regex_au_fwc_qirc_application_dismissal_field
+        - ref: Keyword_au_fwc_qirc_application_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_fwc_qirc_application_decision_exclusion
+            - Regex_au_fwc_qirc_application_citation_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_fwc_qirc_application_primary
+      matches:
+        - ref: Regex_au_fwc_qirc_application_party_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_fwc_qirc_application_decision_exclusion
+            - Regex_au_fwc_qirc_application_citation_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_fwc_qirc_application_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_fwc_qirc_application_primary
+      pattern: >-
+        (?i)\b(?:Fair\s+Work\s+Commission|Queensland\s+Industrial\s+Relations\s+Commission|QIRC|Form\s+F[238]\b|unfair\s+dismissal\s+(?:application|claim|remedy|matter)s?|general\s+protections\s+(?:application|dispute|claim|matter)s?|application\s+for\s+(?:an\s+)?unfair\s+dismissal\s+remedy)
+    - id: Regex_au_fwc_qirc_application_party_field
+      pattern: >-
+        (?i)\b(?:applicant(?:'s)?|respondent(?:'s)?|appellant(?:'s)?|employer(?:'s)?|employee(?:'s)?|former\s+employee|(?:legal\s+)?representative|lodged\s+by)(?:\s+(?:name|full\s+name|legal\s+name|details))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_au_fwc_qirc_application_matter_field
+      pattern: >-
+        (?i)\b(?:U20\d{2}/\d{1,5}\b|(?:FWC\s+|QIRC\s+|Commission\s+|our\s+)?(?:matter|case|file)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*(?=[A-Z/-]{0,6}\d)[A-Z0-9][A-Z0-9/-]{3,20}\b)
+    - id: Regex_au_fwc_qirc_application_dismissal_field
+      pattern: >-
+        (?i)\b(?:(?:date\s+(?:(?:the\s+)?dismissal\s+took\s+effect|of\s+(?:the\s+)?(?:dismissal|termination|decision)|employment\s+(?:commenced|started|ended|was\s+terminated))|dismissal\s+(?:date|effective))\s*[:\-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-](?:\d{4}|\d{2})|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})|reasons?\s+(?:for|given\s+for)\s+(?:the\s+)?(?:dismissal|termination)\s*[:\-]\s*(?!(?:n/?a|unknown|tbc|tba|the|see|refer)\b|_{2,}|\[|<)[A-Za-z][A-Za-z'-]{1,30}(?:[ \t,;]+[A-Za-z0-9'/().-]{1,30}){2,12}|(?:remedy|outcome|orders?)\s+sought\s*[:\-]\s*(?!(?:n/?a|unknown|tbc|tba|the|see|refer)\b|_{2,}|\[|<)[A-Za-z][A-Za-z'-]{2,30})
+    - id: Regex_au_fwc_qirc_application_citation_exclusion
+      pattern: >-
+        (?i)\[20\d{2}\]\s+(?:FWC|FWCFB|QIRC)\s+\d{1,5}\b
+  keywords:
+    - id: Keyword_au_fwc_qirc_application_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - Fair Work Act 2009
+            - Industrial Relations Act 2016
+            - conciliation
+            - reinstatement
+            - compensation
+            - jurisdictional objection
+            - notice of listing
+            - appeal
+            - conference
+            - employer response
+      strength: specific
+    - id: Keyword_au_fwc_qirc_application_decision_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - catchwords
+            - appearances
+            - fact sheet
+            - factsheet
+            - frequently asked questions
+            - practice note
+      strength: specific
+risk_rating: 7
+risk_description: >-
+  The classifier identifies a Fair Work Commission or QIRC application, response or employer case file that names the applicant and employer and carries matter and dismissal or decision particulars. These files hold dismissal reasons, conduct and performance allegations, and often health or family information, and are litigation-sensitive until the matter is resolved. Published decisions, guidance, blank forms and news are excluded from enforce tiers. Risk 7 supports SENSITIVE Legal.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Legal
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Fair Work Commission - Form F8 General protections application involving dismissal
+    url: https://www.fwc.gov.au/documents/forms/form_f8.pdf
+  - title: Fair Work Commission - Form F3 Employer response to unfair dismissal application
+    url: https://www.fwc.gov.au/documents/forms/form_f3.docx
+  - title: Industrial Relations Act 2016 (Qld) (AustLII)
+    url: https://classic.austlii.edu.au/au/legis/qld/consol_act/ira2016242/s339.html
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - FWC Forms F2/F3/F8 and QIRC application/appeal case files; 75 gated on a populated party field, 85 on party + matter number/reference + dismissal/decision particulars + corroborative term; published decisions (neutral citation, catchwords), guidance and blank forms excluded.
+author: testpattern-community
+license: MIT

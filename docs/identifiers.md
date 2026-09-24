@@ -12,11 +12,11 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [Asbestos sample reference](#asbestos-sample-reference) | The asbestos assessor or NATA-accredited laboratory | customer-defined | low | 1 |
 | [ASIC / MSIC card number](#asic-msic-card-number) | The aviation or maritime security identification card issuing body | unpublished | medium | 1 |
 | [Asset number / functional location](#asset-functional-location) | The customer's asset management system (e.g. SAP PM functional locations, Maximo assets) | customer-defined | low | 1 |
-| [Agency case / file / matter number](#case-reference-number) | The customer agency's case management or records system | customer-defined | low | 4 |
+| [Agency case / file / matter number](#case-reference-number) | The customer agency's case management or records system | customer-defined | low | 5 |
 | [Crime and Corruption Commission reference](#ccc-reference) | Crime and Corruption Commission (Queensland) | unpublished | medium | 1 |
 | [Council property / rate assessment number](#council-property-number) | Queensland local governments | customer-defined | low | 1 |
 | [Records management (eDRMS) record number](#edrms-record-number) | The customer's records management system (e.g. Content Manager, RecFind, Objective) | customer-defined | medium | 1 |
-| [Employee / staff ID](#employee-id) | The customer's payroll or HR system (e.g. Aurion, SAP, Workday) | customer-defined | low | 2 |
+| [Employee / staff ID](#employee-id) | The customer's payroll or HR system (e.g. Aurion, SAP, Workday) | customer-defined | low | 5 |
 | [Environmental incident / notification reference](#environmental-incident-reference) | The operator's incident system or the administering authority | customer-defined | low | 1 |
 | [Electrical Safety Office notification reference](#eso-incident-notification-reference) | Electrical Safety Office / WHSQ (Qld) | unpublished | low | 1 |
 | [Generator outage work order / reference](#generator-outage-work-order) | The generator's maintenance system (e.g. SAP PM, Maximo) | customer-defined | low | 1 |
@@ -26,6 +26,7 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [NEM connection agreement number](#nem-connection-agreement-number) | The network service provider (e.g. Powerlink, Energex, Ergon Energy) and connecting generator | customer-defined | medium | 1 |
 | [NGER facility identification number](#nger-facility-id) | Clean Energy Regulator | unpublished | low | 1 |
 | [Office of the Independent Assessor complaint reference](#oia-complaint-reference) | Office of the Independent Assessor (Queensland) | unpublished | medium | 1 |
+| [Position number](#position-number) | The customer's HR / establishment system | customer-defined | medium | 2 |
 | [QCAT file number](#qcat-file-number) | Queensland Civil and Administrative Tribunal | unpublished | medium | 1 |
 | [Queensland Corrective Services IOMS number](#qcs-ioms-number) | Queensland Corrective Services (Integrated Offender Management System) | unpublished | medium | 3 |
 | [Queensland corrections order / parole reference](#qcs-order-reference) | Queensland Corrective Services and Parole Board Queensland | unpublished | low | 2 |
@@ -39,10 +40,15 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [Queensland Police exhibit / property number](#qps-exhibit-number) | Queensland Police Service | unpublished | medium | 1 |
 | [QTAC application number](#qtac-application-number) | Queensland Tertiary Admissions Centre | unpublished | medium | 1 |
 | [Regulator prosecution / enforcement reference](#regulator-prosecution-reference) | Queensland regulators (e.g. Workplace Health and Safety Queensland) | unpublished | low | 1 |
+| [Worker screening / background check reference](#screening-check-reference) | AusCheck, NDIS Worker Screening Unit, police or AGSVA | unpublished | low | 1 |
+| [Superannuation member number](#super-member-number) | The superannuation fund | customer-defined | low | 1 |
 | [Surveillance device / warrant reference](#surveillance-warrant-reference) | Queensland law enforcement agencies and issuing courts | unpublished | medium | 1 |
 | [Switching sheet number](#switching-sheet-number) | The network or plant operator (switching program system) | customer-defined | medium | 1 |
+| [Telco account / service number](#telco-account-number) | The customer's telecommunications billing / CRM system | customer-defined | low | 1 |
 | [University / TAFE student number](#tertiary-student-number) | The customer university or TAFE | customer-defined | low | 4 |
 | [Utility customer account number](#utility-account-number) | The customer's energy or water retail billing / CRM system (e.g. SAP IS-U, Gentrack) | customer-defined | low | 2 |
+| [Victim Assist Queensland claim reference](#victim-assist-claim-reference) | Victim Assist Queensland | unpublished | low | 1 |
+| [Workers compensation claim number](#workcover-claim-number) | WorkCover Queensland, a self-insurer or Comcare | unpublished | low | 1 |
 | [Queensland youth justice client / case reference](#youth-justice-reference) | Queensland youth justice services | unpublished | medium | 1 |
 
 ## access-test-permit-number
@@ -414,7 +420,7 @@ samples: ["Case number: HC20264471", "File no. PI20251827", "Case number CR20260
 
 **Sensitivity:** Links a person to the customer's case records; sensitivity follows the case type.
 
-**Used by:** `au-ndis-reportable-incident`, `au-qld-mandatory-data-breach-notification`, `au-qld-public-interest-disclosure`, `au-tertiary-academic-misconduct-record`
+**Used by:** `au-fwc-qirc-employment-application`, `au-ndis-reportable-incident`, `au-qld-mandatory-data-breach-notification`, `au-qld-public-interest-disclosure`, `au-tertiary-academic-misconduct-record`
 
 ## ccc-reference
 
@@ -626,7 +632,7 @@ samples: ["Employee ID: 00447182", "Staff number 00552011", "Employee no. 000719
 
 **Sensitivity:** Links an employee to integrity, disclosure or HR matters.
 
-**Used by:** `au-qld-ccc-corrupt-conduct-notification`, `au-qld-public-interest-disclosure`
+**Used by:** `au-conflict-of-interest-declaration`, `au-payslip-wages-record`, `au-qld-ccc-corrupt-conduct-notification`, `au-qld-public-interest-disclosure`, `au-qld-public-sector-discipline-record`
 
 ## environmental-incident-reference
 
@@ -1104,6 +1110,59 @@ samples: ["OIA reference: OIA-26-00412", "OIA ref OIA-25-11827", "OIA reference 
 **Sensitivity:** Links a named councillor and complainant to conduct allegations.
 
 **Used by:** `au-qld-councillor-conduct-complaint`
+
+## position-number
+
+**Position number** — issued by The customer's HR / establishment system.
+
+Position (establishment) numbers used in the customer's HR system on vacancies, selection, discipline and conflict of interest records.
+
+**Appears in:** Selection reports; Discipline records; Conflict of interest declarations; Establishment lists.
+
+**Labels:** `Position number`, `Position ID`, `Position no.`
+
+**Public format:** customer-defined. Entirely customer-specific.
+
+**Public fallback** (precision: medium):
+
+```
+(?i)\b(?:position\s+(?:no\.?|number|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+```
+
+The label is HR-specific; other record fields supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the position number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\bposition\s+(?:no\.?|number|ID)\s*[:#]?\s*\d{8}\b
+samples: ["Position number: 30047182", "position no. 30007193", "Position ID 30020471"]
+```
+
+**Sensitivity:** Links an HR record to a specific role and its incumbent.
+
+**Used by:** `au-qld-public-sector-discipline-record`, `au-qld-public-sector-selection-report`
 
 ## qcat-file-number
 
@@ -1794,6 +1853,112 @@ samples: ["Prosecution reference: WHS004471", "Investigation no. INV118273", "Pr
 
 **Used by:** `regulatory-prosecution-brief`
 
+## screening-check-reference
+
+**Worker screening / background check reference** — issued by AusCheck, NDIS Worker Screening Unit, police or AGSVA.
+
+Reference numbers for worker screening and background checks (AusCheck critical infrastructure checks, NDIS worker screening, police checks, security clearances) recorded on outcome letters and HR records.
+
+**Appears in:** Background check outcome letters; Worker screening registers; Clearance records.
+
+**Labels:** `Application number`, `Check reference`, `Clearance number`, `Worker screening ID`
+
+**Public format:** unpublished. AusCheck, NDIS worker screening and AGSVA reference formats are not published.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:(?:application|check|clearance|screening|worker\s+screening)\s+(?:no\.?|number|ref(?:erence)?|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+```
+
+Reference labels are generic; the classifier needs a person and a screening outcome.
+
+**Customer supplies at engagement:**
+
+- A description of the check reference format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\b(?:check|clearance)\s+(?:no\.?|number|reference)\s*[:#]?\s*AC\d{7}\b
+samples: ["Check reference: AC4471820", "clearance number AC0071932", "Check number AC2047181"]
+```
+
+**Sensitivity:** Links a worker to a criminal history, security assessment or suitability outcome.
+
+**Used by:** `au-worker-screening-background-check-outcome`
+
+## super-member-number
+
+**Superannuation member number** — issued by The superannuation fund.
+
+Member numbers issued by superannuation funds and written on choice forms, pay slips and onboarding records.
+
+**Appears in:** Superannuation standard choice forms; Pay slips; Onboarding records.
+
+**Labels:** `Member number`, `Membership number`, `Member no.`
+
+**Public format:** customer-defined. Each fund sets its own member number format; none is published centrally.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:(?:member|membership)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+```
+
+Member labels occur in many membership contexts; fund fields (USI, fund ABN) supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the member number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\bmember(?:ship)?\s+(?:no\.?|number)\s*[:#]?\s*\d{8}\b
+samples: ["Member number: 40017382", "membership number 40007193", "Member no. 40020471"]
+```
+
+**Sensitivity:** Links a person to their superannuation account.
+
+**Used by:** `au-tfn-declaration-super-choice-form`
+
 ## surveillance-warrant-reference
 
 **Surveillance device / warrant reference** — issued by Queensland law enforcement agencies and issuing courts.
@@ -1900,6 +2065,59 @@ samples: ["Switching sheet no: SS204718", "switching sheet number SS007193", "Sw
 
 **Used by:** `au-hv-switching-sheet-access-permit`
 
+## telco-account-number
+
+**Telco account / service number** — issued by The customer's telecommunications billing / CRM system.
+
+Customer, account and service reference numbers issued by a telecommunications provider (other than the phone number itself) and recorded on customer and DFV protection records.
+
+**Appears in:** Telco customer records; DFV affected-person records; Account security notes.
+
+**Labels:** `Account number`, `Customer number`, `Service ID`
+
+**Public format:** customer-defined. Provider-specific; no public format. Mobile numbers / MSISDNs are public-format and handled separately.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:(?:account|customer|service)\s+(?:no\.?|number|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+```
+
+Generic account labels; telco evidence and protection actions supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the account / service number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\b(?:account|customer)\s+(?:no\.?|number)\s*[:#]?\s*\d{10}\b
+samples: ["Account number: 4001882731", "customer number 4000552011", "Account no. 4007193245"]
+```
+
+**Sensitivity:** Links a (possibly at-risk) customer to a telco account.
+
+**Used by:** `au-telco-dfv-affected-customer-record`
+
 ## tertiary-student-number
 
 **University / TAFE student number** — issued by The customer university or TAFE.
@@ -2005,6 +2223,112 @@ samples: ["Account number: 4001882731", "Customer number 4000552011", "account n
 **Sensitivity:** Links a named customer, supply address and sensitive circumstances (medical equipment, family violence, hardship) to a utility account.
 
 **Used by:** `au-energy-family-violence-customer-record`, `au-energy-life-support-register`
+
+## victim-assist-claim-reference
+
+**Victim Assist Queensland claim reference** — issued by Victim Assist Queensland.
+
+Application / claim references issued by Victim Assist Queensland for financial assistance applications under the Victims of Crime Assistance Act 2009 (Qld).
+
+**Appears in:** Victim Assist applications; Assessment and payment correspondence.
+
+**Labels:** `Claim number`, `Application number`, `VAQ reference`
+
+**Public format:** unpublished. The reference format is not published.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:(?:VAQ\s+)?(?:claim|application)\s+(?:no\.?|number|ref(?:erence)?)|VAQ\s+ref(?:erence)?)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+```
+
+Claim labels are generic; Victim Assist anchors and applicant / crime fields supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the claim reference format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\b(?:claim|application)\s+(?:no\.?|number)\s*[:#]?\s*VA\d{7}\b
+samples: ["Application number: VA2047181", "claim number VA0071932", "Application no. VA4471820"]
+```
+
+**Sensitivity:** Identifies a victim of violence and their application.
+
+**Used by:** `au-qld-victim-assist-application`
+
+## workcover-claim-number
+
+**Workers compensation claim number** — issued by WorkCover Queensland, a self-insurer or Comcare.
+
+Claim numbers issued by the workers' compensation insurer (WorkCover Queensland, a licensed self-insurer or Comcare) and printed on claim, medical certificate and return to work records.
+
+**Appears in:** Applications for compensation; Work capacity certificates; Return to work plans; Claim decisions.
+
+**Labels:** `Claim number`, `Claim no.`, `WorkCover claim number`
+
+**Public format:** unpublished. Claim number formats are not published by WorkCover Queensland or Comcare.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:(?:workcover\s+)?claim\s+(?:no\.?|number|ref(?:erence)?))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+```
+
+Claim labels are common in insurance; the classifier also needs worker and injury/medical fields.
+
+**Customer supplies at engagement:**
+
+- A description of the claim number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\bclaim\s+(?:no\.?|number)\s*[:#]?\s*C\d{7}\b
+samples: ["Claim number: C4471820", "claim no. C0071932", "Claim Number C2047181"]
+```
+
+**Sensitivity:** Links a worker to an injury, medical condition and claim history (use restricted by WCRA s 572A).
+
+**Used by:** `au-qld-workers-compensation-claim`
 
 ## youth-justice-reference
 

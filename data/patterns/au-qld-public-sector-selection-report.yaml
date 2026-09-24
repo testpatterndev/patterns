@@ -1,0 +1,195 @@
+schema: testpattern/v1
+name: Queensland Public Sector Selection Report and Candidate Assessment
+slug: au-qld-public-sector-selection-report
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Recruitment and selection records under the Recruitment and Selection Directive 07/23 (Public Sector Act 2022 (Qld) ss 46 and 222): selection panel reports, comparative and merit assessments documenting why the proposed successful applicant is "best suited", candidate scoring and ranking sheets, referee checks and panel recommendations for a named candidate and position. Council and university selection reports with the same structure are also caught. Overlaps global-top500-074-interview-evaluation-notes (generic phrase classifier being rebuilt separately).
+operation: >-
+  Primary: a selection phrase (selection report, selection panel report, selection panel, recruitment and selection report/outcome/decision, comparative assessment, merit assessment/ranking, best suited, referee report/check/comments, panel chair, Directive 07/23). 75 tier requires, within 300 characters, a populated candidate field (applicant, candidate, preferred/recommended/successful applicant or candidate, referee, interviewee, with a non-placeholder value) OR a populated position field (position number/title/ID, vacancy or job reference, classification, work unit). 85 tier requires the candidate field AND a score/ranking field (score, rating, ranking or rank with a numeric value such as 44/50, 85%, rank 1, or a suitability rating such as highly suitable / not suitable) AND a recommendation/panel field (recommendation, recommended for appointment, panel chair/members/recommendation, delegate approval, approved by, reasons best suited, with at least two words) AND an independent corroborative term (merit, appointment, interview, shortlist, key capabilities, role description, conflict of interest). All enforce tiers AND NOT the shared template-exclusion dictionary and a job-advertisement/guidance exclusion (how to apply, applications close, about the role, fact sheet, frequently asked questions, training module, case study, this directive applies). 65 is discovery-only.
+pattern: >-
+  (?i)\b(?:selection\s+(?:panel\s+)?report|selection\s+panel|recruitment\s+and\s+selection\s+(?:report|outcome|decision)|comparative\s+assessment|merit\s+(?:assessment|ranking)|best\s+suited|referee\s+(?:report|check|comments)s?|panel\s+chair(?:person)?|Directive\s+0?7/23)
+confidence: medium
+confidence_justification: >-
+  Medium: selection report, comparative assessment and best suited are the directive's own terms, but they also fill the directive, recruitment guidance and job advertisements (which carry position numbers and classifications), so a job-ad exclusion is applied and 85 needs candidate, score and recommendation structures together. Position numbers and job references are agency-defined and are label-anchored only. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic selection records.
+jurisdictions:
+  - au
+regulations:
+  - Public Sector Act 2022 (Qld) ss 46, 222
+  - Recruitment and Selection Directive 07/23 (Qld)
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - employment
+corroborative_evidence:
+  keywords:
+    - selection report
+    - selection panel
+    - comparative assessment
+    - best suited
+    - referee check
+    - merit
+    - position number
+    - panel chair
+  proximity: 300
+customisation:
+  - key: position-number
+    kind: identifier-format
+    identifier: position-number
+    target: purview.regexes/Regex_au_qld_selection_report_position_field
+    mode: extend
+    affects_tiers:
+      - 75
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's position number format (see docs/identifiers.md#position-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "SELECTION REPORT\nPosition number: 50012345\nClassification: AO6\nApplicant: Jordan Testwell  Total score: 44/50  Rank: 1\nApplicant: Casey Teston  Total score: 38/50  Rank: 2\nRecommendation: Jordan Testwell is best suited for appointment on merit\nPanel chair: Riley Testwell, Director Workforce"
+      description: Selection report with position, candidate scores and ranks, recommendation and panel chair (85 tier)
+      synthetic: true
+    - value: "Comparative assessment - Lecturer (Level B)\nCandidate 1: Priya Testwell - interview rating: highly suitable\nCandidate 2: Sam Teston - interview rating: suitable\nPanel recommendation: appoint Priya Testwell to the fixed-term role"
+      description: University comparative assessment with ratings and panel recommendation (85 tier)
+      synthetic: true
+    - value: "Referee report\nCandidate: Morgan Teston\nReferee: Alex Testwell (former supervisor, 2024-2026)\nComments: reliable, strong written communication."
+      description: Referee report with a populated candidate field (75 tier)
+      synthetic: true
+    - value: "Selection panel notes - Position number: 30098765\nInterviews held 12/09/2026 in the Brisbane office."
+      description: Panel notes with a populated position number only (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: "The selection panel must document the reasons why the proposed successful applicant was determined to be best suited, including a comparative assessment of the applicants."
+      description: Directive 07/23 guidance (65 only)
+    - value: "About the role: Senior Policy Officer. Position number: 50012345. Classification: AO6. The selection panel will assess your application against the key capabilities. How to apply: submit a two-page response. Applications close 30/09/2026."
+      description: Public job advertisement with a position number (excluded)
+    - value: "Selection report\nPosition number: [insert]\nApplicant: ________\nTotal score: __/50\nRecommendation: <name of recommended applicant>"
+      description: Blank selection report (65 only)
+    - value: "Queensland agencies filled 9,800 roles in 2025-26 and panels continued to appoint the applicant best suited on merit, the Commission reported."
+      description: News / statistics (65 only)
+false_positives:
+  - description: Public job advertisements and role descriptions carry position numbers, classifications and selection panel wording.
+    mitigation: Advertisement wording (how to apply, applications close, about the role) is excluded; 85 also needs candidate scores and a recommendation, which advertisements never carry.
+  - description: Directive 07/23 text, forgov recruitment guidance and training.
+    mitigation: Enforce tiers need populated candidate or position fields; guidance, FAQ, case study and training wording is excluded.
+  - description: Blank selection report and scoring templates.
+    mitigation: Blank lines, square-bracket and angle-bracket placeholders are rejected; numeric score fields need digits.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_qld_selection_report_primary
+      matches:
+        - ref: Regex_au_qld_selection_report_candidate_field
+        - ref: Regex_au_qld_selection_report_score_field
+        - ref: Regex_au_qld_selection_report_recommendation_field
+        - ref: Keyword_au_qld_selection_report_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_selection_report_advert_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_qld_selection_report_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_qld_selection_report_candidate_field
+            - Regex_au_qld_selection_report_position_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_selection_report_advert_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_qld_selection_report_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_qld_selection_report_primary
+      pattern: >-
+        (?i)\b(?:selection\s+(?:panel\s+)?report|selection\s+panel|recruitment\s+and\s+selection\s+(?:report|outcome|decision)|comparative\s+assessment|merit\s+(?:assessment|ranking)|best\s+suited|referee\s+(?:report|check|comments)s?|panel\s+chair(?:person)?|Directive\s+0?7/23)
+    - id: Regex_au_qld_selection_report_candidate_field
+      pattern: >-
+        (?i)\b(?:(?:preferred|recommended|successful|unsuccessful)\s+(?:applicant|candidate)|applicant|candidate|referee|interviewee)(?:\s+(?:name|\d{1,2}))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_au_qld_selection_report_position_field
+      pattern: >-
+        (?i)\b(?:position\s+(?:no\.?|number|title|ID)|vacancy\s+(?:ref(?:erence)?|no\.?|number)|job\s+(?:ref(?:erence)?|ID|no\.?|number)|classification(?:\s+level)?|work\s+unit)\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_au_qld_selection_report_score_field
+      pattern: >-
+        (?i)\b(?:(?:total|overall|interview|weighted|capability|panel)\s+)?(?:score|rating|ranking|rank)\s*[:#]?\s*(?:\d{1,3}(?:\.\d{1,2})?\s*(?:/\s*\d{1,3}|out\s+of\s+\d{1,3}|%)|\d{1,2}\b|highly\s+suitable|suitable|not\s+suitable|unsuitable|meets|exceeds|does\s+not\s+meet)
+    - id: Regex_au_qld_selection_report_recommendation_field
+      pattern: >-
+        (?i)\b(?:recommend(?:ation|ed(?:\s+for\s+appointment)?)|panel\s+(?:chair(?:person)?|members?|recommendation)|delegate(?:\s+approval)?|approved\s+by|reasons?\s+(?:for\s+(?:the\s+)?recommendation|best\s+suited))\s*[:\-]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z][A-Za-z'-]{1,30}(?:[ \t,;]+[A-Za-z0-9'/().-]{1,30}){1,12}
+  keywords:
+    - id: Keyword_au_qld_selection_report_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - merit
+            - appointment
+            - appoint
+            - interview
+            - shortlist
+            - shortlisted
+            - key capabilities
+            - role description
+            - conflict of interest
+            - work test
+      strength: specific
+    - id: Keyword_au_qld_selection_report_advert_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - how to apply
+            - applications close
+            - about the role
+            - fact sheet
+            - factsheet
+            - frequently asked questions
+            - training module
+            - case study
+            - this directive applies
+      strength: specific
+risk_rating: 7
+risk_description: >-
+  The classifier identifies a selection panel report, comparative assessment, candidate scoring sheet or referee report that links named candidates to a position with scores, rankings and panel reasoning. Disclosure exposes unsuccessful applicants, referee opinions and adverse information relied on, and can undermine the merit process or found review and appeal claims. The directive, guidance, job advertisements and blank templates are excluded from enforce tiers. Risk 7 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Queensland Government (forgov) - Recruitment and selection Directive 07/23
+    url: https://www.forgov.qld.gov.au/pay-benefits-and-policy/directives-policies-circulars-and-guidelines/recruitment-and-selection-directive-0723
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - Directive 07/23 selection reports, comparative assessments, scoring sheets and referee reports; 75 gated on a populated candidate or position field, 85 on candidate + score/ranking + panel recommendation + corroborative term; directive text, job advertisements and blank templates excluded.
+author: testpattern-community
+license: MIT
