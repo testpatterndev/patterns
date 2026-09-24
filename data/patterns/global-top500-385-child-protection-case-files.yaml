@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Child protection case files
 slug: global-top500-385-child-protection-case-files
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -53,6 +53,9 @@ test_cases:
       description: Alternative topic phrase match
     - value: mandatory reporting
       description: Additional topic phrase match
+    - value: "child protection case files\nChild: Riley Teston\nDate of birth: 14/05/2019\nCase number: CS20264471\nParent: Jordan Teston\nNotes: child protection case files opened after a notification on 12/08/2026."
+      description: Populated child record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -60,6 +63,8 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: welfare registry
       description: Generic word pair from old broad template should not match
+    - value: "Policy guidance: this procedure explains how records about child protection case files are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to child protection case files appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -79,17 +84,13 @@ purview:
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
-    - dict: data-record-context
-      as: Evidence_data_record_context
-      match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_child_protection_case
       matches:
-        - ref: Evidence_child_protection_case
+        - ref: Regex_global_top500_385_child_protection_case_files_record_structure
           min_count: 2
           unique_results: true
-        - ref: Evidence_data_record_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -98,8 +99,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_child_protection_case
       matches:
-        - ref: Evidence_child_protection_case
-        - ref: Evidence_data_record_context
+        - ref: Regex_global_top500_385_child_protection_case_files_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -114,8 +114,9 @@ purview:
     - id: Pattern_child_protection_case
       pattern: >-
         (?is)\b(?:child\s+protection\s+case\s+files|child\s+protection|child\s+safety|mandatory\s+reporting|risk\s+of\s+harm|care\s+order|family\s+services|out[\s-]+of[\s-]+home\s+care|parental\s+responsibility)\b
-    - id: Pattern_au_top500_385_child_protection_case_files_label_context
-      pattern: (?i)\b(?:child\s+protection\s+case\s+files)\b
+    - id: Regex_global_top500_385_child_protection_case_files_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|child|young\s+person|subject\s+child|parent|guardian|carer|(?:case|file|notification|intake|reference|ref)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_child_protection_case
       groups:
@@ -132,15 +133,6 @@ purview:
             - welfare
             - out-of-home care
             - parental responsibility
-    - id: Keyword_au_top500_385_child_protection_case_files_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - child protection case files
-            - child
-            - protection
-            - case
-            - files
 risk_description: >-
   This Australian detector recognises child protection case files, child protection, and child safety language with eight nearby case terms. A normal true positive can identify a child, family, reporter, alleged harm, placement, risk assessment, and intervention, making disclosure capable of serious privacy, retaliation, and safeguarding consequences. Policy manuals, mandatory-reporting training, and blank forms can still match because the detector is concept-based and medium-confidence. Risk 8 SENSITIVE fits an ordinary contained case file, while PROTECTED requires active safe-location secrecy, immediate life-safety risk, protected-source exposure, bulk cases, or significant damage.
 sensitivity_labels:
@@ -152,8 +144,11 @@ sensitivity_labels:
   nz_gov: CONFIDENTIAL
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent child record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 972 without changing detector or package metadata.'

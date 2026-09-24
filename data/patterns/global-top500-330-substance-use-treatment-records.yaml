@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Substance use treatment records
 slug: global-top500-330-substance-use-treatment-records
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -51,6 +51,9 @@ test_cases:
     description: Alternative topic phrase match
   - value: opioid treatment
     description: Additional topic phrase match
+  - value: "substance use\nPatient name: Avery Teston\nURN: 004418273\nDate of birth: 04/02/1991\nClinician: Dr Jordan Staffson\nNotes: substance use reviewed at appointment on 12/08/2026."
+    description: Populated health record reaching the 75/85 structure gate
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -58,6 +61,8 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: patient biometric
     description: Generic word pair from old broad template should not match
+  - value: "Policy guidance: this procedure explains how records about substance use are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Medical terminology in health education materials, research publications, clinical guidelines, or public health
     documents without patient-specific data.
@@ -90,75 +95,51 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 85
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_substance_use_treatment_records
-    matches:
-    - ref: Pattern_global_top500_330_substance_use_treatment_records_label_context
-    - ref: Keyword_global_top500_330_substance_use_treatment_records_domain_context
-    - ref: Keyword_substance_use_treatment_records
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_substance_use_treatment_records
-    matches:
-    - ref: Pattern_global_top500_330_substance_use_treatment_records_label_context
-    - ref: Keyword_global_top500_330_substance_use_treatment_records_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_substance_use_treatment_records
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_substance_use_treatment_records
+      matches:
+        - ref: Regex_global_top500_330_substance_use_treatment_records_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_substance_use_treatment_records
+      matches:
+        - ref: Regex_global_top500_330_substance_use_treatment_records_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_substance_use_treatment_records
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_substance_use_treatment_records
-    pattern: (?is)\b(?:substance\s+use|substance\s+abuse|addiction\s+treatment|opioid\s+treatment|drug\s+dependence|recovery\s+program|relapse\s+prevention)\b
-  - id: Pattern_global_top500_330_substance_use_treatment_records_label_context
-    pattern: (?i)\b(?:substance\s+use\s+treatment\s+records)\b
-  keywords:
-  - id: Keyword_substance_use_treatment_records
-    groups:
-    - match_style: word
-      terms:
-      - substance use
-      - substance abuse
-      - addiction treatment
-      - rehabilitation
-      - detoxification
-      - health
-      - biomedical
-      - opioid treatment
-      - drug dependence
-      - recovery program
-      - counseling
-      - relapse prevention
-    strength: domain
-  - id: Keyword_global_top500_330_substance_use_treatment_records_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - substance use treatment records
-      - substance
-      - use
-      - treatment
-    strength: domain
+    - id: Regex_substance_use_treatment_records
+      pattern: (?is)\b(?:substance\s+use|substance\s+abuse|addiction\s+treatment|opioid\s+treatment|drug\s+dependence|recovery\s+program|relapse\s+prevention)\b
+    - id: Regex_global_top500_330_substance_use_treatment_records_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|patient|client|participant|donor|recipient|clinician|URN|UR\s+number|MRN|medical\s+record\s+number|Medicare(?:\s+number)?|IHI|referring\s+(?:doctor|practitioner)|(?:specimen|accession|lab|laboratory|study|participant|patient|client|trial|case|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent health record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
 - version: 1.2.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1877 without changing

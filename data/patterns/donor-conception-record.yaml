@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Donor Conception Record
 slug: donor-conception-record
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -58,6 +58,9 @@ test_cases:
       description: Donor identity release application from donor-conceived person
     - value: 'Confidential — Donor Conception File. IVF Australia Queensland — Donor Matching Report. Recipient couple: James and Lisa PARK. Egg donor selected: Donor Code ED-5104. Embryo donor option declined. Assisted reproductive technology consent forms signed 20/01/2026. Donor profile reviewed: blood type compatible, CMV negative, genetic screening completed. Treatment plan: fresh egg collection and fertilisation with recipient partner sperm. Gamete storage consent: surplus embryos to be cryopreserved. Donor conception register entry to be created upon confirmed pregnancy. Fertility specialist: Dr Rachel Wong.'
       description: Donor matching report with recipient couple and donor profile details
+    - value: "Donor Conception\nPatient name: Avery Teston\nURN: 004418273\nDate of birth: 04/02/1991\nClinician: Dr Jordan Staffson\nNotes: Donor Conception reviewed at appointment on 12/08/2026."
+      description: Populated health record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: The Victorian Assisted Reproductive Treatment Authority published its annual report on donor conception in Australia showing that 2,500 donor conception births were recorded across all states. The report presents aggregate de-identified data on trends and outcomes.
       description: Published annual report with aggregate donor conception statistics
@@ -65,6 +68,8 @@ test_cases:
       description: IVF clinic marketing material about donor programs
     - value: The National Health and Medical Research Council published guidelines on the ethical conduct of assisted reproductive technology research. The guidelines address donor consent, anonymity, and the rights of donor-conceived individuals.
       description: Published ethical guidelines for assisted reproductive technology research
+    - value: "Policy guidance: this procedure explains how records about Donor Conception are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Published statistics and annual reports on donor conception and ART outcomes
     mitigation: 'Negative keyword exclusion: ''annual report'', ''published'', ''aggregate data'', ''de-identified'', ''statistics'', ''trends''. Require proximity to actual individual identifiers or donor codes.'
@@ -89,7 +94,9 @@ purview:
     - confidence_level: 85
       id_match: Pattern_donor_conception_record_donor_conception_terms
       matches:
-        - ref: Evidence_donor_conception_record_primary_keywords
+        - ref: Regex_donor_conception_record_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_donor_conception_record_classification_markers
         - ref: Evidence_donor_conception_record_corroborative_terms
         - ref: Pattern_donor_conception_record_donor_code_reference
@@ -103,7 +110,10 @@ purview:
     - confidence_level: 75
       id_match: Pattern_donor_conception_record_donor_conception_terms
       matches:
-        - ref: Evidence_donor_conception_record_primary_keywords
+        - type: any
+          refs:
+            - Regex_donor_conception_record_record_structure
+            - Evidence_donor_conception_record_corroborative_terms
         - type: any
           min_matches: 0
           max_matches: 0
@@ -127,22 +137,10 @@ purview:
       pattern: \b(?:SD|ED)-\d{4,5}\b
     - id: Pattern_donor_conception_record_art_register_reference
       pattern: \bART-\d{4}-\d{4,5}\b
+    - id: Regex_donor_conception_record_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|patient|client|participant|donor|recipient|clinician|URN|UR\s+number|MRN|medical\s+record\s+number|Medicare(?:\s+number)?|IHI|referring\s+(?:doctor|practitioner)|(?:specimen|accession|lab|laboratory|study|participant|patient|client|trial|case|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_donor_conception_record_primary_keywords
-      groups:
-        - match_style: word
-          terms:
-            - donor conception
-            - sperm donor
-            - egg donor
-            - donor identity
-            - donor-conceived person
-            - assisted reproductive technology
-            - donor register
-            - donor matching
-            - donor information release
-            - embryo donor
-      strength: specific
     - id: Evidence_donor_conception_record_classification_markers
       groups:
         - match_style: word
@@ -156,7 +154,6 @@ purview:
             - recipient
             - donor code
             - fertility clinic
-            - offspring
             - gamete
             - biological parent
             - treatment cycle
@@ -200,8 +197,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Personal-Privacy
 references: []
 created: '2026-03-06'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent health record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1492 without changing detector or package metadata.'

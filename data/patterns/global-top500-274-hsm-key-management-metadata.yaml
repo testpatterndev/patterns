@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: HSM key management metadata
 slug: global-top500-274-hsm-key-management-metadata
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -42,6 +42,9 @@ test_cases:
     description: Alternative topic phrase match
   - value: key lifecycle
     description: Additional topic phrase match
+  - value: "hardware security module\nHost: fw01.corp 10.20.30.40\nRule 14: allow tcp/443 from 10.20.0.0/16\nFinding: CVE-2025-21298 unpatched on asset ID WS-004471."
+    description: Populated tech record reaching the 75/85 structure gate
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -49,6 +52,8 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: hsm key slot
     description: Generic word pair from old broad template should not match
+  - value: "Policy guidance: this procedure explains how records about hardware security module are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Authentication-related terminology in software documentation, security training materials, or system architecture
     descriptions without actual credentials.
@@ -67,71 +72,46 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 85
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_hsm_key_management
-    matches:
-    - ref: Keyword_hsm_key_management
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-    min_count: 2
-  - confidence_level: 75
-    id_match: Regex_hsm_key_management
-    matches:
-    - ref: Keyword_global_top500_274_hsm_key_management_metadata_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_hsm_key_management
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_hsm_key_management
+      matches:
+        - ref: Regex_global_top500_274_hsm_key_management_metadata_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+      min_count: 2
+    - confidence_level: 75
+      id_match: Regex_hsm_key_management
+      matches:
+        - ref: Regex_global_top500_274_hsm_key_management_metadata_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_hsm_key_management
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_hsm_key_management
-    pattern: (?is)\b(?:hardware\s+security\s+module|key\s+management|key\s+rotation|key\s+lifecycle|master\s+key|wrapping\s+key|key\s+escrow|key\s+ceremony|cryptographic\s+key)\b
-  - id: Pattern_global_top500_274_hsm_key_management_metadata_label_context
-    pattern: (?i)\b(?:hsm\s+key\s+management\s+metadata)\b
-  keywords:
-  - id: Keyword_hsm_key_management
-    groups:
-    - match_style: word
-      terms:
-      - hsm
-      - hardware security module
-      - key management
-      - pkcs#11
-      - kms
-      - key rotation
-      - key lifecycle
-      - master key
-      - wrapping key
-      - key escrow
-      - key ceremony
-      - cryptographic key
-    strength: specific
-  - id: Keyword_global_top500_274_hsm_key_management_metadata_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - hsm key management metadata
-      - hsm
-      - key
-      - management
-      - metadata
-    strength: domain
+    - id: Regex_hsm_key_management
+      pattern: (?is)\b(?:hardware\s+security\s+module|key\s+management|key\s+rotation|key\s+lifecycle|master\s+key|wrapping\s+key|key\s+escrow|key\s+ceremony|cryptographic\s+key)\b
+    - id: Regex_global_top500_274_hsm_key_management_metadata_record_structure
+      pattern: >-
+        (?i)\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:/\d{1,2})?\b|\bCVE-\d{4}-\d{4,7}\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:tcp|udp)\s*/?\s*\d{2,5}\b|\b(?:port|dport|sport)\s*[:=]?\s*\d{2,5}\b|\b(?:hostname|host|asset\s+ID|device\s+ID|sAMAccountName|UPN|username|account\s+name)\s*:\s*(?!_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9._\\@-]{2,63}
 risk_description: The detector matches hardware security module, HSM, key management, key rotation, or key lifecycle language,
   identifying cryptographic-governance context rather than secret key material. A genuine metadata record can reveal custody
   processes, rotation schedules, key identifiers, system dependencies, and control gaps that improve targeting of key-management
@@ -148,8 +128,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent tech record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
 - version: 1.3.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1827 without changing

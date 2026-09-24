@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Intrusion detection alerts
 slug: global-top500-283-intrusion-detection-alerts
-version: 1.2.3
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -46,6 +46,9 @@ test_cases:
     description: Alternative topic phrase match
   - value: alert threshold
     description: Additional topic phrase match
+  - value: "intrusion detection\nHost: fw01.corp 10.20.30.40\nRule 14: allow tcp/443 from 10.20.0.0/16\nFinding: CVE-2025-21298 unpatched on asset ID WS-004471."
+    description: Populated tech record reaching the 75/85 structure gate
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -53,6 +56,8 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: ids intrusion detection
     description: Generic word pair from old broad template should not match
+  - value: "Policy guidance: this procedure explains how records about intrusion detection are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Authentication-related terminology in software documentation, security training materials, or system architecture
     descriptions without actual credentials.
@@ -71,72 +76,45 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 85
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_intrusion_detection_alerts
-    matches:
-    - ref: Pattern_global_top500_283_intrusion_detection_alerts_label_context
-    - ref: Keyword_global_top500_283_intrusion_detection_alerts_domain_context
-    - ref: Keyword_intrusion_detection_alerts
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_intrusion_detection_alerts
-    matches:
-    - ref: Pattern_global_top500_283_intrusion_detection_alerts_label_context
-    - ref: Keyword_global_top500_283_intrusion_detection_alerts_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_intrusion_detection_alerts
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_intrusion_detection_alerts
+      matches:
+        - ref: Regex_global_top500_283_intrusion_detection_alerts_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_intrusion_detection_alerts
+      matches:
+        - ref: Regex_global_top500_283_intrusion_detection_alerts_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_intrusion_detection_alerts
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_intrusion_detection_alerts
-    pattern: (?is)\b(?:intrusion\s+detection|network\s+intrusion|signature\s+rule|alert\s+threshold|packet\s+inspection|anomaly\s+detection|intrusion\s+prevention|network\s+monitoring)\b
-  - id: Pattern_global_top500_283_intrusion_detection_alerts_label_context
-    pattern: (?i)\b(?:intrusion\s+detection\s+alerts)\b
-  keywords:
-  - id: Keyword_intrusion_detection_alerts
-    groups:
-    - match_style: word
-      terms:
-      - intrusion detection
-      - ids
-      - ips
-      - snort
-      - suricata
-      - network intrusion
-      - signature rule
-      - alert threshold
-      - packet inspection
-      - anomaly detection
-      - intrusion prevention
-      - network monitoring
-    strength: specific
-  - id: Keyword_global_top500_283_intrusion_detection_alerts_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - intrusion detection alerts
-      - intrusion
-      - detection
-      - alerts
-    strength: domain
+    - id: Regex_intrusion_detection_alerts
+      pattern: (?is)\b(?:intrusion\s+detection|network\s+intrusion|signature\s+rule|alert\s+threshold|packet\s+inspection|anomaly\s+detection|intrusion\s+prevention|network\s+monitoring)\b
+    - id: Regex_global_top500_283_intrusion_detection_alerts_record_structure
+      pattern: >-
+        (?i)\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:/\d{1,2})?\b|\bCVE-\d{4}-\d{4,7}\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:tcp|udp)\s*/?\s*\d{2,5}\b|\b(?:port|dport|sport)\s*[:=]?\s*\d{2,5}\b|\b(?:hostname|host|asset\s+ID|device\s+ID|sAMAccountName|UPN|username|account\s+name)\s*:\s*(?!_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9._\\@-]{2,63}
 risk_description: The detector recognizes intrusion-detection, signature-rule, packet-inspection, anomaly, and alert-threshold
   terminology, indicating an alert record or discussion rather than a network credential. Real alert sets can reveal monitored
   segments, triggering signatures, source and destination activity, and gaps an attacker could use to adjust intrusion techniques.
@@ -153,8 +131,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent tech record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
 - version: 1.2.2
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1834 without changing

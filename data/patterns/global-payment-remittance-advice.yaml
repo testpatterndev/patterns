@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Payment/Remittance Advice
 slug: global-payment-remittance-advice
-version: 1.4.1
+version: 1.5.0
 type: keyword_list
 pattern_class: concept
 description: Detects payment advices, remittance notices, and electronic funds transfer confirmations.
@@ -33,6 +33,9 @@ test_cases:
       description: Test match 2
     - value: 'Remittance notice: bank transfer confirmed, amount received $10,000'
       description: Test match 3
+    - value: "Remittance advice\nPayee: Harbour Logistics Pty Ltd\nBSB: 064-000\nAccount number: 12345678\nInvoice number: INV-20417\nPayment date: 12/08/2026\nAmount paid: $14,250.00"
+      description: Populated payee record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: Please advise on the payment schedule
       description: Non-match 1
@@ -66,8 +69,9 @@ purview:
     - confidence_level: 85
       id_match: Regex_remittance
       matches:
-        - ref: Keyword_remittance
-        - ref: Keyword_payment
+        - ref: Regex_global_payment_remittance_advice_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -76,7 +80,7 @@ purview:
     - confidence_level: 75
       id_match: Regex_remittance
       matches:
-        - ref: Keyword_remittance
+        - ref: Regex_global_payment_remittance_advice_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -97,17 +101,10 @@ purview:
       pattern: (?i)\b(?:remittance\s+(?:advice|notice|slip)|payment\s+(?:advice|remittance))\b
     - id: Regex_eft_reference
       pattern: (?i)\b(?:eft\s+(?:reference|number)|electronic\s+funds\s+transfer)\b
+    - id: Regex_global_payment_remittance_advice_record_structure
+      pattern: >-
+        (?i)\b(?:payee|supplier|vendor|creditor|beneficiary|account\s+name|BSB|account\s+(?:no\.?|number)|invoice\s+(?:no\.?|number)|remittance\s+(?:no\.?|number|ref(?:erence)?)|payment\s+(?:ref(?:erence)?|date)|amount\s+paid)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Keyword_remittance
-      groups:
-        - match_style: word
-          terms:
-            - remittance advice
-            - remittance notice
-            - payment advice
-            - payment remittance
-            - remittance slip
-      strength: specific
     - id: Keyword_payment
       groups:
         - match_style: word
@@ -124,8 +121,11 @@ purview:
             - bank transfer
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent payee record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 568 without changing detector or package metadata.'

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Laboratory test results
 slug: global-top500-325-laboratory-test-results
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -50,6 +50,9 @@ test_cases:
     description: Alternative topic phrase match
   - value: blood test
     description: Additional topic phrase match
+  - value: "laboratory test\nPatient name: Avery Teston\nURN: 004418273\nDate of birth: 04/02/1991\nClinician: Dr Jordan Staffson\nNotes: laboratory test reviewed at appointment on 12/08/2026."
+    description: Populated health record reaching the 75/85 structure gate
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -57,6 +60,8 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: patient biometric
     description: Generic word pair from old broad template should not match
+  - value: "Policy guidance: this procedure explains how records about laboratory test are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Medical terminology in health education materials, research publications, clinical guidelines, or public health
     documents without patient-specific data.
@@ -90,64 +95,51 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 85
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_laboratory_test_results
-    matches:
-    - ref: Keyword_laboratory_test_results
-    - ref: Pattern_global_top500_325_laboratory_test_results_label_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_laboratory_test_results
-    matches:
-    - ref: Keyword_laboratory_test_results
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_laboratory_test_results
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_laboratory_test_results
+      matches:
+        - ref: Regex_global_top500_325_laboratory_test_results_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_laboratory_test_results
+      matches:
+        - ref: Regex_global_top500_325_laboratory_test_results_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_laboratory_test_results
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_laboratory_test_results
-    pattern: (?is)\b(?:laboratory\s+test|lab\s+results|test\s+results|blood\s+test|pathology\s+results|reference\s+range|laboratory\s+report|clinical\s+chemistry)\b
-  - id: Pattern_global_top500_325_laboratory_test_results_label_context
-    pattern: (?i)\b(?:laboratory\s+test\s+results)\b
-  keywords:
-  - id: Keyword_laboratory_test_results
-    groups:
-    - match_style: word
-      terms:
-      - laboratory test
-      - lab results
-      - test results
-      - blood test
-      - pathology results
-      - health
-      - biomedical
-      - specimen
-      - reference range
-      - analyte
-      - laboratory report
-      - clinical chemistry
-    strength: specific
+    - id: Regex_laboratory_test_results
+      pattern: (?is)\b(?:laboratory\s+test|lab\s+results|test\s+results|blood\s+test|pathology\s+results|reference\s+range|laboratory\s+report|clinical\s+chemistry)\b
+    - id: Regex_global_top500_325_laboratory_test_results_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|patient|client|participant|donor|recipient|clinician|URN|UR\s+number|MRN|medical\s+record\s+number|Medicare(?:\s+number)?|IHI|referring\s+(?:doctor|practitioner)|(?:specimen|accession|lab|laboratory|study|participant|patient|client|trial|case|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent health record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
 - version: 1.2.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1873 without changing

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Budget/Forecast Document
 slug: global-budget-forecast-document
-version: 1.4.1
+version: 1.5.0
 type: keyword_list
 pattern_class: concept
 description: Detects budget proposals, financial forecasts, and expenditure planning documents.
@@ -31,6 +31,9 @@ test_cases:
       description: Test match 2
     - value: Budget variance report showing approved budget vs actuals
       description: Test match 3
+    - value: "To: Director-General\nFrom: Principal Legal Officer\nDate: 12/08/2026\nSubject: Budget proposal\nOur ref: LS2026-0412\nThis briefing sets out the Budget proposal for decision."
+      description: Populated doc record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: We are on a tight budget this month
       description: Non-match 1
@@ -64,8 +67,9 @@ purview:
     - confidence_level: 85
       id_match: Regex_budget
       matches:
-        - ref: Keyword_budget
-        - ref: Keyword_confidential_financial
+        - ref: Regex_global_budget_forecast_document_record_structure
+          min_count: 3
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -74,7 +78,9 @@ purview:
     - confidence_level: 75
       id_match: Regex_budget
       matches:
-        - ref: Keyword_budget
+        - ref: Regex_global_budget_forecast_document_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -95,31 +101,10 @@ purview:
       pattern: (?i)\b(?:budget\s+(?:proposal|allocation|amendment)|financial\s+(?:forecast|plan))\b
     - id: Regex_forecast
       pattern: (?i)\b(?:(?:revenue|expenditure|financial)\s+forecast|budget\s+(?:variance|performance))\b
+    - id: Regex_global_budget_forecast_document_record_structure
+      pattern: >-
+        (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!_{2,}|\[|<)[A-Za-z0-9]
   keywords:
-    - id: Keyword_budget
-      groups:
-        - match_style: word
-          terms:
-            - operating budget
-            - budget submission
-            - budget papers
-            - budget proposal
-            - budget allocation
-            - financial forecast
-            - expenditure plan
-            - funding allocation
-            - approved budget
-      strength: specific
-    - id: Keyword_confidential_financial
-      groups:
-        - match_style: word
-          terms:
-            - confidential
-            - restricted
-            - sensitive financial
-            - internal only
-            - not for distribution
-      strength: specific
     - id: Keyword_financial_planning
       groups:
         - match_style: word
@@ -131,8 +116,11 @@ purview:
             - financial projection
       strength: specific
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent doc record structure (Regex ..._record_structure); 85 requires 3 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 523 without changing detector or package metadata.'

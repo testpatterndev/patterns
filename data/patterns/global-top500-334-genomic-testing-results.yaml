@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Genomic testing results
 slug: global-top500-334-genomic-testing-results
-version: 1.2.3
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -50,6 +50,9 @@ test_cases:
     description: Alternative topic phrase match
   - value: DNA analysis
     description: Additional topic phrase match
+  - value: "genomic testing\nPatient name: Avery Teston\nURN: 004418273\nDate of birth: 04/02/1991\nClinician: Dr Jordan Staffson\nNotes: genomic testing reviewed at appointment on 12/08/2026."
+    description: Populated health record reaching the 75/85 structure gate
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -57,6 +60,8 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: patient biometric
     description: Generic word pair from old broad template should not match
+  - value: "Policy guidance: this procedure explains how records about genomic testing are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Medical terminology in health education materials, research publications, clinical guidelines, or public health
     documents without patient-specific data.
@@ -89,75 +94,51 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 85
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_genomic_testing_results
-    matches:
-    - ref: Pattern_global_top500_334_genomic_testing_results_label_context
-    - ref: Keyword_global_top500_334_genomic_testing_results_domain_context
-    - ref: Keyword_genomic_testing_results
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_genomic_testing_results
-    matches:
-    - ref: Pattern_global_top500_334_genomic_testing_results_label_context
-    - ref: Keyword_global_top500_334_genomic_testing_results_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_genomic_testing_results
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_genomic_testing_results
+      matches:
+        - ref: Regex_global_top500_334_genomic_testing_results_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_genomic_testing_results
+      matches:
+        - ref: Regex_global_top500_334_genomic_testing_results_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_genomic_testing_results
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_genomic_testing_results
-    pattern: (?is)\b(?:genomic\s+testing|genetic\s+testing|genome\s+sequencing|DNA\s+analysis|genetic\s+variant|hereditary\s+risk|gene\s+mutation|whole\s+genome|genetic\s+counseling)\b
-  - id: Pattern_global_top500_334_genomic_testing_results_label_context
-    pattern: (?i)\b(?:genomic\s+testing\s+results)\b
-  keywords:
-  - id: Keyword_genomic_testing_results
-    groups:
-    - match_style: word
-      terms:
-      - genomic testing
-      - genetic testing
-      - genome sequencing
-      - DNA analysis
-      - genetic variant
-      - health
-      - biomedical
-      - pharmacogenomics
-      - hereditary risk
-      - gene mutation
-      - whole genome
-      - genetic counseling
-    strength: specific
-  - id: Keyword_global_top500_334_genomic_testing_results_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - genomic testing results
-      - genomic
-      - testing
-      - results
-    strength: domain
+    - id: Regex_genomic_testing_results
+      pattern: (?is)\b(?:genomic\s+testing|genetic\s+testing|genome\s+sequencing|DNA\s+analysis|genetic\s+variant|hereditary\s+risk|gene\s+mutation|whole\s+genome|genetic\s+counseling)\b
+    - id: Regex_global_top500_334_genomic_testing_results_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|patient|client|participant|donor|recipient|clinician|URN|UR\s+number|MRN|medical\s+record\s+number|Medicare(?:\s+number)?|IHI|referring\s+(?:doctor|practitioner)|(?:specimen|accession|lab|laboratory|study|participant|patient|client|trial|case|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 created: '2026-02-08'
-updated: '2026-07-15'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent health record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
 - version: 1.2.2
   date: '2026-07-15'
   description: v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1880; detector and package metadata unchanged.
