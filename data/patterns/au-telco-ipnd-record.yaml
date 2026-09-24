@@ -1,0 +1,181 @@
+schema: testpattern/v1
+name: Australian IPND Customer Record (Integrated Public Number Database)
+slug: au-telco-ipnd-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Integrated Public Number Database (IPND) data exchanged between carriage service providers, Data Providers, Data Users and the IPND Manager (Telstra): fixed-width upload and download files (HDR header record with an IPND file type, 905-character customer records, TRL trailer record), IPND file names (IPNDUP upload, IPNDES/LA/DI/LD/RS/EW download) and IPND extracts or reject reports listing public numbers with their List Code. List Code UL (Unlisted Number) and SA (Suppressed Address) records are protected by Telecommunications Act 1997 Part 13 (s 276 disclosure offence; s 285 permitted IPND uses exclude unlisted numbers). "Silent number" is an informal synonym for an unlisted number, not IPND terminology, and is used only as weak corroboration.
+operation: >-
+  Primary (65, discovery only): "Integrated Public Number Database", the token IPND, or an IPND HDR header record (HDRIPND + file type UP/PE/DI/ES/LA/LD/RS/PR/QU/QR/QP). 75: primary plus one IPND record structure: a fixed-width customer record laid out per the Telstra technical requirements (public number padded to 20 characters, Service Status C/D at position 21, List Code LE/UL/SA at 740-741 followed by a Usage Code R/B/G/C/N, and a 14-digit YYYYMMDDHHMMSS Transaction Date at 857-870), or a populated "List Code: UL/SA/LE" or "Public Number: <Australian number>" field. 85: primary plus two distinct record-structure hits (min_count 2, unique) plus either an IPND file artefact (IPNDUP upload file name, IPND download file name, or a TRL trailer record with sequence number, creation time and record count) or an independent IPND/Part 13 keyword (unlisted number, suppressed address, Data Provider, IPND Manager). Every tier ANDs NOT template/noise exclusion and NOT the IPND specification itself ("Technical Requirements for IPND", "Field Name Format From To Mandatory", "IPND User Guidelines for Data Files"). Proximity is 3000 characters because IPND records are 905 characters wide, so the header and the first two customer records sit about 2,700 characters apart.
+pattern: (?i)(?:\bIntegrated\s+Public\s+Number\s+Database\b|\bIPND\b|\bHDRIPND(?:UP|PE|DI|ES|LA|LD|RS|PR|QU|QR|QP))
+confidence: medium
+confidence_justification: >-
+  Medium. The fixed-width customer record regex is tied to verified field positions (Telstra Data Users and Data Providers Technical Requirements for IPND, section 6) and is very specific. The labelled "List Code:" / "Public Number:" path is looser and can appear in CSP internal tooling or correspondence. The IPND specification and user guidelines contain the same header, file-type and list-code vocabulary, so they are explicitly excluded. 85/75 are heuristic evidence tiers, not measured accuracy; test records are synthetic, use ACMA-reserved fictional number ranges (07 5550 xxxx, 02 5550 xxxx, 0491 570 156) and were generated at the published field offsets.
+jurisdictions:
+  - au
+regulations:
+  - Telecommunications Act 1997 (Cth) Part 13 ss 276, 285
+  - Telecommunications Act 1997 (Cth) Sch 2 cl 10
+  - IPND Industry Code C555:2020
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - PSPF
+  - ISO 27001
+data_categories:
+  - pii
+  - contact-information
+corroborative_evidence:
+  keywords:
+    - unlisted number
+    - unlisted telephone number
+    - suppressed address
+    - Data Provider
+    - Data User
+    - IPND Manager
+    - Carriage Service Provider
+    - list code
+    - service status
+    - silent number
+  proximity: 3000
+test_cases:
+  should_match:
+    - value: "HDRIPNDUPXQA01000004220260924093015\n0755501234          CFFTESTON                                  AVERY                                                                                                                                                                                                                                                                                                                                        WATTLEBIRD                                                            STAFFORD                                QLD4053                                                                                                                                                                                                                                  ULR                                                                                                         XQAXQADP12026092314150320260923141503F\n0491570156          CFFTESTON                                  MORGAN                                                                                                                                                                                                                                                                                                                                       BANKSIA                                                               KEDRON                                  QLD4031                                                                                                                                                                                   KEDRON                                  QLD4031SARMobil                                                                                                    XQAXQADP12026092314192220260923141922F\nTRL0000042202609240930150000002"
+      description: "85 - IPND upload file: HDRIPNDUP header, two fixed-width customer records (UL unlisted fixed service, SA suppressed-address mobile) with 14-digit transaction dates, and a TRL trailer record"
+      synthetic: true
+    - value: "HDRIPNDUPXQA01000004320260924101122\n0255501876          CFFEXAMPLETON                              JORDAN                                                                                                                                                                                                                                                                                                                                       GREVILLEA                                                             PARRAMATTA                              NSW2150                                                                                                                                                                                   PARRAMATTA                              NSW2150LER                                                                                                         XQAXQADP12026092314221020260923142210F"
+      description: 75 - IPND upload file header plus one fixed-width listed-entry (LE) customer record; no trailer or second record
+      synthetic: true
+    - value: "IPND extract - customer records flagged for suppressed address review\nPublic Number: 07 5550 1234\nList Code: SA\nCustomer: Avery Teston, Stafford QLD 4053\nPublic Number: 0491 570 156\nList Code: UL\nNote: suppressed address and unlisted number - do not release outside the Data Provider team (Telecommunications Act 1997 s 276)."
+      description: 85 - labelled IPND extract with two populated public numbers and list codes plus independent unlisted/suppressed-address evidence
+      synthetic: true
+    - value: "Customer safety request (DFV): IPND list code: UL applied to the service on 23/09/2026 and the directory entry withdrawn. Customer Morgan Teston asked that the new address in Kedron not be disclosed."
+      description: 75 - case note with one populated IPND list code field
+      synthetic: true
+    - value: "IPND reject report for file source XQA01\nPublic Number: 0255501876\nCustomer: Jordan Exampleton\nError: MH 006 service address locality missing"
+      description: 75 - IPND reject report with one populated public number
+      synthetic: true
+  should_not_match:
+    - value: "Telstra Data Users and Data Providers Technical Requirements for IPND\nNo Field Name Format From To Mandatory/Optional\n1 Record Type X (3) 1 3 Mandatory. Valid value is HDR\n2 File Type X (6) 4 9 Mandatory. IPNDUP\n9 List Code X (2) 740 741 Mandatory. LE = Listed Entry, UL = Unlisted Number, SA = Suppressed Address\nFor example, a file named IPNDUPAXIS10000001 will initially result in an error file called IPNDUPAXIS10000001.001.err."
+      description: The Telstra IPND technical requirements specification itself (header layout, list code values, example file names)
+    - value: "IPND data correction request\nPublic Number: __________\nList Code: [LE / UL / SA]\nCustomer name: __________\nData Provider Code: __________"
+      description: Blank IPND data correction form
+    - value: "The Integrated Public Number Database (IPND) is an industry-wide database of all Australian public telephone numbers, including listed and unlisted numbers. Carriage service providers must give the IPND Manager customer data, and unlisted numbers cannot be published in public number directories."
+      description: ACMA-style guidance text about the IPND
+    - value: "A provider was fined after uploading 50,000 records to the IPND with the wrong list code, which published unlisted numbers and silent numbers in directories, the regulator said."
+      description: News reporting on an IPND data incident
+    - value: "IPND training exercise for new Data Provider staff: Public Number: 07 5550 1234, List Code: UL, Public Number: 02 5550 1876, List Code: SA. Identify which record must not be sent to directory publishers."
+      description: Training exercise with fictional populated fields (suppressed by template/noise exclusion)
+false_positives:
+  - description: The Telstra IPND technical requirements, IPND User Guidelines for Data Files and IPND file-format documentation, which contain HDR/TRL layouts, IPND file types and list code values.
+    mitigation: Every tier ANDs NOT a specification exclusion ("Technical Requirements for IPND", "Field Name Format From To Mandatory", "IPND User Guidelines"); the fixed-width record regex needs real field offsets that tables do not reproduce.
+  - description: ACMA guidance, CSP policy pages and news about unlisted numbers and the IPND.
+    mitigation: No populated record structure, so these stay at 65 discovery.
+  - description: CSP internal tooling or correspondence that mentions IPND and a "Public Number:" field for a single, non-sensitive listed service.
+    mitigation: Reaches 75 only; 85 needs two distinct record hits plus an IPND file artefact or Part 13 evidence. Tune by raising the enforce threshold to 85 where this is noisy.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 3000
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_telco_ipnd_primary
+      matches:
+        - ref: Regex_au_telco_ipnd_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_telco_ipnd_file_artefact
+            - Keyword_au_telco_ipnd_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_telco_ipnd_spec_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_telco_ipnd_primary
+      matches:
+        - ref: Regex_au_telco_ipnd_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_telco_ipnd_spec_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_telco_ipnd_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_telco_ipnd_spec_exclusion
+  regexes:
+    - id: Regex_au_telco_ipnd_primary
+      pattern: >-
+        (?i)(?:\bIntegrated\s+Public\s+Number\s+Database\b|\bIPND\b|\bHDRIPND(?:UP|PE|DI|ES|LA|LD|RS|PR|QU|QR|QP))
+    - id: Regex_au_telco_ipnd_record_structure
+      pattern: >-
+        (?:(?:(?<!\d)(?:0[2-478]\d{8}|1[38]00\d{6})[ ]{10}|(?<!\d)61[2-478]\d{8}[ ]{9}|(?<!\d)13\d{4}[ ]{14})[CD][^\n]{718}(?:LE|UL|SA)[RBGCN][^\n]{114}20\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:[01]\d|2[0-3])[0-5]\d[0-5]\d|\b[Ll]ist\s+[Cc]ode\s*[:=]\s*(?:UL|SA|LE)\b(?!\s*(?:=|-\s|\(|/|,|or\b))|\b[Pp]ublic\s+[Nn]umber\s*[:=]\s*(?:\+?61\s?|0)[2-478](?:[ -]?\d){8}(?!\d))
+    - id: Regex_au_telco_ipnd_file_artefact
+      pattern: >-
+        (?:\bIPNDUP[A-Z0-9]{5}\.?\d{7}(?:\.\d{3}\.err)?(?:\.asc)?\b|\bIPND(?:ES|LA|DI|LD|RS|EW|RE|RU|SE|SC|QP)\.[A-Za-z0-9]{1,5}\.\d{7}(?:\.\d{7}\.\d{3,4})?(?:\.asc)?\b|\bTRL\d{28})
+    - id: Regex_au_telco_ipnd_spec_exclusion
+      pattern: >-
+        (?i)\b(?:Technical\s+Requirements\s+for\s+IPND|Field\s+Name\s+Format(?:\s+From\s+To)?\s+Mandatory|IPND\s+User\s+Guidelines|Data\s+Users\s+and\s+Data\s+Providers\s+Technical\s+Requirements)\b
+  keywords:
+    - id: Keyword_au_telco_ipnd_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - unlisted number
+            - unlisted numbers
+            - unlisted telephone number
+            - suppressed address
+            - Data Provider
+            - Data User
+            - IPND Manager
+            - Carriage Service Provider
+            - Telecommunications Act 1997
+            - Part 13
+            - silent number
+      strength: specific
+risk_rating: 9
+risk_description: >-
+  The classifier identifies IPND customer data: fixed-width IPND upload/download records and IPND extracts that link a public number to a customer name, service address and List Code. Records coded UL (Unlisted Number) or SA (Suppressed Address) exist because the customer asked for the number or address to be kept out of directories; disclosure is an offence under Telecommunications Act 1997 s 276 and can expose people who are hiding from a violent partner or stalker to physical harm. A bulk IPND file holds up to 10,000 such records per upload. Specification text, guidance, blank forms and training material are excluded from enforce tiers. Risk 9 supports SENSITIVE Personal-Privacy; PROTECTED is not generally met for a single CSP extract.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - title: Telstra - Data Users and Data Providers Technical Requirements for IPND
+    url: https://www.telstra.com.au/content/dam/tcom/personal/consumer-advice/ipnd/data-provider-information-pack/ipnd-data-users-and-data-providers-technical-requirements.pdf
+  - title: Telecommunications Act 1997 (Cth) - Part 13 and Schedule 2
+    url: https://www.legislation.gov.au/C2004A05145/latest/text
+  - title: ACMA - IPND checklist for carriage service providers
+    url: https://www.acma.gov.au/ipnd-checklist-csps
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - anchored on the Telstra IPND technical requirements (HDR/TRL layouts, customer record field offsets, file names) and Telecommunications Act 1997 Part 13; 75 gated on an IPND record structure, 85 on two record hits plus an IPND file artefact or Part 13 evidence; the IPND specification itself is excluded.
+author: testpattern-community
+license: MIT

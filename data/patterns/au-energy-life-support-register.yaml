@@ -1,0 +1,206 @@
+schema: testpattern/v1
+name: Energy Retailer or Distributor Life Support Register Record
+slug: au-energy-life-support-register
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Life support equipment registration records kept by Australian energy retailers and distributors under Part 7 of the National Energy Retail Rules (rules 123A-126A): completed medical confirmation forms, register entries and deregistration records that tie a premises (NMI, MIRN or supply address) to a customer and to life support equipment from the rule 3 list (oxygen concentrator, intermittent peritoneal dialysis machine, kidney dialysis machine, chronic positive airways pressure respirator, Crigler-Najjar syndrome phototherapy equipment, ventilator for life support, or other certified equipment). Applies in Queensland (Energex, Ergon Energy and retailers) since 1 July 2015.
+operation: >-
+  Primary: a life support registration phrase (life support equipment/register/registration/deregistration/customer/premises/flag/status/user/program, medical confirmation form, confirmation reminder notice, deregistration notice). 75 tier requires, within 300 characters, one populated structure: either a premises field (NMI/MIRN label followed by an NMI-shaped value, or a service/supply/property/premises address label followed by a street number and name) or a medical-confirmation field (equipment type from the rule 3 list, a provider number containing a digit, or a named medical practitioner) or a rule 126 register-date field (a filled date for when supply is required, medical confirmation received, registration or deregistration date, or a reason for deregistration). 85 tier requires a premises field AND a medical-confirmation or register-date field AND a populated customer field (customer/account holder/patient name, or a customer/account number). All enforce tiers AND NOT the shared template-exclusion dictionary and a rules/guidance exclusion (National Energy Retail Rules, AEMC, fact sheet, rule change, Improving Life Support Processes). 65 is discovery-only (primary phrase alone) and will surface blank forms, fact sheets and the rules themselves.
+pattern: >-
+  (?i)\b(?:life\s+support\s+(?:equipment|registers?|registration|deregistration|customers?|premises|flag(?:ged)?|status|users?|program(?:me)?|dependent)|medical\s+confirmation\s+forms?|confirmation\s+reminder\s+notices?|deregistration\s+notices?)\b
+confidence: medium
+confidence_justification: >-
+  Medium: the primary phrases come straight from NERR Part 7 and retailer forms, but the same phrases fill the rules, blank forms, distributor eligibility pages and fact sheets, so enforce tiers need populated record fields. The NMI value is shape-checked only (no checksum validator), and provider-number format is unverified, so values are loose and placeholder-guarded. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic records laid out like the published form headings.
+jurisdictions:
+  - au
+regulations:
+  - National Energy Retail Rules Part 7 (rr 123A-126A)
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - health
+  - pii
+  - energy
+corroborative_evidence:
+  keywords:
+    - life support equipment
+    - medical confirmation form
+    - oxygen concentrator
+    - kidney dialysis machine
+    - peritoneal dialysis
+    - ventilator for life support
+    - NMI
+    - service address where equipment is located
+  proximity: 300
+customisation:
+  - key: utility-account-number
+    kind: identifier-format
+    identifier: utility-account-number
+    target: purview.regexes/Regex_au_energy_life_support_customer_field
+    mode: extend
+    affects_tiers:
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's utility customer account number format (see docs/identifiers.md#utility-account-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Life support register - registration record\nCustomer name: Avery Teston\nNMI: 3114567890\nService address: 14 Wattlebird Street, Stafford QLD 4053\nLife support equipment: oxygen concentrator\nMedical confirmation received: 16/09/2026\nProvider number: 2451837K"
+      description: Register entry with NMI, address, equipment, confirmation date and customer name (85 tier)
+      synthetic: true
+    - value: "Medical Confirmation Form (completed)\nAccount holder: Morgan Teston\nService address where equipment is located: Unit 3/27 Carrington Avenue, Toowong QLD 4066\nDate you require energy supply for the purposes of life support equipment: 01/10/2026\nEquipment type: kidney dialysis machine\nTreating doctor: Dr Priya Testwell"
+      description: Completed retailer medical confirmation form (85 tier)
+      synthetic: true
+    - value: "Life support deregistration notice issued.\nSupply address: 8 Sandpiper Court, Mackay QLD 4740\nDeregistration date: 11/08/2026\nReason for deregistration: customer vacated premises"
+      description: Deregistration record with address and reason, no customer field (75 tier)
+      synthetic: true
+    - value: "Life support flagged on account.\nNMI: 4102938475\nPlease send the customer a confirmation reminder notice."
+      description: Life support flag with NMI only (75 tier)
+      synthetic: true
+    - value: "Life support customer - Jamie Teston. Equipment: CPAP. Awaiting medical confirmation form from GP."
+      description: Life support mention with equipment field only (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: "life support equipment means any of the following: (a) an oxygen concentrator; (b) an intermittent peritoneal dialysis machine; (c) a kidney dialysis machine; (d) a chronic positive airways pressure respirator; (e) crigler najjar syndrome phototherapy equipment; (f) a ventilator for life support"
+      description: National Energy Retail Rules rule 3 definition (legislation text, 65 only)
+    - value: "Medical Confirmation Form\nDate of issue\n1. Details\nService address where equipment is located\nAddress\nSuburb State Postcode\nDate you require energy supply for the purposes of life support equipment\n3. Medical Practitioner Confirmation\nProvider number: Number of medical practice/hospital where patient was reviewed\nSignature and stamp of medical practitioner:"
+      description: Blank retailer medical confirmation form (headings without values, 65 only)
+    - value: "Life support customers: if someone at your home relies on life support equipment such as an oxygen concentrator or kidney dialysis machine, ask your retailer for a medical confirmation form and have your doctor complete it."
+      description: Distributor eligibility page (65 only)
+    - value: "Life Support Fact Sheet. Under the National Energy Retail Rules we must register your premises. Example record - Customer name: Casey Teston, NMI: 3100000001, Life support equipment: ventilator for life support"
+      description: Fact sheet with an illustrative record, suppressed by the guidance exclusion
+    - value: "Customer name: [Customer name]\nNMI: __________\nLife support equipment: <select equipment>\nMedical confirmation received: __________"
+      description: CRM template with placeholders (65 only)
+    - value: The AEMC's Improving Life Support Processes rule, made on 25 June 2026, requires annual verification of life support registration from 1 December 2027.
+      description: Rule-change news (65 only)
+false_positives:
+  - description: The National Energy Retail Rules, AEMC rule-change papers and AER material quote the equipment list and "medical confirmation form".
+    mitigation: Enforce tiers need populated premises or medical fields, and a rules/guidance exclusion group suppresses text naming the Rules, AEMC, fact sheets or the 2026 rule change.
+  - description: Blank retailer medical confirmation forms and distributor eligibility pages.
+    mitigation: >-
+      Blank lines, square-bracket and angle-bracket placeholders and n/a/tbc values are rejected; provider numbers must contain a digit so the blank form's "Provider number" heading followed by printed instructions does not count.
+  - description: Customer bills that print the NMI and supply address next to a generic life support hotline notice.
+    mitigation: A bill with an NMI and a life support notice can reach 75; the 85 tier also needs a medical-confirmation field and a customer field. Deploy at 85 where billing archives are in scope.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_energy_life_support_primary
+      matches:
+        - ref: Regex_au_energy_life_support_premises_field
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_energy_life_support_medical_field
+            - Regex_au_energy_life_support_register_date_field
+        - ref: Regex_au_energy_life_support_customer_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_energy_life_support_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_energy_life_support_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_energy_life_support_premises_field
+            - Regex_au_energy_life_support_medical_field
+            - Regex_au_energy_life_support_register_date_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_energy_life_support_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_energy_life_support_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_energy_life_support_primary
+      pattern: >-
+        (?i)\b(?:life\s+support\s+(?:equipment|registers?|registration|deregistration|customers?|premises|flag(?:ged)?|status|users?|program(?:me)?|dependent)|medical\s+confirmation\s+forms?|confirmation\s+reminder\s+notices?|deregistration\s+notices?)\b
+    - id: Regex_au_energy_life_support_premises_field
+      pattern: >-
+        (?i)\b(?:(?:NMI|MIRN|National\s+Metering\s+Identifier)\s*[:#-]?\s*(?:\d{10,11}|[A-HJ-NP-Z]{2}[0-9A-HJ-NP-Z]{2}\d{6,7})\b|(?:service|supply|property|premises|site|installation)\s+address(?:\s+where\s+(?:the\s+)?equipment\s+is\s+located)?\s*[:#]\s*(?:(?:Unit|Lot|Apt|Flat)\s+)?\d{1,5}[A-Za-z]?(?:/\d{1,5}[A-Za-z]?)?\s+[A-Z][A-Za-z'-]{1,30})
+    - id: Regex_au_energy_life_support_medical_field
+      pattern: >-
+        (?i)\b(?:(?:life\s+support\s+)?equipment(?:\s+type)?\s*[:#]\s*(?:an?\s+)?(?:oxygen\s+concentrator|(?:intermittent\s+)?peritoneal\s+dialysis|kidney\s+dialysis|home\s+(?:haemo)?dialysis|chronic\s+positive\s+airways?\s+pressure|CPAP|crigler[\s-]+najjar|ventilator)|(?:medical\s+practitioner\s+)?provider\s+(?:no\.?|number)\s*[:#]\s*(?=[A-Z]{0,3}\d)[A-Z0-9]{6,10}\b|(?:medical\s+practitioner|treating\s+(?:doctor|practitioner|GP)|doctor|GP)(?:\s+name)?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?:Dr\.?\s+)?[A-Z][A-Za-z'-]{1,30}[ \t]+[A-Z][A-Za-z'-]{1,30})
+    - id: Regex_au_energy_life_support_register_date_field
+      pattern: >-
+        (?i)\b(?:(?:date\s+(?:you\s+)?requir(?:e|es|ed)\s+(?:energy\s+)?supply(?:\s+for\s+the\s+purposes\s+of\s+life\s+support\s+equipment)?|supply\s+required\s+(?:from|date)|(?:date\s+)?medical\s+confirmation\s+(?:received|date)|(?:life\s+support\s+)?registration\s+date|date\s+registered|deregistration\s+date|date\s+deregistered)\s*[:#]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-](?:\d{4}|\d{2})|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})|reason\s+for\s+deregistration\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{2,30})
+    - id: Regex_au_energy_life_support_customer_field
+      pattern: >-
+        (?i)\b(?:(?:customer|account\s+holder|life\s+support\s+user|patient|person\s+requiring\s+(?:the\s+)?(?:life\s+support\s+)?equipment)(?:\s+(?:full\s+)?name)?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{1,30}[ \t]+[A-Z][A-Za-z'-]{1,30}|(?:customer|account)\s+(?:no\.?|number|ID)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba)\b|_{2,}|\[|<)(?=[A-Z-]{0,5}\d)[A-Z0-9][A-Z0-9-]{4,15}\b)
+  keywords:
+    - id: Keyword_au_energy_life_support_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - National Energy Retail Rules
+            - Retail Rules
+            - text: NERR
+              case_sensitive: true
+            - text: AEMC
+              case_sensitive: true
+            - Australian Energy Market Commission
+            - Australian Energy Regulator
+            - rule change
+            - fact sheet
+            - factsheet
+            - Improving Life Support Processes
+            - frequently asked questions
+            - means any of the following
+      strength: specific
+risk_rating: 9
+risk_description: >-
+  The classifier identifies a life support register entry or completed medical confirmation that links an identified customer and premises (NMI or address) to a household member's dependence on medical equipment such as dialysis, oxygen or ventilation. The record is health information about a person tied to a physical location where a vulnerable person lives, and the register itself is the safeguard against planned interruption; disclosure exposes health status and location, and tampering or loss can put a life at risk during outages. Guidance, the Rules, blank forms and fact sheets are excluded from enforce tiers. Risk 9 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - title: AEMC - National Energy Retail Rules v37 (full), Part 7 Life support equipment and rule 3 definition
+    url: https://energy-rules.aemc.gov.au/storage/rules/ea1906d07927e4ba3bf5da59bf1d891308cfabda/assets/files/NERR%20-%20v37%20-%20Full.pdf
+  - title: AEMC - NERR Part 7 extract
+    url: https://www.aemc.gov.au/sites/default/files/2021-03/NERR%20-%20v25%20-%20Part%207.pdf
+  - title: Energy Locals - Medical Confirmation Form (retailer form headings)
+    url: https://public.energylocals.com.au/public/Energy-Locals-Medical-Confirmation-Form.pdf
+  - title: Energex - Life support customers
+    url: https://www.energex.com.au/outages/be-prepared-for-outages/life-support-customers
+  - title: AEMC - Improving life support processes (rule change, commences 1 December 2027)
+    url: https://www.aemc.gov.au/rule-changes/improving-life-support-processes
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - NERR Part 7 life support register and medical confirmation records; 75 gated on a populated premises or medical-confirmation field, 85 on premises + medical + customer fields; rules, fact sheets and blank forms excluded.
+author: testpattern-community
+license: MIT

@@ -1,0 +1,292 @@
+schema: testpattern/v1
+name: IEC 61850 SCL Substation Configuration File
+slug: global-iec61850-scl-configuration
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  IEC 61850 System Configuration Language (SCL) files for a configured substation or IED: SCD, ICD, CID, SSD and IID exports from substation configurator tools. Detects the SCL XML namespace and the populated Communication section (ConnectedAP with IP addressing, GOOSE and Sampled Values multicast MAC addresses in the 01-0C-CD range, APPIDs) plus IED, logical device and control-block structure. A populated SCD/CID gives the station bus network plan, IED names and GOOSE trip-signal addressing for a live substation.
+operation: >-
+  Primaries: the SCL namespace (xmlns="http://www.iec.ch/61850/2003/SCL"), a populated ConnectedAP element (ConnectedAP iedName=...), or an "IEC 61850" phrase near SCL / .scd / .icd / .cid / .ssd / .iid. 65 is discovery-only (any primary). 75 requires the namespace plus an IED, LDevice, LLN0, ConnectedAP, SubNetwork or Substation element, or the namespace or ConnectedAP plus populated addressing (a dotted-quad P type="IP", a GOOSE/SV MAC P type="MAC-Address" 01-0C-CD-xx-xx-xx, or a P type="APPID"). 85 requires the namespace or ConnectedAP plus a populated P type="IP", a second distinct addressing structure (01-0C-CD MAC or APPID) and a control block (GSE/SMV cbName address block, GSEControl, ReportControl or SampledValueControl). Placeholder IP 0.0.0.0 is not counted. All enforce tiers exclude template/noise text, XML schema documentation (xs:element, xs:complexType), libiec61850 samples and the OpenSCD TrainingIEC61850 fixture, and the libiec61850 sample address 10.0.0.2. Proximity is 1000 characters because the header, Communication and IED sections of an SCL file sit close together but exceed 300 characters.
+pattern: >-
+  xmlns(?::[A-Za-z]{1,10})?="http://www\.iec\.ch/61850/2003/SCL"
+confidence: high
+confidence_justification: >-
+  High: the SCL namespace URI and the P type="IP" / P type="MAC-Address" / P type="APPID" address elements are machine-format structures that essentially only occur in IEC 61850 SCL files. Residual false positives are developer fixtures and schema documentation, which are excluded. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic SCL fragments shaped like the libiec61850 and OpenSCD sample files.
+jurisdictions:
+  - global
+regulations:
+  - SOCI Act 2018 (Cth)
+  - NIS2
+frameworks:
+  - IEC 62443
+  - IEC 61850
+  - NIST CSF
+  - AESCSF
+data_categories:
+  - infrastructure
+  - technology
+corroborative_evidence:
+  keywords:
+    - GSEControl
+    - ReportControl
+    - SampledValueControl
+    - ConnectedAP
+    - SubNetwork
+    - GOOSE
+    - APPID
+    - LDevice
+  proximity: 1000
+test_cases:
+  should_match:
+    - value: |-
+        <?xml version="1.0" encoding="UTF-8"?>
+        <SCL xmlns="http://www.iec.ch/61850/2003/SCL" version="2007" revision="B" release="4">
+          <Header id="WATTLEBIRD_ZS_132kV" nameStructure="IEDName" version="3" revision="12"/>
+          <Communication>
+            <SubNetwork name="STATION_BUS_A" type="8-MMS">
+              <ConnectedAP iedName="WBZ_F07_PROT" apName="S1">
+                <Address>
+                  <P type="IP">172.20.14.21</P>
+                  <P type="IP-SUBNET">255.255.255.0</P>
+                  <P type="IP-GATEWAY">172.20.14.1</P>
+                </Address>
+                <GSE ldInst="PROT" cbName="gcbTrip">
+                  <Address>
+                    <P type="VLAN-ID">00A</P>
+                    <P type="VLAN-PRIORITY">4</P>
+                    <P type="MAC-Address">01-0C-CD-01-00-1A</P>
+                    <P type="APPID">3A01</P>
+                  </Address>
+                </GSE>
+              </ConnectedAP>
+            </SubNetwork>
+          </Communication>
+      description: 85 - CID with populated IP, GOOSE MAC, APPID and a GSE control-block address
+      synthetic: true
+    - value: |-
+        <SCL xmlns:sxy="http://www.iec.ch/61850/2003/SCLcoordinates" xmlns="http://www.iec.ch/61850/2003/SCL">
+          <Substation name="KOORALBYN_66" desc="Zone substation">
+            <VoltageLevel name="E1" nomFreq="50.0" numPhases="3">
+              <Bay name="FDR_03"><ConductingEquipment type="CBR" name="QA1"/></Bay>
+            </VoltageLevel>
+          </Substation>
+          <Communication>
+            <SubNetwork name="PROCESS_BUS" type="8-MMS">
+              <ConnectedAP iedName="KRB_MU_03" apName="P1">
+                <Address><P type="IP">10.66.3.40</P></Address>
+                <SMV ldInst="MU01" cbName="MSVCB01">
+                  <Address><P type="MAC-Address">01-0C-CD-04-00-03</P><P type="APPID">4003</P></Address>
+                </SMV>
+              </ConnectedAP>
+            </SubNetwork>
+          </Communication>
+      description: 85 - SCD with Substation section, IP, Sampled Values MAC, APPID and SMV control block
+      synthetic: true
+    - value: |-
+        <SCL xmlns="http://www.iec.ch/61850/2003/SCL">
+          <Header id="REL_670_ICD" nameStructure="IEDName"/>
+          <IED name="RC670_BAY_IED" manufacturer="Relayco" type="RC670" configVersion="2.1">
+            <AccessPoint name="S1"><Server><LDevice inst="CTRL">
+              <LN0 lnClass="LLN0" lnType="LLN0_1" inst=""/>
+            </LDevice></Server></AccessPoint>
+          </IED>
+      description: 75 - vendor ICD with namespace and IED / LDevice structure but no addressing
+      synthetic: true
+    - value: |-
+        <ConnectedAP iedName="MRV_BCU_12" apName="S1">
+          <Address>
+            <P type="IP">192.168.40.112</P>
+            <P type="IP-SUBNET">255.255.255.0</P>
+          </Address>
+        </ConnectedAP>
+      description: 75 - ConnectedAP fragment with a populated station-bus IP (namespace outside the window)
+      synthetic: true
+  should_not_match:
+    - value: |-
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="http://www.iec.ch/61850/2003/SCL" targetNamespace="http://www.iec.ch/61850/2003/SCL">
+          <xs:element name="SCL"><xs:complexType><xs:sequence>
+            <xs:element name="Header" type="tHeader"/>
+            <xs:element name="IED" type="tIED" minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence></xs:complexType></xs:element>
+      description: SCL.xsd schema documentation (published specification text)
+    - value: |-
+        <SCL xmlns="http://www.iec.ch/61850/2003/SCL">
+          <Header id="" nameStructure="IEDName"></Header>
+          <Communication><SubNetwork name="subnetwork1" type="8-MMS">
+            <ConnectedAP iedName="simpleIO" apName="accessPoint1"><Address>
+              <P type="IP">10.0.0.2</P>
+              <P type="IP-SUBNET">255.255.255.0</P>
+            </Address>
+            <GSE ldInst="GenericIO" cbName="gcbEvents"><Address>
+              <P type="MAC-Address">01-0c-cd-01-00-01</P><P type="APPID">1000</P>
+            </Address></GSE></ConnectedAP></SubNetwork></Communication>
+          <IED name="simpleIO">
+      description: libiec61850 example CID (sample address 10.0.0.2)
+    - value: |-
+        <SCL xmlns="http://www.iec.ch/61850/2003/SCL" version="2007" revision="B" release="4">
+          <Header id="TrainingIEC61850" nameStructure="IEDName"/>
+          <DataTypeTemplates>
+            <LNodeType lnClass="LLN0" id="LLN0_Template"><DO name="Mod" type="ENC_Mod"/></LNodeType>
+          </DataTypeTemplates>
+      description: Blank DataTypeTemplates file from a training fixture (no IED, no addressing)
+    - value: |-
+        IEC 61850 training course, module 4: editing the SCD file. The trainer shows a ConnectedAP with <P type="IP">192.168.1.10</P> and a GOOSE MAC-Address 01-0C-CD-01-00-01 so students can see where addressing lives.
+      description: Training slide text quoting SCL snippets
+    - value: >-
+        Relayco launches a cloud IEC 61850 SCL editor that imports .scd and .icd files and validates GOOSE subscriptions in seconds, the company said on Tuesday.
+      description: News / marketing text
+false_positives:
+  - description: IEC 61850 schema (SCL.xsd) and standard text quote element names and the namespace.
+    mitigation: Enforce tiers need populated element markup (IED name=, ConnectedAP iedName=, P type="IP" values) and exclude xs:element / xs:complexType / xs:schema.
+  - description: Open-source library fixtures (libiec61850 examples, OpenSCD test files) are real SCL but describe no live site.
+    mitigation: The libiec61850 sample address 10.0.0.2, "libiec61850", "server_example" and the OpenSCD "TrainingIEC61850" header are excluded; in a large SCD the Header can sit outside the window, so an OpenSCD fixture may still reach 75 through its ConnectedAP section.
+  - description: Vendor ICD templates carry IED and LDevice structure with no station addressing.
+    mitigation: They reach 75 only; 85 needs a populated IP, a 01-0C-CD MAC or APPID, and a control block.
+  - description: Training decks and forum posts that paste SCL snippets.
+    mitigation: Template/noise exclusion plus "IEC 61850 training"; prose mentions of the standard stay at 65.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 1000
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match:
+        type: any
+        ids:
+          - Regex_global_iec61850_scl_namespace
+          - Regex_global_iec61850_scl_connected_ap
+      matches:
+        - ref: Regex_global_iec61850_scl_ip_address
+        - type: any
+          refs:
+            - Regex_global_iec61850_scl_multicast_mac
+            - Regex_global_iec61850_scl_appid
+        - ref: Regex_global_iec61850_scl_control_block
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_iec61850_scl_exclusion
+            - Regex_global_iec61850_scl_sample_address
+    - confidence_level: 75
+      id_match: Regex_global_iec61850_scl_namespace
+      matches:
+        - type: any
+          refs:
+            - Regex_global_iec61850_scl_element
+            - Regex_global_iec61850_scl_ip_address
+            - Regex_global_iec61850_scl_multicast_mac
+            - Regex_global_iec61850_scl_appid
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_iec61850_scl_exclusion
+            - Regex_global_iec61850_scl_sample_address
+    - confidence_level: 75
+      id_match: Regex_global_iec61850_scl_connected_ap
+      matches:
+        - type: any
+          refs:
+            - Regex_global_iec61850_scl_ip_address
+            - Regex_global_iec61850_scl_multicast_mac
+            - Regex_global_iec61850_scl_appid
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_iec61850_scl_exclusion
+            - Regex_global_iec61850_scl_sample_address
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_global_iec61850_scl_namespace
+          - Regex_global_iec61850_scl_connected_ap
+          - Regex_global_iec61850_scl_phrase
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_global_iec61850_scl_namespace
+      pattern: >-
+        xmlns(?::[A-Za-z]{1,10})?="http://www\.iec\.ch/61850/2003/SCL"
+    - id: Regex_global_iec61850_scl_connected_ap
+      pattern: >-
+        <ConnectedAP\s+iedName="[A-Za-z0-9_]{1,64}"\s+apName="[A-Za-z0-9_]{1,32}"
+    - id: Regex_global_iec61850_scl_phrase
+      pattern: >-
+        (?i)\bIEC\s*61850\b[\s\S]{0,60}(?:\bSCL\b|\.(?:scd|icd|cid|ssd|iid)\b|substation\s+configuration\s+(?:description|language))
+    - id: Regex_global_iec61850_scl_element
+      pattern: >-
+        <(?:IED\s+name="[A-Za-z0-9_]{1,64}"|LDevice\s+inst="[A-Za-z0-9_]{1,64}"|LN0\s+lnClass="LLN0"|ConnectedAP\s+iedName="[A-Za-z0-9_]{1,64}"|SubNetwork\s+name="[^"]{1,64}"|Substation\s+name="[^"]{1,64}")
+    - id: Regex_global_iec61850_scl_ip_address
+      pattern: >-
+        <P\s+type="IP">(?!0\.0\.0\.0<)\d{1,3}(?:\.\d{1,3}){3}</P>
+    - id: Regex_global_iec61850_scl_multicast_mac
+      pattern: >-
+        <P\s+type="MAC-Address">01-0[Cc]-[Cc][Dd](?:-[0-9A-Fa-f]{2}){3}</P>
+    - id: Regex_global_iec61850_scl_appid
+      pattern: >-
+        <P\s+type="APPID">[0-9A-Fa-f]{1,4}</P>
+    - id: Regex_global_iec61850_scl_control_block
+      pattern: >-
+        <(?:(?:GSE|SMV)\s+ldInst="[A-Za-z0-9_]{1,64}"\s+cbName="[A-Za-z0-9_]{1,64}"|GSEControl\s|ReportControl\s|SampledValueControl\s)
+    - id: Regex_global_iec61850_scl_sample_address
+      pattern: >-
+        <P\s+type="IP">10\.0\.0\.2</P>
+  keywords:
+    - id: Keyword_global_iec61850_scl_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - xs:element
+            - xs:complexType
+            - xs:schema
+            - TrainingIEC61850
+            - libiec61850
+            - server_example
+            - IEC 61850 training
+      strength: specific
+risk_rating: 9
+risk_description: >-
+  A populated SCD/CID/ICD file maps a substation's IEC 61850 station and process bus: IED names, IP addresses, GOOSE and Sampled Values multicast addressing, APPIDs and the control blocks that carry protection trips and interlocks. Disclosure gives an attacker the target list and addressing needed to spoof GOOSE messages or reach protection relays, with consequences for supply and public safety. Configuration files for critical infrastructure assets can be SOCI protected information. Schema text, library fixtures and marketing are excluded from enforce tiers. Risk 9 supports SENSITIVE InfoTech.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - title: libiec61850 example CID (simpleIO_direct_control_goose.cid)
+    url: https://raw.githubusercontent.com/mz-automation/libiec61850/v1.5/examples/server_example_goose/simpleIO_direct_control_goose.cid
+  - title: OpenSCD test file comm-map.scd
+    url: https://raw.githubusercontent.com/openscd/open-scd/main/packages/openscd/test/testfiles/comm-map.scd
+  - title: OpenSCD templates.scd (DataTypeTemplates only)
+    url: https://raw.githubusercontent.com/openscd/open-scd/main/packages/openscd/public/xml/templates.scd
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - SCL namespace / ConnectedAP primaries; 75 gated on SCL element markup or populated addressing; 85 on populated IP plus 01-0C-CD MAC or APPID plus a control block; schema, library-fixture and training exclusions.
+author: testpattern-community
+license: MIT

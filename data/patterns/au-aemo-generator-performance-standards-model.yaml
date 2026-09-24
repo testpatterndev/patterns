@@ -1,0 +1,199 @@
+schema: testpattern/v1
+name: NEM Generator Performance Standards and Power System Model Data
+slug: au-aemo-generator-performance-standards-model
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Generator performance standards (agreed schedule 5.2 standards under S5.2.5.x at the automatic, minimum or negotiated access standard) and the power system model data behind them (NER S5.2.4(b): functional block diagrams, parameters with settings, gains, time constants, delays and deadbands, encrypted models, model source code, releasable user guides, Power System Design and Setting Data Sheets) for a named generating system. The NER treats this as confidential information (cl 3.13.3(k)-(l), 5.3.4 model data, 8.6.1) and AEMO releases model source code only in compiled or encrypted form.
+operation: >-
+  Primary: generator performance standard(s), agreed or negotiated performance standard(s), register of performance standards, releasable user guide, Power System Design / Setting Data Sheet, or an S5.2.5.x clause reference. 65 is discovery-only (primary alone) and will surface the NER, AEMO Power System Model Guidelines, AEMC determinations and blank data sheets. 75 requires, within 300 characters, either a populated control parameter (gain, time constant, deadband, droop, delay, ramp rate, washout or a Kx / Tx symbol set with = or : to a number) or a populated plant field (DUID, connection point, generating unit or system, power station, registered or maximum capacity, nameplate rating, connection agreement number, model version, TNI, plant name) with a non-placeholder value. 85 requires both a parameter and a plant field plus independent model-release evidence (model source code, encrypted or compiled model, functional block diagram, confidential information, commercially sensitive) or a model file name (.dyr, .sav, .pscx, .psmx, .dll). Model file extensions are weak evidence only and never enough on their own. All tiers exclude template/fixture text and a pattern-specific exclusion group (consultation, draft and final determinations, rule change, issues paper, media release).
+pattern: (?i)\b(?:generator\s+performance\s+standards?|(?:agreed|negotiated)\s+performance\s+standards?|register\s+of\s+performance\s+standards|releasable\s+user\s+guide|Power\s+System\s+(?:Design|Setting)\s+Data\s+Sheet|S5\.2\.5\.\d{1,2})\b
+confidence: medium
+confidence_justification: >-
+  Medium: the anchors are NER defined terms and clause numbers that dominate the Rules, AEMO guidelines and consultation papers, so enforcement depends on populated parameter values or plant fields. Parameter symbols (Kp, Ti and similar) are generic control-engineering notation, which is why they only count near a performance-standard anchor. PSS/E and PSCAD file extensions are the researcher's knowledge, not verified against AEMO documents, and are weak evidence at 85 only. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic.
+jurisdictions:
+  - au
+regulations:
+  - National Electricity Rules (v217) cl 3.13.3(k)-(l), 4.14(n), 5.3.4A, S5.2.4(b), S5.2.5, 8.6.1
+  - National Electricity Law
+frameworks:
+  - ISO 27001
+data_categories:
+  - infrastructure
+  - business
+  - energy-market
+corroborative_evidence:
+  keywords:
+    - model source code
+    - encrypted model
+    - functional block diagram
+    - confidential information
+    - commercially sensitive
+    - negotiated access standard
+    - automatic access standard
+    - minimum access standard
+  proximity: 300
+customisation:
+  - key: nem-connection-agreement-number
+    kind: identifier-format
+    identifier: nem-connection-agreement-number
+    target: purview.regexes/Regex_au_aemo_gps_model_plant_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's nem connection agreement number format (see docs/identifiers.md#nem-connection-agreement-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Teston Solar Farm - releasable user guide v2.1 (confidential information, NER 8.6.1)\nDUID: TESTSF1\nConnection point: Teston 275 kV substation\nPPC voltage controller: Kp = 2.5 pu, Ti = 0.8 s, deadband = 0.5 %\nModel files: TESTSF1_PPC_v21.dyr and TESTSF1_inv.dll (encrypted model)."
+      description: Releasable user guide with plant fields, controller parameters and model files (intended 85)
+      synthetic: true
+    - value: "Generator performance standards schedule - S5.2.5.5 reactive power capability: negotiated access standard\nGenerating system: Teston Wind Farm Stage 2\nAgreed value: 0.395 x maximum active power at the connection point."
+      description: Agreed performance standard for a named generating system, no parameters (intended 75)
+      synthetic: true
+    - value: "Power System Setting Data Sheet - Teston BESS\nFrequency controller droop = 3.3 %\nFrequency deadband = 0.015 Hz"
+      description: Filled setting data sheet with parameter values but no plant field (intended 75)
+      synthetic: true
+    - value: "Register of performance standards extract - S5.2.5.13 voltage and reactive power control\nPower station: Teston Creek Hydro\nAVR gain = 400 pu\nTime constant = 0.02 s\nFunctional block diagram and model source code held by AEMO; commercially sensitive."
+      description: Register extract with plant, AVR parameters and model-release content (intended 85)
+      synthetic: true
+  should_not_match:
+    - value: "S5.2.4(b) ... the parameters of each functional block, including all settings, gains, time constants, delays, deadbands and limits; encrypted models in a form suitable for the software simulation products nominated by AEMO in the Power System Model Guidelines, Power System Design Data Sheet and Power System Setting Data Sheet."
+      description: NER text (legislation decoy, stays at 65)
+    - value: "Power System Setting Data Sheet\nDUID: [enter DUID]\nConnection point: __________\nGain (pu): __________\nTime constant (s): __________\nDeadband (Hz): tbc"
+      description: Blank AEMO data sheet
+    - value: "Power System Model Guidelines - draft determination and consultation paper. AEMO seeks submissions on how generator performance standards and releasable user guides should describe model parameters."
+      description: AEMO consultation / guideline decoy
+    - value: "Worked example: an excitation system under S5.2.5.13 might use Ka = 200 pu and Ta = 0.02 s."
+      description: Training / textbook worked example
+    - value: AEMO registered 4 GW of new solar and wind generation this year after agreeing generator performance standards with each developer, a media release says.
+      description: News / media release
+false_positives:
+  - description: The National Electricity Rules, AEMC rule determinations and AEMO Power System Model Guidelines.
+    mitigation: No populated parameter or plant values; determination, consultation and rule change wording is excluded.
+  - description: Blank Power System Design and Setting Data Sheets.
+    mitigation: Placeholders (blank lines, brackets, n/a, tbc) are rejected and template framing is excluded.
+  - description: Control engineering textbooks and training material that set gains and time constants.
+    mitigation: Needs a performance-standard anchor within 300 characters; worked-example and training framing is excluded.
+  - description: Public generator registration information (DUIDs and capacities are published by AEMO).
+    mitigation: A public registration row alone reaches at most 75 when next to a performance-standard anchor; 85 also needs controller parameters and model-release evidence.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_aemo_gps_model_primary
+      matches:
+        - ref: Regex_au_aemo_gps_model_parameter
+        - ref: Regex_au_aemo_gps_model_plant_field
+        - type: any
+          refs:
+            - Keyword_au_aemo_gps_model_release
+            - Regex_au_aemo_gps_model_file
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_aemo_gps_model_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_aemo_gps_model_primary
+      matches:
+        - type: any
+          refs:
+            - Regex_au_aemo_gps_model_parameter
+            - Regex_au_aemo_gps_model_plant_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_aemo_gps_model_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_aemo_gps_model_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_aemo_gps_model_exclusion
+  regexes:
+    - id: Regex_au_aemo_gps_model_primary
+      pattern: >-
+        (?i)\b(?:generator\s+performance\s+standards?|(?:agreed|negotiated)\s+performance\s+standards?|register\s+of\s+performance\s+standards|releasable\s+user\s+guide|Power\s+System\s+(?:Design|Setting)\s+Data\s+Sheet|S5\.2\.5\.\d{1,2})\b
+    - id: Regex_au_aemo_gps_model_parameter
+      pattern: >-
+        \b(?:[Gg]ain|[Tt]ime\s+constant|[Dd]ead\s?band|[Dd]roop|[Dd]elay|[Rr]amp\s+rate|[Ww]ashout(?:\s+time)?|K[pPiIaAvVqQdD]|T[1-9]|T[a-z][0-9]?)\b(?:\s*\([^)]{1,15}\))?\s*[:=]\s*-?\d{1,6}(?:\.\d{1,6})?(?:\s*(?:ms|s|pu/s|pu|p\.u\.|mHz|Hz|%|MW/min|MW|MVAr|kV))?
+    - id: Regex_au_aemo_gps_model_plant_field
+      pattern: >-
+        (?i)\b(?:DUID|connection\s+point|generating\s+(?:unit|system)(?:\s+name)?|power\s+station|registered\s+capacity|maximum\s+capacity|nameplate\s+rating|connection\s+agreement(?:\s+(?:no\.?|number|ref(?:erence)?))?|model\s+version|TNI|plant\s+name)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,40}(?:[ \t]+[A-Za-z0-9][A-Za-z0-9/'.,()-]{0,30}){0,4}
+    - id: Regex_au_aemo_gps_model_file
+      pattern: >-
+        \b[A-Za-z0-9][A-Za-z0-9_-]{1,40}\.(?:dyr|sav|pscx|psmx|dll)\b
+  keywords:
+    - id: Keyword_au_aemo_gps_model_release
+      groups:
+        - match_style: word
+          terms:
+            - model source code
+            - encrypted model
+            - encrypted models
+            - compiled model
+            - functional block diagram
+            - confidential information
+            - commercially sensitive
+            - hold point
+            - R2 model
+      strength: specific
+    - id: Keyword_au_aemo_gps_model_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - consultation paper
+            - draft determination
+            - final determination
+            - rule change
+            - issues paper
+            - submissions
+            - media release
+      strength: specific
+risk_rating: 7
+risk_description: >-
+  Agreed generator performance standards and the model data behind them (controller block diagrams, gains, time constants, deadbands, encrypted models and model source code) are confidential information under the NER and commercially sensitive to the generator and its OEMs; AEMO releases model source code only in compiled or encrypted form. Leakage exposes proprietary control designs and, in the hands of an attacker, the exact behaviour of a plant's frequency and voltage control. Risk 7 supports SENSITIVE Commercial-in-Confidence; aggregation of many plants' models would justify a higher rating.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Commercial-in-Confidence
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: National Electricity Rules v217 (AEMC) - cl 3.13.3, 4.14(n), 5.3.4A, S5.2.4, S5.2.5, 8.6, Chapter 10
+    url: https://aemc-dra-production-s3.s3.ap-southeast-2.amazonaws.com/public/rules/4f2ddc105b6239728c4148e1579003e56befb38c/assets/files/NER%20-%20v217%20-%20Full.pdf
+  - title: AEMO Power System Model Guidelines (published guideline, decoy source)
+    url: https://www.aemo.com.au/-/media/Files/Stakeholder_Consultation/Consultations/Electricity_Consultations/2018/PSM/POWER_SYSTEM_MODEL_GUIDELINES_DFC.pdf
+  - title: AEMC - Confidentiality provisions for network connections
+    url: https://www.aemc.gov.au/rule-changes/confidentiality-provisions-for-network-connections
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - anchored on NER generator performance standards (S5.2.5.x) and S5.2.4(b) model data terms; 75 gated on a populated control parameter or plant field, 85 on both plus model-release evidence or a model file name (weak, unverified extensions); rule determinations, consultations and media releases excluded.
+author: testpattern-community
+license: MIT

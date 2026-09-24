@@ -1,16 +1,19 @@
 schema: testpattern/v1
 name: National Metering Identifier
 slug: global-national-metering-identifier
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Detects National Metering Identifier (NMI) patterns used in the Australian energy market. A 10 or 11 digit number identifying electricity and gas connection points. Context-dependent: requires
-  energy/meter keywords.
+  Detects National Metering Identifier (NMI) patterns used in the Australian energy market. A 10 or 11 digit number identifying electricity and gas connection points. Also covers the gas
+  Meter Installation Registration Number (MIRN), which is allocated in the NMI number space: AEMO reserves the 5 XXX XXX XXX range for the gas industry (NSW/ACT 52, Vic 53, Qld 54, SA 55,
+  WA 56, Tas 57) and MIRNs travel in the same aseXML NMI element with a checksum attribute. Context-dependent: requires energy/meter keywords.
 operation: >-
   Regex pattern using universal engine. The top-level regex \b\d{10,11}\b matches 10 or 11 digit numbers. The Purview engine uses three regexes: Pattern_nmi_labeled (labeled format with
-  NMI/meter/metering prefix + 10-11 digits), Pattern_nmi_prefix (numbers starting with known NMI prefixes 60/61/70-79 or alphanumeric NGGG/QAAA prefixes), and Pattern_au_nmi (bare 10-11 digit format).
+  NMI/MIRN/Meter Installation Registration Number/meter/metering prefix + 10-11 digits), Pattern_nmi_prefix (numbers starting with known NMI prefixes 60/61/70-79, the gas MIRN ranges 52-57, or
+  alphanumeric NGGG/QAAA prefixes), and Pattern_au_nmi (bare 10-11 digit format). No checksum validator is applied: the NMI checksum is documented in the MSATS NMI Procedure, but the Queensland
+  gas Retail Market Procedures do not state the MIRN checksum algorithm, so neither is claimed.
   Three confidence tiers: High (85) requires energy metering + energy provider keywords with template exclusion logic; Medium (75) requires energy metering keywords (using prefix regex); Low (65)
   requires energy metering + energy provider keywords (using generic regex). Evidence uses 2 keyword groups (13 energy metering terms, 9 energy provider terms) within 500-character proximity. Keyword
   lists: infrastructure-energy.
@@ -18,7 +21,8 @@ pattern: \b\d{10,11}\b
 confidence: low
 confidence_justification: >-
   Low confidence: a bare 10-11 digit number matches phone numbers, ABNs, bank account numbers, and many other numeric sequences. Corroborative evidence keywords such as NMI, meter, energy, or AEMO are
-  essential for reliable detection.
+  essential for reliable detection. MIRN values are shape- and range-checked only; the MIRN checksum algorithm is not verified to equal the NMI algorithm, so no checksum validator is
+  applied to either.
 jurisdictions:
   - global
 regulations:
@@ -36,6 +40,8 @@ corroborative_evidence:
   keywords:
     - NMI
     - National Metering Identifier
+    - MIRN
+    - Meter Installation Registration Number
     - meter
   proximity: 500
   keyword_lists:
@@ -48,6 +54,12 @@ test_cases:
       description: 11-digit NMI (maximum length)
     - value: '7001234567'
       description: NMI starting with 7
+    - value: 'Gas retailer account - MIRN: 5412345678, supply point at 14 Wattlebird Street, Stafford QLD 4053'
+      description: Queensland gas MIRN (54 range) with MIRN label (85 labeled regex)
+      synthetic: true
+    - value: 'Meter Installation Registration Number (MIRN): 53210987654 - gas distributor transfer request'
+      description: Victorian gas MIRN (53 range, 11 characters with checksum digit) with the full label
+      synthetic: true
   should_not_match:
     - value: '123456789'
       description: Only 9 digits (below minimum of 10)
@@ -55,6 +67,8 @@ test_cases:
       description: 12 digits (above maximum of 11)
     - value: 12345ABCDE
       description: Contains letters instead of all digits
+    - value: Your MIRN (Meter Installation Registration Number) is printed on the first page of your gas bill.
+      description: Retailer help text naming MIRN without a value
 false_positives:
   - description: Long numeric sequences in phone numbers, account numbers, ABNs, and other identifiers may match the generic 10-11 digit pattern without energy context.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with energy-specific terms to confirm actual NMI data.
@@ -105,9 +119,9 @@ purview:
     - id: Pattern_au_nmi
       pattern: \b\d{10,11}\b
     - id: Pattern_nmi_labeled
-      pattern: (?i)\b(?:NMI|National\s+Metering\s+Identifier|meter\s+(?:number|no|ID)|metering\s+(?:identifier|number))\s*[:#-]?\s*\d{10,11}\b
+      pattern: (?i)\b(?:NMI|MIRN|National\s+Metering\s+Identifier|Meter\s+Installation\s+Registration\s+Number|meter\s+(?:number|no|ID)|metering\s+(?:identifier|number))(?:\s*\((?:NMI|MIRN)\))?\s*[:#-]?\s*\d{10,11}\b
     - id: Pattern_nmi_prefix
-      pattern: \b(?:6[01]\d{8,9}|7[0-9]\d{8,9}|NGGG\d{6,7}|QAAA\d{6,7})\b
+      pattern: \b(?:5[2-7]\d{8,9}|6[01]\d{8,9}|7[0-9]\d{8,9}|NGGG\d{6,7}|QAAA\d{6,7})\b
   keywords:
     - id: Evidence_energy_metering
       groups:
@@ -116,6 +130,10 @@ purview:
             - text: NMI
               case_sensitive: true
             - National Metering Identifier
+            - text: MIRN
+              case_sensitive: true
+            - Meter Installation Registration Number
+            - distribution supply point
             - meter
             - metering
             - energy
@@ -145,9 +163,24 @@ purview:
   filters:
     - id: Guard_nmi_same_digits
       type: AllDigitsSameFilter
+references:
+  - title: AEMO - MSATS National Metering Identifier Procedure v7.4 (NMI structure, checksum, gas range 5 XXX XXX XXX)
+    url: https://www.aemo.com.au/-/media/files/electricity/nem/retail_and_metering/metering-procedures/2026/msats-national-metering-identifier-procedure-v74.pdf
+  - title: AEMO - National Metering Allocation List v14 (gas ranges 52-57, Qld 5400000000-5499999999)
+    url: https://www.aemo.com.au/-/media/files/electricity/nem/retail_and_metering/metering-procedures/nmi-allocation-list.pdf
+  - title: AEMO - Retail Market Procedures (Queensland) v23.0 (MIRN definition and checksum digit)
+    url: https://www.aemo.com.au/-/media/files/gas/retail_markets_and_metering/market-procedures/qld/2025/retail-market-procedures-qld-v23-clean.pdf
+  - title: AEMO - Participant Build Pack 4 (Queensland) (MIRN carried in aseXML NMI element with checksum attribute)
+    url: https://www.aemo.com.au/-/media/files/gas/retail_markets_and_metering/market-procedures/qld/2025/participant-build-pack-4--queensland.pdf
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: >-
+      Recognise the gas Meter Installation Registration Number (MIRN) instead of creating a separate au-gas-mirn classifier: add MIRN and "Meter Installation Registration Number" (with an
+      optional "(NMI)"/"(MIRN)" suffix) to Pattern_nmi_labeled, add the AEMO gas ranges 52-57 to Pattern_nmi_prefix, and add MIRN terms to Evidence_energy_metering. Sources: AEMO NMI Procedure
+      v7.4, NMI Allocation List v14, Qld Retail Market Procedures v23.0 and PBP4. No checksum validator added; the MIRN checksum algorithm is not verified to match the NMI algorithm.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 561 without changing detector or package metadata.'
