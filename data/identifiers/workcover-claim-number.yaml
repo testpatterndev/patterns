@@ -1,0 +1,48 @@
+schema: testpattern/identifier-v1
+key: workcover-claim-number
+name: Workers compensation claim number
+issuer: WorkCover Queensland, a self-insurer or Comcare
+description: Claim numbers issued by the workers' compensation insurer (WorkCover Queensland, a licensed self-insurer or Comcare) and printed on claim, medical certificate and return to work records.
+appears_in:
+- Applications for compensation
+- Work capacity certificates
+- Return to work plans
+- Claim decisions
+labels:
+- Claim number
+- Claim no.
+- WorkCover claim number
+public_format:
+  status: unpublished
+  notes: Claim number formats are not published by WorkCover Queensland or Comcare.
+fallback:
+  pattern: (?i)\b(?:(?:workcover\s+)?claim\s+(?:no\.?|number|ref(?:erence)?))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+  precision: low
+  rationale: Claim labels are common in insurance; the classifier also needs worker and injury/medical fields.
+  samples:
+  - 'Claim number: C4471820'
+  - 'WorkCover claim no: 20260412'
+replacement:
+  customer_supplies:
+  - A description of the claim number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+  - The label text used on documents and exports (for example the exact field heading).
+  - 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+  - Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+  steps:
+  - Collect the customer inputs listed above during the engagement discovery session.
+  - Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+  - If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+  - Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+  - Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+  validation:
+  - Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+  - The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+  - The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+  - Overlay values never appear in build logs or readiness output (counts and keys only).
+  example_overlay:
+    pattern: (?i)\bclaim\s+(?:no\.?|number)\s*[:#]?\s*C\d{7}\b
+    samples:
+    - 'Claim number: C4471820'
+    - claim no. C0071932
+    - Claim Number C2047181
+sensitivity: Links a worker to an injury, medical condition and claim history (use restricted by WCRA s 572A).
