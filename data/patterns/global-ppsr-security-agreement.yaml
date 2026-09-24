@@ -1,61 +1,69 @@
 schema: testpattern/v1
 name: PPSR Security Agreement
 slug: global-ppsr-security-agreement
-version: 1.3.2
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
-description: Detects Personal Property Securities Register (PPSR) security agreements and related collateral documentation.
+description: >-
+  Detects populated security agreements and PPSR registrations: a security agreement / PPSR / personal property securities phrase combined with a named grantor or secured party, a PPSR registration or financing statement number, or described collateral. Phrase-only mentions stay discovery-only.
 operation: >-
-  Keyword-based detection matching PPSR, security interest, collateral, and Personal Property Securities Act terms.
-  Corroborative evidence: 14 keywords within 300 characters.
+  Pattern type: regex (boost_regex). Primary: security agreement, PPSR, personal property securities, registered security interest, general security agreement. 65 (discovery only): primary alone. 75: primary plus one populated field - named grantor/secured party/debtor/chargor, a registration / financing statement / search number, or a collateral class/description, serial number or VIN. 85: primary plus two distinct field types plus perfection/priority evidence (perfection, priority, PMSI, after-acquired property, PPSA, verification statement, end time, amendment demand). Template/sample and guidance framing excluded on every enforce tier.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Enforce tiers require populated party, registration or collateral fields; PPSR fact sheets, used-car buying advice and workshop agendas stay at 65. Medium because PPSR search certificates obtained for due diligence share the same fields.
 jurisdictions:
   - global
 regulations:
-- "AML/CTF Act (Cth)"
-- "IPA 2009 (Qld)"
-- "NDB Scheme (Cth)"
-- "Privacy Act 1988 (Cth)"
-- "SOCI Act 2018 (Cth)"
+  - Personal Property Securities Act 2009 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
 frameworks:
-- ISO 27001
-- ISO 27701
-- PCI-DSS
-- SOC 2
+  - ISO 27001
+  - ISO 27701
+  - PCI-DSS
+  - SOC 2
 data_categories:
   - legal
   - financial
 test_cases:
   should_match:
-    - value: PPSR notice received
-      description: Exact 65 discovery probe with a PPSR phrase and no security details
-    - value: 'PPSR security agreement: secured party and grantor'
-      description: Exact 75 probe with parties to the security interest
-    - value: 'PPSR security agreement: secured party, collateral and financing statement'
-      description: Exact 85 probe with security context and registration/perfection evidence
-    - value: 'PPSR security interest registration: financing statement for collateral'
-      description: PPSR financing statement identifying collateral
-    - value: 'Personal Property Securities Act: secured party and grantor agreement'
-      description: Test match 2
-    - value: PMSI registration on PPSR with perfected security interest and priority
-      description: Test match 3
+    - value: "GENERAL SECURITY AGREEMENT\nGrantor: Coral Coast Freight Pty Ltd\nSecured party: Harbourside Credit Union Ltd\nCollateral class: All present and after-acquired property\nPPSR registration number: 202609240012345\nThe security interest is perfected by registration and has priority over later registrations."
+      description: Populated GSA - parties, collateral, registration and perfection terms (85)
+      synthetic: true
+    - value: "PPSR verification statement\nGrantor: Morgan Teston\nIssued following registration on the register."
+      description: Verification statement with one populated grantor field (75)
+      synthetic: true
   should_not_match:
-    - value: Personal property insurance policy
-      description: Non-match 1
-    - value: Security guard at the property entrance
-      description: Non-match 2
-    - value: General security agreement workshop agenda
-      description: Educational instrument wording must remain discovery-only
+    - value: "Fact sheet: a security agreement lets a secured party register a security interest on the PPSR. Registration helps with perfection and priority over other creditors."
+      description: PPSR fact sheet naming terms without values
+      synthetic: true
+    - value: "GENERAL SECURITY AGREEMENT\nGrantor: __________\nSecured party: __________\nCollateral class: __________\nPPSR registration number: __________"
+      description: Blank agreement form - placeholder values
+      synthetic: true
+    - value: "Car buyers are urged to check the PPSR before paying for a used vehicle, the regulator said, after 3,000 complaints last year."
+      description: Consumer news item
+      synthetic: true
+    - value: "Personal property insurance policy"
+      description: Unrelated
+      synthetic: true
+    - value: "Security guard at the property entrance"
+      description: Unrelated
+      synthetic: true
+    - value: "General security agreement workshop agenda"
+      description: Workshop wording - discovery only at most
+      synthetic: true
 false_positives:
-  - description: Generic property or security references in non-PPSR contexts.
-    mitigation: Require PPSR-specific terms like PPSA, financing statement, or security interest.
+  - description: PPSR fact sheets, used-vehicle buying advice and training about security interests.
+    mitigation: No populated party, registration or collateral field, and guidance framing is excluded.
+  - description: PPSR search results obtained for due diligence.
+    mitigation: They legitimately carry grantor and registration fields and can reach 75/85.
 exports:
   - yaml
 scope: narrow
 risk_rating: 7
 risk_description: >-
-  The pattern identifies PPSR security agreements containing a grantor, secured party, collateral, financing statement, priority, PMSI, and perfection terms. Disclosure can expose financed assets, creditor priority, obligations, and weaknesses that support commercial pressure, fraud, or interference with refinancing and asset transactions. The grantor, secured party, guarantors, and counterparties may face moderate legal and financial harm within the secured arrangement, although some registration facts are publicly searchable and enforcement requires legal authority. Risk 7 and SENSITIVE Legal fit the complete agreement, while a broad confidential collateral portfolio or privileged registry control would be needed for PROTECTED.
+  The pattern identifies PPSR security agreements containing a grantor, secured party, collateral, financing statement, priority, PMSI, and perfection terms. Disclosure can expose financed assets, creditor priority, obligations, and weaknesses that support commercial pressure, fraud, or interference with refinancing and asset transactions. The grantor, secured party, guarantors, and counterparties may face moderate legal and financial harm within the secured arrangement, although some registration facts are publicly searchable and enforcement requires legal authority. Risk 7 and SENSITIVE Legal fit the complete agreement, while a broad confidential collateral portfolio or privileged registry control would be needed for PROTECTED. Quality pass 2026-09-24: enforce tiers (75/85) now require populated record structure (labelled fields with real values, identifiers or data rows); phrase-only mentions in guidance, marketing, blank forms and news stay at 65 discovery.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -66,7 +74,7 @@ sensitivity_labels:
   ca_gov: "Protected B"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -75,22 +83,34 @@ purview:
     - confidence_level: 85
       id_match: Regex_ppsr_security
       matches:
-        - ref: Keyword_security_agreement_context
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_global_ppsr_security_agreement_party
+            - Regex_global_ppsr_security_agreement_registration
+            - Regex_global_ppsr_security_agreement_collateral
         - ref: Keyword_priority_perfection_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_ppsr_security_agreement_guidance_exclusion
     - confidence_level: 75
       id_match: Regex_ppsr_security
       matches:
-        - ref: Keyword_security_agreement_context
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_global_ppsr_security_agreement_party
+            - Regex_global_ppsr_security_agreement_registration
+            - Regex_global_ppsr_security_agreement_collateral
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_ppsr_security_agreement_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_ppsr_security
@@ -102,83 +122,67 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_ppsr_security
-      pattern: >-
-        (?i)\b(?:security\s+agreement|ppsr|personal\s+property\s+securities|registered\s+security\s+interest|general\s+security\s+agreement)\b
+      pattern: (?i)\b(?:security\s+agreement|ppsr|personal\s+property\s+securities|registered\s+security\s+interest|general\s+security\s+agreement)\b
+    - id: Regex_global_ppsr_security_agreement_party
+      pattern: (?i)\b(?:grantors?|secured\s+part(?:y|ies)|debtors?|chargors?|security\s+provider|secured\s+creditor)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)(?:(?:Mr|Mrs|Ms|Mx|Dr|Prof)\.?[ \t]{1,3})?[A-Z][A-Za-z'.-]{1,30}(?:[ \t]{1,3}[A-Z&][A-Za-z'.&-]{0,30}){0,5}
+    - id: Regex_global_ppsr_security_agreement_registration
+      pattern: (?i)\b(?:(?:PPSR\s+)?registration|financing\s+statement|search)\s*(?:no\.?|number|#)[ \t]{0,3}[:#]?[ \t]{0,3}\d{6,20}\b
+    - id: Regex_global_ppsr_security_agreement_collateral
+      pattern: (?i)\b(?:collateral(?:\s+(?:class|type|description))?|secured\s+property|serial\s+number|VIN|chassis\s*(?:no\.?|number))(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)[A-Z0-9$][A-Za-z0-9/&'.,$%-]{0,40}(?:[ \t]{1,3}[A-Za-z0-9&$][A-Za-z0-9/&'.,$%-]{0,30}){0,5}
   keywords:
-    - id: Keyword_ppsr
-      groups:
-        - match_style: word
-          terms:
-            - PPSR
-            - Personal Property Securities Register
-            - PPSA
-            - security interest
-            - secured party
-            - grantor
-            - collateral
-            - perfection
-            - attachment
-            - registration
-      strength: domain
-    - id: Keyword_collateral
-      groups:
-        - match_style: word
-          terms:
-            - all assets
-            - plant and equipment
-            - stock in trade
-            - inventory
-            - motor vehicles
-            - intellectual property
-            - receivables
-            - proceeds
-            - after-acquired property
-      strength: specific
-    - id: Keyword_legal_general
-      groups:
-        - match_style: word
-          terms:
-            - agreement
-            - contract
-            - deed
-            - executed
-            - witnessed
-            - signature
-            - cooling off
-            - default
-            - termination
-            - entire agreement
-      strength: domain
-    - id: Keyword_security_agreement_context
-      groups:
-        - match_style: word
-          terms:
-            - security interest
-            - secured party
-            - grantor
-            - collateral
-            - all assets
-            - plant and equipment
-            - inventory
-            - receivables
-            - proceeds
-      strength: specific
     - id: Keyword_priority_perfection_context
       groups:
         - match_style: word
           terms:
-            - financing statement
-            - registration number
-            - perfected security interest
             - perfection
+            - perfected
             - priority
-            - purchase money security interest
             - text: PMSI
               case_sensitive: true
-      strength: specific
+            - purchase money security interest
+            - after-acquired property
+            - text: PPSA
+              case_sensitive: true
+            - verification statement
+            - end time
+            - amendment demand
+      strength: domain
+    - id: Keyword_global_ppsr_security_agreement_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - policy guidance
+            - guidance note
+            - this guideline
+            - this procedure
+            - fact sheet
+            - training module
+            - e-learning
+            - course notes
+            - media release
+            - press release
+            - news report
+            - frequently asked questions
+            - best practice guide
+            - white paper
+            - whitepaper
+            - webinar
+            - how-to guide
+            - user guide
+            - help centre article
+            - help center article
+            - insurance policy
+            - security guard
+            - workshop agenda
+            - search the register
+      strength: noise
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: >-
+      Quality pass (2026-09-24): 75 and 85 were phrase-only keyword tiers; 75 now needs a populated grantor/secured party, registration/financing statement number or collateral field and 85 needs two distinct field types plus perfection/priority evidence; removed the 'Personal Property Securities Register' evidence term that overlapped the primary; converted type keyword_list -> regex (boost_regex) with a top-level pattern; replaced the bare 'PPSR notice received' positive; added fact-sheet, blank-form and news decoys; dropped AML/CTF Act and SOCI Act, added Personal Property Securities Act 2009 (Cth) with verified references.
   - version: 1.3.2
     date: '2026-07-19'
     description: 'Targeted finance/health blocker remediation: retain PPSR/security-agreement phrases at 65 discovery, require parties or collateral at 75 and additional registration/perfection evidence at 85, with exact-tier and workshop probes.'
@@ -217,3 +221,23 @@ remediation:
     changes:
       - 'Mapped non-canonical confidence 95 to 85.'
       - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
+pattern: (?i)\b(?:security\s+agreement|ppsr|personal\s+property\s+securities|registered\s+security\s+interest|general\s+security\s+agreement)\b
+engine: boost_regex
+references:
+  - title: Personal Property Securities Act 2009 (Cth)
+    url: https://www.legislation.gov.au/C2009A00130/latest/text
+  - title: Personal Property Securities Register
+    url: https://www.ppsr.gov.au/
+corroborative_evidence:
+  keywords:
+    - perfection
+    - perfected
+    - priority
+    - PMSI
+    - purchase money security interest
+    - after-acquired property
+    - PPSA
+    - verification statement
+    - end time
+    - amendment demand
+  proximity: 300

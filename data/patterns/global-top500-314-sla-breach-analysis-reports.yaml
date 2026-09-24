@@ -1,74 +1,87 @@
 schema: testpattern/v1
 name: SLA breach analysis reports
 slug: global-top500-314-sla-breach-analysis-reports
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies sla breach analysis reports patterns in security and access control contexts. Detects potential exposure
-  of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 7 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:SLA\s+breach|service\s+level\s+agreement|SLA\s+violation|uptime\s+target|performance\s+metric|penalty\s+clause|service\s+credit|response\s+time|resolution\s+time|availability\s+target|breach\s+analysis|SLA\s+report)\b
+description: >-
+  Detects SLA breach analysis reports: SLA breach or service-credit wording with measured metrics against targets and populated contract, incident and credit fields. Topic wording alone is discovery-only.
+operation: >-
+  Regex_sla_breach_primary (SLA breach/violation, service-level failure or service-credit calculation wording) is discovery-only at 65. 75 requires the primary plus one populated structure: a numeric service metric (availability/uptime/target/response/resolution time with a unit) or a populated contract field (incident/ticket/contract number, customer, supplier, service, reporting period, credit amount). 85 requires a numeric service metric (availability/uptime/target/response/resolution time with a unit) (two distinct hits), a populated contract field (incident/ticket/contract number, customer, supplier, service, reporting period, credit amount), and independent contractual-consequence (penalty, rebate, KPI, remediation, downtime) evidence that does not repeat the primary. Every enforce tier rejects template/noise wording (template-exclusion) and guidance, policy, training and news framing (Keyword_sla_breach_guidance_exclusion).
+pattern: >-
+  (?i)\b(?:SLA\s+(?:breach|violation|miss|failure)(?:es)?(?:\s+(?:analysis|report))?|service\s+level\s+(?:breach|failure|shortfall)|breach(?:ed)?\s+(?:the\s+)?SLA|service\s+credits?\s+(?:calculation|claim|report))\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: the topic phrase alone is discovery-only; enforcement needs populated structure (a numeric service metric (availability/uptime/target/response/resolution time with a unit) or a populated contract field (incident/ticket/contract number, customer, supplier, service, reporting period, credit amount)), and 85 needs two distinct structures plus independent contractual-consequence (penalty, rebate, KPI, remediation, downtime) evidence, so policies, blank forms and training text stay below 75.
 jurisdictions:
 - global
 regulations:
-- GDPR
+- Competition and Consumer Act 2010 (Cth)
+frameworks:
+- ISO 27001
+- SOC 2
 data_categories:
-- credentials
 - security
 corroborative_evidence:
   keywords:
-  - sla breach analysis reports
-  - sla
-  - breach
-  - analysis
-  - reports
-  - operations
-  - resilience
+  - root cause
+  - penalty
+  - rebate
+  - abatement
+  - KPI
+  - contractual
+  - remediation plan
+  - downtime
+  - customer impact
+  - P1
   proximity: 300
 test_cases:
   should_match:
-  - value: SLA breach
-    description: Primary topic phrase match
-  - value: service level agreement
-    description: Case-insensitive topic phrase match
-  - value: SLA violation
-    description: Alternative topic phrase match
-  - value: uptime target
-    description: Additional topic phrase match
+  - value: The supplier disputes the SLA breach raised in August.
+    description: Discovery probe (65)
+    synthetic: true
+  - value: |-
+      SLA breach analysis - August
+      Availability: 99.1%
+    description: Medium-tier probe (75) - numeric metric
+    synthetic: true
+  - value: |-
+      SLA breach analysis - August 2026
+      Supplier: Tidewater Networks
+      Contract number: HH-ICT-2024-017
+      Availability: 99.1% against target: 99.9%
+      P1 resolution: 9.5 hours (target 4 hours)
+      Service credit: AUD 12,400 rebate; root cause and remediation plan due within 10 business days.
+    description: High-tier probe (85) - several metrics, contract fields and consequence context
+    synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
+  - value: unrelated generic text
+    description: No relevant phrase context
   - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: backup outage
-    description: Generic word pair from old broad template should not match
+    description: Random text should not match
+  - value: 'Policy statement: SLA breaches are reported to the contract manager each month.'
+    description: Policy text
+    synthetic: true
+  - value: |-
+      SLA breach report template
+      Availability: ____%
+      Supplier: [insert]
+    description: Blank template
+    synthetic: true
+  - value: 'News report: the telco paid service credits after an SLA breach left customers offline.'
+    description: News framing
+    synthetic: true
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+- description: Contract templates define SLA targets.
+  mitigation: Blank values and template/guidance framing are excluded; 85 needs two metrics plus contract fields.
 exports:
 - purview_xml
 - yaml
 - regex_copy
 scope: wide
-risk_description: This classifier flags SLA breaches, service-level agreements, violations, uptime and availability targets,
-  response and resolution times, penalty clauses, service credits, and breach-analysis terminology. A genuine report can expose
-  contractual failures, customer impact, performance weakness, penalty exposure, and remediation decisions that harm negotiations,
-  reputation, or supplier relationships. The affected scale is the relevant customer-service relationship and operational
-  teams, while standard contract language and generic performance reports can match without an actual breach. Risk 8 SENSITIVE
-  reflects serious contained commercial and operational harm; PROTECTED would require critical-service failure or significant
-  broader damage.
+risk_description: >-
+  The detector now requires SLA-breach wording plus measured service metrics or populated contract fields before enforcing. A genuine report can expose contractual failures, customer impact, performance weakness, penalty exposure, and remediation decisions that harm negotiations, reputation, or supplier relationships. The affected scale is the relevant customer-service relationship and operational teams, while standard contract language and generic performance reports can match without an actual breach. Risk 8 SENSITIVE reflects serious contained commercial and operational harm; PROTECTED would require critical-service failure or significant broader damage.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -79,36 +92,42 @@ sensitivity_labels:
   ca_gov: Protected A
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
   - dict: template-exclusion
     as: Keyword_noise_exclusion
     match_style: word
   pattern_tiers:
   - confidence_level: 85
-    id_match: Regex_sla_breach
+    id_match: Regex_sla_breach_primary
     matches:
-    - ref: Pattern_global_top500_314_sla_breach_analysis_reports_label_context
-    - ref: Keyword_global_top500_314_sla_breach_analysis_reports_domain_context
-    - ref: Keyword_sla_breach
+    - ref: Regex_sla_breach_metric_value
+      min_count: 2
+      unique_results: true
+    - ref: Regex_sla_breach_contract_field
+    - ref: Keyword_sla_breach_context
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_sla_breach_guidance_exclusion
   - confidence_level: 75
-    id_match: Regex_sla_breach
+    id_match: Regex_sla_breach_primary
     matches:
-    - ref: Pattern_global_top500_314_sla_breach_analysis_reports_label_context
-    - ref: Keyword_global_top500_314_sla_breach_analysis_reports_domain_context
+    - type: any
+      refs:
+      - Regex_sla_breach_metric_value
+      - Regex_sla_breach_contract_field
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_sla_breach_guidance_exclusion
   - confidence_level: 65
     discovery_only: true
-    id_match: Regex_sla_breach
+    id_match: Regex_sla_breach_primary
     matches:
     - type: any
       min_matches: 0
@@ -116,59 +135,68 @@ purview:
       refs:
       - Keyword_noise_exclusion
   regexes:
-  - id: Regex_sla_breach
-    pattern: (?is)\b(?:SLA\s+breach|service\s+level\s+agreement|SLA\s+violation|uptime\s+target|performance\s+metric|penalty\s+clause|service\s+credit|response\s+time|resolution\s+time|availability\s+target|breach\s+analysis|SLA\s+report)\b
-  - id: Pattern_global_top500_314_sla_breach_analysis_reports_label_context
-    pattern: (?i)\b(?:sla\s+breach\s+analysis\s+reports)\b
+  - id: Regex_sla_breach_primary
+    pattern: >-
+      (?i)\b(?:SLA\s+(?:breach|violation|miss|failure)(?:es)?(?:\s+(?:analysis|report))?|service\s+level\s+(?:breach|failure|shortfall)|breach(?:ed)?\s+(?:the\s+)?SLA|service\s+credits?\s+(?:calculation|claim|report))\b
+  - id: Regex_sla_breach_metric_value
+    pattern: >-
+      (?i)\b(?:availability|uptime|achieved|actual|target|measured|resolution\s+time|response\s+time|MTTR|P[1-4]\s+(?:resolution|response))\s*[:=]?\s*\d{1,3}(?:\.\d{1,3})?\s*(?:%|hours?|hrs?|minutes?|mins?)
+  - id: Regex_sla_breach_contract_field
+    pattern: >-
+      (?i)\b(?:incident\s+(?:no\.?|number|ID|ref)|ticket\s+(?:no\.?|ID)|contract\s+(?:no\.?|number|ref)|customer|supplier|vendor|service|reporting\s+period|credit\s+amount|service\s+credit)\s*[:=#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'._:@#+-]{1,60}
   keywords:
-  - id: Keyword_sla_breach
+  - id: Keyword_sla_breach_context
     groups:
     - match_style: word
       terms:
-      - SLA breach
-      - service level agreement
-      - SLA violation
-      - uptime target
-      - performance metric
-      - penalty clause
-      - service credit
-      - response time
-      - resolution time
-      - availability target
-      - breach analysis
-      - SLA report
+      - root cause
+      - penalty
+      - rebate
+      - abatement
+      - text: KPI
+        case_sensitive: true
+      - contractual
+      - remediation plan
+      - downtime
+      - customer impact
+      - text: P1
+        case_sensitive: true
     strength: specific
-  - id: Keyword_global_top500_314_sla_breach_analysis_reports_domain_context
+  - id: Keyword_sla_breach_guidance_exclusion
     groups:
     - match_style: word
       terms:
-      - sla breach analysis reports
-      - sla
-      - breach
-      - analysis
-      - reports
+      - policy statement
+      - guidance note
+      - best practice guide
+      - media release
+      - press release
+      - news report
+      - course module
+      - learning objectives
+      - awareness course
+      - webinar
+      - lesson plan
+      - quiz question
     strength: domain
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: 'Quality pass (2026-09-24): primary narrowed to breach/credit wording (bare service level agreement, response time, penalty clause removed); self-corroboration removed; 75 needs a numeric service metric or populated contract field; 85 needs two metrics, a contract field and consequence context; guidance/news exclusion; populated tests and decoys; GDPR replaced with Competition and Consumer Act 2010 (Cth); frameworks and ISM reference added; credentials category removed.'
 - version: 1.2.1
   date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1864 without changing
-    detector or package metadata.'
+  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1864 without changing detector or package metadata.'
 - version: 1.2.0
   date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
+  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
 - version: 1.1.1
   date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
+  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
 - version: 1.1.0
   date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 remediation:
@@ -178,3 +206,5 @@ remediation:
     - Mapped non-canonical confidence 80 to 75.
     - Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 risk_rating: 8
+references:
+- https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/ism

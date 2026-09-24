@@ -1,66 +1,71 @@
 schema: testpattern/v1
 name: Right-to-work verification documents
 slug: global-top500-067-right-to-work-verification-documents
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to right-to-work verification documents in Australian contexts. Enforcement anchors on verification concepts (right to work, work entitlement, VEVO
-  check, visa verification, employment eligibility); generic immigration/visa status, work permit, and visa holder wording describes immigration records generally and remains discovery-only.
+  Detects right-to-work and visa entitlement verification records (VEVO checks, work entitlement checks, US Form I-9) for an identified employee or candidate, with visa subclass, expiry or grant details or visa work conditions.
 operation: >-
-  Pattern type: regex (boost_regex engine). The broad topic vocabulary (including immigration status, visa status, work permit, visa conditions, visa holder) feeds a 65 discovery_only tier;
-  enforcement at 75/85 requires Pattern_right_to_work_verification — the retained right-to-work / work-entitlement / VEVO-check / visa-verification / employment-eligibility anchors — with
-  corroborative evidence within 300 characters and the shared template exclusion. Explicit verification-event evidence (verified, checked, verification date, eligibility outcome) is not yet
-  defined and must be reviewed before any further tier changes.
+  Primary: a right-to-work phrase (right to work check, work entitlement check, visa verification, VEVO, employment eligibility verification, Form I-9). 75 tier requires a populated person field (employee/staff name or number, candidate, applicant, visa holder, family/given name, passport number, date of birth, position number or title) with a non-placeholder value within 300 characters. 85 tier additionally requires a populated visa detail (visa subclass, grant/expiry/check date, visa grant number, or visa work condition) and an independent corroborative term (passport, citizenship, Home Affairs, work permit, residency). All tiers exclude template/fixture text (template-exclusion); enforce tiers also exclude guidance, policy, training and media-release framing. 65 is discovery-only (primary alone) and will surface policies, guidance, blank forms and statistics.
 pattern: >-
-  (?is)\b(?:right\s+to\s+work|work\s+entitlement|visa\s+verification|VEVO\s+check|work\s+rights|immigration\s+status|visa\s+status|work\s+permit|employment\s+eligibility|visa\s+conditions|right\s+to\s+work\s+check|visa\s+holder)\b
+  (?i)\b(?:right\s+to\s+work(?:\s+check)?|work\s+entitlement(?:\s+check)?|visa\s+(?:entitlement\s+)?verification|VEVO(?:\s+check)?|work\s+rights\s+check|employment\s+eligibility(?:\s+verification)?|Form\s+I-9)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated person field and 85 adds a record-specific populated detail plus independent corroboration. Person values are customer-defined (employee IDs, position numbers), so the field regexes use labelled loose values with a placeholder guard. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
   - global
 regulations:
-  - AML/CTF Act (Cth)
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
+  - Migration Act 1958 (Cth)
+  - Fair Work Act 2009 (Cth)
   - Privacy Act 1988 (Cth)
-  - TIA Act 1979 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
   - GDPR
 frameworks:
   - ISO 27001
   - ISO 27701
 data_categories:
   - pii
+  - employment
 corroborative_evidence:
   keywords:
-    - right-to-work verification documents
-    - right
-    - work
-    - verification
-    - documents
-    - employment
-    - workforce
-    - records
+    - passport
+    - citizenship
+    - Home Affairs
+    - work permit
+    - residency
+    - birth certificate
+    - sighted
+    - sponsor
+    - bridging visa
   proximity: 300
 test_cases:
   should_match:
-    - value: right to work
-      description: Primary topic phrase match
-    - value: work entitlement
-      description: Case-insensitive topic phrase match
-    - value: visa verification
-      description: Alternative topic phrase match
-    - value: VEVO check
-      description: Additional topic phrase match
+    - value: "Right to work check\nCandidate: Avery Teston\nPassport number: PA1234567\nVisa subclass: 482\nVisa expiry date: 14/03/2028\nVEVO result sighted by HR; sponsor: Harbour Logistics Pty Ltd."
+      description: '85: VEVO check with candidate, passport, subclass and expiry'
+      synthetic: true
+    - value: "Employment eligibility verification (Form I-9)\nEmployee: Morgan Teston\nDocument: US passport card\nExpiration date: 2029-05-31\nVerified by HR on 2026-09-01; citizenship attestation completed."
+      description: '85: Form I-9 record with employee and document expiry'
+      synthetic: true
+    - value: "VEVO check\nEmployee name: Jordan Staffson\nOutcome recorded on the onboarding checklist; copy filed."
+      description: '75: VEVO check naming the employee, no visa detail'
+      synthetic: true
     - value: 'Employer VEVO check completed: work rights verified on 16 July.'
-      description: Explicit verification action and outcome reach the enforcing tiers
-    - value: 'Visa holder status updated for tourism.'
-      description: Generic visa-holder/status wording matches the discovery branch only (no verification anchor — relabeled from the first-pass no-match expectation)
-    - value: 'Checklist template: perform right to work check.'
-      description: Blank process material matches the verification anchor but the template exclusion holds it to discovery
+      description: '65 discovery only: verification sentence without a populated person field'
+      synthetic: true
   should_not_match:
+    - value: Employers should complete a right to work check before an employee starts. Use VEVO to confirm visa conditions and keep a record.
+      description: Guidance text - must stay below 75
+    - value: "Right to work check\nCandidate: __________\nPassport number: __________\nVisa subclass: ___"
+      description: Blank checklist - must stay below 75
+    - value: 'Checklist template: perform right to work check.'
+      description: Template text (noise exclusion) - must stay below 75
+    - value: Home Affairs said 12,000 VEVO checks were run last month, according to a media release.
+      description: News / media release - must stay below 75
+    - value: Visa holder status updated for tourism.
+      description: Generic visa-holder wording, no verification anchor - must stay below 75
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
@@ -70,12 +75,14 @@ test_cases:
     - value: Immigration policy changed this month.
       description: General immigration topic language contains no status/verification phrase
 false_positives:
-  - description: Common words and phrases related to right-to-work verification documents appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Policies, directives, fact sheets, guidance and training material that name the record type.
+    mitigation: Enforce tiers require a populated person field; guidance text has labels without values and guidance/training/media-release framing is excluded.
+  - description: Blank forms, templates and HR system configuration.
+    mitigation: Blank lines, square- and angle-bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded.
+  - description: Aggregate statistics and news reporting.
+    mitigation: No populated person field, so these stay at 65 discovery.
+  - description: Records that identify the person only in free text (no field label) fall to 65.
+    mitigation: Accepted precision trade-off; extend the person-field regex with the customer employee-id format to recover recall.
 exports:
   - purview_xml
   - yaml
@@ -86,71 +93,84 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_right_to_work_verification
+      id_match: Regex_top500_067_right_to_work_verification_documents_primary
       matches:
-        - ref: Evidence_right_to_work
-          min_count: 2
-          unique_results: true
+        - ref: Regex_top500_067_right_to_work_verification_documents_person_field
+        - ref: Regex_top500_067_right_to_work_verification_documents_record_detail
+        - ref: Keyword_top500_067_right_to_work_verification_documents_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_067_right_to_work_verification_documents_guidance_exclusion
     - confidence_level: 75
-      id_match: Pattern_right_to_work_verification
+      id_match: Regex_top500_067_right_to_work_verification_documents_primary
       matches:
-        - ref: Evidence_right_to_work
+        - ref: Regex_top500_067_right_to_work_verification_documents_person_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_067_right_to_work_verification_documents_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_right_to_work
+      id_match: Regex_top500_067_right_to_work_verification_documents_primary
       matches:
-        - ref: Evidence_right_to_work
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-    - id: Pattern_right_to_work
+    - id: Regex_top500_067_right_to_work_verification_documents_primary
       pattern: >-
-        (?is)\b(?:right\s+to\s+work|work\s+entitlement|visa\s+verification|VEVO\s+check|work\s+rights|immigration\s+status|visa\s+status|work\s+permit|employment\s+eligibility|visa\s+conditions|right\s+to\s+work\s+check|visa\s+holder)\b
-    - id: Pattern_right_to_work_verification
+        (?i)\b(?:right\s+to\s+work(?:\s+check)?|work\s+entitlement(?:\s+check)?|visa\s+(?:entitlement\s+)?verification|VEVO(?:\s+check)?|work\s+rights\s+check|employment\s+eligibility(?:\s+verification)?|Form\s+I-9)\b
+    - id: Regex_top500_067_right_to_work_verification_documents_person_field
       pattern: >-
-        (?is)\b(?:right\s+to\s+work|right\s+to\s+work\s+check|work\s+entitlement|visa\s+verification|VEVO\s+check|employment\s+eligibility)\b
-    - id: Pattern_au_top500_067_right_to_work_verification_documents_label_context
-      pattern: (?i)\b(?:right\-to\-work\s+verification\s+documents)\b
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number|title)|work\s+unit|business\s+unit|candidate|applicant|visa\s+holder|(?:holder|family|given)\s+names?|full\s+name|passport\s+(?:no\.?|number)|date\s+of\s+birth)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_top500_067_right_to_work_verification_documents_record_detail
+      pattern: >-
+        (?i)\bvisa\s+(?:subclass|type|class)\s*[:\-]?\s*(?:subclass\s+)?\d{3}\b|\b(?:visa\s+)?(?:grant|expiry|expiration|check|verification)\s+date\s*[:\-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})|\bvisa\s+grant\s+(?:no\.?|number)\s*[:#]?\s*\d{8,14}\b|\b(?:work|visa)\s+conditions?\s*[:\-]\s*(?:8\d{3}\b|no\s+work|unlimited|limited|nil)
   keywords:
-    - id: Evidence_right_to_work
+    - id: Keyword_top500_067_right_to_work_verification_documents_corroborative
       groups:
         - match_style: word
           terms:
-            - right to work
-            - work entitlement
-            - visa verification
-            - VEVO check
-            - work rights
-            - immigration status
-            - visa status
+            - passport
+            - citizenship
+            - Home Affairs
             - work permit
-            - employment eligibility
-            - visa conditions
-            - right to work check
-            - visa holder
-    - id: Keyword_au_top500_067_right_to_work_verification_documents_domain_context
+            - residency
+            - birth certificate
+            - sighted
+            - sponsor
+            - bridging visa
+      strength: specific
+    - id: Keyword_top500_067_right_to_work_verification_documents_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - right-to-work verification documents
-            - right
-            - work
-            - verification
-            - documents
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
+      strength: domain
 risk_description: >-
-  The detector recognises right-to-work checks, work-authorisation verification, visa entitlement evidence, and associated employment eligibility documents. A populated verification pack may combine identity, nationality or immigration status, document details, expiry dates, and an employer decision, creating identity-fraud, discrimination, and livelihood risks. Public compliance guidance and blank checklists can trigger without containing a worker's evidence. Risk 8 SENSITIVE is justified for an individual's verification document; PROTECTED would require a bulk identity repository, privileged immigration system access, or significant operational damage.
+  The classifier identifies a right-to-work or visa entitlement verification record about an identified person, gated on a populated person field (75) plus a record-specific populated detail (85). Disclosure exposes an identifiable person's immigration status, passport and visa details, which can enable identity fraud or exploitation of migrant workers. Policies, guidance, blank forms, training and news stay at 65 discovery. Risk 8 supports SENSITIVE Personal-Privacy (OFFICIAL: Sensitive).
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -160,8 +180,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-17'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): merged the two primary regexes into one verification anchor (generic visa-holder/status wording dropped); rebuilt tiers - 65 primary phrase (discovery), 75 primary + populated person field (employee/staff name or number, position number/title, work unit), 85 adds a record-specific populated detail regex plus an independent corroborative keyword group; removed the self-corroborating Evidence/label-context groups so a single phrase no longer reaches 75/85; added guidance/training/media-release exclusion to enforce tiers; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys; regulations now cite Migration Act 1958 (Cth), Fair Work Act 2009 (Cth) with the privacy statutes (removed AML/CTF, TIA, My Health Records and HRIPA boilerplate); references now cite primary sources.'
   - version: 1.4.0
     date: '2026-07-17'
     description: >-
@@ -198,8 +221,10 @@ changelog:
 author: testpattern-community
 license: MIT
 references:
-  - https://immi.homeaffairs.gov.au/visas/already-have-a-visa/check-visa-details-and-conditions
-  - https://www.fairwork.gov.au/tools-and-resources/fact-sheets/rights-and-obligations/visa-holders-and-migrant-workers-workplace-rights-and-entitlements
-  - https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/organisations/employee-records-exemption
-
+  - title: Department of Home Affairs - Check visa details and conditions (VEVO)
+    url: https://immi.homeaffairs.gov.au/visas/already-have-a-visa/check-visa-details-and-conditions
+  - title: Fair Work Ombudsman - Visa holders and migrant workers fact sheet
+    url: https://www.fairwork.gov.au/tools-and-resources/fact-sheets/rights-and-obligations/visa-holders-and-migrant-workers-workplace-rights-and-entitlements
+  - title: OAIC - Employee records exemption
+    url: https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/organisations/employee-records-exemption
 risk_rating: 8

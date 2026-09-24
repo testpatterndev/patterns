@@ -1,23 +1,25 @@
 schema: testpattern/v1
 name: Adoption Records Pre-Release
 slug: adoption-records-pre-release
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects pre-release adoption records including birth parent identities, adoptee matching assessments, placement recommendations, relinquishment consents, and contact vetoes under the Adoption Act 2009 (Qld). These records contain information that individuals have a legal right to control — premature or unauthorised disclosure can cause profound emotional harm and breach court-sealed orders.
-operation: 'Keyword proximity: primary keywords (adoption order, birth parent, relinquishment, adoptee, placement recommendation, contact veto, contact statement) within 300 characters of corroborative keywords (PROTECTED, Privacy, Adoption Act 2009, birth certificate, Department of Child Safety). Negative keyword exclusion for published adoption statistics, policy frameworks, and academic research.'
+operation: >-
+  Primary: adoption record phrases (adoption order, birth parent, relinquishment consent, adoptee matching/assessment, placement recommendation, contact veto/statement, pre-adoption report). 65 = phrase only (discovery). 75 = phrase plus a populated adoption record field (birth parent, adoptee, child, adoptive parents, name, date of birth, case/file number) or a labelled case reference. 85 = phrase plus two distinct populated record fields plus independent adoption evidence (Adoption Act 2009, birth certificate, birth mother/father, prospective adoptive parents, home study ...). Noise, template and published-statistics/policy framing excluded from every tier.
 pattern: (?i)\b(adoption\s+order|birth\s+parent\s+(?:identity|details|consent)|relinquishment\s+(?:consent|document)|adoptee\s+(?:matching|assessment|placement)|placement\s+recommendation|contact\s+(?:veto|statement)|pre-adoption\s+(?:report|assessment))\b
 confidence: medium
-confidence_justification: 'Medium confidence: requires co-occurrence of adoption-specific legal terminology with individual identifiers. General discussions of adoption law or policy without personal details do not trigger detection.'
+confidence_justification: >-
+  Medium confidence: enforcement requires populated adoption record fields, not topic words; the case reference is a documented label-anchored fallback because agency case numbers are unpublished.
 jurisdictions:
   - au
 regulations:
-- "Adoption Act 2009 (Qld)"
-- "Child Protection Act 1999 (Qld)"
-- "IPA 2009 (Qld)"
+  - "Adoption Act 2009 (Qld)"
+  - "Child Protection Act 1999 (Qld)"
+  - "IPA 2009 (Qld)"
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - health
   - government
@@ -49,16 +51,28 @@ corroborative_evidence:
 
     - government-services
     - en-government-classification
+customisation:
+  - key: case-reference-number
+    kind: identifier-format
+    identifier: case-reference-number
+    target: purview.regexes/Regex_adoption_records_pre_release_case_reference
+    mode: replace
+    affects_tiers: [75]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#case-reference-number). Earlier versions used the ADO-YYYY-NNNNN case and ASC-YYYY-NNNNN suitability-certificate format, which does not appear in any published source.
 test_cases:
   should_match:
     - value: 'PROTECTED Privacy. Pre-Adoption Assessment Report — Adoption Act 2009 (Qld) Part 7. Birth parent: Amanda Catherine BROOKS, DOB 09/11/1998. Relinquishment consent signed 14/02/2026 in the presence of a delegated officer. Birth father: identity not disclosed under s.192. Adoptee: female infant, DOB 28/01/2026. Placement recommendation: prospective adoptive parents Michael and Sarah CHEN assessed as suitable under s.79. Contact veto registered by birth mother. Department of Child Safety Case Officer: Jennifer Liu.'
-      description: Pre-adoption assessment with birth parent identity and placement recommendation
-    - value: 'Department of Child Safety, Seniors and Disability Services — Adoption Services Unit. Adoptee matching assessment for Child Reference ADO-2026-00341. Birth parent identity documents held under sealed court order. Birth certificate (original) to be reissued under Adoption Act 2009 s.214 upon finalisation of adoption order. Post-adoption contact statement lodged by birth mother. Prospective adoptive parents have completed adoption suitability assessment including psychological evaluation and home study.'
-      description: Adoptee matching assessment with sealed birth parent records
-    - value: 'Confidential — Intercountry Adoption File. Adoption order application under Adoption Act 2009 Part 9. Adoptee: male child, aged 3, Country of Origin: Thailand. Pre-adoption report prepared by delegated authority. Birth parent consent obtained through Central Authority Bangkok. Placement recommendation approved by Chief Executive. Prospective adoptive parents: Robert and Maria JENSEN, Adoption Suitability Certificate No. ASC-2025-01287. Contact veto: not applicable.'
-      description: Intercountry adoption file with placement recommendation and consent details
-    - value: "Pre-Adoption Assessment\nPatient name: Avery Teston\nURN: 004418273\nDate of birth: 04/02/1991\nClinician: Dr Jordan Staffson\nNotes: Pre-Adoption Assessment reviewed at appointment on 12/08/2026."
-      description: Populated health record reaching the 75/85 structure gate
+      description: Pre-adoption assessment with birth parent identity and placement recommendation (reaches 85)
+    - value: 'Department of Child Safety, Seniors and Disability Services — Adoption Services Unit. Adoptee matching assessment. Case number: AD20260341. Birth parent identity documents held under sealed court order. Birth certificate (original) to be reissued under Adoption Act 2009 s.214 upon finalisation of adoption order. Post-adoption contact statement lodged by birth mother. Prospective adoptive parents have completed adoption suitability assessment including psychological evaluation and home study.'
+      description: Adoptee matching assessment with sealed birth parent records (reaches 75)
+    - value: 'Confidential — Intercountry Adoption File. Adoption order application under Adoption Act 2009 Part 9. Adoptee: male child, aged 3, Country of Origin: Thailand. Pre-adoption report prepared by delegated authority. Birth parent consent obtained through Central Authority Bangkok. Placement recommendation approved by Chief Executive. Prospective adoptive parents: Robert and Maria JENSEN, adoption suitability assessed on case number 2025/01287. Contact veto: not applicable.'
+      description: Intercountry adoption file with placement recommendation and consent details (reaches 85)
+    - value: "PROTECTED — Adoption Services, Department of Child Safety\nPre-adoption assessment report\nCase number: AD20264471\nBirth mother: Avery Teston\nAdoptee: Riley Teston\nDate of birth: 14/05/2026\nPlacement recommendation: prospective adoptive parents assessed as suitable; birth certificate to be reissued under the Adoption Act 2009 on finalisation."
+      description: 'Populated pre-adoption record: case number, birth parent and adoptee fields plus Adoption Act evidence (reaches 85)'
+      synthetic: true
+    - value: "Adoption order application\nCase number: AD20250912\nThe placement recommendation was endorsed by the chief executive delegate."
+      description: Labelled case reference with an adoption primary but no other record fields (reaches 75)
       synthetic: true
   should_not_match:
     - value: The Queensland Government published its Annual Report on Adoption Services showing 127 adoption orders were finalised in 2025. The report presents aggregate statistics on domestic and intercountry adoptions by region and age group.
@@ -69,6 +83,10 @@ test_cases:
       description: Published personal adoption stories shared with consent
     - value: "Policy guidance: this procedure explains how records about Pre-Adoption Assessment are handled, who may access them and how long they are kept. It contains no records about any person or system."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: "Pre-adoption assessment report\nCase number: __________\nBirth mother: __________\nAdoptee: __________\nDate of birth: ___/___/______"
+      description: Blank form / template with unfilled fields (must stay below 75)
+    - value: "News: Queensland finalised 127 adoption orders last year; advocates want contact veto provisions reviewed, the minister said."
+      description: News or training text naming the topic (must stay below 75)
 false_positives:
   - description: Published adoption statistics and annual reports from government agencies
     mitigation: 'Negative keyword exclusion: ''annual report'', ''published statistics'', ''aggregate data'', ''de-identified''. Require proximity to actual individual identifiers or case references.'
@@ -96,10 +114,7 @@ purview:
         - ref: Regex_adoption_records_pre_release_record_structure
           min_count: 2
           unique_results: true
-        - ref: Evidence_adoption_records_pre_release_classification_markers
         - ref: Evidence_adoption_records_pre_release_corroborative_terms
-        - ref: Pattern_adoption_records_pre_release_adoption_case_reference
-        - ref: Pattern_adoption_records_pre_release_adoption_suitability_cert
         - type: any
           min_matches: 0
           max_matches: 0
@@ -112,7 +127,7 @@ purview:
         - type: any
           refs:
             - Regex_adoption_records_pre_release_record_structure
-            - Evidence_adoption_records_pre_release_corroborative_terms
+            - Regex_adoption_records_pre_release_case_reference
         - type: any
           min_matches: 0
           max_matches: 0
@@ -132,20 +147,13 @@ purview:
   regexes:
     - id: Pattern_adoption_records_pre_release_adoption_record_terms
       pattern: (?i)\b(adoption\s+order|birth\s+parent|relinquishment\s+consent|adoptee\s+(?:matching|assessment)|placement\s+recommendation|contact\s+(?:veto|statement)|pre-adoption\s+(?:report|assessment)|adoption\s+suitability)\b
-    - id: Pattern_adoption_records_pre_release_adoption_case_reference
-      pattern: \bADO-\d{4}-\d{4,5}\b
-    - id: Pattern_adoption_records_pre_release_adoption_suitability_cert
-      pattern: \bASC-\d{4}-\d{4,5}\b
     - id: Regex_adoption_records_pre_release_record_structure
       pattern: >-
-        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|patient|client|participant|donor|recipient|clinician|URN|UR\s+number|MRN|medical\s+record\s+number|Medicare(?:\s+number)?|IHI|referring\s+(?:doctor|practitioner)|(?:specimen|accession|lab|laboratory|study|participant|patient|client|trial|case|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|birth\s+(?:mother|father|parent)|adoptee|child|prospective\s+adoptive\s+parents?|adoptive\s+parents?|case\s+officer|(?:case|file|child|reference)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_adoption_records_pre_release_case_reference
+      pattern: >-
+        (?i)\b(?:case|file|matter|reference)\s+(?:no\.?|number|ID|#)\s*[:#]?\s*(?:[A-Z]{1,4}[/-]?)?\d[A-Z0-9/-]{3,20}\b
   keywords:
-    - id: Evidence_adoption_records_pre_release_classification_markers
-      groups:
-        - match_style: word
-          terms:
-            - Privacy
-      strength: domain
     - id: Evidence_adoption_records_pre_release_corroborative_terms
       groups:
         - match_style: word
@@ -191,10 +199,17 @@ sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: PROTECTED Personal-Privacy
-references: []
+references:
+  - title: Adoption Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-029
+  - title: Child Protection Act 1999 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-1999-010
 created: '2026-03-06'
 updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): rebuilt tiers - 75 needs populated adoption record fields or a labelled case reference, 85 needs two distinct record fields plus independent adoption evidence (Adoption Act, birth certificate, home study ...); removed the invented ADO-/ASC- reference regexes (not in any published source) in favour of the case-reference-number labelled fallback declared as an identifier-format customisation slot; dropped the generic 'Privacy' marker group; tests converted to labelled references, realistic 85/75 positives and blank-form/news decoys; references added."
   - version: 1.4.0
     date: '2026-09-24'
     description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent health record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."

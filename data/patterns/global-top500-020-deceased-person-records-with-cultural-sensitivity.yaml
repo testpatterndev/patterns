@@ -1,34 +1,26 @@
 schema: testpattern/v1
 name: Deceased-person records with cultural sensitivity
 slug: global-top500-020-deceased-person-records-with-cultural-sensitivity
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: >-
-  Identifies documents containing references to deceased-person records with cultural sensitivity in Australian contexts. This information type is classified as personally identifiable information
-  under applicable data protection regulations.
-operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 9 keywords within 300 characters. Keyword
-  lists: pii-personal. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+description: 'Identifies records about a deceased person that carry cultural-sensitivity handling requirements (for example Aboriginal and Torres Strait Islander name and image restrictions): a deceased-person record with populated person fields and explicit cultural-protocol evidence.'
+operation: 'Primary: deceased person/estate, death record/notification, next of kin, Aboriginal deceased, Torres Strait Islander, sorry business, cultural sensitivity. 65 (discovery only) = primary alone. 75 = primary plus one populated deceased-person record field (name / name of deceased, date of birth, date or place of death, next of kin, community, language group, registration / case / file number, coroner reference) plus cultural-protocol evidence (cultural protocol, restricted name or image, images of the deceased, replacement name, name avoidance, community authority, traditional custodian, culturally restricted). 85 = primary plus two distinct populated record fields plus cultural-protocol evidence. All tiers exclude template/fixture text.'
 pattern: (?is)\b(?:deceased\s+person|deceased\s+estate|death\s+record|cultural\s+sensitivity|Aboriginal\s+deceased|Torres\s+Strait\s+Islander|sorry\s+business|death\s+notification|next\s+of\s+kin)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: 'Medium: death-record vocabulary is common in probate, guidance and news; enforcement needs a populated deceased-person record and cultural-protocol evidence that the primary does not itself match.'
 jurisdictions:
   - global
 regulations:
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
-  - GDPR
+  - IPA 2009 (Qld)
 frameworks:
   - ISO 27001
   - ISO 27701
 data_categories:
-  - government-id
   - pii
+  - government
 corroborative_evidence:
   keywords:
     - deceased-person records with cultural sensitivity
@@ -47,27 +39,43 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: deceased person
-      description: Primary topic phrase match
-    - value: deceased estate
-      description: Case-insensitive topic phrase match
-    - value: death record
-      description: Alternative topic phrase match
-    - value: cultural sensitivity
-      description: Additional topic phrase match
+    - value: |-
+        Death notification - Aboriginal deceased
+        Name of deceased: Jamie Teston
+        Date of death: 02/08/2026
+        Community: Palm Island
+        Senior next of kin: Morgan Teston
+        Cultural protocol: the family requests that the name and images are not used; use the replacement name advised by community authority.
+      description: 85 - populated deceased-person record with cultural-protocol evidence
+      synthetic: true
+    - value: |-
+        Deceased estate file
+        Name of deceased: Riley Teston
+        The family asked that images of the deceased are not reproduced, in line with cultural protocol.
+      description: 75 - one populated record field plus cultural-protocol evidence
+      synthetic: true
     - value: 'Aboriginal deceased record: restricted image under community cultural protocol.'
-      description: Death record and explicit cultural restriction together (reaches the enforcing tiers)
+      description: 65 discovery - cultural restriction without populated record fields
+    - value: Death record received from the registry for the estate file.
+      description: 65 discovery - death-record mention without fields or cultural evidence
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: name disability
-      description: Generic word pair from old broad template should not match
     - value: Deceased estate notice sent to next of kin.
-      description: Generic probate wording without cultural-sensitivity evidence stays discovery-only and must not enforce
+      description: Generic probate wording without cultural-protocol evidence stays discovery-only
     - value: Cultural sensitivity training for customer service.
-      description: Culture wording without cultural-protocol evidence for a deceased record must not enforce
+      description: Culture wording without a deceased-person record must not enforce
+    - value: 'Cultural protocol guidance: when a deceased person is Aboriginal or Torres Strait Islander, ask the family before using their name or image.'
+      description: Guidance naming the protocol - no populated record (65 at most)
+    - value: |-
+        Death notification form
+        Name of deceased: ________
+        Date of death: __/__/____
+        Community: [if known]
+        Cultural protocol: [family advice]
+      description: Blank form - placeholder fields are rejected
+    - value: 'Warning: this story contains images of a deceased person. The community asked media to respect cultural protocol.'
+      description: News warning - no populated record fields
 false_positives:
   - description: >-
       Common words and phrases related to deceased-person records with cultural sensitivity appearing in policy documents, training materials, HR templates, or compliance guidelines without actual
@@ -87,13 +95,13 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_deceased_records
       matches:
-        - ref: Evidence_deceased_records
+        - ref: Regex_global_top500_020_deceased_person_records_record_structure
           min_count: 2
           unique_results: true
         - ref: Evidence_deceased_cultural_protocol
@@ -101,67 +109,49 @@ purview:
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Pattern_deceased_records
       matches:
-        - ref: Evidence_deceased_records
+        - ref: Regex_global_top500_020_deceased_person_records_record_structure
         - ref: Evidence_deceased_cultural_protocol
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
     - confidence_level: 65
+      discovery_only: true
       id_match: Pattern_deceased_records
       matches:
-        - ref: Evidence_deceased_records
-      discovery_only: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_deceased_records
       pattern: (?is)\b(?:deceased\s+person|deceased\s+estate|death\s+record|cultural\s+sensitivity|Aboriginal\s+deceased|Torres\s+Strait\s+Islander|sorry\s+business|death\s+notification|next\s+of\s+kin)\b
-    - id: Pattern_au_top500_020_deceased_person_records_with_cultural_sensitivity_label_context
-      pattern: (?i)\b(?:deceased\-person\s+records\s+with\s+cultural\s+sensitivity)\b
+    - id: Regex_global_top500_020_deceased_person_records_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|name\s+of\s+deceased|deceased(?:\s+name)?|date\s+of\s+death|DOD|place\s+of\s+death|(?:senior\s+)?next\s+of\s+kin|NOK|community|language\s+group|informant|(?:death\s+)?registration\s+(?:no\.?|number)|coroner(?:'s)?\s+(?:ref|reference|case\s+(?:no\.?|number))|(?:case|file)\s+(?:no\.?|number))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_deceased_records
-      groups:
-        - match_style: word
-          terms:
-            - deceased person
-            - deceased estate
-            - death record
-            - cultural sensitivity
-            - Aboriginal deceased
-            - Torres Strait Islander
-            - sorry business
-            - death notification
-            - next of kin
-            - bereavement
     - id: Evidence_deceased_cultural_protocol
       groups:
         - match_style: word
           terms:
-            - Aboriginal deceased
-            - Torres Strait Islander deceased
-            - sorry business
             - cultural protocol
             - restricted name
             - restricted image
+            - images of the deceased
+            - images of deceased
+            - replacement name
+            - name avoidance
             - community authority
             - traditional custodian
             - culturally restricted
+            - cultural advice
       strength: domain
-    - id: Keyword_au_top500_020_deceased_person_records_with_cultural_sensitivity_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - deceased-person records with cultural sensitivity
-            - deceased
-            - person
-            - cultural
-            - sensitivity
-risk_description: >-
-  The Deceased-person records with cultural sensitivity detector matches general phrases such as deceased person, estate, or death record. It does not determine cultural affiliation, identify a deceased individual, or establish that the surrounding material contains culturally restricted images, names, ceremonies, or community knowledge. The terms can appear in routine probate, records-management, and public-notice contexts, although actual culturally sensitive records may require careful handling. Risk 3 and OFFICIAL reflect the broad concept hit while making cultural and person-specific context the trigger for stronger protection.
+risk_description: The enforcing tiers identify a populated deceased-person record (name, dates, community, next of kin, registration or case references) that also records cultural-protocol handling such as name or image restrictions. Disclosure can breach community cultural protocols and cause distress to families and communities, and may expose living next of kin, but the record usually concerns one deceased person and a bounded family group. Phrase-only mentions (probate notices, guidance, news warnings) stay at 65 discovery. Risk 3 and OFFICIAL are retained from the reviewed workbook; populated culturally restricted records may warrant local elevation.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -170,9 +160,17 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: CONFIDENTIAL
   ca_gov: Protected B
+references:
+  - title: AIATSIS - Australian Institute of Aboriginal and Torres Strait Islander Studies
+    url: https://aiatsis.gov.au/
+  - title: OAIC - What is personal information
+    url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-personal-information
 created: '2026-02-08'
-updated: '2026-07-17'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): 75 now requires a populated deceased-person record field (new Regex_..._record_structure) plus cultural-protocol evidence; 85 requires two distinct record fields plus that evidence (the old tiers could fire on primary phrases alone because the evidence groups repeated them). Removed Aboriginal deceased / Torres Strait Islander deceased / sorry business from the protocol group (the primary matches them) and dropped the unused label/domain groups; template exclusion renamed to the standard Keyword_noise_exclusion. Replaced bare-phrase positives with populated synthetic records; added guidance, blank-form and news decoys. Metadata: removed HRIPA, My Health Records Act, NDB Scheme and GDPR (not applicable to deceased-person cultural records); data_categories government-id -> government; risk_description updated to the gated behaviour (risk 3 retained); added references.'
   - version: 1.4.0
     date: '2026-07-17'
     description: 'TP-00151 approved reduced scope: add the reviewer-defined Evidence_deceased_cultural_protocol phrase dictionary (Aboriginal deceased, Torres Strait Islander deceased, sorry business, cultural protocol, restricted name/image, community authority, traditional custodian, culturally restricted) and require it on the 75/85 enforcing tiers alongside the existing death-record anchor, evidence, and template NOT-gate; the generic deceased-record 65 tier is demoted to discovery_only. Per QA consistency correction, the generic-probate near miss is authored as a non-enforcing (discovery) negative rather than the first-pass no-match expectation. Added the cultural-restriction positive plus probate and culture-training negatives.'

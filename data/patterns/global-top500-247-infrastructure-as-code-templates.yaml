@@ -1,139 +1,201 @@
 schema: testpattern/v1
 name: Infrastructure-as-code templates
 slug: global-top500-247-infrastructure-as-code-templates
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies infrastructure-as-code templates patterns in security and access control contexts. Detects potential
-  exposure of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 7 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:infrastructure\s+as\s+code|IaC\s+template|ARM\s+template|bicep\s+template|ansible\s+playbook|provisioning\s+template|infrastructure\s+template|cloud\s+resource)\b
-confidence: low
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+description: >-
+  Identifies infrastructure-as-code files (Terraform, CloudFormation, ARM/Bicep, Ansible) with populated resource, provider, task or network definitions. IaC wording alone is discovery-only.
+operation: >-
+  Regex_iac_templates (infrastructure as code, IaC repo/module, ARM/Bicep, Terraform configuration/module/plan/state, CloudFormation stack, Ansible playbook, Pulumi program, main.tf, terraform.tfvars) is discovery-only at 65. 75 requires one structure: a Terraform resource/module/provider/backend block, a CloudFormation/ARM/Bicep resource type, an Ansible module task or become/gather_facts key, or a network definition (CIDR, cidr_blocks, CidrIp, internal host). 85 requires two distinct structures plus cloud security context (production, VPC, subnet, security group, IAM role, key vault). Enforcing tiers reject template/fixture wording (shared template-exclusion dictionary) and guidance, policy, training and news framing. Known limitation: the shared template-exclusion dictionary contains the word "template", so text that literally says "ARM template" or "CloudFormation template" stays at 65.
+pattern: (?i)\b(?:infrastructure[\s-]as[\s-]code|IaC\s+(?:templates?|modules?|repository|repo|code)|ARM\s+templates?|Bicep\s+(?:templates?|modules?|files?)|Terraform\s+(?:configuration|modules?|plan|state|code|files?)|CloudFormation\s+(?:templates?|stacks?)|Ansible\s+playbooks?|Pulumi\s+(?:program|stack)|main\.tf|terraform\.tfvars)\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: topic wording is discovery-only; enforcement requires IaC structure, and 85 adds a second structure and cloud security context.
 jurisdictions:
-- global
+  - global
 regulations:
-- GDPR
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - ISO 27001
+  - NIST CSF
+  - CIS Controls
 data_categories:
-- credentials
-- security
+  - security
+  - technology
 corroborative_evidence:
   keywords:
-  - infrastructure-as-code templates
-  - infrastructure
-  - code
-  - templates
-  - software
-  - engineering
-  - architecture
+    - production
+    - VPC
+    - subnet
+    - security group
+    - IAM role
+    - key vault
   proximity: 300
 test_cases:
   should_match:
-  - value: infrastructure as code
-    description: Primary topic phrase match
-  - value: iac template
-    description: Case-insensitive topic phrase match
-  - value: ARM template
-    description: Alternative topic phrase match
-  - value: bicep template
-    description: Additional topic phrase match
+    - value: |-
+        Terraform module for the payments network (main.tf)
+        # Production VPC security group for the payments database
+        provider "aws" {
+          region = "ap-southeast-2"
+        }
+        resource "aws_security_group" "payments_db" {
+          name   = "payments-db-prod"
+          ingress {
+            from_port   = 5432
+            to_port     = 5432
+            protocol    = "tcp"
+            cidr_blocks = ["10.20.0.0/16"]
+          }
+        }
+      description: High tier (85) - Terraform provider/resource blocks and CIDR ingress with production VPC security group context
+      synthetic: true
+    - value: |-
+        Ansible playbook for patching web servers:
+        - hosts: webservers
+          become: true
+          tasks:
+            - ansible.builtin.yum:
+                name: httpd
+                state: latest
+      description: Medium tier (75) - Ansible task structure only
+      synthetic: true
+    - value: |-
+        CloudFormation stack for the records bucket:
+        AWSTemplateFormatVersion: '2010-09-09'
+        Resources:
+          RecordsBucket:
+            Type: AWS::S3::Bucket
+      description: Medium tier (75) - CloudFormation resource type only
+      synthetic: true
+    - value: We are moving the remaining servers to infrastructure as code next year.
+      description: Discovery tier (65) - topic wording only
+      synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
-  - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: source code config
-    description: Generic word pair from old broad template should not match
+    - value: unrelated generic text without domain phrases
+      description: No relevant topic phrases present
+    - value: 'Guidance note: organisations should scan infrastructure as code for open security groups before merging.'
+      description: Guidance text
+    - value: |-
+        CloudFormation blank template skeleton
+        AWSTemplateFormatVersion: ________
+        Resources: ________
+      description: Blank template
+    - value: 'Training module: learners write a Terraform module with resource "aws_s3_bucket" "demo" in a sandbox account.'
+      description: Training/demo framing must not enforce
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+  - description: Provider documentation, IaC tutorials and module registries contain resource blocks and CIDR examples.
+    mitigation: Topic wording is discovery-only; enforcement needs IaC structure, and guidance/tutorial/demo/template framing is excluded.
+  - description: Genuine files described as an "ARM template" or "CloudFormation template" trip the shared template-exclusion NOT group (false negative).
+    mitigation: Documented limitation; Terraform, Bicep and Ansible content and CloudFormation bodies (AWSTemplateFormatVersion) are unaffected.
 exports:
-- purview_xml
-- yaml
-- regex_copy
+  - purview_xml
+  - yaml
+  - regex_copy
 scope: wide
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_iac_templates
-    matches:
-    - ref: Keyword_global_top500_247_infrastructure_as_code_templates_domain_context
-    - ref: Pattern_global_top500_247_infrastructure_as_code_templates_label_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_iac_templates
-    matches:
-    - ref: Keyword_global_top500_247_infrastructure_as_code_templates_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_iac_templates
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_iac_templates
+      matches:
+        - type: any
+          min_matches: 2
+          refs:
+            - Evidence_terraform_block
+            - Evidence_cloud_resource_type
+            - Evidence_ansible_task
+            - Evidence_network_definition
+        - ref: Keyword_cloud_security_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_iac_templates
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_terraform_block
+            - Evidence_cloud_resource_type
+            - Evidence_ansible_task
+            - Evidence_network_definition
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_iac_templates
   regexes:
-  - id: Regex_iac_templates
-    pattern: (?is)\b(?:infrastructure\s+as\s+code|IaC\s+template|ARM\s+template|bicep\s+template|ansible\s+playbook|provisioning\s+template|infrastructure\s+template|cloud\s+resource)\b
-  - id: Pattern_global_top500_247_infrastructure_as_code_templates_label_context
-    pattern: (?i)\b(?:infrastructure\-as\-code\s+templates)\b
+    - id: Regex_iac_templates
+      pattern: (?i)\b(?:infrastructure[\s-]as[\s-]code|IaC\s+(?:templates?|modules?|repository|repo|code)|ARM\s+templates?|Bicep\s+(?:templates?|modules?|files?)|Terraform\s+(?:configuration|modules?|plan|state|code|files?)|CloudFormation\s+(?:templates?|stacks?)|Ansible\s+playbooks?|Pulumi\s+(?:program|stack)|main\.tf|terraform\.tfvars)\b
+    - id: Evidence_terraform_block
+      pattern: \b(?:resource|data)\s{1,3}\"[a-z0-9_]{2,60}\"\s{1,3}\"[\w-]{1,60}\"|\bmodule\s{1,3}\"[\w-]{1,60}\"\s{0,3}\{|\bprovider\s{1,3}\"[a-z0-9_-]{2,40}\"\s{0,3}\{|\bbackend\s{1,3}\"[a-z0-9_]{2,20}\"\s{0,3}\{
+    - id: Evidence_cloud_resource_type
+      pattern: \bAWSTemplateFormatVersion\b|\bType:\s{0,3}[\"']?AWS::[A-Za-z0-9]{2,40}::[A-Za-z0-9]{2,60}|\"type\"\s{0,3}:\s{0,3}\"Microsoft\.[A-Za-z]{2,40}/[A-Za-z/]{2,80}\"|\bresource\s{1,3}[A-Za-z]\w{0,60}\s{1,3}'Microsoft\.[A-Za-z]{2,40}/[A-Za-z/]{2,80}@\d{4}-\d{2}-\d{2}(?:-preview)?'
+    - id: Evidence_ansible_task
+      pattern: \bansible\.(?:builtin|windows|posix)\.[a-z_]{2,40}\s{0,3}:|\bbecome:\s{0,3}(?:true|yes)\b|\bgather_facts:\s{0,3}(?:true|false|yes|no)\b
+    - id: Evidence_network_definition
+      pattern: (?i)\bcidr_blocks?\s{0,3}=|\bCidrIp:|\bsource_address_prefix(?:es)?\s{0,3}=|\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}/\d{1,2}\b|\b[a-z0-9-]{1,63}\.(?:internal|corp|local|lan)\b
   keywords:
-  - id: Keyword_iac_templates
-    groups:
-    - match_style: word
-      terms:
-      - infrastructure as code
-      - IaC template
-      - terraform
-      - cloudformation
-      - ARM template
-      - bicep template
-      - ansible playbook
-      - provisioning template
-      - infrastructure template
-      - cloud resource
-    strength: noise
-  - id: Keyword_global_top500_247_infrastructure_as_code_templates_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - infrastructure-as-code templates
-      - infrastructure
-      - templates
-    strength: noise
-risk_description: The pattern recognises infrastructure as code, IaC, ARM template, or Bicep template language, indicating
-  an automation template topic rather than parsing a complete cloud definition. A genuine private template can disclose resource
-  architecture, security settings, identities, naming conventions, and deployment dependencies that improve reconnaissance
-  or enable misconfiguration reuse. The short IaC term and common platform documentation create substantial false-positive
-  potential, while a normal match may cover only a reusable component. Risk 7 SENSITIVE preserves the accepted classification
-  for a substantive internal template; PROTECTED would require confirmed critical-environment coverage or another path to
-  significant damage.
+    - id: Keyword_cloud_security_context
+      groups:
+        - match_style: word
+          terms:
+            - production
+            - text: VPC
+              case_sensitive: true
+            - subnet
+            - security group
+            - firewall rule
+            - IAM role
+            - key vault
+            - private endpoint
+            - network security group
+      strength: specific
+    - id: Keyword_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - policy statement
+            - this policy requires
+            - guidance note
+            - this guidance
+            - better practice guide
+            - learning objectives
+            - course module
+            - training module
+            - training course
+            - awareness training
+            - media release
+            - press release
+            - news report
+            - reported today
+            - journalists
+            - frequently asked questions
+            - this standard requires
+            - teams should
+            - organisations should
+            - agencies should
+            - entities should
+            - how to write
+            - checklist for
+      strength: exclusion
+risk_description: >-
+  The detector identifies infrastructure-as-code files when Terraform blocks, cloud resource types, Ansible tasks or network definitions are present; IaC wording alone is discovery-only. A genuine private template can disclose resource architecture, security settings, identities, naming conventions, and deployment dependencies that improve reconnaissance or enable misconfiguration reuse. The short IaC term and common platform documentation create substantial false-positive potential, while a normal match may cover only a reusable component. Risk 7 SENSITIVE preserves the accepted classification for a substantive internal template; PROTECTED would require confirmed critical-environment coverage or another path to significant damage.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -143,39 +205,39 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
-- version: 1.3.1
-  date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1806 without changing
-    detector or package metadata.'
-- version: 1.3.0
-  date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
-- version: 1.2.1
-  date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
-- version: 1.2.0
-  date: '2026-07-04'
-  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier
-    collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword
-    evidence at the same confidence level'
-- version: 1.1.0
-  date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Downgraded weak medium-confidence tier to low because evidence was
-    generic, structural, or absent.
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): 75 no longer fires on the primary phrase alone: it now requires IaC structure (Terraform block, CloudFormation/ARM/Bicep resource type, Ansible task, or network/CIDR definition) and 85 requires two distinct structures plus cloud security context (the old noise-strength keyword lists self-corroborated the primary); dropped bare "cloud resource", "provisioning template" and "infrastructure template"; guidance/news/training exclusion added; bare-phrase tests replaced with synthetic Terraform/Ansible/CloudFormation records and decoys; documented the template-word limitation. Replaced GDPR with Criminal Code Act 1995 (Cth); added ISO 27001/NIST CSF/CIS Controls frameworks and verified OWASP IaC / ISM references; data_categories credentials -> technology.'
+  - version: 1.3.1
+    date: '2026-07-14'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1806 without changing detector or package metadata.'
+  - version: 1.3.0
+    date: '2026-07-09'
+    description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
+  - version: 1.2.1
+    date: '2026-07-09'
+    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.2.0
+    date: '2026-07-04'
+    description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword evidence at the same confidence level'
+  - version: 1.1.0
+    date: '2026-07-04'
+    description: Mapped non-canonical confidence 80 to 75.; Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
 author: testpattern-community
 license: MIT
+references:
+  - title: OWASP Infrastructure as Code Security Cheat Sheet
+    url: https://cheatsheetseries.owasp.org/cheatsheets/Infrastructure_as_Code_Security_Cheat_Sheet.html
+  - title: ASD Information Security Manual (ISM)
+    url: https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/ism
 remediation:
   catalog_quality_2026_06_02:
     status: applied
     changes:
-    - Mapped non-canonical confidence 80 to 75.
-    - Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
-    - Collapsed 3 duplicate 65-confidence tier(s) into the strictest canonical tier.
-    - Aligned recommended_confidence to 65.
+      - Mapped non-canonical confidence 80 to 75.
+      - Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
+      - Collapsed 3 duplicate 65-confidence tier(s) into the strictest canonical tier.
+      - Aligned recommended_confidence to 65.
 risk_rating: 7

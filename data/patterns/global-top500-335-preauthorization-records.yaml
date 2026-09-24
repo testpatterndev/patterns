@@ -1,61 +1,62 @@
 schema: testpattern/v1
 name: Preauthorization records
 slug: global-top500-335-preauthorization-records
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies preauthorization records references in healthcare and patient records. Protected health information
-  under applicable data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 6 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:prior\s+authorization|insurance\s+authorization|coverage\s+determination|medical\s+necessity|utilization\s+review|claims\s+approval|health\s+plan|authorization\s+request)\b
+description: >-
+  Identifies patient prior-authorisation / pre-approval records - authorisation requests, coverage determinations and utilisation or medical-necessity reviews for a named patient - when the phrase sits with populated patient identifiers and authorisation fields. Health and insurance information under applicable data protection regulations.
+operation: >-
+  Pattern type: regex (boost_regex engine). Primary: prior authorisation / pre-authorisation / pre-approval request, insurance authorisation, coverage determination, medical necessity review, utilisation review, authorisation request. 65 (discovery only): phrase alone. 75: phrase plus a populated patient identifier field. 85: patient field plus a populated authorisation field (member/policy number, authorisation or claim number, CPT/HCPCS/MBS item, ICD-10 or diagnosis code, requested service, insurer, determination) plus independent decision evidence (approved, denied, pended, appeal, peer-to-peer, units requested, length of stay, step therapy). Template and guidance/training framing excluded from 75/85.
+pattern: (?i)\b(?:prior\s+authori[sz]ation|pre-?authori[sz]ation|pre-?approval\s+request|insurance\s+authori[sz]ation|coverage\s+determination|medical\s+necessity\s+review|utili[sz]ation\s+review|authori[sz]ation\s+request)\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: enforce tiers need a populated patient identifier; 85 also needs an authorisation field and decision evidence. Payer policy pages and provider manuals carry the phrases without a patient record and stay at 65.
 jurisdictions:
 - global
+frameworks:
+  - ISO 27001
+  - ISO 27701
 regulations:
-- GDPR
-- HRIPA (Cth)
-- IPA 2009 (Qld)
-- My Health Records Act 2012 (Cth)
-- NDB Scheme (Cth)
-- Privacy Act 1988 (Cth)
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+  - IPA 2009 (Qld)
+  - GDPR
+  - HIPAA
 data_categories:
 - healthcare
 - phi
 corroborative_evidence:
   keywords:
-  - preauthorization records
-  - preauthorization
-  - records
-  - health
-  - biomedical
-  - information
+    - approved
+    - denied
+    - pended
+    - appeal
+    - peer-to-peer
+    - units requested
   proximity: 300
-  keyword_lists:
-  - healthcare-clinical
-  - data-record-context
-  - generic-data-labels
 test_cases:
   should_match:
-  - value: prior authorization
-    description: Primary topic phrase match
-  - value: insurance authorization
-    description: Case-insensitive topic phrase match
-  - value: coverage determination
-    description: Alternative topic phrase match
-  - value: medical necessity
-    description: Additional topic phrase match
+    - value: "PRIOR AUTHORIZATION REQUEST\nPatient name: Avery Teston\nDOB: 04/02/1991\nMember ID: HFX44718202\nRequested service: MRI lumbar spine\nCPT code: 72148\nDiagnosis code: M54.16\nDetermination: pended for peer-to-peer review; clinical notes attached"
+      description: Populated prior authorisation request with patient, authorisation fields and decision evidence (85)
+      synthetic: true
+    - value: "Utilization review note\nPatient: Casey Rourke\nMRN: 5540921\nReviewer to contact the treating team tomorrow."
+      description: Utilisation review note with labelled patient identifiers only (75)
+      synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
-  - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: patient biometric
-    description: Generic word pair from old broad template should not match
+    - value: "unrelated generic text without domain phrases"
+      description: No relevant topic phrases present
+    - value: "placeholder value 12345"
+      description: Random text should not match topic-specific regex
+    - value: "patient biometric"
+      description: Generic word pair from old broad template should not match
+    - value: "Policy guidance: this procedure explains how prior authorization requests are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Prior authorization request form\nPatient name: ____________________\nDate of birth: ____________________\nMember ID: ____________________\nRequested service: ____________________\nDiagnosis code: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "Training: this session explains when a prior authorization is required, how coverage determination timelines work and how providers lodge an appeal if a request is denied."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
 - description: Medical terminology in health education materials, research publications, clinical guidelines, or public health
     documents without patient-specific data.
@@ -69,13 +70,8 @@ exports:
 - yaml
 - regex_copy
 scope: wide
-risk_description: This regex finds prior-authorization, insurance-authorization, or coverage-determination phrases with six
-  healthcare corroborators, representing an insurer or payer decision about requested care rather than a clinical result itself.
-  A true record can reveal the patient's identity, requested procedure or medicine, provider, insurer, and approval or denial,
-  allowing condition inference and possible interference with access to care. The administrative record has credible privacy
-  and financial consequences but usually less diagnostic depth than treatment notes, and policy guidance or blank forms can
-  still match. Risk 6 and SENSITIVE are proportionate; risk 8 or PROTECTED requires detailed clinical justification, high-cost
-  or stigmatized care, bulk payer records, or a safety-critical delay.
+risk_description: >-
+  This regex finds prior-authorisation, coverage-determination and utilisation-review phrases and enforces only when populated patient identifier fields (with authorisation fields at 85) sit nearby; phrase-only text stays at 65 discovery. A true record can reveal the patient's identity, requested procedure or medicine, provider, insurer, and approval or denial, allowing condition inference and possible interference with access to care. The administrative record has credible privacy and financial consequences but usually less diagnostic depth than treatment notes, and policy guidance or blank forms can still match. Risk 6 and SENSITIVE are proportionate; risk 8 or PROTECTED requires detailed clinical justification, high-cost or stigmatized care, bulk payer records, or a safety-critical delay.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -86,75 +82,87 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_preauthorization_records
-    matches:
-    - ref: Pattern_global_top500_335_preauthorization_records_label_context
-    - ref: Keyword_global_top500_335_preauthorization_records_domain_context
-    - ref: Keyword_preauthorization_records
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_preauthorization_records
-    matches:
-    - ref: Pattern_global_top500_335_preauthorization_records_label_context
-    - ref: Keyword_global_top500_335_preauthorization_records_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_preauthorization_records
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_preauthorization_records
+      matches:
+        - ref: Regex_global_top500_335_preauthorization_records_patient_fields
+        - ref: Regex_global_top500_335_preauthorization_records_authorization_fields
+        - ref: Keyword_global_top500_335_preauthorization_records_decision_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_335_preauthorization_records_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_preauthorization_records
+      matches:
+        - ref: Regex_global_top500_335_preauthorization_records_patient_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_335_preauthorization_records_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_preauthorization_records
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_preauthorization_records
-    pattern: (?is)\b(?:prior\s+authorization|insurance\s+authorization|coverage\s+determination|medical\s+necessity|utilization\s+review|claims\s+approval|health\s+plan|authorization\s+request)\b
-  - id: Pattern_global_top500_335_preauthorization_records_label_context
-    pattern: (?i)\b(?:preauthorization\s+records)\b
+    - id: Regex_preauthorization_records
+      pattern: (?i)\b(?:prior\s+authori[sz]ation|pre-?authori[sz]ation|pre-?approval\s+request|insurance\s+authori[sz]ation|coverage\s+determination|medical\s+necessity\s+review|utili[sz]ation\s+review|authori[sz]ation\s+request)\b
+    - id: Regex_global_top500_335_preauthorization_records_patient_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|patient(?:\s+name)?|URN|UR\s*(?:no\.?|number)|MRN|medical\s+record\s+(?:no\.?|number)|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|IHI|DVA\s+(?:no\.?|number)|(?:patient|client|hospital|case|file|episode)\s*(?:no\.?|number|ID)|(?:referring|treating|requesting)\s+(?:doctor|practitioner|clinician|psychiatrist)|clinician|consultant)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_global_top500_335_preauthorization_records_authorization_fields
+      pattern: (?i)\b(?:member\s*(?:no\.?|number|ID)|policy\s*(?:no\.?|number)|(?:authori[sz]ation|auth|approval|request|claim)\s*(?:no\.?|number|ID|ref(?:erence)?)|(?:CPT|HCPCS|MBS\s+item|item)\s*(?:code|no\.?|number)?|ICD-?10(?:-AM)?(?:\s+code)?|diagnosis(?:\s+code)?|requested\s+(?:service|procedure|medication)|health\s+fund|insurer|payer|determination|decision)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-  - id: Keyword_preauthorization_records
-    groups:
-    - match_style: word
-      terms:
-      - preauthorization
-      - prior authorization
-      - pre-approval
-      - insurance authorization
-      - coverage determination
-      - health
-      - biomedical
-      - medical necessity
-      - utilization review
-      - claims approval
-      - health plan
-      - authorization request
-    strength: specific
-  - id: Keyword_global_top500_335_preauthorization_records_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - preauthorization records
-      - preauthorization
-    strength: domain
+    - id: Keyword_global_top500_335_preauthorization_records_decision_evidence
+      groups:
+        - match_style: word
+          terms:
+            - approved
+            - denied
+            - pended
+            - appeal
+            - peer-to-peer
+            - units requested
+            - length of stay
+            - step therapy
+            - formulary exception
+            - clinical notes attached
+      strength: specific
+    - id: Keyword_global_top500_335_preauthorization_records_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: "Quality pass (2026-09-24): rebuilt tiers - 75 needs a populated patient identifier and 85 needs patient fields plus an authorisation field (member/claim number, CPT/MBS item, diagnosis code, determination) plus decision evidence; the old tiers corroborated with their own phrases. Primary tightened (dropped 'health plan' and 'claims approval', added pre-authorisation/pre-approval spellings). Bare-phrase tests replaced with populated records plus policy, blank-form and training decoys. Removed HRIPA (Cth) and My Health Records Act 2012 (Cth), added HIPAA; references titled; frameworks added."
 - version: 1.2.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1881 without changing
@@ -182,3 +190,10 @@ remediation:
     - Mapped non-canonical confidence 80 to 75.
     - Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 risk_rating: 6
+references:
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-sensitive-information
+    title: OAIC - What is sensitive information
+  - url: https://www.hhs.gov/hipaa/for-professionals/privacy/laws-regulations/index.html
+    title: HHS - HIPAA Privacy Rule (protected health information)

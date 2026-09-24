@@ -1,61 +1,63 @@
 schema: testpattern/v1
 name: Immunization records
 slug: global-top500-333-immunization-records
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies immunization records references in healthcare and patient records. Protected health information under
-  applicable data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 6 keywords within 300 characters. Keyword lists: au-healthcare-records. Uses additional
-  domain-context evidence and explicit exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:immunization\s+record|vaccination\s+record|vaccine\s+history|immunization\s+schedule|booster\s+dose|vaccination\s+certificate|immunization\s+register|vaccine\s+administration|lot\s+number|vaccination\s+date)\b
+description: >-
+  Identifies individual immunisation / vaccination records - immunisation history statements, vaccination records and certificates, register extracts and vaccine administration entries - when the phrase sits with populated patient identifiers and vaccine administration fields. Health information under applicable data protection regulations.
+operation: >-
+  Pattern type: regex (boost_regex engine). Primary: immunisation/vaccination record phrases (immunisation or immunization record/history/schedule/register/certificate/status, vaccination record/history/certificate/status, vaccine history or administration, booster dose, immunisation history statement). 65 (discovery only): phrase alone. 75: phrase plus a populated patient identifier field (name, DOB, Medicare, IHI, URN/MRN). 85: patient field plus a populated vaccine administration field (vaccine/brand, batch or lot number, dose number, date given, vaccinator, injection site) plus independent vaccine evidence (named vaccine or antigen such as influenza, MMR, DTPa, pneumococcal, hepatitis B, HPV, COVID-19, or AEFI). Template and guidance/training framing excluded from 75/85.
+pattern: (?i)\b(?:immuni[sz]ation\s+(?:records?|history(?:\s+statement)?|schedule|register|certificate|status)|vaccination\s+(?:records?|history|certificate|status)|vaccine\s+(?:history|administration)|booster\s+dose)\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: enforce tiers need a populated patient identifier; 85 also needs a vaccine administration field and a named vaccine. Immunisation schedules, clinic flyers and public health campaigns carry the phrases but no patient field, so they stay at 65.
 jurisdictions:
 - global
+frameworks:
+  - ISO 27001
+  - ISO 27701
 regulations:
-- GDPR
-- HRIPA (Cth)
-- IPA 2009 (Qld)
-- My Health Records Act 2012 (Cth)
-- NDB Scheme (Cth)
-- Privacy Act 1988 (Cth)
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+  - My Health Records Act 2012 (Cth)
+  - IPA 2009 (Qld)
+  - GDPR
+  - HIPAA
 data_categories:
 - healthcare
 - phi
 corroborative_evidence:
   keywords:
-  - immunization records
-  - immunization
-  - records
-  - health
-  - biomedical
-  - information
+    - influenza
+    - MMR
+    - DTPa
+    - pneumococcal
+    - hepatitis B
+    - COVID-19
   proximity: 300
-  keyword_lists:
-  - au-healthcare-records
-  - data-record-context
-  - generic-data-labels
 test_cases:
   should_match:
-  - value: immunization record
-    description: Primary topic phrase match
-  - value: vaccination record
-    description: Case-insensitive topic phrase match
-  - value: vaccine history
-    description: Alternative topic phrase match
-  - value: immunization schedule
-    description: Additional topic phrase match
+    - value: "Immunisation history statement\nName: Riley Ashworth\nDate of birth: 14/05/2019\nMedicare number: 2953 17720 1\nVaccine: Priorix (MMR)\nDose number: 2\nDate given: 03/06/2024\nBatch number: AK2197\nVaccinator: RN Sam Ortiz"
+      description: Populated immunisation record with patient identifiers, administration fields and a named vaccine (85)
+      synthetic: true
+    - value: "Vaccination record request\nPatient name: Jordan Whitlock\nDOB: 22/11/1987\nRequested for travel clearance."
+      description: Vaccination record request with labelled patient identifiers only (75)
+      synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
-  - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: patient biometric
-    description: Generic word pair from old broad template should not match
+    - value: "unrelated generic text without domain phrases"
+      description: No relevant topic phrases present
+    - value: "placeholder value 12345"
+      description: Random text should not match topic-specific regex
+    - value: "patient biometric"
+      description: Generic word pair from old broad template should not match
+    - value: "Policy guidance: this procedure explains how immunisation records are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Vaccination record\nPatient name: ____________________\nDate of birth: ____________________\nVaccine: ____________________\nBatch number: ____________________\nDate given: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the 2026 immunisation schedule adds a booster dose of pneumococcal vaccine for adults over 70, and clinics are reminding families to check their vaccination status before winter influenza season."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
 - description: Medical terminology in health education materials, research publications, clinical guidelines, or public health
     documents without patient-specific data.
@@ -69,13 +71,8 @@ exports:
 - yaml
 - regex_copy
 scope: wide
-risk_description: This medium-confidence regex finds immunization-record, vaccination-record, or vaccine-history phrases with
-  healthcare-record corroboration, targeting a person's administered-vaccine history rather than general vaccine discussion.
-  A true record can reveal dates, products, eligibility categories, exemptions, or access decisions and could support limited
-  profiling or document fraud against the patient. Most routine histories are narrow preventive-care records with less diagnostic
-  depth than pathology, consultation, or treatment notes, and benign public-health or education matches remain possible. Risk
-  6 and SENSITIVE reflect credible privacy harm; risk 8 or PROTECTED requires sensitive exemption reasons, adverse-event detail,
-  a linked clinical dossier, bulk registry exposure, or safety-critical outbreak operations.
+risk_description: >-
+  This medium-confidence regex finds immunisation and vaccination record phrases and enforces only when populated patient identifier fields (with vaccine administration fields at 85) sit nearby; phrase-only text stays at 65 discovery. A true record can reveal dates, products, eligibility categories, exemptions, or access decisions and could support limited profiling or document fraud against the patient. Most routine histories are narrow preventive-care records with less diagnostic depth than pathology, consultation, or treatment notes, and benign public-health or education matches remain possible. Risk 6 and SENSITIVE reflect credible privacy harm; risk 8 or PROTECTED requires sensitive exemption reasons, adverse-event detail, a linked clinical dossier, bulk registry exposure, or safety-critical outbreak operations.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -86,75 +83,92 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_immunization_records
-    matches:
-    - ref: Pattern_global_top500_333_immunization_records_label_context
-    - ref: Keyword_global_top500_333_immunization_records_domain_context
-    - ref: Keyword_immunization_records
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_immunization_records
-    matches:
-    - ref: Pattern_global_top500_333_immunization_records_label_context
-    - ref: Keyword_global_top500_333_immunization_records_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_immunization_records
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_immunization_records
+      matches:
+        - ref: Regex_global_top500_333_immunization_records_patient_fields
+        - ref: Regex_global_top500_333_immunization_records_administration_fields
+        - ref: Keyword_global_top500_333_immunization_records_vaccine_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_333_immunization_records_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_immunization_records
+      matches:
+        - ref: Regex_global_top500_333_immunization_records_patient_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_333_immunization_records_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_immunization_records
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_immunization_records
-    pattern: (?is)\b(?:immunization\s+record|vaccination\s+record|vaccine\s+history|immunization\s+schedule|booster\s+dose|vaccination\s+certificate|immunization\s+register|vaccine\s+administration|lot\s+number|vaccination\s+date)\b
-  - id: Pattern_global_top500_333_immunization_records_label_context
-    pattern: (?i)\b(?:immunization\s+records)\b
+    - id: Regex_immunization_records
+      pattern: (?i)\b(?:immuni[sz]ation\s+(?:records?|history(?:\s+statement)?|schedule|register|certificate|status)|vaccination\s+(?:records?|history|certificate|status)|vaccine\s+(?:history|administration)|booster\s+dose)\b
+    - id: Regex_global_top500_333_immunization_records_patient_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|patient(?:\s+name)?|URN|UR\s*(?:no\.?|number)|MRN|medical\s+record\s+(?:no\.?|number)|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|IHI|DVA\s+(?:no\.?|number)|(?:patient|client|hospital|case|file|episode)\s*(?:no\.?|number|ID)|(?:referring|treating|requesting)\s+(?:doctor|practitioner|clinician|psychiatrist)|clinician|consultant)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_global_top500_333_immunization_records_administration_fields
+      pattern: (?i)\b(?:vaccine(?:\s+(?:brand|name|given))?|batch(?:\s+(?:no\.?|number))?|lot(?:\s+(?:no\.?|number))?|dose(?:\s+(?:no\.?|number))?|date\s+(?:given|administered|of\s+vaccination)|vaccinator|immuni[sz]ation\s+provider|(?:injection\s+)?site(?:\s+of\s+injection)?)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-  - id: Keyword_immunization_records
-    groups:
-    - match_style: word
-      terms:
-      - immunization record
-      - vaccination record
-      - vaccine history
-      - immunization schedule
-      - booster dose
-      - health
-      - biomedical
-      - vaccination certificate
-      - immunization register
-      - vaccine administration
-      - lot number
-      - vaccination date
-    strength: specific
-  - id: Keyword_global_top500_333_immunization_records_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - immunization records
-      - immunization
-    strength: domain
+    - id: Keyword_global_top500_333_immunization_records_vaccine_evidence
+      groups:
+        - match_style: word
+          terms:
+            - influenza
+            - text: MMR
+              case_sensitive: true
+            - DTPa
+            - pneumococcal
+            - hepatitis B
+            - text: HPV
+              case_sensitive: true
+            - COVID-19
+            - meningococcal
+            - varicella
+            - rotavirus
+            - adverse event following immunisation
+            - text: AEFI
+              case_sensitive: true
+      strength: specific
+    - id: Keyword_global_top500_333_immunization_records_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: "Quality pass (2026-09-24): rebuilt tiers - 75 needs a populated patient identifier and 85 needs patient fields plus a vaccine administration field (vaccine, batch/lot, dose, date given, vaccinator) plus a named vaccine; the old 85 corroborated with its own primary phrases. Primary tightened (AU spelling added; bare 'lot number' and 'vaccination date' moved to the field regex). Bare-phrase tests replaced with populated records plus policy, blank-form and news decoys. Removed HRIPA (Cth), added HIPAA; references titled; frameworks added."
 - version: 1.2.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1879 without changing
@@ -182,3 +196,10 @@ remediation:
     - Mapped non-canonical confidence 80 to 75.
     - Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 risk_rating: 6
+references:
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-sensitive-information
+    title: OAIC - What is sensitive information
+  - url: https://www.hhs.gov/hipaa/for-professionals/privacy/laws-regulations/index.html
+    title: HHS - HIPAA Privacy Rule (protected health information)

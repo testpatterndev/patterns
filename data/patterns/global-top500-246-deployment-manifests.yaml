@@ -1,139 +1,190 @@
 schema: testpattern/v1
 name: Deployment manifests
 slug: global-top500-246-deployment-manifests
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies deployment manifests patterns in security and access control contexts. Detects potential exposure
-  of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 6 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:deployment\s+manifest|kubernetes\s+manifest|container\s+deployment|helm\s+chart|deployment\s+configuration|service\s+manifest|orchestration\s+config|pod\s+specification|deployment\s+descriptor|release\s+manifest)\b
+description: >-
+  Identifies Kubernetes/Helm/Compose deployment manifests with populated resource definitions: apiVersion/kind, container image and pod spec keys, namespaces or internal hosts. Manifest wording alone is discovery-only.
+operation: >-
+  Regex_deployment_manifests (deployment/kubernetes/service/release manifest, helm chart/values file/release, docker-compose.yml, compose file, pod spec, deployment descriptor, kustomization.yaml) is discovery-only at 65. 75 requires one structure: apiVersion/kind resource line, container image or pod-spec key (containerPort, replicas, serviceAccountName, secretKeyRef...), or a namespace/internal host. 85 requires two distinct structures plus cluster context (production, cluster, ingress controller, load balancer, rollout, TLS). Enforcing tiers reject template/fixture wording (shared template-exclusion dictionary) and guidance, policy, training and news framing. Known limitation: the shared template-exclusion dictionary contains "template", which also appears as the pod-template key in Deployment/StatefulSet/Job manifests, so those manifests stay at 65 unless the dictionary is adjusted.
+pattern: (?i)\b(?:(?:deployment|kubernetes|k8s|service|release)\s+manifests?|helm\s+(?:chart|values\s+file|release)|docker-compose\.ya?ml|compose\s+file|pod\s+spec(?:ification)?|deployment\s+descriptor|kustomization\.ya?ml)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: topic wording is discovery-only; enforcement requires manifest structure, and 85 adds a second structure and cluster context. Pod-template manifests are under-detected (see operation).
 jurisdictions:
-- global
+  - global
 regulations:
-- GDPR
+  - Criminal Code Act 1995 (Cth)
+frameworks:
+  - ISO 27001
+  - NIST CSF
+  - CIS Controls
 data_categories:
-- credentials
-- security
+  - security
+  - technology
 corroborative_evidence:
   keywords:
-  - deployment manifests
-  - deployment
-  - manifests
-  - software
-  - engineering
-  - architecture
+    - production
+    - cluster
+    - ingress controller
+    - load balancer
+    - rollout
   proximity: 300
 test_cases:
   should_match:
-  - value: deployment manifest
-    description: Primary topic phrase match
-  - value: kubernetes manifest
-    description: Case-insensitive topic phrase match
-  - value: container deployment
-    description: Alternative topic phrase match
-  - value: helm chart
-    description: Additional topic phrase match
+    - value: |-
+        Kubernetes manifest for payments-api (production cluster)
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: payments-api
+          namespace: payments-prod
+        spec:
+          type: LoadBalancer
+          ports:
+            - port: 443
+        ---
+        apiVersion: v1
+        kind: Pod
+        spec:
+          serviceAccountName: payments-runner
+          containers:
+            - name: api
+              image: registry.example.internal/payments/api:2.14.0
+      description: High tier (85) - apiVersion/kind, container spec and namespace with production cluster context
+      synthetic: true
+    - value: |-
+        Helm values file for the intranet chart:
+        replicaCount: 2
+        imagePullPolicy: IfNotPresent
+      description: Medium tier (75) - pod-spec key only
+      synthetic: true
+    - value: 'docker-compose.yml for the reporting stack: kind: Service definitions are generated from it by the converter.'
+      description: Medium tier (75) - resource kind line only
+      synthetic: true
+    - value: Can someone review the helm chart changes before the release?
+      description: Discovery tier (65) - topic wording only
+      synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
-  - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: source code config
-    description: Generic word pair from old broad template should not match
+    - value: unrelated generic text without domain phrases
+      description: No relevant topic phrases present
+    - value: 'Kubernetes guidance note: organisations should not put secrets in a deployment manifest; reference them with secretKeyRef instead.'
+      description: Guidance text
+    - value: |-
+        Deployment manifest blank template
+        kind: Deployment
+        namespace: ______
+        image: ______
+      description: Blank template
+    - value: 'Tutorial: this pod specification runs a demo nginx container with image: nginx/nginx:1.27 in a local cluster.'
+      description: Tutorial/demo framing must not enforce
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+  - description: Kubernetes documentation, tutorials and vendor examples contain apiVersion/kind and image lines.
+    mitigation: Topic wording is discovery-only; enforcement needs manifest structure, and guidance/tutorial/demo/template framing is excluded.
+  - description: 'Deployment, StatefulSet and Job manifests contain a template: key that trips the shared template-exclusion NOT group (false negative).'
+    mitigation: Documented limitation; Service, Pod, ConfigMap, Ingress, Helm values and Compose files are unaffected.
 exports:
-- purview_xml
-- yaml
-- regex_copy
+  - purview_xml
+  - yaml
+  - regex_copy
 scope: wide
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_deployment_manifests
-    matches:
-    - ref: Pattern_global_top500_246_deployment_manifests_label_context
-    - ref: Keyword_global_top500_246_deployment_manifests_domain_context
-    - ref: Keyword_deployment_manifests
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_deployment_manifests
-    matches:
-    - ref: Pattern_global_top500_246_deployment_manifests_label_context
-    - ref: Keyword_global_top500_246_deployment_manifests_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_deployment_manifests
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_deployment_manifests
+      matches:
+        - type: any
+          min_matches: 2
+          refs:
+            - Evidence_k8s_kind
+            - Evidence_container_spec
+            - Evidence_namespace_host
+        - ref: Keyword_cluster_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_deployment_manifests
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_k8s_kind
+            - Evidence_container_spec
+            - Evidence_namespace_host
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_deployment_manifests
   regexes:
-  - id: Regex_deployment_manifests
-    pattern: (?is)\b(?:deployment\s+manifest|kubernetes\s+manifest|container\s+deployment|helm\s+chart|deployment\s+configuration|service\s+manifest|orchestration\s+config|pod\s+specification|deployment\s+descriptor|release\s+manifest)\b
-  - id: Pattern_global_top500_246_deployment_manifests_label_context
-    pattern: (?i)\b(?:deployment\s+manifests)\b
+    - id: Regex_deployment_manifests
+      pattern: (?i)\b(?:(?:deployment|kubernetes|k8s|service|release)\s+manifests?|helm\s+(?:chart|values\s+file|release)|docker-compose\.ya?ml|compose\s+file|pod\s+spec(?:ification)?|deployment\s+descriptor|kustomization\.ya?ml)\b
+    - id: Evidence_k8s_kind
+      pattern: \bapiVersion:\s{0,3}[\w./-]{1,60}|\bkind:\s{0,3}(?:Deployment|StatefulSet|DaemonSet|Service|Ingress|ConfigMap|Secret|Pod|CronJob|Job|Namespace|HorizontalPodAutoscaler|NetworkPolicy)\b
+    - id: Evidence_container_spec
+      pattern: "\\bimage:\\s{0,3}[\\\"']?[a-z0-9][\\w.-]{0,100}(?::\\d{2,5})?/[\\w./-]{1,120}(?::[\\w.-]{1,60})?|\\b(?:containerPort|replicas|replicaCount|serviceAccountName|imagePullSecrets|secretKeyRef|configMapKeyRef|livenessProbe|readinessProbe)\\s{0,3}:"
+    - id: Evidence_namespace_host
+      pattern: (?i)\bnamespace:\s{0,3}[a-z0-9][a-z0-9-]{1,62}\b|\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:/\d{1,2})?\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:hostname|host|server|asset\s+ID|device\s+ID|node|instance)\s*:\s*(?!_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9._-]{2,63}
   keywords:
-  - id: Keyword_deployment_manifests
-    groups:
-    - match_style: word
-      terms:
-      - deployment manifest
-      - kubernetes manifest
-      - container deployment
-      - helm chart
-      - deployment configuration
-      - service manifest
-      - orchestration config
-      - pod specification
-      - deployment descriptor
-      - release manifest
-    strength: specific
-  - id: Keyword_global_top500_246_deployment_manifests_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - deployment manifests
-      - deployment
-      - manifests
-    strength: domain
-risk_description: The detector finds deployment manifest, Kubernetes manifest, container deployment, or Helm chart language,
-  pointing to an orchestration artefact rather than confirming sensitive values inside it. A genuine manifest can reveal service
-  topology, image names, ports, namespaces, resource constraints, and secret references useful for attack preparation or unauthorised
-  deployment changes. Public chart examples and ordinary container documentation can match, and one manifest typically describes
-  a bounded workload. Risk 7 SENSITIVE reflects credible moderate harm from an internal deployment record; PROTECTED would
-  require a critical production estate, embedded high-impact secrets, or other evidence of significant damage.
+    - id: Keyword_cluster_context
+      groups:
+        - match_style: word
+          terms:
+            - production
+            - cluster
+            - ingress controller
+            - load balancer
+            - rollout
+            - node pool
+            - text: TLS
+              case_sensitive: true
+      strength: specific
+    - id: Keyword_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - policy statement
+            - this policy requires
+            - guidance note
+            - this guidance
+            - better practice guide
+            - learning objectives
+            - course module
+            - training module
+            - training course
+            - awareness training
+            - media release
+            - press release
+            - news report
+            - reported today
+            - journalists
+            - frequently asked questions
+            - this standard requires
+            - teams should
+            - organisations should
+            - agencies should
+            - entities should
+            - how to write
+            - checklist for
+      strength: exclusion
+risk_description: >-
+  The detector identifies deployment manifests when apiVersion/kind resources, container specs, namespaces or internal hosts are present; manifest wording alone is discovery-only. A genuine manifest can reveal service topology, image names, ports, namespaces, resource constraints, and secret references useful for attack preparation or unauthorised deployment changes. Public chart examples and ordinary container documentation can match, and one manifest typically describes a bounded workload. Risk 7 SENSITIVE reflects credible moderate harm from an internal deployment record; PROTECTED would require a critical production estate, embedded high-impact secrets, or other evidence of significant damage.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -143,36 +194,34 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
-- version: 1.2.1
-  date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1805 without changing
-    detector or package metadata.'
-- version: 1.2.0
-  date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
-- version: 1.1.1
-  date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
-- version: 1.1.0
-  date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  - version: 1.3.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): 75 now requires manifest structure (apiVersion/kind, container image or pod-spec key, namespace or internal host) and 85 requires two distinct structures plus cluster context (replaces self-corroborating topic keyword list and label-context regex); dropped generic "container deployment", "deployment configuration" and "orchestration config" from the primary; guidance/news/training exclusion added; bare-phrase tests replaced with synthetic manifests and guidance/template/tutorial decoys; documented the template: key limitation. Replaced GDPR with Criminal Code Act 1995 (Cth); added ISO 27001/NIST CSF/CIS Controls frameworks and verified OWASP Kubernetes / ISM references; data_categories credentials -> technology.'
+  - version: 1.2.1
+    date: '2026-07-14'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1805 without changing detector or package metadata.'
+  - version: 1.2.0
+    date: '2026-07-09'
+    description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
+  - version: 1.1.1
+    date: '2026-07-09'
+    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.1.0
+    date: '2026-07-04'
+    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 references:
-- https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/ism
-- https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/essential-eight
-- https://www.oaic.gov.au/privacy/australian-privacy-principles-guidelines/chapter-11-app-11-security-of-personal-information
+  - title: OWASP Kubernetes Security Cheat Sheet
+    url: https://cheatsheetseries.owasp.org/cheatsheets/Kubernetes_Security_Cheat_Sheet.html
+  - title: ASD Information Security Manual (ISM)
+    url: https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/ism
 remediation:
   catalog_quality_2026_06_02:
     status: applied
     changes:
-    - Mapped non-canonical confidence 80 to 75.
-    - Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
+      - Mapped non-canonical confidence 80 to 75.
+      - Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 risk_rating: 7

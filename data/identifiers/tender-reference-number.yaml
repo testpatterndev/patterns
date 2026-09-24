@@ -1,0 +1,54 @@
+schema: testpattern/identifier-v1
+key: tender-reference-number
+name: Tender / contract reference number
+issuer: The customer agency's procurement system (QTenders, agency contract register or e-tendering platform)
+description: >-
+  Reference numbers that identify a request for tender, quote or offer, and the contract that results from it. They tie pricing schedules, evaluation reports and contract documents to one procurement.
+appears_in:
+  - Tender pricing schedules and financial offers
+  - Tender evaluation reports and matrices
+  - Contract award and variation records
+labels:
+  - Tender number
+  - RFT number
+  - RFQ / RFP / RFO / ITO reference
+  - Contract number
+  - Offer reference
+public_format:
+  status: customer-defined
+  notes: >-
+    Every Queensland agency numbers its own procurements; QTenders displays the agency's reference and does not publish a single state-wide format. The earlier catalogue used an invented QLD-YYYY-NNNNN format.
+fallback:
+  pattern: (?i)\b(?:(?:tender|contract|offer|invitation|RFx)\s+(?:no\.?|number|ref(?:erence)?|ID)|(?:RFT|RFQ|RFP|RFO|ITO)(?:\s+(?:no\.?|number|ref(?:erence)?))?)\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{2,20}\b
+  precision: low
+  rationale: >-
+    Tender and contract labels are common in procurement correspondence, so the fallback only corroborates pricing or evaluation structure; the value must contain a digit, which rejects label-only prose and blank forms.
+  samples:
+    - 'Tender number: DTMR-2026-0417'
+    - RFT 2026-0417
+    - Contract no. C2025/1180
+replacement:
+  customer_supplies:
+    - A description of the tender / contract reference format as issued by the customer's system (length, prefixes, separators, check digit if any).
+    - The label text used on documents and exports (for example the exact field heading).
+    - 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+    - Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+  steps:
+    - Collect the customer inputs listed above during the engagement discovery session.
+    - Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+    - If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+    - Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+    - Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+  validation:
+    - Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+    - The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+    - The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+    - Overlay values never appear in build logs or readiness output (counts and keys only).
+  example_overlay:
+    pattern: (?i)\b(?:RFT|tender)\s*(?:no\.?|number)?\s*[:#]?\s*DOE\d{6}\b
+    samples:
+      - RFT DOE260417
+      - 'Tender number: DOE251180'
+      - tender no. DOE260002
+sensitivity: >-
+  Links pricing and evaluation content to a live procurement; exposure before award can breach probity and commercial-in-confidence obligations.

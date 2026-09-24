@@ -1,18 +1,20 @@
 schema: testpattern/v1
 name: Data Breach Report
 slug: au-data-breach-report
-version: 1.5.0
-type: keyword_list
+version: 1.6.0
+type: regex
 pattern_class: concept
-description: Detects data breach reports including breach details, affected individuals, and OAIC notifications.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+engine: boost_regex
+description: 'Detects populated data breach reports and assessments under the Commonwealth Notifiable Data Breaches (NDB) scheme (Privacy Act 1988 Part IIIC): breach report / notification / assessment titles together with populated breach record fields (entity, dates, individuals affected, information involved, incident reference). The Queensland mandatory notification of data breach scheme (IPA 2009 Chapter 3A) is out of scope and will be a separate classifier.'
+operation: 'Primary: data breach report/notification/assessment, privacy breach/incident report or assessment, notifiable data breach, NDB assessment/notification. 65 (discovery only) = primary alone. 75 = primary plus one populated breach record field (entity/organisation, date of breach/discovery/notification, incident or breach reference, individuals or records affected, information or data involved, OAIC reference, contact officer) with a non-placeholder value. 85 = primary plus two distinct populated fields plus independent NDB-scheme evidence (OAIC, eligible data breach, serious harm, statement to the Commissioner, section 26WK, Part IIIC, affected individuals, credit monitoring ...). All tiers exclude template/fixture text. Converted from keyword_list to a tier-gated regex classifier; the legacy top-level keyword list is kept as descriptive metadata only.'
+pattern: (?i)\b(?:data\s+breach\s+(?:report|notification|assessment)|privacy\s+(?:breach|incident)\s+(?:report|assessment)|notifiable\s+data\s+breach|ndb\s+(?:assessment|notification))\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: 'Medium: breach report titles also appear in OAIC guidance, templates and news, so enforcement requires populated breach record fields; 85 adds NDB-scheme evidence that the primary does not itself match.'
 jurisdictions:
   - au
 regulations:
-- "IPA 2009 (Qld)"
-- "Privacy Act 1988 (Cth)"
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
 frameworks:
 - ISO 27001
 data_categories:
@@ -21,27 +23,44 @@ data_categories:
   - legal
 test_cases:
   should_match:
-    - value: 'Data breach report received for triage.'
-      description: Exact 65 discovery probe - report phrase without response, notification, or affected-person evidence
-    - value: 'Data breach assessment: forensic analysis completed after containment.'
-      description: Exact 75 probe - incident-response evidence without notification and affected-person evidence
+    - value: |-
+        Notifiable data breach assessment
+        Entity: Harbour Freight Pty Ltd
+        Date of discovery: 03/09/2026
+        Individuals affected: 12,480
+        Information involved: names, dates of birth, driver licence numbers
+        The entity has reasonable grounds to believe an eligible data breach occurred; a statement will be lodged with the OAIC under section 26WK.
+      description: 85 - populated NDB assessment with entity, dates, affected count and serious-harm/OAIC evidence
+      synthetic: true
+    - value: |-
+        Data breach report - privacy team
+        Incident reference: PB-2026-118
+        Date of breach: 28/08/2026
+        Containment: supplier credentials revoked.
+      description: 75 - populated breach record fields without NDB-scheme evidence
+      synthetic: true
     - value: 'Notifiable data breach report: OAIC notification issued to affected individuals.'
-      description: Exact 85 probe - regulatory notification and affected-person evidence
-    - value: 'Notifiable data breach report: OAIC notification for affected individuals'
-      description: Test match 1
+      description: 65 discovery - title and scheme words, no populated record fields
     - value: 'Data breach assessment: eligible data breach with serious harm evaluation'
-      description: Test match 2
-    - value: Breach notification and breach remediation plan per NDB scheme
-      description: Test match 3
+      description: 65 discovery - assessment title without populated fields
   should_not_match:
     - value: Breach of contract claim
-      description: Non-match 1
+      description: Non-data breach usage
     - value: The dam breach caused flooding
-      description: Non-match 2
-    - value: 'Sample template for notifying the privacy regulator after personal information exposure.'
+      description: Non-data breach usage
+    - value: The OAIC guide explains when a notifiable data breach must be reported and what a statement to the Commissioner should contain.
+      description: Regulator guidance naming the scheme - no populated breach record (65 at most)
+    - value: |-
+        Data breach report form
+        Entity: ________
+        Date of discovery: ________
+        Individuals affected: [number]
+        Information involved: [describe]
+      description: Blank report template - placeholder fields are rejected
+    - value: Retailer lodges notifiable data breach notification after 1.2 million customer records were exposed, the OAIC confirmed on Tuesday.
+      description: News report - no populated record fields
+    - value: Sample template for notifying the privacy regulator after personal information exposure.
       description: Adjacent template language is not a populated breach record
-    - value: 'The public catalogue lists an incident-notification document.'
-      description: Public catalogue metadata has no data-breach primary
     - value: 'Security incident report: forensic analysis and containment completed.'
       description: Sibling cyber-report language does not satisfy the data-breach primary
 false_positives:
@@ -63,7 +82,7 @@ sensitivity_labels:
   ca_gov: "Protected B"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -72,8 +91,10 @@ purview:
     - confidence_level: 85
       id_match: Regex_data_breach
       matches:
-        - ref: Keyword_breach_notification
-        - ref: Keyword_affected_individuals
+        - ref: Regex_au_data_breach_report_record_structure
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_ndb_scheme_evidence
         - type: any
           min_matches: 0
           max_matches: 0
@@ -82,7 +103,7 @@ purview:
     - confidence_level: 75
       id_match: Regex_data_breach
       matches:
-        - ref: Keyword_incident_response
+        - ref: Regex_au_data_breach_report_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -99,54 +120,42 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_data_breach
-      pattern: >-
-        (?i)\b(?:data\s+breach\s+(?:report|notification|assessment)|privacy\s+(?:breach|incident)\s+(?:report|assessment)|notifiable\s+data\s+breach|ndb\s+(?:assessment|notification))\b
+      pattern: (?i)\b(?:data\s+breach\s+(?:report|notification|assessment)|privacy\s+(?:breach|incident)\s+(?:report|assessment)|notifiable\s+data\s+breach|ndb\s+(?:assessment|notification))\b
+    - id: Regex_au_data_breach_report_record_structure
+      pattern: (?i)\b(?:entity(?:\s+name)?|organisation|agency|date\s+of\s+(?:breach|discovery|incident|notification)|breach\s+(?:date|type|reference|ID)|incident\s+(?:ID|number|no\.?|reference|date)|(?:number|no\.?)\s+of\s+(?:affected\s+)?(?:individuals|records|customers)|(?:individuals|records|customers)\s+affected|affected\s+(?:individuals|records)|(?:personal\s+)?information\s+(?:involved|compromised|affected)|data\s+(?:types?|involved|compromised)|OAIC\s+(?:reference|ref|case\s+(?:no\.?|number))|contact\s+(?:person|officer))\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'.,-]{1,40}
   keywords:
-    - id: Keyword_breach_notification
+    - id: Keyword_ndb_scheme_evidence
       groups:
         - match_style: word
           terms:
-            - breach notification
-            - notifiable data breach
-            - text: NDB
+            - text: OAIC
               case_sensitive: true
-            - mandatory reporting
-            - notification timeline
-            - regulatory notification
-            - OAIC notification
-      strength: specific
-    - id: Keyword_affected_individuals
-      groups:
-        - match_style: word
-          terms:
+            - Information Commissioner
+            - eligible data breach
+            - serious harm
+            - statement to the Commissioner
+            - section 26WK
+            - s 26WK
+            - Part IIIC
             - affected individuals
-            - data subjects
-            - impacted users
-            - notification letter
+            - notify affected individuals
             - credit monitoring
             - identity protection
-            - breach scope
+            - remedial action
       strength: specific
-    - id: Keyword_incident_response
-      groups:
-        - match_style: word
-          terms:
-            - incident response
-            - incident handling
-            - containment
-            - eradication
-            - recovery
-            - lessons learned
-            - forensic analysis
-            - forensic investigation
-            - timeline
-            - indicators of compromise
-            - text: IOC
-              case_sensitive: true
-      strength: domain
+references:
+  - title: OAIC - Notifiable data breaches
+    url: https://www.oaic.gov.au/privacy/notifiable-data-breaches
+  - title: OAIC - About the Notifiable Data Breaches scheme
+    url: https://www.oaic.gov.au/privacy/notifiable-data-breaches/about-the-notifiable-data-breaches-scheme
+  - title: Privacy Act 1988 (Cth)
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): Type keyword_list -> regex (primary promoted to the top-level pattern) so tier gates, not bare keyword-list hits, decide detection. Commonwealth NDB focus made explicit. 75 now requires a populated breach record field (new Regex_..._record_structure) instead of generic incident-response words; 85 requires two distinct populated fields plus NDB-scheme evidence (new Keyword_ndb_scheme_evidence; the old 85 reused notifiable data breach/NDB, which the primary itself matches). Removed the unused incident-response and self-overlapping notification groups; recommended_confidence 85 -> 75. Tests rebuilt around populated synthetic breach records with guidance, blank-template and news decoys. Regulations: removed IPA 2009 (Qld) (Queensland MNDB is out of scope - separate classifier planned), added NDB Scheme (Cth). Added OAIC and Privacy Act references.'
   - version: 1.5.0
     date: '2026-07-19'
     description: 'Targeted blocker remediation: replace duplicate high tiers with a discovery-only 65 report tier, a 75 incident-response tier, and an 85 notification-plus-affected-individuals tier; add exact-tier and sibling/public/template probes.'

@@ -1,66 +1,64 @@
 schema: testpattern/v1
 name: Recommendation letters
 slug: global-top500-351-recommendation-letters
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies documents containing references to recommendation letters in international contexts. This information
-  type is classified as personally identifiable information under applicable data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 6 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:recommendation\s+letters?|letter\s+of\s+reference|referee\s+report|academic\s+reference|character\s+reference|professional\s+reference|endorsement\s+letter|faculty\s+recommendation|supervisor\s+reference)\b
+description: >-
+  Identifies recommendation and reference letters about a named person - letters of recommendation or reference, referee reports and academic, character, professional or supervisor references - when the phrase sits with a named candidate and letter structure.
+operation: >-
+  Pattern type: regex (boost_regex engine). Primary: recommendation letter(s), letter of recommendation or reference, referee report, academic/character/professional/supervisor reference, faculty recommendation. 65 (discovery only): phrase alone. 75: phrase plus a named candidate - a populated candidate/applicant/student/position field or an 'I have known <Name> for/since' statement. 85: candidate evidence plus letter structure (addressed to a selection/admissions/hiring committee or panel, 'To whom it may concern', or a 'Yours sincerely/faithfully' close) plus independent evaluative language (strongly/highly recommend, without reservation, in the top ..., work ethic, research potential, intellectual curiosity). Template and guidance/training framing excluded from 75/85.
+pattern: (?i)\b(?:recommendation\s+letters?|letters?\s+of\s+(?:recommendation|reference)|referee\s+report|(?:academic|character|professional|supervisor)\s+reference|faculty\s+recommendation)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: enforce tiers need a named candidate; 85 also needs letter structure and evaluative language. Referee guidance, reference-check policies and job ads stay at 65; unframed fictional letters can still reach enforce tiers.
 jurisdictions:
 - global
+frameworks:
+  - ISO 27001
+  - ISO 27701
 regulations:
-- GDPR
-- AML/CTF Act (Cth)
-- HRIPA (Cth)
-- IPA 2009 (Qld)
-- My Health Records Act 2012 (Cth)
-- NDB Scheme (Cth)
-- Privacy Act 1988 (Cth)
-- TIA Act 1979 (Cth)
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+  - GDPR
+  - FERPA
 data_categories:
 - pii
 corroborative_evidence:
   keywords:
-  - recommendation letters
-  - recommendation
-  - letters
-  - education
-  - research
-  - administration
+    - strongly recommend
+    - highly recommend
+    - without reservation
+    - work ethic
+    - research potential
+    - intellectual curiosity
   proximity: 300
 test_cases:
   should_match:
-  - value: recommendation letter
-    description: Primary topic phrase match
-  - value: recommendation letters
-    description: Plural form as used in structured document labels and real-world usage; regressed to 0 detections before
-      this fix because the base regex required a singular, non-continuing "letter"
-  - value: letter of reference
-    description: Case-insensitive topic phrase match
-  - value: referee report
-    description: Alternative topic phrase match
-  - value: academic reference
-    description: Additional topic phrase match
+    - value: "Letter of recommendation\nDear Admissions Committee,\nI have known Avery Teston since 2023, when she joined my honours seminar. She ranks in the top 2 percent of students I have supervised and shows real research potential. I recommend her without reservation.\nYours sincerely,\nDr Jordan Staffson"
+      description: Populated recommendation letter with a named candidate, letter structure and evaluative language (85)
+      synthetic: true
+    - value: "Referee report\nCandidate: Casey Rourke\nPosition applied for: Research Officer"
+      description: Referee report header with a named candidate only (75)
+      synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
-  - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: student grant
-    description: Generic word pair from old broad template should not match
-  - value: reference check results
-    description: Generic vendor/HR term removed from the regex (2026-07 FP fix) after proving overbroad — matched in unrelated
-      vendor due-diligence decoy documents
-  - value: personal statement
-    description: Generic term removed from the regex (2026-07 FP fix) — not specific to the recommendation-letters domain
+    - value: "unrelated generic text without domain phrases"
+      description: No relevant topic phrases present
+    - value: "placeholder value 12345"
+      description: Random text should not match topic-specific regex
+    - value: "student grant"
+      description: Generic word pair from old broad template should not match
+    - value: "reference check results"
+      description: Generic vendor/HR term removed from the regex (2026-07 FP fix) after proving overbroad — matched in unrelated vendor due-diligence decoy documents
+    - value: "personal statement"
+      description: Generic term removed from the regex (2026-07 FP fix) — not specific to the recommendation-letters domain
+    - value: "Policy guidance: this procedure explains how recommendation letters and referee reports are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Referee report\nCandidate name: ____________________\nPosition applied for: ____________________\nReferee name: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "Training: this careers workshop explains how to ask for a letter of recommendation, what makes a strong academic reference and why you should thank your referees."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
 - description: Common words and phrases related to recommendation letters appearing in policy documents, training materials,
     HR templates, or compliance guidelines without actual personal data.
@@ -79,12 +77,8 @@ exports:
 - yaml
 - regex_copy
 scope: wide
-risk_description: The regex identifies recommendation letters, referee reports, academic references, and letters of reference
-  with six contextual terms. A real letter contains candid judgments about a named person's performance, character, weaknesses,
-  and suitability, so disclosure can damage trust with the referee or unfairly affect admission and employment decisions.
-  Harm is serious for the subject and author but normally confined to one application and can be addressed through process
-  safeguards. Risk 8 and SENSITIVE Personal-Privacy are appropriate; PROTECTED would require protected-source information,
-  acute safety consequences, or bulk compromise of confidential references.
+risk_description: >-
+  The regex identifies recommendation letters, referee reports and academic or character references and enforces only when a named candidate is present; guidance on requesting references stays at 65 discovery. A real letter contains candid judgments about a named person's performance, character, weaknesses, and suitability, so disclosure can damage trust with the referee or unfairly affect admission and employment decisions. Harm is serious for the subject and author but normally confined to one application and can be addressed through process safeguards. Risk 8 and SENSITIVE Personal-Privacy are appropriate; PROTECTED would require protected-source information, acute safety consequences, or bulk compromise of confidential references.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -95,75 +89,85 @@ sensitivity_labels:
   ca_gov: Protected A
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_recommendation_letters
-    matches:
-    - ref: Pattern_global_top500_351_recommendation_letters_label_context
-    - ref: Keyword_global_top500_351_recommendation_letters_domain_context
-    - ref: Keyword_recommendation_letters
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_recommendation_letters
-    matches:
-    - ref: Pattern_global_top500_351_recommendation_letters_label_context
-    - ref: Keyword_global_top500_351_recommendation_letters_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_recommendation_letters
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_recommendation_letters
+      matches:
+        - ref: Regex_global_top500_351_recommendation_letters_candidate
+        - ref: Regex_global_top500_351_recommendation_letters_letter_structure
+        - ref: Keyword_global_top500_351_recommendation_letters_evaluative_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_351_recommendation_letters_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_recommendation_letters
+      matches:
+        - ref: Regex_global_top500_351_recommendation_letters_candidate
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_351_recommendation_letters_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_recommendation_letters
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_recommendation_letters
-    pattern: (?is)\b(?:recommendation\s+letters?|letter\s+of\s+reference|referee\s+report|academic\s+reference|character\s+reference|professional\s+reference|endorsement\s+letter|faculty\s+recommendation|supervisor\s+reference)\b
-  - id: Pattern_global_top500_351_recommendation_letters_label_context
-    pattern: (?i)\b(?:recommendation\s+letters)\b
+    - id: Regex_recommendation_letters
+      pattern: (?i)\b(?:recommendation\s+letters?|letters?\s+of\s+(?:recommendation|reference)|referee\s+report|(?:academic|character|professional|supervisor)\s+reference|faculty\s+recommendation)\b
+    - id: Regex_global_top500_351_recommendation_letters_candidate
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|candidate(?:\s+name)?|applicant(?:\s+name)?|student(?:\s+name)?|position(?:\s+applied\s+for)?|program(?:me)?\s+applied\s+for)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}|\bI\s+have\s+known\s+(?:Mr\.?\s+|Ms\.?\s+|Mrs\.?\s+|Dr\.?\s+)?[A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20})?\s+(?:for|since)\b
+    - id: Regex_global_top500_351_recommendation_letters_letter_structure
+      pattern: (?i)\b(?:Dear\s+(?:Selection|Admissions|Hiring|Scholarship|Recruitment)\s+(?:Committee|Panel|Manager)|To\s+whom\s+it\s+may\s+concern|Yours\s+(?:sincerely|faithfully))\b
   keywords:
-  - id: Keyword_recommendation_letters
-    groups:
-    - match_style: word
-      terms:
-      - recommendation letter
-      - recommendation letters
-      - letter of reference
-      - referee report
-      - academic reference
-      - character reference
-      - professional reference
-      - endorsement letter
-      - recommender
-      - faculty recommendation
-      - supervisor reference
-    strength: specific
-  - id: Keyword_global_top500_351_recommendation_letters_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - recommendation letters
-      - recommendation
-      - letters
-    strength: domain
+    - id: Keyword_global_top500_351_recommendation_letters_evaluative_evidence
+      groups:
+        - match_style: word
+          terms:
+            - strongly recommend
+            - highly recommend
+            - without reservation
+            - in the top
+            - work ethic
+            - research potential
+            - intellectual curiosity
+            - best student
+      strength: specific
+    - id: Keyword_global_top500_351_recommendation_letters_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: "Quality pass (2026-09-24): rebuilt tiers - the old 75/85 fired on the primary phrase alone. 75 now needs a named candidate (populated candidate field or an 'I have known <Name>' statement) and 85 needs candidate evidence plus letter structure plus evaluative language. Bare-phrase tests replaced with a populated letter and referee report plus policy, blank-form and training decoys. Regulations: removed AML/CTF Act, HRIPA, My Health Records Act, IPA and TIA Act; added FERPA; frameworks added; expired HESF 2015 reference replaced."
 - version: 1.3.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1897 without changing
@@ -190,8 +194,12 @@ changelog:
 author: testpattern-community
 license: MIT
 references:
-- https://www.legislation.gov.au/F2015L01639/latest/text
-- https://www.legislation.gov.au/C2004A03712/latest/text
+  - url: https://studentprivacy.ed.gov/ferpa
+    title: FERPA - U.S. Department of Education Student Privacy Policy Office
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)
+  - url: https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/organisations/employee-records-exemption
+    title: OAIC - Employee records exemption
 remediation:
   catalog_quality_2026_06_02:
     status: applied

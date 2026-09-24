@@ -1,19 +1,20 @@
 schema: testpattern/v1
 name: QLD Driver Licence Form
 slug: au-qld-driver-licence-form
-version: 1.4.0
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
-description: Detects QLD Transport and Main Roads driver licence application and renewal forms.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+engine: boost_regex
+description: Detects completed Queensland driver licence application, renewal and replacement forms (Transport and Main Roads, e.g. F3000) containing populated applicant fields.
+operation: 'Primary: driver licence application/renewal/replacement, learner licence/permit, or form F3000. 65 (discovery only) = primary alone. 75 = primary plus one populated applicant field (applicant name, date of birth, customer reference number, licence number/class/expiry, card number, residential address) with a non-placeholder value. 85 = primary plus two distinct populated applicant fields plus independent TMR authority evidence (Transport and Main Roads, TMR, Department of Transport, F3520, F3525). All tiers exclude template/fixture text. Converted from keyword_list to a tier-gated regex classifier; the legacy top-level keyword list is kept as descriptive metadata only.'
+pattern: (?i)\b(?:driver\s+licen[cs]e\s+(?:application|renewal|replacement)|learner\s+(?:licen[cs]e|permit)|f3000)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: 'Medium: licence form titles appear in public guidance and blank forms, so enforcement requires populated applicant fields; 85 also needs TMR authority evidence.'
 jurisdictions:
   - au
 regulations:
-  - AML/CTF Act (Cth)
+  - Transport Operations (Road Use Management) Act 1995 (Qld)
   - IPA 2009 (Qld)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
 frameworks:
   - ISO 27001
@@ -23,28 +24,46 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: 'Driver licence application information session.'
-      description: Exact 65 discovery probe - application phrase without populated applicant fields
-    - value: 'Driver licence application - applicant name, residential address, and signature recorded.'
-      description: Exact 75 probe - populated application fields without a TMR authority marker
-    - value: 'TMR driver licence application - applicant name, Customer Reference Number, licence class, and signature recorded.'
-      description: Exact 85 probe - populated application fields plus TMR authority evidence
+    - value: |-
+        Driver licence application (F3000)
+        Applicant name: Avery Teston
+        Date of birth: 04/02/1991
+        Customer reference number: 104889137
+        Residential address: 14 Wattlebird Street, Stafford QLD 4053
+        Lodged at the Transport and Main Roads customer service centre, Zillmere.
+      description: 85 - populated applicant fields plus TMR authority evidence
+      synthetic: true
+    - value: |-
+        Learner licence application
+        Applicant name: Morgan Teston
+        Date of birth: 19/11/2009
+        Parent or guardian consent attached.
+      description: 75 - populated applicant fields without TMR authority evidence
+      synthetic: true
     - value: 'TMR driver licence application: learner licence identity verification'
-      description: Test match 1
+      description: 65 discovery - form wording without populated applicant fields
+    - value: Driver licence application - applicant name, residential address, and signature recorded.
+      description: 65 discovery - field names listed but not populated
     - value: Queensland driver licence renewal form with photo ID and licence class
-      description: Test match 2
-    - value: Transport and Main Roads provisional licence application
-      description: Test match 3
+      description: 65 discovery - renewal form mention without populated fields
   should_not_match:
     - value: Software licence agreement
-      description: Non-match 1
+      description: Software licence usage
     - value: Licence to thrill movie
-      description: Non-match 2
+      description: Entertainment usage
+    - value: To apply for a learner licence you need proof of identity and must pass the written road rules test at a customer service centre.
+      description: Public guidance naming the form - no populated fields (65 at most)
+    - value: |-
+        Driver licence application
+        Applicant name: ________
+        Date of birth: __/__/____
+        Customer reference number: [office use only]
+      description: Blank form - placeholder fields are rejected
+    - value: Queensland learner licence holders will be able to book practical tests online from October, the Transport Minister announced.
+      description: News item - no populated applicant fields
     - value: 'Sample template for road-authority applicant fields: name, customer reference, class, signature.'
-      description: Adjacent template language is not a populated driver-licence form
-    - value: 'The public website explains how residents apply for permission to drive.'
-      description: Public guidance has no form primary or populated applicant fields
-    - value: 'Queensland software end-user agreement for a government workstation.'
+      description: Template language is not a populated driver-licence form
+    - value: Queensland software end-user agreement for a government workstation.
       description: Sibling software-licensing language does not satisfy the driver-licence primary
 false_positives:
   - description: Software or entertainment licence references.
@@ -53,8 +72,7 @@ exports:
   - yaml
 scope: narrow
 risk_rating: 5
-risk_description: >-
-  The TestPattern concept detects Queensland driver-licence application and renewal material through clustered TMR, learner, provisional, photo-ID, identity-verification, and licence-class terms. An uncompleted template mainly exposes a public administrative process, whereas a filled form can assist identity fraud by revealing applicant answers and supporting-document choices. The classifier does not prove that personal fields are populated or that attachments are present, so the affected person and harm remain conditional on document state. Risk 5 and OFFICIAL fit that bounded form signal; completed applications with identity evidence, addresses, or photographs would raise the context toward SENSITIVE.
+risk_description: The TestPattern concept detects Queensland driver-licence application and renewal material through clustered TMR, learner, provisional, photo-ID, identity-verification, and licence-class terms. An uncompleted template mainly exposes a public administrative process, whereas a filled form can assist identity fraud by revealing applicant answers and supporting-document choices. Enforcing tiers now require populated applicant fields, but they do not establish that identity documents or photographs are attached, so the harm remains bounded to one applicant record. Risk 5 and OFFICIAL fit that bounded form signal; completed applications with identity evidence, addresses, or photographs would raise the context toward SENSITIVE.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -65,31 +83,33 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_tmr_licence
       matches:
+        - ref: Regex_au_qld_driver_licence_form_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_tmr_forms
-        - ref: Evidence_driver_application_fields
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Pattern_tmr_licence
       matches:
-        - ref: Evidence_driver_application_fields
+        - ref: Regex_au_qld_driver_licence_form_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_tmr_licence
@@ -97,32 +117,14 @@ purview:
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_tmr_licence
       pattern: (?i)\b(?:driver\s+licen[cs]e\s+(?:application|renewal|replacement)|learner\s+(?:licen[cs]e|permit)|f3000)\b
-    - id: Pattern_tmr_form
-      pattern: (?i)\b(?:transport\s+and\s+main\s+roads|tmr|department\s+of\s+transport)\b
+    - id: Regex_au_qld_driver_licence_form_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|applicant(?:\s+name)?|licen[cs]e\s+(?:no\.?|number|class|type|expiry(?:\s+date)?)|customer\s+reference\s+(?:no\.?|number)|CRN|card\s+(?:no\.?|number)|residential\s+address|postal\s+address)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_driver_licence
-      groups:
-        - match_style: word
-          terms:
-            - driver licence
-            - driver license
-            - learner licence
-            - provisional licence
-            - text: P1
-              case_sensitive: true
-            - text: P2
-              case_sensitive: true
-            - open licence
-            - licence class
-            - demerit points
-            - licence suspension
-            - medical fitness
-      strength: specific
     - id: Evidence_tmr_forms
       groups:
         - match_style: word
@@ -130,41 +132,24 @@ purview:
             - Transport and Main Roads
             - text: TMR
               case_sensitive: true
-            - Department of Transport
-            - F3000
+            - Department of Transport and Main Roads
             - F3520
             - F3525
-            - Customer Reference Number
-            - text: CRN
-              case_sensitive: true
+            - customer service centre
       strength: domain
-    - id: Evidence_qld_government
-      groups:
-        - match_style: word
-          terms:
-            - Queensland Government
-            - State of Queensland
-            - QLD Government
-            - qld.gov.au
-            - Information Privacy Act 2009
-            - Queensland Privacy Principles
-      strength: specific
-    - id: Evidence_driver_application_fields
-      groups:
-        - match_style: word
-          terms:
-            - applicant name
-            - date of birth
-            - residential address
-            - Customer Reference Number
-            - application number
-            - licence class
-            - photo identification
-            - signature
-      strength: domain
+references:
+  - title: Queensland Government - Driver licensing
+    url: https://www.qld.gov.au/transport/licensing/driver-licensing
+  - title: Queensland Government - Applying for a licence
+    url: https://www.qld.gov.au/transport/licensing/driver-licensing/applying
+  - title: Transport Operations (Road Use Management) Act 1995 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-1995-009
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): Type keyword_list -> regex (primary promoted to the top-level pattern) so tier gates, not bare keyword-list hits, decide detection. 75 now requires a populated applicant field (new Regex_..._record_structure with placeholder guard) instead of field-name keywords; 85 requires two distinct populated fields plus TMR authority evidence (F3000 dropped from that group because the primary matches it). Template exclusion renamed to the standard Keyword_noise_exclusion; removed unused regex/keyword groups; recommended_confidence 85 -> 75. Tests rebuilt with populated synthetic forms and guidance, blank-form and news decoys. Regulations: removed AML/CTF Act and NDB Scheme (not applicable to a TMR form), added Transport Operations (Road Use Management) Act 1995 (Qld). Added qld.gov.au and legislation references.'
   - version: 1.4.0
     date: '2026-07-19'
     description: 'Targeted blocker remediation: add a 65 discovery application tier, make 75 require populated applicant fields and 85 additionally require TMR authority evidence, with exact-tier and sibling/public/template probes.'

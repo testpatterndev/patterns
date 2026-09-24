@@ -1,62 +1,84 @@
 schema: testpattern/v1
 name: Indicators of compromise
 slug: global-top500-289-indicators-of-compromise
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies indicators of compromise patterns in security and access control contexts. Detects potential exposure
-  of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative
-  evidence: 7 keywords within 300 characters. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
-  text.'
-pattern: (?i)\b(?:ioc|indicator[s]?\s+of\s+compromise)\b
+description: >-
+  Detects populated indicator-of-compromise lists and packages: IOC wording together with concrete indicator values such as file hashes, C2 domains or IPs, defanged URLs, mutexes or registry keys. The IOC phrase alone is discovery-only.
+operation: >-
+  Regex_ioc_primary (IOC / indicators of compromise wording) is discovery-only at 65. 75 requires the primary plus one populated structure: a labelled indicator field (hash, C2, malicious IP/domain/URL, mutex, registry key) with a value or a machine indicator (MD5/SHA1/SHA256 hex, defanged hxxp or [.] indicator, IPv4 address). 85 requires a labelled indicator field (hash, C2, malicious IP/domain/URL, mutex, registry key) with a value, a machine indicator (MD5/SHA1/SHA256 hex, defanged hxxp or [.] indicator, IPv4 address), and independent threat-context (first/last seen, actor, TLP, EDR, ATT&CK) evidence that does not repeat the primary. Every enforce tier rejects template/noise wording (template-exclusion) and guidance, policy, training and news framing (Keyword_ioc_guidance_exclusion).
+pattern: >-
+  (?i)\b(?:IOCs?|indicators?\s+of\s+compromise|IOC\s+(?:list|package|bundle|feed|report))\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: the topic phrase alone is discovery-only; enforcement needs populated structure (a labelled indicator field (hash, C2, malicious IP/domain/URL, mutex, registry key) with a value or a machine indicator (MD5/SHA1/SHA256 hex, defanged hxxp or [.] indicator, IPv4 address)), and 85 needs two distinct structures plus independent threat-context (first/last seen, actor, TLP, EDR, ATT&CK) evidence, so policies, blank forms and training text stay below 75.
 jurisdictions:
 - global
 regulations:
-- GDPR
+- SOCI Act 2018 (Cth)
+frameworks:
+- ISO 27001
+- NIST CSF
+- CIS Controls
 data_categories:
-- credentials
 - security
 corroborative_evidence:
   keywords:
-  - indicators of compromise
-  - indicators
-  - compromise
-  - security
-  - operations
-  - threat
-  - data
+  - first seen
+  - last seen
+  - threat actor
+  - TLP:AMBER
+  - TLP:RED
+  - sinkhole
+  - EDR
+  - MITRE ATT&CK
+  - detection rule
+  - blocklist
   proximity: 300
 test_cases:
   should_match:
-  - value: Ioc
-    description: Topic phrase present
-  - value: ioc
-    description: Topic phrase, lowercase
-  - value: this record references the ioc held on file
-    description: Topic phrase within surrounding text
+  - value: The SOC shared its IOC list with the partner agency after the phishing campaign.
+    description: Discovery probe (65) - IOC wording without indicator values
+    synthetic: true
+  - value: |-
+      IOC package - incident 2026-114
+      C2 domain: update-check.harbourcdn.net
+      Malicious IP: 185.220.101.47
+    description: Medium-tier probe (75) - labelled indicators without threat context
+    synthetic: true
+  - value: |-
+      Indicators of compromise - Operation Tidewater (TLP:AMBER)
+      SHA256: 3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea
+      C2 domain: update-check.harbourcdn.net
+      Callback URL: hxxps://update-check[.]harbourcdn[.]net/gate.php
+      First seen: 2026-09-12 03:14 UTC; threat actor overlaps with prior loader activity.
+    description: High-tier probe (85) - hash, labelled C2 fields, defanged URL, TLP and first-seen context
+    synthetic: true
   should_not_match:
   - value: unrelated generic text
     description: No relevant phrase context
   - value: placeholder value 12345
-    description: Random text should not match phrase marker
-  - value: generic policy prose without anchors
-    description: Should reject generic mentions without structural anchor terms
-  - value: template example placeholder record identifier
-    description: Template/sample context should be excluded even when anchor words are present
+    description: Random text should not match
+  - value: 'Policy statement: IOC feeds received from partners must be reviewed by the SOC within 24 hours and loaded into the blocklist.'
+    description: Policy naming IOCs without indicator values
+    synthetic: true
+  - value: |-
+      IOC report template
+      SHA256: ________
+      C2 domain: [insert]
+      Malicious IP: ________
+    description: Blank template - labels without values
+    synthetic: true
+  - value: 'Media release: researchers published indicators of compromise, including the IP 185.220.101.47, for a widespread ransomware campaign.'
+    description: News framing with a public indicator is excluded
+    synthetic: true
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+- description: Public advisories and vendor blogs publish IOC lists with hashes and defanged domains.
+  mitigation: Guidance/news/press-release framing is excluded; public advisories that carry full IOC tables can still reach 75 and should be handled with site or sender exceptions.
+- description: Security awareness or training material explains what an IOC is.
+  mitigation: Topic wording alone is discovery-only; training and course framing is excluded from enforce tiers.
 exports:
 - purview_xml
 - yaml
@@ -64,34 +86,40 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
   - dict: template-exclusion
     as: Keyword_noise_exclusion
     match_style: word
   pattern_tiers:
   - confidence_level: 85
-    id_match: Regex_indicators_of_compromise
+    id_match: Regex_ioc_primary
     matches:
-    - ref: Keyword_indicators_of_compromise
-    - ref: Pattern_global_top500_289_indicators_of_compromise_label_context
+    - ref: Regex_ioc_ioc_field
+    - ref: Regex_ioc_ioc_artefact
+    - ref: Keyword_ioc_context
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_ioc_guidance_exclusion
   - confidence_level: 75
-    id_match: Regex_indicators_of_compromise
+    id_match: Regex_ioc_primary
     matches:
-    - ref: Keyword_indicators_of_compromise
+    - type: any
+      refs:
+      - Regex_ioc_ioc_field
+      - Regex_ioc_ioc_artefact
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_ioc_guidance_exclusion
   - confidence_level: 65
     discovery_only: true
-    id_match: Regex_indicators_of_compromise
+    id_match: Regex_ioc_primary
     matches:
     - type: any
       min_matches: 0
@@ -99,43 +127,51 @@ purview:
       refs:
       - Keyword_noise_exclusion
   regexes:
-  - id: Regex_indicators_of_compromise
-    pattern: (?i)\b(?:ioc|indicator[s]?\s+of\s+compromise)\b
-  - id: Pattern_global_top500_289_indicators_of_compromise_label_context
-    pattern: (?i)\b(?:indicators\s+of\s+compromise)\b
+  - id: Regex_ioc_primary
+    pattern: >-
+      (?i)\b(?:IOCs?|indicators?\s+of\s+compromise|IOC\s+(?:list|package|bundle|feed|report))\b
+  - id: Regex_ioc_ioc_field
+    pattern: >-
+      (?i)\b(?:SHA-?256|SHA-?1|MD5|file\s+hash|C2(?:\s+(?:server|domain|IP))?|C&C|callback\s+(?:domain|IP|URL)|beacon(?:ing)?\s+(?:domain|IP)|malicious\s+(?:IP|domain|URL|file)|source\s+IP|destination\s+IP|mutex|registry\s+key|user[\s-]agent|JA3)\s*[:=#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'._:@#+-]{1,60}
+  - id: Regex_ioc_ioc_artefact
+    pattern: >-
+      (?i)\b[a-fA-F0-9]{64}\b|\b[a-fA-F0-9]{40}\b|\b[a-fA-F0-9]{32}\b|\bhxxps?://|\b[a-z0-9-]{1,63}\[\.\][a-z]{2,24}\b|\b\d{1,3}\[\.\]\d{1,3}\[\.\]\d{1,3}\[\.\]\d{1,3}\b|\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b
   keywords:
-  - id: Keyword_indicators_of_compromise
+  - id: Keyword_ioc_context
     groups:
     - match_style: word
       terms:
-      - indicators of compromise
-      - ioc
-      - malicious ip
-      - malicious domain
-      - file hash
-      - command and control
-      - c2 server
-      - threat indicator
-      - stix
-      - taxii
-      - threat feed
+      - first seen
+      - last seen
+      - threat actor
+      - TLP:AMBER
+      - TLP:RED
+      - sinkhole
+      - text: EDR
+        case_sensitive: true
+      - MITRE ATT&CK
+      - detection rule
       - blocklist
     strength: specific
-  - id: Keyword_global_top500_289_indicators_of_compromise_domain_context
+  - id: Keyword_ioc_guidance_exclusion
     groups:
     - match_style: word
       terms:
-      - indicators of compromise
-      - indicators
-      - compromise
+      - policy statement
+      - guidance note
+      - best practice guide
+      - media release
+      - press release
+      - news report
+      - course module
+      - learning objectives
+      - awareness course
+      - webinar
+      - lesson plan
+      - quiz question
     strength: domain
-risk_description: The current regex matches only the acronym IOC or the phrase indicator of compromise, so the detected unit
-  is a security topic marker rather than an IP address, hash, domain, or internal incident record. Such terminology can point
-  a reader toward threat information, but the words alone do not reveal an organisation's detections, affected assets, or
-  investigative status. The normal impact is low because indicators are routinely exchanged through public advisories and
-  community feeds, and additional concrete values and internal context are needed for misuse. Risk 4 OFFICIAL is therefore
-  appropriate; a confidential incident-specific IOC package identifying active compromise would require separate SENSITIVE
-  assessment.
+risk_description: >-
+  The detector now requires IOC wording plus concrete indicator values (hashes, C2 addresses, defanged URLs) before enforcing, so enforced hits are incident-specific indicator packages rather than topic mentions. Such terminology can point a reader toward threat information, but the words alone do not reveal an organisation's detections, affected assets, or investigative status. The normal impact is low because indicators are routinely exchanged through public advisories and community feeds, and additional concrete values and internal context are needed for misuse. Risk 4 OFFICIAL is therefore appropriate; a confidential incident-specific IOC package identifying active compromise would require separate SENSITIVE assessment.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -145,31 +181,26 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: 'Quality pass (2026-09-24): primary narrowed to IOC wording; same-span keyword self-corroboration removed; 75 now needs a labelled indicator field or a machine indicator (hash, defanged URL/domain, IPv4); 85 needs both plus independent threat context (first/last seen, TLP, actor, EDR, ATT&CK); guidance/news/training exclusion added; bare-phrase tests replaced with populated IOC packages and policy/template/news decoys; GDPR tag replaced with SOCI Act; frameworks and NIST SP 800-61/ATT&CK references added; data_categories credentials removed (indicators are not credentials).'
 - version: 1.3.1
   date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1840 without changing
-    detector or package metadata.'
+  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1840 without changing detector or package metadata.'
 - version: 1.3.0
   date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
+  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
 - version: 1.2.1
   date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
+  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
 - version: 1.2.0
   date: '2026-07-04'
-  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier
-    collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword
-    evidence at the same confidence level'
+  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword evidence at the same confidence level'
 - version: 1.1.0
   date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 references:
@@ -177,6 +208,8 @@ references:
 - https://www.legislation.gov.au/C2018A00029/latest/text
 - https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/preventing-preparing-for-and-responding-to-data-breaches/data-breach-preparation-and-response
 - https://handbook.apra.gov.au/standard/cps-234
+- https://csrc.nist.gov/pubs/sp/800/61/r3/final
+- https://attack.mitre.org/
 remediation:
   catalog_quality_2026_06_02:
     status: applied

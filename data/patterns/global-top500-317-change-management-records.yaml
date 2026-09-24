@@ -1,72 +1,89 @@
 schema: testpattern/v1
 name: Change management records
 slug: global-top500-317-change-management-records
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies change management records patterns in security and access control contexts. Detects potential exposure
-  of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 6 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:change\s+management|change\s+request|change\s+advisory\s+board|change\s+control|implementation\s+plan|rollback\s+plan|change\s+window|maintenance\s+window|approval\s+workflow|change\s+record)\b
+description: >-
+  Detects change management records: change request/CAB wording with populated change fields (owner, CI, planned window, risk, approval) and change artefacts. Topic wording alone is discovery-only.
+operation: >-
+  Regex_change_record_primary (change request/record, RFC, CAB or change-type wording) is discovery-only at 65. 75 requires the primary plus one populated structure: a populated change field (change number, requester/owner/implementer, assignment group, CI/affected service, planned start/end, risk, approval) or a change artefact (ServiceNow CHG number, timestamp, internal hostname, IPv4). 85 requires a populated change field (change number, requester/owner/implementer, assignment group, CI/affected service, planned start/end, risk, approval) (two distinct hits), a change artefact (ServiceNow CHG number, timestamp, internal hostname, IPv4), and independent change-control (implementation/backout/test plan, PIR, outage) evidence that does not repeat the primary. Every enforce tier rejects template/noise wording (template-exclusion) and guidance, policy, training and news framing (Keyword_change_record_guidance_exclusion).
+pattern: >-
+  (?i)\b(?:change\s+(?:request|record|ticket)|request\s+for\s+change|change\s+advisory\s+board|CAB\s+(?:approval|minutes|agenda)|emergency\s+change|normal\s+change|standard\s+change)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: the topic phrase alone is discovery-only; enforcement needs populated structure (a populated change field (change number, requester/owner/implementer, assignment group, CI/affected service, planned start/end, risk, approval) or a change artefact (ServiceNow CHG number, timestamp, internal hostname, IPv4)), and 85 needs two distinct structures plus independent change-control (implementation/backout/test plan, PIR, outage) evidence, so policies, blank forms and training text stay below 75.
 jurisdictions:
 - global
 regulations:
-- GDPR
+- SOCI Act 2018 (Cth)
+frameworks:
+- ISO 27001
+- NIST CSF
 data_categories:
-- credentials
 - security
 corroborative_evidence:
   keywords:
-  - change management records
-  - change
-  - management
-  - records
-  - operations
-  - resilience
+  - implementation plan
+  - backout plan
+  - rollback plan
+  - test plan
+  - post-implementation review
+  - outage required
+  - downtime
+  - approved
+  - peer review
+  - business justification
   proximity: 300
 test_cases:
   should_match:
-  - value: change management
-    description: Primary topic phrase match
-  - value: change request
-    description: Case-insensitive topic phrase match
-  - value: change advisory board
-    description: Alternative topic phrase match
-  - value: change control
-    description: Additional topic phrase match
+  - value: Raise a change request before touching the production firewall.
+    description: Discovery probe (65)
+    synthetic: true
+  - value: |-
+      Change request
+      Change number: CHG0031542
+      Change owner: J. Staffson
+    description: Medium-tier probe (75) - populated change fields
+    synthetic: true
+  - value: |-
+      Normal change - certificate rotation
+      Change number: CHG0031542
+      Configuration item: lb01.harbour.internal
+      Planned start: 2026-09-12 06:30
+      Risk: Moderate
+      Approval status: Approved by CAB
+      Implementation plan attached; backout plan: restore previous certificate; outage required 10 minutes.
+    description: High-tier probe (85) - several change fields, artefacts and change-control context
+    synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
+  - value: unrelated generic text
+    description: No relevant phrase context
   - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: backup outage
-    description: Generic word pair from old broad template should not match
+    description: Random text should not match
+  - value: 'Policy statement: every normal change requires CAB approval and a backout plan.'
+    description: Policy text
+    synthetic: true
+  - value: |-
+      Change request template
+      Change number: ________
+      Planned start: [insert]
+    description: Blank template
+    synthetic: true
+  - value: 'Course module 2: a request for change moves from assessment to CAB approval.'
+    description: Training framing
+    synthetic: true
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+- description: ITIL training and change policies.
+  mitigation: Guidance/training framing is excluded; values must be populated.
 exports:
 - purview_xml
 - yaml
 - regex_copy
 scope: wide
-risk_description: The detector finds change-management, request, advisory-board, control, implementation, rollback, change-window,
-  maintenance-window, approval-workflow, and change-record terminology. A genuine change record can expose target systems,
-  implementation commands, timing, approvers, dependencies, rollback limits, and temporary control changes that facilitate
-  disruption or unauthorised modification. The normal scope is one planned change and its service owners or users, while process
-  guidance and blank request templates can produce benign matches. Risk 8 SENSITIVE reflects serious contained operational
-  harm; PROTECTED would require critical-system changes or evidence of significant organisation-wide consequence.
+risk_description: >-
+  The detector now requires change-record wording plus populated change fields or artefacts (CHG numbers, windows, hosts) before enforcing. A genuine change record can expose target systems, implementation commands, timing, approvers, dependencies, rollback limits, and temporary control changes that facilitate disruption or unauthorised modification. The normal scope is one planned change and its service owners or users, while process guidance and blank request templates can produce benign matches. Risk 8 SENSITIVE reflects serious contained operational harm; PROTECTED would require critical-system changes or evidence of significant organisation-wide consequence.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -77,36 +94,42 @@ sensitivity_labels:
   ca_gov: Protected A
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
   - dict: template-exclusion
     as: Keyword_noise_exclusion
     match_style: word
   pattern_tiers:
   - confidence_level: 85
-    id_match: Regex_change_management
+    id_match: Regex_change_record_primary
     matches:
-    - ref: Pattern_global_top500_317_change_management_records_label_context
-    - ref: Keyword_global_top500_317_change_management_records_domain_context
-    - ref: Keyword_change_management
+    - ref: Regex_change_record_change_field
+      min_count: 2
+      unique_results: true
+    - ref: Regex_change_record_change_artefact
+    - ref: Keyword_change_record_context
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_change_record_guidance_exclusion
   - confidence_level: 75
-    id_match: Regex_change_management
+    id_match: Regex_change_record_primary
     matches:
-    - ref: Pattern_global_top500_317_change_management_records_label_context
-    - ref: Keyword_global_top500_317_change_management_records_domain_context
+    - type: any
+      refs:
+      - Regex_change_record_change_field
+      - Regex_change_record_change_artefact
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_change_record_guidance_exclusion
   - confidence_level: 65
     discovery_only: true
-    id_match: Regex_change_management
+    id_match: Regex_change_record_primary
     matches:
     - type: any
       min_matches: 0
@@ -114,59 +137,66 @@ purview:
       refs:
       - Keyword_noise_exclusion
   regexes:
-  - id: Regex_change_management
-    pattern: (?is)\b(?:change\s+management|change\s+request|change\s+advisory\s+board|change\s+control|implementation\s+plan|rollback\s+plan|change\s+window|maintenance\s+window|approval\s+workflow|change\s+record)\b
-  - id: Pattern_global_top500_317_change_management_records_label_context
-    pattern: (?i)\b(?:change\s+management\s+records)\b
+  - id: Regex_change_record_primary
+    pattern: >-
+      (?i)\b(?:change\s+(?:request|record|ticket)|request\s+for\s+change|change\s+advisory\s+board|CAB\s+(?:approval|minutes|agenda)|emergency\s+change|normal\s+change|standard\s+change)\b
+  - id: Regex_change_record_change_field
+    pattern: >-
+      (?i)\b(?:change\s+(?:no\.?|number|ID)|requested\s+by|change\s+owner|implementer|assignment\s+group|configuration\s+item|affected\s+(?:CI|service|system)s?|planned\s+(?:start|end)|implementation\s+window|risk|impact|approval\s+status|approver)\s*[:=#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'._:@#+-]{1,60}
+  - id: Regex_change_record_change_artefact
+    pattern: >-
+      (?i)\bCHG\d{7}\b|\b20\d{2}-[01]\d-[0-3]\d[T ][0-2]\d:[0-5]\d|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b
   keywords:
-  - id: Keyword_change_management
+  - id: Keyword_change_record_context
     groups:
     - match_style: word
       terms:
-      - change management
-      - change request
-      - change advisory board
-      - text: CAB
-        case_sensitive: true
-      - change control
-      - text: RFC
-        case_sensitive: true
       - implementation plan
+      - backout plan
       - rollback plan
-      - change window
-      - maintenance window
-      - approval workflow
-      - change record
+      - test plan
+      - post-implementation review
+      - outage required
+      - downtime
+      - approved
+      - peer review
+      - business justification
     strength: specific
-  - id: Keyword_global_top500_317_change_management_records_domain_context
+  - id: Keyword_change_record_guidance_exclusion
     groups:
     - match_style: word
       terms:
-      - change management records
-      - change
-      - management
+      - policy statement
+      - guidance note
+      - best practice guide
+      - media release
+      - press release
+      - news report
+      - course module
+      - learning objectives
+      - awareness course
+      - webinar
+      - lesson plan
+      - quiz question
     strength: domain
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: 'Quality pass (2026-09-24): primary narrowed to change record/CAB wording (bare change management, maintenance window, implementation plan removed); self-corroboration removed; 75 needs a populated change field or change artefact; 85 needs two change fields, an artefact and change-control context; guidance exclusion; populated tests and decoys; GDPR replaced with SOCI Act; frameworks, NIST SP 800-128 and ISM references added; credentials category removed.'
 - version: 1.2.1
   date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1867 without changing
-    detector or package metadata.'
+  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1867 without changing detector or package metadata.'
 - version: 1.2.0
   date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
+  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
 - version: 1.1.1
   date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
+  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
 - version: 1.1.0
   date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 remediation:
@@ -176,3 +206,6 @@ remediation:
     - Mapped non-canonical confidence 80 to 75.
     - Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 risk_rating: 8
+references:
+- https://csrc.nist.gov/pubs/sp/800/128/upd1/final
+- https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/ism

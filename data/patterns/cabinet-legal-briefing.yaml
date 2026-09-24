@@ -1,15 +1,15 @@
 schema: testpattern/v1
 name: Cabinet Legal Briefing
 slug: cabinet-legal-briefing
-version: 1.4.1
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: 'Detects legal annexures to Cabinet submissions containing privileged legal analysis supporting Cabinet decision-making. These documents carry dual protection: Cabinet confidentiality (Westminster convention) and legal professional privilege. Disclosure breaches both simultaneously with no remediation possible.'
-operation: 'Primary detection: keyword proximity matching ''Cabinet'' within 150 characters of legal indicators (''legal advice'', ''legal briefing'', ''legal risk'', ''legal annexure'', ''privilege''). Document marker detection: ''CABINET-IN-CONFIDENCE'' combined with ''LEGAL'', ''LPP'', ''PRIVILEGE'', or ''Legal-Privilege''. Corroborative evidence: 3 keywords within 300 characters.'
+operation: 'Primary (any): CABINET-IN-CONFIDENCE marker, Cabinet (Legal) Annexure/Briefing/Submission document type, or "legal advice prepared for Cabinet". 65 (discovery only) = primary alone. 75 = primary plus two distinct populated document header fields (To, From, Date, Subject, Re, Our ref, File/Matter number, Prepared/Approved/Cleared by, Author, Version, Status, Classification) plus independent legal evidence (legal risk, privilege, LPP, PROTECTED, legal professional privilege, legal opinion, Crown Law, Crown Solicitor, constitutional risk, litigation risk). 85 = primary plus three distinct header fields plus the legal evidence. Public handbook/announcement, furniture and template/fixture exclusions are NOT-gated on every tier.'
 pattern: (?i)\bCabinet\b
 confidence: medium
-confidence_justification: 'Medium confidence: The combination of Cabinet + legal privilege terminology is highly specific to government legal practice. Document markers (CABINET-IN-CONFIDENCE + legal terms) provide near-certain identification. False positives from furniture references eliminated by legal keyword proximity requirement.'
+confidence_justification: 'Medium: Cabinet document types and markers are distinctive but also appear in handbooks, news and training; enforcement needs a populated document header and legal evidence that the primary does not itself match. Tiers are heuristic evidence gates, not measured accuracy.'
 jurisdictions:
   - au
 regulations:
@@ -44,25 +44,36 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: |-
-        CABINET-IN-CONFIDENCE — LEGAL PROFESSIONAL PRIVILEGE
+        CABINET-IN-CONFIDENCE - LEGAL PROFESSIONAL PRIVILEGE
+        Cabinet Legal Annexure
+        To: Cabinet Budget Review Committee
+        From: Crown Solicitor
+        Date: 14/03/2026
+        Subject: Coal Royalties Amendment Bill 2026 - constitutional risk
+        Our ref: CL2026-0412
+        Crown Law advises that the retrospective provisions carry a high litigation risk.
+      description: 85 - Cabinet legal annexure with populated header (To/From/Date/Subject/Our ref) and privilege/legal-risk evidence
+      synthetic: true
+    - value: |-
+        PROTECTED - Legal-Privilege
+        Cabinet Legal Briefing
+        Prepared by: Crown Law
+        For: Cabinet Budget Review Committee
+        Subject: Legal risks associated with proposed coal royalty increases
+      description: 75 - Cabinet legal briefing with two populated header fields and Crown Law/PROTECTED evidence
+    - value: |-
+        CABINET-IN-CONFIDENCE - LEGAL PROFESSIONAL PRIVILEGE
         Legal Annexure to Cabinet Submission No. 2025-0412
 
         Legal Risk Assessment
         Subject: Water Infrastructure (Cost Recovery) Amendment Bill 2025
 
         This legal briefing is provided for the information of Cabinet.
-      description: Cabinet legal annexure with dual confidentiality marking
+      description: 65 discovery - marked annexure with a single header field (Subject)
     - value: The legal advice prepared for Cabinet identifies significant risks of constitutional challenge to the proposed amendments. This privileged legal briefing should be read in conjunction with the main Cabinet submission.
-      description: Reference to privileged Cabinet legal briefing
-    - value: |-
-        PROTECTED — Legal-Privilege
-        Cabinet Legal Briefing
-        Prepared by: Crown Law
-        For: Cabinet Budget Review Committee
-        Subject: Legal risks associated with proposed coal royalty increases
-      description: Cabinet legal briefing prepared by Crown Law
+      description: 65 discovery - prose reference to Cabinet legal advice without a document header
     - value: 'Cabinet Legal Briefing prepared by Crown Law: constitutional risk; LPP; PROTECTED.'
-      description: Legal document identity with provider, risk, privilege, and marking enforces without the CABINET-IN-CONFIDENCE marker
+      description: 65 discovery - one-line reference without populated header fields
   should_not_match:
     - value: The Cabinet decision was announced by the Premier at a media conference on Tuesday. The government confirmed it will proceed with the legislation following Cabinet approval.
       description: News article about Cabinet decision announcement
@@ -78,6 +89,14 @@ test_cases:
       description: Marker plus generic Cabinet term cannot self-prove legal content
     - value: Cabinet announced the bill after its regular meeting.
       description: Public Cabinet announcement with no legal briefing, privilege, or confidential marker
+    - value: |-
+        Cabinet Submission cover sheet
+        To: ________
+        From: ________
+        Date: ________
+        Subject: [insert]
+        Legal risk: [summarise]
+      description: Blank Cabinet submission template - placeholder header fields are rejected
 false_positives:
   - description: News articles about Cabinet decisions and announcements
     mitigation: Require co-occurrence with legal privilege terms (LPP, privilege, legal annexure) within proximity window
@@ -93,26 +112,29 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_cabinet_legal_briefing_cabinet_in_confidence_document_marker
+      id_match:
+        type: any
+        ids:
+          - Pattern_cabinet_legal_briefing_cabinet_in_confidence_document_marker
+          - Pattern_cabinet_legal_briefing_cabinet_legal_document_type
+          - Pattern_cabinet_legal_briefing_legal_advice_for_cabinet
       matches:
-        - ref: Pattern_cabinet_legal_briefing_cabinet_legal_document_type
+        - ref: Regex_cabinet_legal_briefing_record_structure
+          min_count: 3
+          unique_results: true
         - ref: Evidence_cabinet_legal_briefing_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_cabinet_legal_briefing_exclusion
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
             - Keyword_noise_exclusion
             - Filter_cabinet_legal_briefing_exclusion
     - confidence_level: 75
@@ -123,16 +145,15 @@ purview:
           - Pattern_cabinet_legal_briefing_cabinet_legal_document_type
           - Pattern_cabinet_legal_briefing_legal_advice_for_cabinet
       matches:
+        - ref: Regex_cabinet_legal_briefing_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_cabinet_legal_briefing_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_cabinet_legal_briefing_exclusion
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
             - Keyword_noise_exclusion
             - Filter_cabinet_legal_briefing_exclusion
     - confidence_level: 65
@@ -152,36 +173,30 @@ purview:
             - Filter_cabinet_legal_briefing_exclusion
   regexes:
     - id: Pattern_cabinet_legal_briefing_cabinet_in_confidence_document_marker
-      pattern: (?i)CABINET[- ]IN[- ]CONFIDENCE
+      pattern: (?i)CABINET[\s-]+IN[\s-]+CONFIDENCE
     - id: Pattern_cabinet_legal_briefing_cabinet_legal_document_type
       pattern: (?i)\bCabinet\s+(?:Legal\s+)?(?:Annexure|Briefing|Submission)\b
     - id: Pattern_cabinet_legal_briefing_legal_advice_for_cabinet
       pattern: (?i)\blegal\s+advice\s+prepared\s+for\s+(?:the\s+)?Cabinet\b
+    - id: Regex_cabinet_legal_briefing_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+(?:by|for)|Approved\s+by|Cleared\s+by|Author|Version|Status|Classification|Contact\s+officer|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<)[A-Za-z0-9$]
   keywords:
-    - id: Evidence_cabinet_legal_briefing_primary
-      groups:
-        - match_style: word
-          terms:
-            - Cabinet
-            - CABINET-IN-CONFIDENCE
-            - Cabinet submission
-            - Cabinet briefing
-      strength: specific
     - id: Evidence_cabinet_legal_briefing_corroborative
       groups:
         - match_style: word
           terms:
-            - legal advice
-            - legal briefing
             - legal risk
-            - legal annexure
+            - litigation risk
+            - constitutional risk
             - privilege
             - text: LPP
               case_sensitive: true
-            - PROTECTED
+            - text: PROTECTED
+              case_sensitive: true
             - legal professional privilege
             - legal opinion
             - Crown Law
+            - Crown Solicitor
       strength: specific
     - id: Evidence_cabinet_legal_briefing_exclusion
       groups:
@@ -204,7 +219,6 @@ purview:
             - oak cabinet
             - filing cabinet
             - cabinet maker
-
       strength: noise
 risk_rating: 10
 risk_description: >-
@@ -213,13 +227,20 @@ sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: PROTECTED Cabinet-in-Confidence
-references: []
+references:
+  - title: Right to Information Act 2009 (Qld) - Schedule 3 s 2 (Cabinet information)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-013
+  - title: Crime and Corruption Act 2001 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2001-069
 created: '2026-02-20'
-updated: '2026-09-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): 75 now requires two distinct populated document header fields (new Regex_..._record_structure) plus legal evidence; 85 requires three header fields plus legal evidence (the old 85 needed only marker + document type + a keyword and could fire on phrases alone). Removed "legal advice", "legal briefing" and "legal annexure" from the corroborative group because the primaries match them (same-span self-corroboration); PROTECTED and LPP are now case-sensitive; the marker regex uses \s+/- separators; recommended_confidence 85 -> 75. Added a populated 85 annexure and a blank cover-sheet decoy; one-line/prose positives re-described as 65 discovery. Added RTI Act and Crime and Corruption Act references.'
   - version: 1.4.1
     date: '2026-09-14'
-    description: 'Assign QGISCF category to PROTECTED Cabinet-in-Confidence; preserve classification tier and detection logic.'
+    description: Assign QGISCF category to PROTECTED Cabinet-in-Confidence; preserve classification tier and detection logic.
   - version: 1.4.0
     date: '2026-07-16'
     description: 'sit-alignment-validation-2026-07-16 wave1 (TP-00686): any-of primary across the CABINET-IN-CONFIDENCE marker, the Cabinet Legal Annexure/Briefing/Submission document-type regex, and a new legal-advice-prepared-for-Cabinet literal regex (previously all tiers required the exact marker, making two authored positives unreachable). Every enforcing branch now requires the legal corroborative group (75 previously enforced on marker plus generic Cabinet wording with zero legal evidence); 85 keys on the marker plus legal document type and the corroborative group. Public handbook/announcement exclusion group now NOT-gated at 75 as well as 85; furniture and noise exclusions retained on all tiers. Adversarial test cases added.'

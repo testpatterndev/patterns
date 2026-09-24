@@ -1,57 +1,66 @@
 schema: testpattern/v1
 name: Provider identifier records
 slug: global-top500-337-provider-identifier-records
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies provider identifier records references in healthcare and patient records. Protected health information
-  under applicable data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 7 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?i)\b(?:provider\s+identifier\s+records?)\b
+description: >-
+  Identifies healthcare provider identifier records - practitioner lists, credentialing files and directory extracts that carry labelled provider identifiers (Medicare provider number, prescriber number, HPI-I/HPI-O, Ahpra registration number, NPI, licence number) alongside practitioner and practice details. Format validation of each identifier is left to the dedicated identifier classifiers.
+operation: >-
+  Pattern type: regex (boost_regex engine). Primary: a labelled provider identifier with a populated value (Medicare provider number/ID, prescriber number, HPI-I or HPI-O, AHPRA registration number, registration number, NPI, licence number). 65 (discovery only): one labelled identifier alone. 75: labelled identifier plus a populated practitioner/practice field (practitioner or provider name, practice/clinic/location, specialty, profession, registration type/status/expiry). 85: two distinct labelled identifiers plus a practitioner/practice field plus independent credentialing evidence (credentialing, scope of practice, conditions on registration, Medicare billing, bulk billing, MBS, Services Australia, NPPES). Template and guidance/training framing excluded from 75/85. No identifier formats are asserted here - see au-medicare-provider-number, au-hpi-individual, global-ahpra-registration and au-pbs-prescriber-number for validated formats.
+pattern: (?i)\b(?:(?:Medicare\s+)?provider\s*(?:no\.?|number|ID)|prescriber\s*(?:no\.?|number)|HPI-?[IO](?:\s+(?:no\.?|number))?|AHPRA\s*(?:registration\s*)?(?:no\.?|number|ID)?|registration\s*(?:no\.?|number)|NPI(?:\s+(?:no\.?|number))?|licen[cs]e\s*(?:no\.?|number))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9-]{3,17}(?:[ \t][0-9]{1,8}){0,3}
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: provider identifiers are administrative and often public (registers, directories), so enforce tiers need a labelled identifier with practitioner/practice context and 85 needs two distinct identifiers plus credentialing evidence. Guidance and blank forms carry the labels without values and never match.
 jurisdictions:
 - global
+frameworks:
+  - ISO 27001
+  - ISO 27701
 regulations:
-- GDPR
+  - Healthcare Identifiers Act 2010 (Cth)
+  - Privacy Act 1988 (Cth)
+  - HIPAA
+  - GDPR
 data_categories:
 - healthcare
 - phi
 corroborative_evidence:
   keywords:
-  - provider identifier records
-  - provider
-  - identifier
-  - records
-  - health
-  - biomedical
-  - information
+    - credentialing
+    - scope of practice
+    - conditions on registration
+    - Medicare billing
+    - Services Australia
+    - NPPES
   proximity: 300
-  keyword_lists:
-  - healthcare-clinical
-  - generic-data-labels
-  - data-record-context
 test_cases:
   should_match:
-  - value: Provider identifier records
-    description: Topic phrase present
-  - value: provider identifier records
-    description: Topic phrase, lowercase
-  - value: this record references the provider identifier records held on file
-    description: Topic phrase within surrounding text
+    - value: "Practitioner credentialing record\nPractitioner name: Dr Priya Ramanathan\nSpecialty: General practice\nMedicare provider number: 2447181A\nAHPRA registration number: MED0001234567\nHPI-I: 8003 6100 0012 3456\nCredentialing complete; scope of practice approved for Medicare billing at this location."
+      description: Credentialing record with three labelled provider identifiers, practitioner fields and credentialing evidence (85)
+      synthetic: true
+    - value: "Provider number: 2447181A\nPractitioner: Dr Jordan Staffson"
+      description: Labelled provider number with a practitioner field (75)
+      synthetic: true
+    - value: "Prescriber number: 1234567"
+      description: Labelled prescriber number alone (65 discovery)
+      synthetic: true
   should_not_match:
-  - value: unrelated generic text
-    description: No relevant phrase context
-  - value: placeholder value 12345
-    description: Random text should not match phrase marker
-  - value: generic narrative without identifier/document anchors
-    description: Should not match plain mention
-  - value: template example placeholder record identifier
-    description: Template/sample context should be excluded even when anchor words are present
+    - value: "unrelated generic text"
+      description: No relevant phrase context
+    - value: "placeholder value 12345"
+      description: Random text should not match phrase marker
+    - value: "generic narrative without identifier/document anchors"
+      description: Should not match plain mention
+    - value: "template example placeholder record identifier"
+      description: Template/sample context should be excluded even when anchor words are present
+    - value: "Policy guidance: this procedure explains how provider identifiers are recorded in the credentialing system and who may update them. It contains no identifier values."
+      description: Policy/guidance naming provider identifiers without values
+    - value: "Provider credentialing form\nPractitioner name: ____________________\nMedicare provider number: ____________________\nAHPRA registration number: ____________________\nHPI-I: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: Services Australia will issue a provider number to new graduates within five days, and Ahpra registration checks remain free online."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
 - description: Medical terminology in health education materials, research publications, clinical guidelines, or public health
     documents without patient-specific data.
@@ -65,13 +74,8 @@ exports:
 - yaml
 - regex_copy
 scope: wide
-risk_description: This regex is narrowly demonstrated against the phrase provider identifier records and surrounding document
-  text; it does not validate or extract an NPI, credential, patient identifier, or confidential provider dossier. Provider
-  numbers and directory associations are commonly public administrative references, so a phrase hit alone has little direct
-  confidentiality impact. Misuse would normally require separate login secrets, payment details, claims, or a false attribution
-  affecting the provider, and generic healthcare documentation may still contain the phrase. Risk 4 and OFFICIAL reflect that
-  correlation-dependent harm; SENSITIVE requires actual confidential provider account data, credentials, non-public claims,
-  or patient-linked records.
+risk_description: >-
+  This regex matches labelled provider identifiers with populated values (Medicare provider number, prescriber number, HPI-I/HPI-O, Ahpra registration, NPI) and enforces only with practitioner or practice fields nearby; it does not validate identifier formats. Provider numbers and directory associations are commonly public administrative references, so a phrase hit alone has little direct confidentiality impact. Misuse would normally require separate login secrets, payment details, claims, or a false attribution affecting the provider, and generic healthcare documentation may still contain the phrase. Risk 4 and OFFICIAL reflect that correlation-dependent harm; SENSITIVE requires actual confidential provider account data, credentials, non-public claims, or patient-linked records.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -82,77 +86,87 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
-  - dict: generic-data-labels
-    as: Evidence_generic_data_labels
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_provider_identifier_records
-    matches:
-    - ref: Keyword_provider_identifier_records
-    - ref: Evidence_generic_data_labels
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_provider_identifier_records
-    matches:
-    - ref: Keyword_global_top500_337_provider_identifier_records_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_provider_identifier_records
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_provider_identifier_records
+      matches:
+        - ref: Regex_provider_identifier_records
+          min_count: 2
+          unique_results: true
+        - ref: Regex_global_top500_337_provider_identifier_records_practitioner_fields
+        - ref: Keyword_global_top500_337_provider_identifier_records_credentialing_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_337_provider_identifier_records_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_provider_identifier_records
+      matches:
+        - ref: Regex_global_top500_337_provider_identifier_records_practitioner_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_337_provider_identifier_records_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_provider_identifier_records
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_provider_identifier_records
-    pattern: (?i)\b(?:provider\s+identifier\s+records?)\b
-  - id: Pattern_global_top500_337_provider_identifier_records_label_context
-    pattern: (?i)\b(?:provider\s+identifier\s+records)\b
+    - id: Regex_provider_identifier_records
+      pattern: (?i)\b(?:(?:Medicare\s+)?provider\s*(?:no\.?|number|ID)|prescriber\s*(?:no\.?|number)|HPI-?[IO](?:\s+(?:no\.?|number))?|AHPRA\s*(?:registration\s*)?(?:no\.?|number|ID)?|registration\s*(?:no\.?|number)|NPI(?:\s+(?:no\.?|number))?|licen[cs]e\s*(?:no\.?|number))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9-]{3,17}(?:[ \t][0-9]{1,8}){0,3}
+    - id: Regex_global_top500_337_provider_identifier_records_practitioner_fields
+      pattern: (?i)\b(?:practitioner(?:\s+name)?|provider(?:\s+name)?|prescriber(?:\s+name)?|(?:practice|clinic|location|site)(?:\s+(?:name|address))?|speciality|specialty|profession|registration\s+(?:type|status|expiry))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-  - id: Keyword_provider_identifier_records
-    groups:
-    - match_style: word
-      terms:
-      - provider identifier
-      - provider number
-      - text: NPI
-        case_sensitive: true
-      - practitioner ID
-      - health provider
-      - biomedical
-      - prescriber number
-      - registration number
-      - medical license
-      - provider registry
-      - AHPRA
-      - Medicare provider
-    strength: specific
-  - id: Keyword_global_top500_337_provider_identifier_records_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - provider identifier records
-      - provider
-    strength: domain
+    - id: Keyword_global_top500_337_provider_identifier_records_credentialing_evidence
+      groups:
+        - match_style: word
+          terms:
+            - credentialing
+            - scope of practice
+            - conditions on registration
+            - Medicare billing
+            - bulk billing
+            - text: MBS
+              case_sensitive: true
+            - Services Australia
+            - text: NPPES
+              case_sensitive: true
+      strength: specific
+    - id: Keyword_global_top500_337_provider_identifier_records_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: "Quality pass (2026-09-24): rebuilt around labelled provider identifiers - the old 75 fired on the phrase 'provider identifier records' alone and 85 relied on generic data labels. Primary is now a labelled provider identifier with a populated value (Medicare provider number, prescriber number, HPI-I/HPI-O, AHPRA registration, NPI, licence number; no formats asserted); 75 adds a practitioner/practice field and 85 needs two distinct identifiers plus practitioner context plus credentialing evidence. Bare-phrase tests replaced with populated records plus policy, blank-form and news decoys. Regulations: added Healthcare Identifiers Act 2010 (Cth), Privacy Act 1988 (Cth), HIPAA; frameworks and references added. Recommend deprecating in favour of the identifier classifiers (au-medicare-provider-number, au-hpi-individual, global-ahpra-registration, au-pbs-prescriber-number) or merging with au-top500-337-provider-identifier-records."
 - version: 1.3.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1883 without changing
@@ -186,3 +200,10 @@ remediation:
     - Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
     - Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.
 risk_rating: 4
+references:
+  - url: https://www.legislation.gov.au/C2010A00072/latest/text
+    title: Healthcare Identifiers Act 2010 (Cth)
+  - url: https://www.ahpra.gov.au/Registration/Registers-of-Practitioners.aspx
+    title: Ahpra - Register of practitioners
+  - url: https://www.hhs.gov/hipaa/for-professionals/privacy/laws-regulations/index.html
+    title: HHS - HIPAA Privacy Rule

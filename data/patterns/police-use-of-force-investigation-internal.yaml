@@ -1,22 +1,25 @@
 schema: testpattern/v1
 name: Police Use-of-Force Investigation (Internal)
 slug: police-use-of-force-investigation-internal
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects internal investigation documents of police use of lethal or serious force, including compelled officer statements under s.7.2 PPRA and Ethical Standards Command evidence before investigation completion.
-operation: 'Keyword proximity: primary keywords (critical incident, police shooting investigation, use of force investigation, Ethical Standards Command, ESC investigation) within 300 characters of officer identifiers and compulsion markers. Document markers from QPS ESC templates. Negative keyword exclusion for published findings and media.'
+operation: >-
+  Primary: use-of-force investigation phrases (critical incident investigation/report/review, police shooting investigation, use of force investigation, Ethical Standards Command, ESC investigation, discharge of firearm report, lethal force review). 65 = phrase only (discovery). 75 = phrase plus a populated person/file field (officer, witness, subject, name, date of birth, file/case number) or a labelled file reference. 85 = phrase plus two distinct populated fields plus independent evidence (self-incrimination notice, s.7.2 PPRA, compelled statement, body-worn camera, tactical assessment, CCC oversight). Media, annual report and training framing excluded.
 pattern: (?i)\b(critical\s+incident\s+(?:investigation|report|review)|police\s+shooting\s+investigation|use\s+of\s+force\s+investigation|Ethical\s+Standards\s+Command|ESC\s+investigation|discharge\s+of\s+firearm\s+(?:investigation|report)|lethal\s+force\s+review)\b
 confidence: medium
-confidence_justification: 'Medium confidence: requires internal investigation terminology with officer identifiers and ESC markers. Compelled statement references are unique to genuine internal affairs files.'
+confidence_justification: >-
+  Medium confidence: enforcement requires populated internal-investigation fields; ESC file numbers are unpublished, so the reference is a documented label-anchored fallback.
 jurisdictions:
   - au
 regulations:
-- "PPRA 2000 (Qld)"
-- "Police Service Admin Act 1990 (Qld)"
+  - Crime and Corruption Act 2001 (Qld)
+  - PPRA 2000 (Qld)
+  - Police Service Admin Act 1990 (Qld)
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - law-enforcement
   - government
@@ -41,16 +44,25 @@ corroborative_evidence:
 
     - government-services
     - en-government-classification
+customisation:
+  - key: case-reference-number
+    kind: identifier-format
+    identifier: case-reference-number
+    target: purview.regexes/Regex_police_use_of_force_investigation_internal_case_reference
+    mode: replace
+    affects_tiers: [75]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#case-reference-number). Earlier versions used the ESC-YYYY-NNNN format, which does not appear in any published source.
 test_cases:
   should_match:
     - value: 'PROTECTED — INTERNAL INVESTIGATION. QPS Ethical Standards Command — Critical Incident Investigation. Police shooting, Ipswich 14/01/2025. Subject officer: SC M. DAVIES, Reg 18742. Discharge of firearm report. Self-incrimination notice under s.7.2 PPRA. Compelled statement obtained. Body-worn camera under review.'
-      description: ESC critical incident investigation with compelled statement
-    - value: 'RESTRICTED — Internal Investigation. Use of force investigation — lethal force review. ESC-2025-0034. Taser and firearm use during pursuit. Tactical assessment: force may be disproportionate. Self-incrimination notice served. Compelled statements not admissible criminally.'
-      description: ESC use-of-force investigation with tactical assessment
+      description: ESC critical incident investigation with compelled statement (reaches 75)
+    - value: 'RESTRICTED — Internal Investigation. Use of force investigation — lethal force review. ESC file number: 2025/0034. Taser and firearm use during pursuit. Tactical assessment: force may be disproportionate. Self-incrimination notice served. Compelled statements not admissible criminally.'
+      description: ESC use-of-force investigation with tactical assessment (reaches 75)
     - value: Critical incident report — preliminary. Police shooting investigation commenced. ESC team deployed. Self-incrimination notices issued. Body-worn camera secured. Parallel coronial and CCC oversight.
-      description: Preliminary critical incident report
-    - value: "Ethical Standards Command\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Ethical Standards Command recorded against the subject; handling restricted."
-      description: Populated justice record reaching the 75/85 structure gate
+      description: Preliminary critical incident report (65 discovery only - prose without populated record fields)
+    - value: "INTERNAL INVESTIGATION — Ethical Standards Command\nSubject officer: Senior Constable Avery Teston\nWitness: Constable Jordan Staffson\nFile number: 2026/0417\nSelf-incrimination notice issued under s.7.2 PPRA; compelled statement and body-worn camera footage secured."
+      description: 'Populated internal investigation: subject officer, witness and file number plus compelled-statement evidence (reaches 85)'
       synthetic: true
   should_not_match:
     - value: 'The CCC published its annual report: 23 critical incidents investigated. Recommended improved use of force training.'
@@ -61,6 +73,10 @@ test_cases:
       description: Police training curriculum
     - value: "Policy guidance: this procedure explains how records about Ethical Standards Command are handled, who may access them and how long they are kept. It contains no records about any person or system."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: "Ethical Standards Command — complaint form\nSubject officer: __________\nWitness: __________\nFile number: __________"
+      description: Blank form / template with unfilled fields (must stay below 75)
+    - value: "News: the Ethical Standards Command is investigating a police shooting at Ipswich; the officer has been placed on administrative duties."
+      description: News or training text naming the topic (must stay below 75)
 false_positives:
   - description: Published oversight body reports
     mitigation: 'Negative keyword exclusion: ''annual report'', ''published'', ''recommendations''. Require compelled statement references.'
@@ -86,10 +102,7 @@ purview:
         - ref: Regex_police_use_of_force_investigation_internal_record_structure
           min_count: 2
           unique_results: true
-        - ref: Evidence_police_use_of_force_investigation_internal_classification_markers
         - ref: Evidence_police_use_of_force_investigation_internal_corroborative_terms
-        - ref: Pattern_police_use_of_force_investigation_internal_esc_file_reference
-        - ref: Pattern_police_use_of_force_investigation_internal_ppra_compulsion
         - type: any
           min_matches: 0
           max_matches: 0
@@ -102,7 +115,7 @@ purview:
         - type: any
           refs:
             - Regex_police_use_of_force_investigation_internal_record_structure
-            - Evidence_police_use_of_force_investigation_internal_corroborative_terms
+            - Regex_police_use_of_force_investigation_internal_case_reference
         - type: any
           min_matches: 0
           max_matches: 0
@@ -122,20 +135,13 @@ purview:
   regexes:
     - id: Pattern_police_use_of_force_investigation_internal_use_of_force_terms
       pattern: (?i)\b(critical\s+incident|police\s+shooting\s+investigation|use\s+of\s+force\s+investigation|Ethical\s+Standards\s+Command|ESC\s+investigation|discharge\s+of\s+firearm|lethal\s+force\s+review)\b
-    - id: Pattern_police_use_of_force_investigation_internal_esc_file_reference
-      pattern: \bESC-\d{4}-\d{3,5}\b
-    - id: Pattern_police_use_of_force_investigation_internal_ppra_compulsion
-      pattern: (?i)\bs\.?\s*7\.2\s+PPRA\b
     - id: Regex_police_use_of_force_investigation_internal_record_structure
       pattern: >-
         (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_police_use_of_force_investigation_internal_case_reference
+      pattern: >-
+        (?i)\b(?:case|file|matter|reference)\s+(?:no\.?|number|ID|#)\s*[:#]?\s*(?:[A-Z]{1,4}[/-]?)?\d[A-Z0-9/-]{3,20}\b
   keywords:
-    - id: Evidence_police_use_of_force_investigation_internal_classification_markers
-      groups:
-        - match_style: word
-          terms:
-            - INTERNAL INVESTIGATION
-      strength: specific
     - id: Evidence_police_use_of_force_investigation_internal_corroborative_terms
       groups:
         - match_style: word
@@ -172,10 +178,17 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Legal
-references: []
+references:
+  - title: Police Powers and Responsibilities Act 2000 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2000-005
+  - title: Crime and Corruption Act 2001 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2001-069
 created: '2026-02-20'
 updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): rebuilt tiers - 75 needs a populated officer/witness/file field or a labelled file reference, 85 needs two distinct record fields plus independent compelled-statement evidence; removed the invented ESC-YYYY-NNNN regex in favour of the case-reference-number labelled fallback (identifier-format slot); dropped the INTERNAL INVESTIGATION marker and the duplicate s.7.2 PPRA regex; tests converted with an 85 positive and blank-form/news decoys; added the Crime and Corruption Act 2001 (Qld) (CCC oversight) and references.'
   - version: 1.4.0
     date: '2026-09-24'
     description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."

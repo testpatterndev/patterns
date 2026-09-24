@@ -1,27 +1,24 @@
 schema: testpattern/v1
 name: Biometric Data Reference
 slug: global-biometric-data-reference
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
-description: Detects references to biometric data including fingerprints, facial recognition, iris scans, and voiceprints in Australian documents.
+description: >-
+  Detects biometric data about an identified person - biometric templates, identifiers and records, fingerprint scans or templates, facial recognition, iris/retina scans, voiceprints and palm prints - when the biometric phrase sits with a populated person identifier and biometric enrolment/capture fields.
 operation: >-
-  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_biometric_phrase matches phrases such as biometric data, biometric template, fingerprint scan, facial recognition, iris
-  scan, retina scan, voiceprint, palm print, and liveness detection. Three confidence tiers: High (85) requires biometric context + data operations keywords with template exclusion logic; Medium (75)
-  requires biometric context keywords; Low (65) requires only the regex match. Evidence uses 2 keyword groups (5 biometric context terms, 9 data operations terms) within 300-character proximity.
-  Template/sample exclusion prevents false positives from training materials.
+  The primary regex matches biometric data phrases (biometric data/template/identifier/scan/record, fingerprint scan/data/template, facial recognition, iris or retina scan, voiceprint, palm print, liveness detection). 65 (discovery only): phrase alone - policy, guidance, news and survey-design text naming the category stays here. 75: phrase plus a populated identified-person field (name, DOB, employee/member/customer/patient/participant number or ID, data subject). 85: person field plus a populated biometric record field (enrolment/capture/sensor ID, date or type, match or quality score, finger position, modality, liveness result, capture device) plus independent record evidence (enrolled, minutiae, false match rate, matched against, access control, time and attendance, identity verification). Template framing and guidance/policy/public-aggregate framing are excluded from 75/85. Converted from keyword_list to regex so the tier logic decides matches.
+pattern: (?i)\b(?:biometric\s+(?:data|template|identifier|scan|record)|fingerprint\s+(?:scan|data|template)|facial\s+recognition|iris\s+scan|retina\s+scan|voiceprint|palm\s+print|liveness\s+detection)\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative evidence keywords are needed for reliable identification since biometric-related
-  terms can appear in non-sensitive contexts.
+  Low by design: the attribute has no fixed format. Enforce tiers now require the attribute to be tied to an identified person record (a populated name/DOB/ID field), and 85 also requires a populated biometric record field plus independent record evidence, so policy text, surveys-in-design and news naming the category stay at 65 discovery.
 jurisdictions:
   - global
 regulations:
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+  - IPA 2009 (Qld)
+  - GDPR
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -30,17 +27,23 @@ data_categories:
   - sensitive-data
 test_cases:
   should_match:
-    - value: 'Biometric data collection: fingerprint scan required'
-      description: Matches 'biometric data' and 'fingerprint scan' via Pattern_biometric_phrase
-    - value: Facial recognition template stored in secure vault
-      description: Matches 'facial recognition' via Pattern_biometric_phrase
-    - value: The biometric identifier was verified using iris scan
-      description: Matches 'biometric identifier' and 'iris scan' via Pattern_biometric_phrase
+    - value: "Biometric identifier record\nEmployee ID: E40917\nName: Avery Teston\nEnrolment ID: FT-7730-2291\nFinger position: right index\nQuality score: 87\nEnrolled for time and attendance access control on 12/08/2026."
+      description: Person-linked biometric identifier record with enrolment fields and access-control evidence (85)
+      synthetic: true
+    - value: "Facial recognition match review\nCustomer ID: C4471820\nName: Casey Rourke"
+      description: Person record naming facial recognition with identifiers only (75)
+      synthetic: true
   should_not_match:
-    - value: The biological sample was analysed
+    - value: "The biological sample was analysed"
       description: No biometric phrase matched by the Purview regex
-    - value: Face-to-face meeting scheduled
+    - value: "Face-to-face meeting scheduled"
       description: No biometric phrase present
+    - value: "Policy guidance: this procedure explains how biometric data and fingerprint scan records are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Biometric enrolment form\nName: ____________________\nEmployee ID: ____________________\nEnrolment ID: ____________________\nFinger position: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the retailer paused facial recognition in its stores after the privacy regulator questioned how biometric data was retained."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: Generic references to biological or facial in non-biometric contexts.
     mitigation: Require specific biometric technology keywords to co-occur.
@@ -49,7 +52,7 @@ exports:
 scope: narrow
 risk_rating: 5
 risk_description: >-
-  The canonical Australian Biometric Data Reference is a keyword-list signal for biometric data, templates, fingerprints, facial recognition, voiceprints, and similar terms. One match may identify material worth investigating, yet it does not contain a face image, fingerprint pattern, voice sample, or machine-readable biometric template. Policy statements and technology descriptions can trigger it without referring to any enrolled individual. Risk 5 and OFFICIAL recognise the sensitivity cue while confining SENSITIVE treatment to actual person-linked biometric material.
+  The detector recognises biometric data phrases (templates, fingerprints, facial recognition, iris scans, voiceprints) and enforces only when they sit with a populated person identifier; policy statements and technology descriptions stay at 65 discovery. One match may identify material worth investigating, yet it does not contain a face image, fingerprint pattern, voice sample, or machine-readable biometric template. Policy statements and technology descriptions can trigger it without referring to any enrolled individual. Risk 5 and OFFICIAL recognise the sensitivity cue while confining SENSITIVE treatment to actual person-linked biometric material.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -61,60 +64,91 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
-  regexes:
-    - id: Pattern_biometric_phrase
-      pattern: >-
-        (?i)\b(?:biometric\s+(?:data|template|identifier|scan|record)|fingerprint\s+(?:scan|data|template)|facial\s+recognition|iris\s+scan|retina\s+scan|voiceprint|palm\s+print|liveness\s+detection)\b
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_biometric_phrase
       matches:
-        - ref: Evidence_biometric_context
-        - ref: Evidence_data_operations
+        - ref: Regex_global_biometric_data_reference_person_fields
+        - ref: Regex_global_biometric_data_reference_biometric_fields
+        - ref: Evidence_biometric_record_evidence
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_biometric_data_reference_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_biometric_phrase
       matches:
-        - ref: Evidence_biometric_context
+        - ref: Regex_global_biometric_data_reference_person_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_biometric_data_reference_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_biometric_phrase
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Pattern_biometric_phrase
+      pattern: (?i)\b(?:biometric\s+(?:data|template|identifier|scan|record)|fingerprint\s+(?:scan|data|template)|facial\s+recognition|iris\s+scan|retina\s+scan|voiceprint|palm\s+print|liveness\s+detection)\b
+    - id: Regex_global_biometric_data_reference_person_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|employee(?:\s+name)?|(?:employee|staff|member|customer|client|patient|participant|respondent|person|applicant|voter|record)\s*(?:no\.?|number|ID)|staff\s+member|member(?:\s+name)?|patient(?:\s+name)?|client(?:\s+name)?|customer(?:\s+name)?|applicant(?:\s+name)?|data\s+subject|resident(?:\s+name)?)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_global_biometric_data_reference_biometric_fields
+      pattern: (?i)\b(?:(?:biometric|enrolment|enrollment|capture|sensor)\s*(?:ID|date|type|quality)|match\s+score|finger(?:print)?\s+(?:position|index)|modality|quality\s+score|liveness(?:\s+result)?|capture\s+device)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_biometric_context
+    - id: Evidence_biometric_record_evidence
       groups:
         - match_style: word
           terms:
-            - biometric
-            - biometrics
-            - physiological
+            - enrolled
+            - minutiae
+            - false match rate
+            - matched against
+            - access control
+            - time and attendance
             - identity verification
-            - authentication
-      strength: domain
-    - id: Evidence_data_operations
+      strength: specific
+    - id: Keyword_global_biometric_data_reference_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - data
-            - collection
-            - storage
-            - processing
-            - database
-            - record
-            - template
-            - scan
-            - capture
-      strength: domain
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+            - public policy document
+            - public policy guidance
+            - public dataset
+            - aggregate statistics
+            - aggregate report
+            - academic paper
+            - blank questionnaire
+            - awareness campaign
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75 was gated only by record-context keywords (generic 'biometric', 'authentication', and data-operation words such as 'data' and 'record') that appear in policy and survey-design text, and 85 evidence could repeat the primary. 75 now requires the attribute to sit with a populated identified-person field (name, DOB, member/employee/patient ID) and 85 requires person fields plus a populated biometric record field (enrolment/capture ID, capture date, match/quality score, finger position) plus independent record evidence; policy text naming the category stays at 65. Bare-phrase tests replaced with populated person records; added policy, blank-form and news decoys; public-context exclusions folded into the guidance exclusion group. Regulations: removed HRIPA (Cth) and My Health Records Act 2012 (Cth); references added. Known limitation: the shared template-exclusion dictionary lists the bare word 'template', so records that say 'biometric template' are suppressed on every tier."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 519 without changing detector or package metadata.'
@@ -141,3 +175,10 @@ keywords:
   - biometric template
   - biometric identifier
   - liveness detection
+references:
+  - url: https://gdpr-info.eu/art-9-gdpr/
+    title: GDPR Article 9 - processing of special categories of personal data (biometric data for unique identification)
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-sensitive-information
+    title: OAIC - What is sensitive information
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)

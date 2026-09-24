@@ -1,26 +1,25 @@
 schema: testpattern/v1
 name: QLD Mental Health Assessment and Involuntary Treatment
 slug: au-qld-mental-health-assessment
-version: 1.3.3
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
 description: >-
-  Detects Queensland mental health assessment and involuntary treatment records, including psychiatric evaluations,
-  Mental Health Act 2016 (Qld) involuntary treatment orders (ITOs), treatment authority documents, and Mental Health
-  Review Tribunal decisions affecting compulsory treatment.
+  Detects Queensland mental health assessment and involuntary treatment records - psychiatric assessments and evaluations, mental state examinations, examination and treatment authorities, forensic orders, recommendations for assessment and Mental Health Review Tribunal matters - when the phrase sits with populated patient identifiers and assessment fields.
 operation: >-
-  Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters. Consolidated coverage (merge
-  qg-1): also covers the former mental-health-involuntary-treatment-order detector scope.
+  Primary: mental health / psychiatric assessment or evaluation, mental state examination, involuntary treatment or admission, treatment authority, examination authority, forensic order, recommendation for assessment, Mental Health Review Tribunal. 65 (discovery only): phrase alone. 75: phrase plus a populated patient identifier field. 85: patient field plus a populated assessment field (diagnosis, mental state, risk rating, legal status, treatment criteria, authorised doctor/psychiatrist, review date, presenting problem, category) plus independent Mental Health Act 2016 or clinical-risk evidence. Template and guidance/training framing excluded from 75/85. Converted from keyword_list to regex.
+pattern: (?i)\b(?:mental\s+health\s+(?:assessment|evaluation)|psychiatric\s+(?:assessment|evaluation)|mental\s+state\s+examination|involuntary\s+(?:treatment|admission)|(?:treatment|examination)\s+authority|forensic\s+order|recommendation\s+for\s+assessment|Mental\s+Health\s+Review\s+Tribunal)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium: enforce tiers need a populated patient identifier; 85 also needs an assessment field and statutory or clinical-risk evidence. Awareness campaigns, Act commentary and training stay at 65.
 jurisdictions:
   - au
 regulations:
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - Mental Health Act 2016 (Qld)
+  - Hospital and Health Boards Act 2011 (Qld)
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -31,25 +30,25 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: Mental health assessment scheduled
-      description: Exact 65 discovery probe with an assessment phrase and no case context
-    - value: Mental health assessment for a patient risk formulation
-      description: Exact 75 probe with clinical assessment context
-    - value: Mental health assessment for a patient under a treatment authority
-      description: Exact 85 probe with clinical and Mental Health Act context
-    - value: 'Mental health assessment: involuntary treatment authority under Mental Health Act'
-      description: Assessment under involuntary treatment authority
-    - value: Psychiatric assessment for mental health tribunal forensic order review
-      description: Test match 2
-    - value: QLD mental health review with examination authority and treatment plan
-      description: Test match 3
+    - value: "PSYCHIATRIC ASSESSMENT - Townsville Hospital and Health Service\nPatient: Jordan Whitlock\nURN: 330918\nDOB: 09/09/1979\nLegal status: Treatment authority (Mental Health Act 2016)\nProvisional diagnosis: Schizoaffective disorder, relapse\nRisk rating: High - suicidal ideation with plan\nAuthorised psychiatrist: Dr Priya Ramanathan"
+      description: Populated psychiatric assessment with patient, assessment fields and Mental Health Act evidence (85)
+      synthetic: true
+    - value: "Mental health assessment requested by ED\nPatient name: Casey Rourke\nMRN: 5540921"
+      description: Assessment request with labelled patient identifiers only (75)
+      synthetic: true
   should_not_match:
-    - value: Mental health awareness campaign
+    - value: "Mental health awareness campaign"
       description: Non-match 1
-    - value: Check your mental health at the door
+    - value: "Check your mental health at the door"
       description: Non-match 2
-    - value: Mental health evaluation software module release notes
+    - value: "Mental health evaluation software module release notes"
       description: Evaluation phrase in product documentation must remain discovery-only
+    - value: "Policy guidance: this procedure explains how mental health assessment records are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Recommendation for assessment\nPatient name: ____________________\nURN: ____________________\nDate of birth: ____________________\nProvisional diagnosis: ____________________\nRisk rating: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the Mental Health Review Tribunal heard more involuntary treatment reviews this year, and the Chief Psychiatrist released updated guidance on the less restrictive way."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: Mental health awareness content in non-clinical contexts.
     mitigation: Require clinical assessment terms like involuntary treatment or mental health tribunal.
@@ -71,112 +70,86 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match:
-        type: any
-        ids:
-          - Pattern_mental_health
-          - Pattern_psychiatric
+      id_match: Pattern_mental_health
       matches:
-        - ref: Evidence_clinical_assessment_context
+        - ref: Regex_au_qld_mental_health_assessment_patient_fields
+        - ref: Regex_au_qld_mental_health_assessment_assessment_fields
         - ref: Evidence_mha_2016
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_mental_health_assessment_guidance_exclusion
     - confidence_level: 75
-      id_match:
-        type: any
-        ids:
-          - Pattern_mental_health
-          - Pattern_psychiatric
+      id_match: Pattern_mental_health
       matches:
-        - ref: Evidence_clinical_assessment_context
+        - ref: Regex_au_qld_mental_health_assessment_patient_fields
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_mental_health_assessment_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match:
-        type: any
-        ids:
-          - Pattern_mental_health
-          - Pattern_psychiatric
+      id_match: Pattern_mental_health
       matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_mental_health
-      pattern: (?i)\b(?:mental\s+health\s+(?:assessment|act|evaluation)|psychiatric\s+(?:assessment|evaluation)|mha\s+2016)\b
-    - id: Pattern_psychiatric
-      pattern: >-
-        (?i)\b(?:chief\s+psychiatrist|involuntary\s+(?:treatment|admission)|mental\s+illness\s+(?:assessment|treatment))\b
+      pattern: (?i)\b(?:mental\s+health\s+(?:assessment|evaluation)|psychiatric\s+(?:assessment|evaluation)|mental\s+state\s+examination|involuntary\s+(?:treatment|admission)|(?:treatment|examination)\s+authority|forensic\s+order|recommendation\s+for\s+assessment|Mental\s+Health\s+Review\s+Tribunal)\b
+    - id: Regex_au_qld_mental_health_assessment_patient_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|patient(?:\s+name)?|URN|UR\s*(?:no\.?|number)|MRN|medical\s+record\s+(?:no\.?|number)|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|IHI|DVA\s+(?:no\.?|number)|(?:patient|client|hospital|case|file|episode)\s*(?:no\.?|number|ID)|(?:referring|treating|requesting)\s+(?:doctor|practitioner|clinician|psychiatrist)|clinician|consultant)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_au_qld_mental_health_assessment_assessment_fields
+      pattern: (?i)\b(?:diagnosis|provisional\s+diagnosis|mental\s+state(?:\s+examination)?|MSE|risk\s+(?:assessment|rating|level)|legal\s+status|treatment\s+criteria|authorised\s+(?:doctor|psychiatrist)|review\s+date|presenting\s+(?:problem|complaint)|category)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_mental_health
-      groups:
-        - match_style: word
-          terms:
-            - mental health assessment
-            - psychiatric assessment
-            - psychiatric evaluation
-            - mental illness
-            - risk assessment
-            - involuntary treatment
-            - capacity assessment
-            - VRAM
-      strength: specific
     - id: Evidence_mha_2016
       groups:
         - match_style: word
           terms:
             - Mental Health Act 2016
-            - MHA 2016
+            - authorised doctor
+            - authorised psychiatrist
             - Chief Psychiatrist
-            - treatment authority
-            - forensic order
-            - mental health tribunal
-      strength: specific
-    - id: Evidence_qld_health_forms
-      groups:
-        - match_style: word
-          terms:
-            - Queensland Health
-            - Hospital and Health Service
-            - text: HHS
-              case_sensitive: true
-            - health.qld.gov.au
-            - QH-IMP
-            - Pathology Queensland
-            - Clinical Excellence Queensland
-      strength: specific
-    - id: Evidence_clinical_assessment_context
-      groups:
-        - match_style: word
-          terms:
-            - patient
+            - less restrictive way
             - risk formulation
-            - treatment plan
-            - capacity assessment
-            - diagnosis
-            - medication
-            - involuntary treatment
-            - clinician
+            - suicidal ideation
+            - capacity to consent
+            - nature and extent
       strength: specific
+    - id: Keyword_au_qld_mental_health_assessment_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75 fired on the primary alone ('involuntary treatment') and 85 evidence repeated primary terms. 75 now needs a populated patient identifier and 85 needs patient fields plus an assessment field (diagnosis, legal status, risk rating, authorised psychiatrist) plus Mental Health Act/clinical-risk evidence. Primary no longer matches the bare Act name. Bare-phrase tests replaced with populated records plus policy, blank-form and news decoys. Removed HRIPA (Cth) and My Health Records Act 2012 (Cth); added Mental Health Act 2016 (Qld) and Hospital and Health Boards Act 2011 (Qld); references added."
   - version: 1.3.3
     date: '2026-07-19'
     description: >-
@@ -226,3 +199,10 @@ remediation:
       - Mapped non-canonical confidence 80 to 75.
       - Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.
       - Aligned recommended_confidence to 85.
+references:
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2016-005
+    title: Mental Health Act 2016 (Qld)
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2011-032
+    title: Hospital and Health Boards Act 2011 (Qld) - Part 7 confidentiality of patient information
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+    title: Information Privacy Act 2009 (Qld)

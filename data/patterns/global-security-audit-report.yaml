@@ -1,56 +1,69 @@
 schema: testpattern/v1
 name: Security Audit Report
 slug: global-security-audit-report
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: concept
-description: Detects security audit reports including SOC 2, ISO 27001, and IRAP findings.
+description: >-
+  Detects populated security audit and assurance reports (SOC 2 Type I/II, ISO/IEC 27001 audits, SSAE 18, IRAP and security control assessments) that carry finding/exception references, severity ratings, technical evidence (hosts, IPs, CVEs) or audit scope details. Phrase-only mentions stay discovery-only.
 operation: >-
-  A SOC 2, ISO 27001, SSAE 18, security-audit, or security-control report title is discovery-only at
-  65. Security-control objectives, activities, trust-service criteria, Annex A, or applicability
-  evidence raises it to 75. The 85 tier additionally requires a classified audit finding, exception,
-  non-compliance, deviation, or required action. Enforcing tiers reject templates and examples.
+  Pattern type: regex. Primary: SOC 2 Type I/II (report), ISO/IEC 27001 audit/assessment, SSAE 18, (information/cyber) security audit/control report or assessment, IRAP assessment. 65 (discovery only): primary alone. 75: primary plus one populated structure - finding/exception/nonconformity reference with a digit, rating/severity value, technical evidence (IPv4, CVE ID, internal hostname, host/asset ID field), or audit scope field (audited entity, service organisation, audit period, report date, lead auditor). 85: primary plus two distinct structures (the four above or a control reference such as A.8.2, CC6.1, ISM-1234) plus assurance evidence (control objective/activity, trust services criteria, Statement of Applicability, exception noted, qualified opinion, operating effectiveness, CUECs, nonconformity). Template/sample and guidance framing excluded on every enforce tier.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Enforce tiers require populated finding, rating, technical or scope fields beside the audit-report phrase; vendor assurance pages, SOC 2 explainers and certification news stay at 65. Medium because redacted public trust-centre summaries can still carry scope fields. Removed clearance-vetting terms (NV1/NV2/AGSVA) that did not relate to audit reports.
 jurisdictions:
   - global
 regulations:
-- "AML/CTF Act (Cth)"
-- "IPA 2009 (Qld)"
-- "Privacy Act 1988 (Cth)"
+  - IPA 2009 (Qld)
+  - Privacy Act 1988 (Cth)
 frameworks:
-- ISO 27001
-- NIST CSF
-- PCI-DSS
+  - ISO 27001
+  - NIST CSF
+  - PCI-DSS
 data_categories:
   - security
   - audit
 test_cases:
   should_match:
-    - value: 'Security audit report'
-      description: Low-tier probe - report title without control evidence
-    - value: 'Security audit report: control objective, control activity, and trust services criteria reviewed.'
-      description: Medium-tier probe - security-control evidence without a classified finding
-    - value: 'Security audit report: control objective and Annex A review found a high risk finding, audit exception, and required action.'
-      description: High-tier probe - security-control evidence plus classified findings
+    - value: "SOC 2 Type II report - CONFIDENTIAL\nService organisation: Cloudbank Payments Pty Ltd\nAudit period: 01/07/2025 to 30/06/2026\nException ID: EX-04\nSeverity: High\nControl CC6.1: 3 of 40 terminated users retained VPN access on host vpn01.corp (10.20.30.40). Exception noted; operating effectiveness not achieved for this control activity."
+      description: Populated SOC 2 report - scope, exception, severity, host evidence and control reference (85)
+      synthetic: true
+    - value: "Security audit report\nLead auditor: Priya Ramanathan\nFieldwork was completed at the Brisbane office."
+      description: Report with a single populated scope field (75)
+      synthetic: true
   should_not_match:
-    - value: Security guard audit of premises
-      description: Physical-security sibling
-    - value: Home security system review
-      description: Consumer-security sibling
-    - value: 'The public assurance page links to a security audit report.'
-      description: Public link mentions only the report title
-    - value: 'Template example: security audit report with control objective, Annex A, high risk finding, audit exception, and required action.'
-      description: Template contains otherwise high-tier evidence
+    - value: "Fact sheet: a SOC 2 Type II report tests whether controls operated effectively over a period. Ask vendors for their latest report and check the trust services criteria and any exceptions."
+      description: Explainer naming the report type without values
+      synthetic: true
+    - value: "SECURITY AUDIT REPORT\nAudited entity: __________\nAudit period: __________\nFinding ID: __________\nSeverity: __________"
+      description: Blank report form - placeholder values
+      synthetic: true
+    - value: "The company said its ISO 27001 certification audit found no major issues, according to a statement released on Monday."
+      description: Certification news item
+      synthetic: true
+    - value: "Security guard audit of premises"
+      description: Unrelated
+      synthetic: true
+    - value: "Home security system review"
+      description: Unrelated
+      synthetic: true
+    - value: "The public assurance page links to a security audit report."
+      description: Public page reference
+      synthetic: true
+    - value: "Template example: security audit report with control objective, Annex A, high risk finding, audit exception, and required action."
+      description: Template framing
+      synthetic: true
 false_positives:
-  - description: Physical security or home security references.
-    mitigation: Require IT security framework terms like SOC 2, ISO 27001, or IRAP.
+  - description: Vendor trust-centre pages and SOC 2 / ISO 27001 explainers.
+    mitigation: No populated finding, rating, technical or scope fields, and guidance framing is excluded.
+  - description: Penetration test and vulnerability reports that mention an audit framework.
+    mitigation: They can reach 75/85 through technical evidence; they are equally sensitive.
 exports:
   - yaml
 scope: narrow
 risk_rating: 8
 risk_description: >-
-  The keyword list identifies a security audit report by combining SOC 2, ISO 27001, IRAP, control-assessment, and audit-finding language; physical-security or home-security reviews are excluded. A genuine report can expose failed controls, exceptions, and remediation priorities that help an attacker select weak points or undermine assurance activity. The usual unit is a bounded assurance report whose findings may be process or compliance oriented rather than directly exploitable. Risk 8 and SENSITIVE InfoTech fit that serious organisational exposure; PROTECTED requires attack-ready weaknesses, critical-system scope, or significant operational damage.
+  The keyword list identifies a security audit report by combining SOC 2, ISO 27001, IRAP, control-assessment, and audit-finding language; physical-security or home-security reviews are excluded. A genuine report can expose failed controls, exceptions, and remediation priorities that help an attacker select weak points or undermine assurance activity. The usual unit is a bounded assurance report whose findings may be process or compliance oriented rather than directly exploitable. Risk 8 and SENSITIVE InfoTech fit that serious organisational exposure; PROTECTED requires attack-ready weaknesses, critical-system scope, or significant operational damage. Quality pass 2026-09-24: enforce tiers (75/85) now require populated record structure (labelled fields with real values, identifiers or data rows); phrase-only mentions in guidance, marketing, blank forms and news stay at 65 discovery.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -61,7 +74,7 @@ sensitivity_labels:
   ca_gov: "Protected B"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -70,93 +83,113 @@ purview:
     - confidence_level: 85
       id_match: Regex_security_audit_framework
       matches:
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_global_security_audit_report_finding_reference
+            - Regex_global_security_audit_report_rating
+            - Regex_global_security_audit_report_technical
+            - Regex_global_security_audit_report_scope
+            - Regex_global_security_audit_report_control_reference
         - ref: Keyword_security_controls
-        - ref: Keyword_audit_finding_classification
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_security_audit_report_guidance_exclusion
     - confidence_level: 75
       id_match: Regex_security_audit_framework
       matches:
-        - ref: Keyword_security_controls
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_global_security_audit_report_finding_reference
+            - Regex_global_security_audit_report_rating
+            - Regex_global_security_audit_report_technical
+            - Regex_global_security_audit_report_scope
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_security_audit_report_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_security_audit_framework
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_security_audit_framework
-      pattern: >-
-        (?i)\b(?:soc\s+2\s+(?:type\s+)?[i]{1,2}|iso[\s/]?(?:iec\s+)?27001\s+(?:audit|assessment|certification)|ssae\s+18|security\s+(?:audit|control)\s+(?:report|assessment))\b
+      pattern: (?i)\b(?:soc\s+2\s+(?:type\s+)?(?:ii|i|1|2)\b(?:\s+report)?|iso[\s/]?(?:iec\s+)?27001\s+(?:audit|assessment|certification\s+audit)|ssae\s+18|(?:information\s+|cyber\s+)?security\s+(?:audit|control)\s+(?:report|assessment)|irap\s+assessment(?:\s+report)?)
+    - id: Regex_global_security_audit_report_finding_reference
+      pattern: (?i)\b(?:(?:finding|issue|observation|exception|nonconformity|non-conformity|NC)\s*(?:no\.?|number|ID|ref(?:erence)?|#))(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)(?=[A-Z/.-]{0,12}\d)[A-Z0-9][A-Z0-9/.-]{0,24}
+    - id: Regex_global_security_audit_report_rating
+      pattern: (?i)\b(?:(?:risk\s+)?rating|severity|risk\s+level|classification|priority|deficiency\s+type)[ \t]{0,3}[:#][ \t]{0,3}(?:extreme|high|medium|moderate|low|critical|significant(?:\s+deficiency)?|material\s+weakness|major|minor|P[1-4])\b
+    - id: Regex_global_security_audit_report_technical
+      pattern: (?i)\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:/\d{1,2})?\b|\bCVE-\d{4}-\d{4,7}\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:hostname|host|asset\s+ID|device\s+ID)[ \t]{0,3}:[ \t]{0,3}(?!_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9._\\@-]{2,63}
+    - id: Regex_global_security_audit_report_scope
+      pattern: (?i)\b(?:audited\s+entity|client|service\s+organi[sz]ation|audit\s+period|period\s+(?:under\s+review|covered)|report\s+date|lead\s+auditor|auditor)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)[A-Z0-9$][A-Za-z0-9/&'.,$%-]{0,40}(?:[ \t]{1,3}[A-Za-z0-9&$][A-Za-z0-9/&'.,$%-]{0,30}){0,5}
+    - id: Regex_global_security_audit_report_control_reference
+      pattern: (?i)\b(?:A\.\d{1,2}\.\d{1,2}(?:\.\d{1,2})?|CC\d\.\d{1,2}|ISM-\d{4})\b
   keywords:
     - id: Keyword_security_controls
       groups:
         - match_style: word
           terms:
-            - security control
             - control objective
             - control activity
             - trust services criteria
-            - common criteria
-            - Annex A
             - Statement of Applicability
-            - text: SOA
-              case_sensitive: true
-            - text: NV1
-              case_sensitive: true
-            - text: NV2
-              case_sensitive: true
-            - text: PV
-              case_sensitive: true
-            - Baseline clearance
-            - Negative Vetting
-            - Positive Vetting
-            - AGSVA
-            - security clearance
-            - DISP
-            - DSPF
-            - DSGL
+            - Annex A
+            - exception noted
+            - qualified opinion
+            - operating effectiveness
+            - complementary user entity controls
+            - bridge letter
+            - nonconformity
+            - corrective action request
       strength: domain
-    - id: Keyword_audit_finding_classification
+    - id: Keyword_global_security_audit_report_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - critical finding
-            - high risk finding
-            - medium risk finding
-            - low risk finding
-            - priority one
-            - priority two
-            - priority three
-            - required action
-            - audit observation
-            - audit exception
-            - non-compliance
-            - deviation
-      strength: specific
-    - id: Keyword_audit_general
-      groups:
-        - match_style: word
-          terms:
-            - internal audit
-            - audit report
-            - audit findings
-            - audit opinion
-            - audit scope
-            - audit objective
-            - audit conclusion
-            - audit recommendation
-            - IIA standards
-            - IPPF
-      strength: specific
+            - policy guidance
+            - guidance note
+            - this guideline
+            - this procedure
+            - fact sheet
+            - training module
+            - e-learning
+            - course notes
+            - media release
+            - press release
+            - news report
+            - frequently asked questions
+            - best practice guide
+            - white paper
+            - whitepaper
+            - webinar
+            - how-to guide
+            - user guide
+            - help centre article
+            - help center article
+            - security guard
+            - home security
+            - assurance page
+            - how to prepare for
+      strength: noise
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: >-
+      Quality pass (2026-09-24): 75 and 85 were phrase-only keyword tiers and the control keyword group mixed in security-clearance terms (NV1/NV2/PV/AGSVA/DISP); 75 now needs a populated finding reference, rating, technical evidence or audit scope field and 85 needs two distinct structures plus assurance evidence; replaced the clearance terms with assurance vocabulary; replaced the bare-phrase positive; added explainer, blank-form and news decoys; dropped AML/CTF Act and added verified ISM / CPS 234 references.
   - version: 1.4.0
     date: '2026-07-19'
     description: 'Profile quality: align the regex-backed detector type; add report-title discovery, security-control medium, and classified-finding high tiers; add public/template adversarial probes.'
@@ -192,3 +225,21 @@ remediation:
     status: applied
     changes:
       - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
+references:
+  - title: ACSC Information Security Manual (ISM)
+    url: https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/ism
+  - title: APRA CPS 234 Information Security
+    url: https://handbook.apra.gov.au/standard/cps-234
+corroborative_evidence:
+  keywords:
+    - control objective
+    - control activity
+    - trust services criteria
+    - Statement of Applicability
+    - Annex A
+    - exception noted
+    - qualified opinion
+    - operating effectiveness
+    - complementary user entity controls
+    - bridge letter
+  proximity: 300

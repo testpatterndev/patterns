@@ -1,21 +1,26 @@
 schema: testpattern/v1
 name: QLD Health Patient Consent
 slug: au-qld-health-patient-consent
-version: 1.3.2
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
-description: Detects QLD Health patient consent forms including advance directives and enduring power of attorney documents.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+description: >-
+  Detects completed Queensland patient consent records - informed, treatment, surgical and anaesthetic consent forms, advance health directives and enduring power of attorney (health) documents - when the consent phrase sits with populated patient identifiers and consent form fields.
+operation: >-
+  Primary: patient/treatment/surgical/anaesthetic consent (form), informed consent, consent to treatment, advance health directive, EPOA (health). 65 (discovery only): phrase alone. 75: phrase plus a populated patient identifier field. 85: patient field plus a populated consent field (procedure or proposed treatment, anaesthetic, consenting doctor, substitute decision-maker, relationship to patient, interpreter, date signed, witness) plus independent clinical-consent evidence (material risks, risks and benefits, alternative treatment, decision-making capacity, blood transfusion, general anaesthetic, sedation). Template and guidance/training framing excluded from 75/85. Converted from keyword_list to regex.
+pattern: (?i)\b(?:(?:patient|treatment|surgical|anaesthetic)\s+consent(?:\s+form)?|informed\s+consent|consent\s+to\s+treatment|advance\s+health\s+directive|EPOA(?:\s+health)?)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium: enforce tiers need a populated patient identifier; 85 also needs a consent field and clinical-consent evidence. Consent policies, website cookie notices and training material stay at 65.
 jurisdictions:
   - au
 regulations:
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - Hospital and Health Boards Act 2011 (Qld)
+  - Powers of Attorney Act 1998 (Qld)
+  - Guardianship and Administration Act 2000 (Qld)
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -27,25 +32,25 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: Informed consent notice
-      description: Exact 65 discovery probe with a consent phrase and no clinical detail
-    - value: Informed consent for surgical procedure
-      description: Exact 75 probe with clinical consent context
-    - value: Queensland Health informed consent for surgical procedure
-      description: Exact 85 probe with clinical detail and QLD Health provenance
-    - value: 'Patient consent form: informed consent for surgical procedure'
-      description: Patient surgical consent form
-    - value: Advance health directive and enduring power of attorney (EPOA) registered
-      description: Test match 2
-    - value: QLD Health treatment consent with substitute decision maker details
-      description: Test match 3
+    - value: "Patient consent form - Gold Coast Hospital and Health Service\nPatient name: Avery Teston\nURN: 004418273\nDOB: 04/02/1991\nProposed procedure: Laparoscopic cholecystectomy\nAnaesthetic: General\nConsenting doctor: Dr Jordan Staffson\nMaterial risks and alternative treatment discussed; patient has decision-making capacity."
+      description: Populated surgical consent with patient, consent fields and clinical-consent evidence (85)
+      synthetic: true
+    - value: "Informed consent recorded in the chart\nPatient: Casey Rourke\nMRN: 5540921"
+      description: Informed consent note with labelled patient identifiers only (75)
+      synthetic: true
   should_not_match:
-    - value: Cookie consent banner on website
+    - value: "Cookie consent banner on website"
       description: Non-match 1
-    - value: Consent to receive marketing emails
+    - value: "Consent to receive marketing emails"
       description: Non-match 2
-    - value: Patient election form training session agenda
+    - value: "Patient election form training session agenda"
       description: Training reference must remain discovery-only
+    - value: "Policy guidance: this procedure explains how informed consent forms are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Patient consent form\nPatient name: ____________________\nURN: ____________________\nProposed procedure: ____________________\nConsenting doctor: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "Training: the informed consent module covers material risks, interpreters and substitute decision-makers, with worked scenarios for nursing staff."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: Digital consent in non-health contexts.
     mitigation: Require clinical consent terms like patient, surgical, or advance directive.
@@ -54,7 +59,7 @@ exports:
 scope: narrow
 risk_rating: 8
 risk_description: >-
-  The classifier identifies treatment and surgical consent, advance health directives, enduring powers of attorney, substitute decision makers, and Queensland Health consent forms. A genuine document reveals the patient's contemplated procedure, capacity or decision-making arrangements, chosen representative, and legal authorization, allowing coercion, treatment interference, or exposure of sensitive health choices. One consent form has bounded scope but combines clinical and legal facts whose misuse can have serious personal consequences. Risk 8 and SENSITIVE are proportionate; PROTECTED would require a vulnerable-person register, privileged legal strategy, or compromise causing significant and irreversible care harm.
+  The detector recognises treatment, surgical and informed consent, advance health directive and EPOA language and enforces only when populated patient identifier fields sit nearby; phrase-only text stays at 65 discovery. A genuine document reveals the patient's contemplated procedure, capacity or decision-making arrangements, chosen representative, and legal authorization, allowing coercion, treatment interference, or exposure of sensitive health choices. One consent form has bounded scope but combines clinical and legal facts whose misuse can have serious personal consequences. Risk 8 and SENSITIVE are proportionate; PROTECTED would require a vulnerable-person register, privileged legal strategy, or compromise causing significant and irreversible care harm.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -65,31 +70,34 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_health_consent
       matches:
+        - ref: Regex_au_qld_health_patient_consent_patient_fields
+        - ref: Regex_au_qld_health_patient_consent_consent_fields
         - ref: Evidence_clinical_consent_context
-        - ref: Evidence_qld_health_forms
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_health_patient_consent_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_health_consent
       matches:
-        - ref: Evidence_clinical_consent_context
+        - ref: Regex_au_qld_health_patient_consent_patient_fields
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_health_patient_consent_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_health_consent
@@ -98,69 +106,50 @@ purview:
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
   regexes:
-    - id: Pattern_qld_health
-      pattern: (?i)\b(?:queensland\s+health|hospital\s+and\s+health\s+service|hhs)\b
     - id: Pattern_health_consent
-      pattern: (?i)\b(?:(?:patient|treatment|surgical)\s+(?:consent|election)(?:\s+form)?|informed\s+consent|advance\s+health\s+directive|epoa(?:\s+health)?)\b
+      pattern: (?i)\b(?:(?:patient|treatment|surgical|anaesthetic)\s+consent(?:\s+form)?|informed\s+consent|consent\s+to\s+treatment|advance\s+health\s+directive|EPOA(?:\s+health)?)\b
+    - id: Regex_au_qld_health_patient_consent_patient_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|patient(?:\s+name)?|URN|UR\s*(?:no\.?|number)|MRN|medical\s+record\s+(?:no\.?|number)|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|IHI|DVA\s+(?:no\.?|number)|(?:patient|client|hospital|case|file|episode)\s*(?:no\.?|number|ID)|(?:referring|treating|requesting)\s+(?:doctor|practitioner|clinician|psychiatrist)|clinician|consultant)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_au_qld_health_patient_consent_consent_fields
+      pattern: (?i)\b(?:procedure|proposed\s+(?:procedure|treatment)|operation|anaesthetic(?:\s+type)?|consenting\s+(?:doctor|clinician|practitioner)|substitute\s+decision[\s-]+maker|relationship\s+to\s+patient|interpreter|date\s+(?:signed|of\s+consent)|witness)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_patient_consent
-      groups:
-        - match_style: word
-          terms:
-            - patient consent
-            - informed consent
-            - patient election
-            - consent form
-            - advance health directive
-            - text: AHD
-              case_sensitive: true
-            - enduring power of attorney
-            - EPOA
-            - health care wishes
-      strength: specific
-    - id: Evidence_qld_health_forms
-      groups:
-        - match_style: word
-          terms:
-            - Queensland Health
-            - QLD Health
-            - Hospital and Health Service
-            - text: HHS
-              case_sensitive: true
-            - health.qld.gov.au
-            - QH-IMP
-            - Pathology Queensland
-            - Clinical Excellence Queensland
-      strength: specific
-    - id: Evidence_qld_government
-      groups:
-        - match_style: word
-          terms:
-            - Queensland Government
-            - State of Queensland
-            - QLD Government
-            - qld.gov.au
-            - Information Privacy Act 2009
-            - Queensland Privacy Principles
-      strength: specific
     - id: Evidence_clinical_consent_context
       groups:
         - match_style: word
           terms:
-            - surgical procedure
-            - treatment
-            - anaesthetic
-            - substitute decision maker
-            - decision-making capacity
+            - material risks
             - risks and benefits
-            - witness signature
-            - enduring power of attorney
+            - alternative treatment
+            - decision-making capacity
+            - blood transfusion
+            - general anaesthetic
+            - sedation
+            - Queensland Health
+            - Hospital and Health Service
       strength: specific
+    - id: Keyword_au_qld_health_patient_consent_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; the 75 tier fired on the primary alone ('treatment consent') - 75 now needs a populated patient identifier and 85 needs patient fields plus a consent field (procedure, anaesthetic, consenting doctor, substitute decision-maker, date signed) plus clinical-consent evidence. Bare-phrase tests replaced with populated records plus policy, blank-form and training decoys. Regulations: removed HRIPA (Cth) and My Health Records Act 2012 (Cth); added Hospital and Health Boards Act 2011 (Qld), Powers of Attorney Act 1998 (Qld), Guardianship and Administration Act 2000 (Qld); references added."
   - version: 1.3.2
     date: '2026-07-19'
     description: 'Targeted finance/health blocker remediation: keep consent phrases at 65 discovery, require independent clinical/legal details at 75 and QLD Health provenance at 85, broaden genuine treatment-consent coverage, and add exact-tier plus training probes.'
@@ -194,3 +183,10 @@ remediation:
     changes:
       - 'Mapped non-canonical confidence 95 to 85.'
       - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
+references:
+  - url: https://www.publications.qld.gov.au/dataset/power-of-attorney-and-advance-health-directive-forms
+    title: Queensland Government - Power of attorney and advance health directive forms
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2011-032
+    title: Hospital and Health Boards Act 2011 (Qld) - Part 7 confidentiality of patient information
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+    title: Information Privacy Act 2009 (Qld)

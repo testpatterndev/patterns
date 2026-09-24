@@ -1,63 +1,82 @@
 schema: testpattern/v1
 name: Incident timeline evidence
 slug: global-top500-296-incident-timeline-evidence
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies incident timeline evidence patterns in security and access control contexts. Detects potential exposure
-  of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative
-  evidence: 8 keywords within 300 characters. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
-  text.'
-pattern: (?i)\b(?:incident\s+timeline|timeline\s+of\s+events|event\s+timeline)\b
+description: >-
+  Detects incident timelines: timeline or chronology wording with timestamped entries and host, user or evidence-source artefacts. Timeline wording alone is discovery-only.
+operation: >-
+  Regex_incident_timeline_primary (incident timeline / chronology wording) is discovery-only at 65. 75 requires the primary plus one populated structure: a timestamped entry (ISO or d/m/yyyy hh:mm) or a host/user artefact (IPv4, internal hostname, labelled host/user/account/evidence source). 85 requires a timestamped entry (ISO or d/m/yyyy hh:mm) (two distinct hits), a host/user artefact (IPv4, internal hostname, labelled host/user/account/evidence source), and independent attack-phase (initial access, lateral movement, exfiltration, containment) evidence that does not repeat the primary. Every enforce tier rejects template/noise wording (template-exclusion) and guidance, policy, training and news framing (Keyword_incident_timeline_guidance_exclusion).
+pattern: >-
+  (?i)\b(?:incident\s+timeline|timeline\s+of\s+(?:events|the\s+incident|compromise)|attack\s+timeline|chronology\s+of\s+(?:events|the\s+incident)|event\s+timeline)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: the topic phrase alone is discovery-only; enforcement needs populated structure (a timestamped entry (ISO or d/m/yyyy hh:mm) or a host/user artefact (IPv4, internal hostname, labelled host/user/account/evidence source)), and 85 needs two distinct structures plus independent attack-phase (initial access, lateral movement, exfiltration, containment) evidence, so policies, blank forms and training text stay below 75.
 jurisdictions:
 - global
 regulations:
-- GDPR
+- Privacy Act 1988 (Cth)
+- NDB Scheme (Cth)
+- SOCI Act 2018 (Cth)
+frameworks:
+- ISO 27001
+- NIST CSF
 data_categories:
-- credentials
 - security
 corroborative_evidence:
   keywords:
-  - incident timeline evidence
-  - incident
-  - timeline
-  - evidence
-  - security
-  - operations
-  - threat
-  - data
+  - initial access
+  - lateral movement
+  - exfiltration
+  - containment
+  - eradication
+  - first observed
+  - privilege escalation
+  - ransomware
+  - phishing email
+  - persistence
   proximity: 300
 test_cases:
   should_match:
-  - value: Incident timeline
-    description: Topic phrase present
-  - value: incident timeline
-    description: Topic phrase, lowercase
-  - value: this record references the incident timeline held on file
-    description: Topic phrase within surrounding text
+  - value: The incident timeline will be finalised after the forensic review.
+    description: Discovery probe (65)
+    synthetic: true
+  - value: |-
+      Incident timeline
+      2026-09-12 03:14 first alert raised by the mail gateway
+    description: Medium-tier probe (75) - one timestamped entry
+    synthetic: true
+  - value: |-
+      Incident timeline - INC-2026-114
+      2026-09-12 03:14 phishing email delivered to avery.teston (initial access)
+      2026-09-12 03:41 macro executed on ws-fin-114.harbour.internal
+      2026-09-12 05:02 lateral movement to 10.20.4.31 using a stolen service account
+      2026-09-12 07:15 containment - hosts isolated.
+    description: High-tier probe (85) - multiple timestamps, host artefacts, attack phases
+    synthetic: true
   should_not_match:
   - value: unrelated generic text
     description: No relevant phrase context
   - value: placeholder value 12345
-    description: Random text should not match phrase marker
-  - value: generic policy prose without anchors
-    description: Should reject generic mentions without structural anchor terms
-  - value: template example placeholder record identifier
-    description: Template/sample context should be excluded even when anchor words are present
+    description: Random text should not match
+  - value: 'Policy statement: the incident manager maintains an incident timeline for every major incident.'
+    description: Policy text
+    synthetic: true
+  - value: |-
+      Incident timeline template
+      Date/time: ________
+      Host: [insert]
+      Action: ________
+    description: Blank template
+    synthetic: true
+  - value: 'News report: the company published a timeline of events showing attackers moved laterally on 12/09/2026 03:14 before containment.'
+    description: News framing
+    synthetic: true
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+- description: Project plans and history articles contain dated timelines.
+  mitigation: Enforcement needs incident/timeline wording plus timestamps and host/user artefacts; 85 also needs attack-phase context; guidance/news framing is excluded.
 exports:
 - purview_xml
 - yaml
@@ -65,34 +84,42 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
   - dict: template-exclusion
     as: Keyword_noise_exclusion
     match_style: word
   pattern_tiers:
   - confidence_level: 85
-    id_match: Regex_incident_timeline
+    id_match: Regex_incident_timeline_primary
     matches:
-    - ref: Keyword_incident_timeline
-    - ref: Pattern_global_top500_296_incident_timeline_evidence_label_context
+    - ref: Regex_incident_timeline_timestamp_row
+      min_count: 2
+      unique_results: true
+    - ref: Regex_incident_timeline_host_artefact
+    - ref: Keyword_incident_timeline_context
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_incident_timeline_guidance_exclusion
   - confidence_level: 75
-    id_match: Regex_incident_timeline
+    id_match: Regex_incident_timeline_primary
     matches:
-    - ref: Keyword_incident_timeline
+    - type: any
+      refs:
+      - Regex_incident_timeline_timestamp_row
+      - Regex_incident_timeline_host_artefact
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_incident_timeline_guidance_exclusion
   - confidence_level: 65
     discovery_only: true
-    id_match: Regex_incident_timeline
+    id_match: Regex_incident_timeline_primary
     matches:
     - type: any
       min_matches: 0
@@ -100,43 +127,50 @@ purview:
       refs:
       - Keyword_noise_exclusion
   regexes:
-  - id: Regex_incident_timeline
-    pattern: (?i)\b(?:incident\s+timeline|timeline\s+of\s+events|event\s+timeline)\b
-  - id: Pattern_global_top500_296_incident_timeline_evidence_label_context
-    pattern: (?i)\b(?:incident\s+timeline\s+evidence)\b
+  - id: Regex_incident_timeline_primary
+    pattern: >-
+      (?i)\b(?:incident\s+timeline|timeline\s+of\s+(?:events|the\s+incident|compromise)|attack\s+timeline|chronology\s+of\s+(?:events|the\s+incident)|event\s+timeline)\b
+  - id: Regex_incident_timeline_timestamp_row
+    pattern: >-
+      (?i)\b20\d{2}-[01]\d-[0-3]\d[T ]?[0-2]\d:[0-5]\d(?::[0-5]\d)?|\b[0-3]?\d/[01]?\d/20\d{2}\s+[0-2]?\d:[0-5]\d
+  - id: Regex_incident_timeline_host_artefact
+    pattern: >-
+      (?i)\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:host(?:name)?|user(?:name)?|account|source|evidence\s+(?:ref|item|source)|log\s+source)\s*[:=#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'._:@#+-]{1,60}
   keywords:
-  - id: Keyword_incident_timeline
+  - id: Keyword_incident_timeline_context
     groups:
     - match_style: word
       terms:
-      - incident timeline
-      - timeline of events
-      - event timeline
-      - incident response
-      - forensic evidence
-      - root cause
-      - breach notification
-      - containment
-      - remediation
-      - compromise
-      - attack vector
       - initial access
+      - lateral movement
+      - exfiltration
+      - containment
+      - eradication
+      - first observed
+      - privilege escalation
+      - ransomware
+      - phishing email
+      - persistence
     strength: specific
-  - id: Keyword_global_top500_296_incident_timeline_evidence_domain_context
+  - id: Keyword_incident_timeline_guidance_exclusion
     groups:
     - match_style: word
       terms:
-      - incident timeline evidence
-      - incident
-      - timeline
-      - evidence
+      - policy statement
+      - guidance note
+      - best practice guide
+      - media release
+      - press release
+      - news report
+      - course module
+      - learning objectives
+      - awareness course
+      - webinar
+      - lesson plan
+      - quiz question
     strength: domain
-risk_description: This classifier matches incident-timeline, timeline-of-events, or event-timeline phrases, signalling a chronology
-  record but not validating timestamps or evidence sources. A real incident timeline can expose when compromise occurred,
-  which controls fired, what responders knew, and how containment unfolded, helping an adversary contest evidence or adapt
-  future activity. The normal scale is one incident and its affected people, systems, and investigators, while generic project
-  timelines and response templates require contextual confirmation. Risk 8 SENSITIVE reflects serious contained investigative
-  harm; PROTECTED would require a critical or legally exceptional incident with significant consequences.
+risk_description: >-
+  The detector now requires incident-timeline wording plus timestamped entries and host/user artefacts before enforcing. A real incident timeline can expose when compromise occurred, which controls fired, what responders knew, and how containment unfolded, helping an adversary contest evidence or adapt future activity. The normal scale is one incident and its affected people, systems, and investigators, while generic project timelines and response templates require contextual confirmation. Risk 8 SENSITIVE reflects serious contained investigative harm; PROTECTED would require a critical or legally exceptional incident with significant consequences.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -146,31 +180,26 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: 'Quality pass (2026-09-24): self-corroborating keyword group removed; 75 needs a timestamped entry or host/user artefact; 85 needs two distinct timestamps, a host artefact and attack-phase context; guidance/news exclusion; populated timeline tests and decoys; GDPR replaced with Privacy Act 1988 (Cth), NDB Scheme (Cth) and SOCI Act; frameworks and NIST SP 800-61 reference added; credentials category removed.'
 - version: 1.3.1
   date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1847 without changing
-    detector or package metadata.'
+  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1847 without changing detector or package metadata.'
 - version: 1.3.0
   date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
+  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
 - version: 1.2.1
   date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
+  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
 - version: 1.2.0
   date: '2026-07-04'
-  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier
-    collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword
-    evidence at the same confidence level'
+  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword evidence at the same confidence level'
 - version: 1.1.0
   date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 references:
@@ -178,6 +207,7 @@ references:
 - https://www.legislation.gov.au/C2018A00029/latest/text
 - https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/preventing-preparing-for-and-responding-to-data-breaches/data-breach-preparation-and-response
 - https://handbook.apra.gov.au/standard/cps-234
+- https://csrc.nist.gov/pubs/sp/800/61/r3/final
 remediation:
   catalog_quality_2026_06_02:
     status: applied

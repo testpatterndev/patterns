@@ -1,23 +1,23 @@
 schema: testpattern/v1
 name: QLD School Incident Report
 slug: au-qld-school-incident-report
-version: 1.4.1
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
-description: Detects QLD school incident reports containing student behavioural and disciplinary details.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+description: >-
+  Detects Queensland school incident and student behaviour records for a named student - school/student incident reports, behaviour incident records, behaviour support plans and disciplinary absence (suspension/exclusion) records - when the phrase sits with populated student identifiers and incident fields.
+operation: >-
+  Primary: school/student/behaviour incident report, notification or record, behaviour incident, (individual) behaviour support plan, school disciplinary absence, short/long/charge-related suspension, proposed exclusion. 65 (discovery only): phrase alone. 75: phrase plus a populated student identifier field (student name, DOB, EQ ID, year level, parent/guardian, class). 85: student field plus a populated incident field (incident date/time/type/location, behaviour category, witnesses, reported by, action taken, consequence, injuries, SDA type) plus independent school-system evidence (OneSchool, Department of Education, State School, parent notified, Student Code of Conduct, duty of care). Template and guidance/training framing excluded from 75/85. Converted from keyword_list to regex.
+pattern: (?i)\b(?:(?:school|student|behaviour(?:al)?)\s+incident\s+(?:report|notification|record)|behaviour\s+incident|(?:individual\s+)?behaviour\s+support\s+plan|school\s+disciplinary\s+absence|(?:short|long|charge-related)[\s-]+suspension|proposed\s+exclusion)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium: enforce tiers need a populated student identifier; 85 also needs an incident field and school-system evidence. Behaviour policies, codes of conduct and news reports stay at 65.
 jurisdictions:
   - au
 regulations:
-  - AML/CTF Act (Cth)
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
-  - TIA Act 1979 (Cth)
+  - IPA 2009 (Qld)
+  - Education (General Provisions) Act 2006 (Qld)
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -28,17 +28,23 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: 'School incident report: student behaviour and disciplinary suspension'
-      description: Test match 1
-    - value: OneSchool behavioural incident record with student welfare assessment
-      description: Test match 2
-    - value: QLD school discipline exclusion report and duty of care documentation
-      description: Test match 3
+    - value: "OneSchool behaviour incident record - Harbourview State High School\nStudent name: Riley Ashworth\nEQ ID: 0612345678X\nYear level: 9\nIncident date: 16/09/2026\nIncident type: Physical aggression towards a peer\nAction taken: Short suspension (3 days); parent contacted by the deputy principal."
+      description: Populated behaviour incident record with student, incident fields and school-system evidence (85)
+      synthetic: true
+    - value: "Student incident report\nStudent: Casey Rourke\nClass: 7B"
+      description: Incident report with labelled student fields only (75)
+      synthetic: true
   should_not_match:
-    - value: Traffic incident report
+    - value: "Traffic incident report"
       description: Non-match 1
-    - value: The school reopened after holidays
+    - value: "The school reopened after holidays"
       description: Non-match 2
+    - value: "Policy guidance: this procedure explains how school incident report forms are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Student incident report\nStudent name: ____________________\nYear level: ____________________\nIncident date: ____________________\nIncident type: ____________________\nAction taken: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the department says school disciplinary absence numbers fell this term after more schools adopted behaviour support plans and restorative practices."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: Generic incident reports in non-school contexts.
     mitigation: Require school-specific terms like OneSchool, student behaviour, or school discipline.
@@ -47,7 +53,7 @@ exports:
 scope: narrow
 risk_rating: 7
 risk_description: >-
-  The detector finds Queensland school incident material through student behaviour, discipline, suspension, welfare, duty-of-care, and related report language. A completed report can identify a student, witnesses, alleged conduct, injuries, interventions, and safeguarding decisions, creating direct reputational, educational, and wellbeing harm if disclosed. General behaviour policies, incident procedures, and staff training can contain the same terms without describing an event. Risk 7 SENSITIVE Government suits a normal student-linked incident report; PROTECTED would require life-safety detail, a major protected investigation, or broad exposure capable of significant damage.
+  The detector recognises school incident, behaviour incident and disciplinary absence language and enforces only when populated student identifier fields sit nearby; phrase-only text stays at 65 discovery. A completed report can identify a student, witnesses, alleged conduct, injuries, interventions, and safeguarding decisions, creating direct reputational, educational, and wellbeing harm if disclosed. General behaviour policies, incident procedures, and staff training can contain the same terms without describing an event. Risk 7 SENSITIVE Government suits a normal student-linked incident report; PROTECTED would require life-safety detail, a major protected investigation, or broad exposure capable of significant damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -61,74 +67,83 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_school_incident
       matches:
-        - ref: Evidence_incident_behaviour
-        - ref: Evidence_qld_education_forms
+        - ref: Regex_au_qld_school_incident_report_student_fields
+        - ref: Regex_au_qld_school_incident_report_incident_fields
+        - ref: Evidence_qld_school_context
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_school_incident_report_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_school_incident
       matches:
-        - ref: Evidence_incident_behaviour
+        - ref: Regex_au_qld_school_incident_report_student_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_school_incident_report_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_education_incident
+      id_match: Pattern_school_incident
       matches:
-        - ref: Evidence_qld_government
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_school_incident
-      pattern: (?i)\b(?:(?:school|student)\s+incident\s+(?:report|notification)|behaviour\s+(?:management|support)\s+plan)\b
-    - id: Pattern_education_incident
-      pattern: (?i)\b(?:student\s+code\s+of\s+conduct|disciplinary\s+(?:action|consequence)|behaviour\s+incident)\b
+      pattern: (?i)\b(?:(?:school|student|behaviour(?:al)?)\s+incident\s+(?:report|notification|record)|behaviour\s+incident|(?:individual\s+)?behaviour\s+support\s+plan|school\s+disciplinary\s+absence|(?:short|long|charge-related)[\s-]+suspension|proposed\s+exclusion)\b
+    - id: Regex_au_qld_school_incident_report_student_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|student(?:\s+name)?|pupil|child|candidate(?:\s+name)?|EQ\s*ID|LUI|USI|year\s+level|grade\s+level|parent(?:\s+name)?|guardian|carer|(?:student|candidate|enrolment|applicant|file)\s*(?:no\.?|number|ID)|home\s+group|class)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_au_qld_school_incident_report_incident_fields
+      pattern: (?i)\b(?:incident\s+(?:date|time|type|category|location)|date\s+of\s+incident|location|behaviour(?:\s+category)?|witness(?:es)?|reported\s+by|action\s+taken|consequence|injur(?:y|ies)|SDA\s+type)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_incident_behaviour
+    - id: Evidence_qld_school_context
       groups:
         - match_style: word
           terms:
-            - school incident report
-            - student incident report
-            - behaviour management
-            - behaviour support
-            - student code of conduct
-            - disciplinary
-            - suspension
-            - exclusion
-            - risk assessment
-      strength: specific
-    - id: Evidence_qld_education_forms
-      groups:
-        - match_style: word
-          terms:
+            - OneSchool
             - Department of Education
             - Education Queensland
             - State School
-            - SEF-1
-            - ppr.qed.qld.gov.au
-            - education.qld.gov.au
-            - eq.edu.au
+            - State High School
+            - parent notified
+            - parent contacted
+            - Student Code of Conduct
+            - duty of care
       strength: specific
-    - id: Evidence_qld_government
+    - id: Keyword_au_qld_school_incident_report_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - Queensland Government
-            - State of Queensland
-            - QLD Government
-            - qld.gov.au
-            - Information Privacy Act 2009
-            - Queensland Privacy Principles
-      strength: specific
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75 fired on the primary alone ('School incident report') and 85 evidence repeated primary phrases. 75 now needs a populated student identifier and 85 needs student fields plus a populated incident field plus school-system evidence. Dropped the policy-phrase primary 'student code of conduct'. Tests replaced with populated records plus policy, blank-form and news decoys. Regulations: removed AML/CTF Act, HRIPA, My Health Records Act, NDB and TIA Act; added Education (General Provisions) Act 2006 (Qld); references added."
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 587 without changing detector or package metadata.'
@@ -165,3 +180,10 @@ remediation:
       - 'Mapped non-canonical confidence 80 to 75.'
       - 'Mapped non-canonical confidence 70 to 65.'
       - 'Aligned recommended_confidence to 75.'
+references:
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2006-039
+    title: Education (General Provisions) Act 2006 (Qld)
+  - url: https://education.qld.gov.au/parents-and-carers/school-information/oneschool
+    title: Queensland Department of Education - OneSchool
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+    title: Information Privacy Act 2009 (Qld)

@@ -1,24 +1,22 @@
 schema: testpattern/v1
 name: Previous legal names and aliases
 slug: global-top500-002-previous-legal-names-and-aliases
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: >-
-  Identifies documents containing references to previous legal names and aliases in international contexts. This information type is classified as personally identifiable information under applicable
-  data protection regulations.
-operation: >-
-  A broad former-name phrase is discovery-only at 65. The canonical previous-legal-names-and-aliases
-  label reaches 75, while 85 additionally requires two distinct non-overlapping alias-history terms.
-  Template/sample/test exclusions apply to every tier.
+description: Identifies personal records that link a person to previous legal names or aliases (former, maiden, birth or assumed names, deed-poll name changes, also-known-as entries) with populated identity fields.
+operation: 'Primary: previous legal names, former/maiden/birth/assumed name, prior/previous surname, also known as, name change, deed poll. 65 (discovery only) = primary alone. 75 = primary plus one populated identity field (name, surname, given names, date of birth, applicant/registrant, former/maiden/birth name, also known as / AKA / alias, registration, certificate, passport, customer or client number) with a non-placeholder value. 85 = primary plus two distinct populated identity fields plus independent identity-record evidence (Registry of Births, Deaths and Marriages, change of name certificate, birth/marriage certificate, statutory declaration, identity verification, passport). All tiers exclude template/fixture text.'
 pattern: (?is)\b(?:previous\s+legal\s+names|former\s+name|maiden\s+name|also\s+known\s+as|name\s+change|deed\s+poll|prior\s+surname|previous\s+surname|birth\s+name|assumed\s+name)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: 'Medium: alias phrases are common in forms, guidance and news, so enforcement requires populated identity fields; 85 adds identity-registry evidence.'
 jurisdictions:
   - global
 regulations:
+  - Privacy Act 1988 (Cth)
   - GDPR
+frameworks:
+  - ISO 27701
 data_categories:
   - government-id
   - pii
@@ -40,27 +38,41 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: previous legal names
-      description: Primary topic phrase match
-    - value: former name
-      description: Exact 65 discovery probe - former-name phrase without the canonical previous-names-and-aliases label
-    - value: maiden name
-      description: Alternative topic phrase match
-    - value: also known as
-      description: Additional topic phrase match
-    - value: previous legal names and aliases
-      description: Exact 75 probe - canonical label without two additional alias-history terms
+    - value: |-
+        Change of name registration
+        Applicant name: Avery Teston
+        Date of birth: 04/02/1991
+        Former name: Avery Mayfield
+        Registration number: CN2026004471
+        Change of name certificate issued by the Registry of Births, Deaths and Marriages on 12/08/2026.
+      description: 85 - populated name-change record with registry evidence
+      synthetic: true
+    - value: |-
+        Customer identity update
+        Customer number: C4471820
+        Former name: Riley Mayfield
+        The customer asked for the account to show the current surname.
+      description: 75 - populated former-name field and customer number, no registry evidence
+      synthetic: true
     - value: 'Change of name record. Previous legal names and aliases held by the applicant: maiden name and former name as registered by deed poll.'
-      description: Exact 85 probe - canonical label with multiple additional non-overlapping alias-history terms
+      description: 75 - record statement with a populated applicant field (alias types listed), no registry evidence
+    - value: Applicant advised a maiden name by phone; the details will follow in writing.
+      description: 65 discovery - alias mention without populated fields
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: name disability
-      description: Generic word pair from old broad template should not match
+    - value: If you have a former name or maiden name, list it on the form so we can match your records.
+      description: Form guidance - no populated identity fields (65 at most)
+    - value: |-
+        Previous legal names and aliases
+        Former name: ________
+        Maiden name: [if applicable]
+        Date of birth: __/__/____
+      description: Blank form section - placeholder fields are rejected
+    - value: The actor, also known as Riley Mayfield, announced a name change by deed poll last week.
+      description: News item - no populated identity fields
     - value: 'Sample: Previous legal names and aliases, maiden name and former name'
-      description: High-like template fixture must be rejected by the shared exclusion dictionary
+      description: Template fixture rejected by the shared exclusion dictionary
 false_positives:
   - description: Common words and phrases related to previous legal names and aliases appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -86,10 +98,10 @@ purview:
     - confidence_level: 85
       id_match: Regex_previous_legal_names
       matches:
-        - ref: Pattern_global_top500_002_previous_legal_names_and_aliases_label_context
-        - ref: Keyword_additional_alias_history
+        - ref: Regex_global_top500_002_previous_legal_names_and_aliases_record_structure
           min_count: 2
           unique_results: true
+        - ref: Keyword_identity_record_evidence
         - type: any
           min_matches: 0
           max_matches: 0
@@ -98,7 +110,7 @@ purview:
     - confidence_level: 75
       id_match: Regex_previous_legal_names
       matches:
-        - ref: Pattern_global_top500_002_previous_legal_names_and_aliases_label_context
+        - ref: Regex_global_top500_002_previous_legal_names_and_aliases_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -108,7 +120,6 @@ purview:
       discovery_only: true
       id_match: Regex_previous_legal_names
       matches:
-        - ref: Keyword_previous_legal_names
         - type: any
           min_matches: 0
           max_matches: 0
@@ -117,40 +128,24 @@ purview:
   regexes:
     - id: Regex_previous_legal_names
       pattern: (?is)\b(?:previous\s+legal\s+names|former\s+name|maiden\s+name|also\s+known\s+as|name\s+change|deed\s+poll|prior\s+surname|previous\s+surname|birth\s+name|assumed\s+name)\b
-    - id: Pattern_global_top500_002_previous_legal_names_and_aliases_label_context
-      pattern: (?i)\b(?:previous\s+legal\s+names\s+and\s+aliases)\b
+    - id: Regex_global_top500_002_previous_legal_names_and_aliases_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|applicant(?:\s+name)?|registrant|(?:former|previous|prior|maiden|birth|assumed)\s+(?:legal\s+)?(?:names?|surnames?)|also\s+known\s+as|AKA|alias(?:es)?|registration\s+(?:no\.?|number)|certificate\s+(?:no\.?|number)|passport\s+(?:no\.?|number)|(?:customer|client)\s+(?:no\.?|number|ID))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Keyword_previous_legal_names
+    - id: Keyword_identity_record_evidence
       groups:
         - match_style: word
           terms:
-            - previous legal names
-            - aliases
-            - former name
-            - maiden name
-            - also known as
-            - name change
-            - deed poll
-            - prior surname
-            - previous surname
-            - birth name
-            - nee
-            - assumed name
-      strength: specific
-    - id: Keyword_additional_alias_history
-      groups:
-        - match_style: word
-          terms:
-            - former name
-            - maiden name
-            - also known as
-            - name change
-            - deed poll
-            - prior surname
-            - previous surname
-            - birth name
-            - nee
-            - assumed name
+            - Registry of Births, Deaths and Marriages
+            - Births, Deaths and Marriages
+            - text: BDM
+              case_sensitive: true
+            - change of name certificate
+            - birth certificate
+            - marriage certificate
+            - statutory declaration
+            - identity verification
+            - proof of identity
+            - passport
       strength: specific
 risk_description: >-
   The medium-confidence concept regex finds former-name, maiden-name, prior-surname, deed-poll, birth-name, and alias terminology with personal-name context, rather than extracting a name pair by itself. In a genuine identity record, disclosure can link a person's current and former identities, support impersonation or unwanted tracing, and expose a legally significant name change. The normal affected unit is one person or bounded identity file with serious but contained privacy and identity-fraud consequences. Risk 8 and SENSITIVE are justified, while PROTECTED is not met without a protected witness identity, bulk identity history, or consequences amounting to significant damage.
@@ -163,8 +158,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): 75 now requires a populated identity field (new Regex_..._record_structure, placeholder-guarded) instead of the canonical label phrase; 85 requires two distinct populated identity fields plus identity-registry evidence (new Keyword_identity_record_evidence). Removed the label-context regex and the alias-history keyword groups that repeated the primary (same-span self-corroboration). Replaced bare-phrase positives with populated synthetic records; added guidance, blank-form and news decoys. Metadata: added Privacy Act 1988 (Cth) and ISO 27701. Note: active twin of au-top500-002-previous-legal-names-and-aliases (merge candidate).'
   - version: 1.4.0
     date: '2026-07-19'
     description: 'Personal-name baseline: make 65/75/85 cumulative and exact by separating former-name discovery, the canonical previous-names-and-aliases label, and two non-overlapping additional alias-history terms; preserve AU/global overlap for tenant comparison and add adversarial template coverage.'

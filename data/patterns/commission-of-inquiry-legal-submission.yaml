@@ -1,20 +1,22 @@
 schema: testpattern/v1
 name: Commission of Inquiry Legal Submission
 slug: commission-of-inquiry-legal-submission
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects draft legal submissions to Commissions of Inquiry established under the Commissions of Inquiry Act 1950 (Qld). Disclosure prejudices the State's participation and may breach statutory confidentiality.
-operation: 'Primary detection: keyword proximity matching ''Commission of Inquiry'' or ''COI'' within 200 characters of draft/submission terms (''draft submission'', ''proposed submission'', ''legal submission'', ''submission for approval'', ''terms of reference response''). Document marker detection: ''Commission of Inquiry'' + ''DRAFT'' + (''PROTECTED'' or ''CONFIDENTIAL''). Exclusion: negative match on ''final report'', ''published'', ''tabled''. Corroborative evidence: 3 keywords within 300 characters.'
+operation: 'Primary: Commission of Inquiry / COI within 300 characters of draft, proposed or legal submission or terms-of-reference-response wording (either order). 65 (discovery only) = any Commission of Inquiry / COI mention. 75 = primary plus two distinct populated document header fields (To, From, Date, Subject, Re, Our ref, File/Matter number, Prepared/Approved/Cleared by, Author, Version, Status, Classification). 85 = primary plus three distinct header fields plus an independent restriction or legal-custody marker (PROTECTED, CONFIDENTIAL, privilege, not for publication, internal approval, Crown Law, Crown Solicitor). Published/tabled material and template/fixture text are NOT-gated on every tier.'
 pattern: (?i)\b(?:Commission\s+of\s+Inquiry|COI)\b
-confidence: low
-confidence_justification: 'Medium confidence: Commission of Inquiry + DRAFT/submission + PROTECTED markers is precise. Exclusion of published reports and tabled submissions eliminates public document false positives.'
+confidence: medium
+confidence_justification: 'Medium: the bounded COI-plus-submission primary is specific, and enforcement needs a populated document header; published reports, tabled submissions and guides stay at discovery. Tiers are heuristic evidence gates, not measured accuracy.'
 jurisdictions:
   - au
 regulations:
+  - Commissions of Inquiry Act 1950 (Qld)
+  - RTI Act 2009 (Qld)
+frameworks:
   - QGISCF
-  - "Commissions of Inquiry Act 1950 (Qld)"
 data_categories:
   - legal
   - government
@@ -40,6 +42,17 @@ corroborative_evidence:
 test_cases:
   should_match:
     - value: |-
+        DRAFT - PROTECTED - LEGAL PROFESSIONAL PRIVILEGE
+        State of Queensland - draft legal submission to the Commission of Inquiry into Youth Detention Oversight
+        To: Director-General
+        From: Principal Crown Counsel
+        Date: 12/08/2026
+        Our ref: CL2026-0917
+        Status: Draft for approval
+        The proposed submission concedes that incident reporting in two centres did not meet the Terms of Reference 4 standard.
+      description: 85 - draft COI submission with populated header and PROTECTED/privilege marking
+      synthetic: true
+    - value: |-
         DRAFT — PROTECTED
         Legal Submission to the Commission of Inquiry into Queensland Government Accountability
 
@@ -47,9 +60,16 @@ test_cases:
         Status: Draft for Director-General approval
 
         This proposed submission addresses Terms of Reference 3 and 7 regarding departmental governance frameworks.
-      description: Draft COI legal submission with PROTECTED marking
+      description: 75 - draft COI legal submission with two populated header fields (Prepared by, Status) and a PROTECTED marking
+    - value: |-
+        Commission of Inquiry - proposed submission
+        Prepared by: Legal Services Unit
+        Date: 03/06/2026
+        The department will address procurement governance under Terms of Reference 2.
+      description: 75 - bounded primary with two populated header fields, no restriction marker
+      synthetic: true
     - value: The draft submission to the COI has been circulated for internal review only. The proposed submission for approval contains candid admissions regarding procurement failures that have not been approved for public disclosure.
-      description: Internal COI draft submission with candid admissions
+      description: 65 discovery - internal prose without a populated document header
     - value: |-
         CONFIDENTIAL — NOT FOR PUBLICATION
         Commission of Inquiry — Queensland Floods Response
@@ -57,9 +77,9 @@ test_cases:
 
         Terms of Reference Response:
         The State of Queensland acknowledges systemic issues in emergency management coordination.
-      description: Draft COI submission on floods response
-    - value: 'CONFIDENTIAL Commission of Inquiry legal submission, draft v4; TOR 7 response; DG approval pending; not for publication.'
-      description: Inquiry, draft legal artefact, approval status, and publication restriction enforce
+      description: 65 discovery - draft submission heading without populated header fields
+    - value: CONFIDENTIAL Commission of Inquiry legal submission, draft v4; TOR 7 response; DG approval pending; not for publication.
+      description: 65 discovery - one-line reference without populated header fields
   should_not_match:
     - value: The Coaldrake Commission of Inquiry published its final report in June 2022. The report recommended significant reforms to Queensland Government integrity frameworks.
       description: Published COI final report
@@ -75,6 +95,15 @@ test_cases:
       description: The bare label without restriction or internal status discovers but must not enforce
     - value: The parliamentary library catalogued past public inquiry reports.
       description: Library cataloguing with no Commission of Inquiry draft submission or restriction
+    - value: |-
+        Commission of Inquiry - draft submission cover sheet
+        To: ________
+        From: ________
+        Date: ________
+        Status: [draft / final]
+      description: Blank submission cover sheet - placeholder header fields are rejected
+    - value: Counsel assisting the Commission of Inquiry said the State would lodge its legal submission next week, the ABC reported.
+      description: News report of a pending submission - no populated header fields
 false_positives:
   - description: Published COI final reports
     mitigation: Negative match on 'final report', 'published', 'findings', 'recommendations released'
@@ -90,7 +119,7 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -99,10 +128,10 @@ purview:
     - confidence_level: 85
       id_match: Pattern_coi_legal_submission
       matches:
-        - ref: Evidence_coi_restriction
-        - ref: Evidence_coi_draft_status
-          min_count: 2
+        - ref: Regex_commission_of_inquiry_legal_submission_record_structure
+          min_count: 3
           unique_results: true
+        - ref: Evidence_coi_restriction
         - type: any
           min_matches: 0
           max_matches: 0
@@ -112,8 +141,9 @@ purview:
     - confidence_level: 75
       id_match: Pattern_coi_legal_submission
       matches:
-        - ref: Evidence_coi_draft_status
-        - ref: Evidence_coi_restriction
+        - ref: Regex_commission_of_inquiry_legal_submission_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -141,27 +171,23 @@ purview:
       pattern: (?i)\bCOI\b
     - id: Pattern_coi_legal_submission
       pattern: (?i)\b(?:(?:Commission\s+of\s+Inquiry|COI)\b[\s\S]{0,300}?\b(?:(?:draft|proposed|legal)\s+submission|terms\s+of\s+reference\s+response)|(?:(?:draft|proposed|legal)\s+submission|terms\s+of\s+reference\s+response)\b[\s\S]{0,300}?\b(?:Commission\s+of\s+Inquiry|COI))\b
+    - id: Regex_commission_of_inquiry_legal_submission_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+(?:by|for)|Approved\s+by|Cleared\s+by|Author|Version|Status|Classification|Contact\s+officer|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<)[A-Za-z0-9$]
   keywords:
-    - id: Evidence_coi_draft_status
-      groups:
-        - match_style: word
-          terms:
-            - draft submission
-            - proposed submission
-            - legal submission
-            - submission for approval
-            - terms of reference response
-            - internal review
-      strength: domain
     - id: Evidence_coi_restriction
       groups:
         - match_style: word
           terms:
-            - PROTECTED
-            - CONFIDENTIAL
+            - text: PROTECTED
+              case_sensitive: true
+            - text: CONFIDENTIAL
+              case_sensitive: true
             - privilege
+            - privileged
             - not for publication
             - internal approval
+            - Crown Law
+            - Crown Solicitor
       strength: domain
     - id: Filter_coi_public_material
       groups:
@@ -181,10 +207,15 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Legal
-references: []
+references:
+  - title: Right to Information Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-013
 created: '2026-02-20'
-updated: '2026-07-16'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): 75 now requires two distinct populated document header fields (new Regex_..._record_structure) instead of draft-status keywords; 85 requires three header fields plus a restriction/legal-custody marker. Removed Evidence_coi_draft_status (its terms - draft/proposed/legal submission, TOR response - are matched by the primary itself); PROTECTED and CONFIDENTIAL are case-sensitive; recommended_confidence 85 -> 75; confidence low -> medium to match the gated design. Added a populated 85 draft, a 75 proposed submission, blank cover-sheet and news decoys; existing one-line/prose positives re-described as 65. Metadata: moved QGISCF from regulations to frameworks, added RTI Act 2009 (Qld) and a reference.'
   - version: 1.4.0
     date: '2026-07-16'
     description: 'sit-alignment-validation-2026-07-16 wave1 (TP-00701): normalize the legacy purview block (raw id-less regexes, group:/values: keywords, exclude_keyword filters, single inert 65 discovery tier) into referenced Purview regex/keyword ids and add enforcing tiers — the SIT was risk 8 SENSITIVE but could never enforce. New Pattern_coi_legal_submission bounded-proximity primary (Commission of Inquiry/COI within 300 chars of draft/proposed/legal submission or terms-of-reference-response wording, both directions); Evidence_coi_draft_status and Evidence_coi_restriction keyword groups and Filter_coi_public_material per the approved reference definitions. 75 requires the bounded primary plus draft-status and one restriction marker; 85 additionally requires two distinct draft/approval/TOR signals; 65 discovery keys on the plain inquiry mention. Template-exclusion noise dictionary attached and NOT-gated on all tiers. Adversarial test cases added; recommended_confidence raised to 85.'

@@ -1,64 +1,81 @@
 schema: testpattern/v1
 name: Purple team exercise plans
 slug: global-top500-294-purple-team-exercise-plans
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies purple team exercise plans patterns in security and access control contexts. Detects potential exposure
-  of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative
-  evidence: 9 keywords within 300 characters. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
-  text.'
-pattern: (?i)\b(?:purple\s+team|tabletop|adversary\s+emulation|exercise\s+plan)\b
+description: >-
+  Detects purple-team and adversary-emulation exercise plans that name ATT&CK techniques, targets, test windows, C2 infrastructure and expected detections. Exercise wording alone is discovery-only; tabletop exercises are out of scope.
+operation: >-
+  Regex_purple_team_primary (purple-team exercise/engagement/plan or adversary-emulation plan wording) is discovery-only at 65. 75 requires the primary plus one populated structure: a MITRE ATT&CK technique ID (T1xxx / T1xxx.xxx) or a populated exercise field (target host/scope, test window, detection owner, white cell, emulated actor, C2 infrastructure, expected detection). 85 requires a MITRE ATT&CK technique ID (T1xxx / T1xxx.xxx) (two distinct hits), a populated exercise field (target host/scope, test window, detection owner, white cell, emulated actor, C2 infrastructure, expected detection), and independent detection-engineering (SIEM/EDR, telemetry, rules of engagement, tooling) evidence that does not repeat the primary. Every enforce tier rejects template/noise wording (template-exclusion) and guidance, policy, training and news framing (Keyword_purple_team_guidance_exclusion).
+pattern: >-
+  (?i)\b(?:purple[\s-]team(?:ing)?\s+(?:exercise|engagement|plan|test|scenario|schedule)s?|adversary\s+emulation\s+(?:plan|exercise|scenario)|attack\s+simulation\s+plan)\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: the topic phrase alone is discovery-only; enforcement needs populated structure (a MITRE ATT&CK technique ID (T1xxx / T1xxx.xxx) or a populated exercise field (target host/scope, test window, detection owner, white cell, emulated actor, C2 infrastructure, expected detection)), and 85 needs two distinct structures plus independent detection-engineering (SIEM/EDR, telemetry, rules of engagement, tooling) evidence, so policies, blank forms and training text stay below 75.
 jurisdictions:
 - global
 regulations:
-- GDPR
+- SOCI Act 2018 (Cth)
+frameworks:
+- ISO 27001
+- NIST CSF
 data_categories:
-- credentials
 - security
 corroborative_evidence:
   keywords:
-  - purple team exercise plans
-  - purple
-  - team
-  - exercise
-  - plans
-  - security
-  - operations
-  - threat
-  - data
+  - detection gap
+  - SIEM
+  - EDR
+  - telemetry
+  - rules of engagement
+  - deconfliction
+  - blue team
+  - Atomic Red Team
+  - Caldera
+  - Cobalt Strike
   proximity: 300
 test_cases:
   should_match:
-  - value: Purple team
-    description: Topic phrase present
-  - value: purple team
-    description: Topic phrase, lowercase
-  - value: this record references the purple team held on file
-    description: Topic phrase within surrounding text
+  - value: The next purple team exercise is planned for the finance network in November.
+    description: Discovery probe (65)
+    synthetic: true
+  - value: |-
+      Purple team exercise plan - wave 2
+      Target host: fin-app02.harbour.internal
+      Test window: 14/11/2026 20:00-23:00
+    description: Medium-tier probe (75) - populated exercise fields
+    synthetic: true
+  - value: |-
+      Adversary emulation plan - FIN7 profile
+      Target host: fin-app02.harbour.internal
+      Test window: 14/11/2026 20:00-23:00
+      Steps: T1566.001 spearphishing attachment, T1059.001 PowerShell, T1003.001 LSASS memory
+      C2 server: 203.0.113.44 (Cobalt Strike)
+      Expected detection: EDR alert and SIEM correlation rule; record every detection gap for the blue team.
+    description: High-tier probe (85) - technique IDs, exercise fields and detection context
+    synthetic: true
   should_not_match:
   - value: unrelated generic text
     description: No relevant phrase context
   - value: placeholder value 12345
-    description: Random text should not match phrase marker
-  - value: generic policy prose without anchors
-    description: Should reject generic mentions without structural anchor terms
-  - value: template example placeholder record identifier
-    description: Template/sample context should be excluded even when anchor words are present
+    description: Random text should not match
+  - value: 'Policy statement: purple team exercises are run twice a year with written rules of engagement.'
+    description: Policy text
+    synthetic: true
+  - value: |-
+      Purple team exercise plan template
+      Target host: ________
+      Test window: [insert]
+    description: Blank template
+    synthetic: true
+  - value: 'Course module 2: adversary emulation plan basics - T1059.001 PowerShell and T1566.001 phishing explained.'
+    description: Training framing with technique IDs
+    synthetic: true
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+- description: ATT&CK training decks cite technique IDs.
+  mitigation: Training/course framing is excluded; 85 also needs populated target or window fields.
 exports:
 - purview_xml
 - yaml
@@ -66,34 +83,42 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
   - dict: template-exclusion
     as: Keyword_noise_exclusion
     match_style: word
   pattern_tiers:
   - confidence_level: 85
-    id_match: Regex_purple_team
+    id_match: Regex_purple_team_primary
     matches:
-    - ref: Keyword_purple_team
-    - ref: Pattern_global_top500_294_purple_team_exercise_plans_label_context
+    - ref: Regex_purple_team_attack_technique
+      min_count: 2
+      unique_results: true
+    - ref: Regex_purple_team_exercise_field
+    - ref: Keyword_purple_team_context
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_purple_team_guidance_exclusion
   - confidence_level: 75
-    id_match: Regex_purple_team
+    id_match: Regex_purple_team_primary
     matches:
-    - ref: Keyword_purple_team
+    - type: any
+      refs:
+      - Regex_purple_team_attack_technique
+      - Regex_purple_team_exercise_field
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_purple_team_guidance_exclusion
   - confidence_level: 65
     discovery_only: true
-    id_match: Regex_purple_team
+    id_match: Regex_purple_team_primary
     matches:
     - type: any
       min_matches: 0
@@ -101,44 +126,52 @@ purview:
       refs:
       - Keyword_noise_exclusion
   regexes:
-  - id: Regex_purple_team
-    pattern: (?i)\b(?:purple\s+team|tabletop|adversary\s+emulation|exercise\s+plan)\b
-  - id: Pattern_global_top500_294_purple_team_exercise_plans_label_context
-    pattern: (?i)\b(?:purple\s+team\s+exercise\s+plans)\b
+  - id: Regex_purple_team_primary
+    pattern: >-
+      (?i)\b(?:purple[\s-]team(?:ing)?\s+(?:exercise|engagement|plan|test|scenario|schedule)s?|adversary\s+emulation\s+(?:plan|exercise|scenario)|attack\s+simulation\s+plan)\b
+  - id: Regex_purple_team_attack_technique
+    pattern: >-
+      \bT1\d{3}(?:\.\d{3})?\b
+  - id: Regex_purple_team_exercise_field
+    pattern: >-
+      (?i)\b(?:target(?:\s+(?:host|system|asset|scope))?|in[\s-]scope|test\s+window|exercise\s+date|start\s+time|detection\s+owner|white\s+cell|emulated\s+(?:actor|group)|C2\s+(?:server|infrastructure)|expected\s+detection|use\s+case)\s*[:=#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'._:@#+-]{1,60}
   keywords:
-  - id: Keyword_purple_team
+  - id: Keyword_purple_team_context
     groups:
     - match_style: word
       terms:
-      - purple team
-      - tabletop exercise
-      - adversary emulation
-      - exercise plan
-      - red team
-      - blue team
-      - attack scenario
-      - threat simulation
-      - MITRE ATT&CK
-      - kill chain
       - detection gap
-      - security exercise
+      - text: SIEM
+        case_sensitive: true
+      - text: EDR
+        case_sensitive: true
+      - telemetry
+      - rules of engagement
+      - deconfliction
+      - blue team
+      - Atomic Red Team
+      - Caldera
+      - Cobalt Strike
     strength: specific
-  - id: Keyword_global_top500_294_purple_team_exercise_plans_domain_context
+  - id: Keyword_purple_team_guidance_exclusion
     groups:
     - match_style: word
       terms:
-      - purple team exercise plans
-      - purple
-      - team
-      - exercise
-      - plans
+      - policy statement
+      - guidance note
+      - best practice guide
+      - media release
+      - press release
+      - news report
+      - course module
+      - learning objectives
+      - awareness course
+      - webinar
+      - lesson plan
+      - quiz question
     strength: domain
-risk_description: This pattern recognizes purple-team, tabletop, adversary-emulation, or exercise-plan phrases, indicating
-  an exercise topic or plan rather than an actual attack event. A genuine plan can reveal selected targets, attack techniques,
-  test timing, expected detections, and control gaps, allowing participants or outsiders to evade or disrupt the exercise
-  and learn the defensive posture. The normal affected scale is the systems and teams in one exercise, while public methodologies,
-  conference material, and generic tabletop references can match without operational detail. Risk 8 SENSITIVE is justified
-  for a current plan; PROTECTED would require critical targets, protected operations, or significant damage from disclosure.
+risk_description: >-
+  The detector now requires purple-team or adversary-emulation plan wording plus ATT&CK technique IDs or populated target/window/C2 fields before enforcing. A genuine plan can reveal selected targets, attack techniques, test timing, expected detections, and control gaps, allowing participants or outsiders to evade or disrupt the exercise and learn the defensive posture. The normal affected scale is the systems and teams in one exercise, while public methodologies, conference material, and generic tabletop references can match without operational detail. Risk 8 SENSITIVE is justified for a current plan; PROTECTED would require critical targets, protected operations, or significant damage from disclosure.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -148,31 +181,26 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: 'Quality pass (2026-09-24): primary narrowed to purple-team/adversary-emulation plan wording (tabletop and bare exercise plan removed); self-corroboration removed; 75 needs an ATT&CK technique ID or populated exercise field; 85 needs two technique IDs, an exercise field and detection-engineering context; guidance exclusion; populated tests and decoys; GDPR replaced with SOCI Act; frameworks and ATT&CK reference added; credentials category removed.'
 - version: 1.3.1
   date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1845 without changing
-    detector or package metadata.'
+  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1845 without changing detector or package metadata.'
 - version: 1.3.0
   date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
+  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
 - version: 1.2.1
   date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
+  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
 - version: 1.2.0
   date: '2026-07-04'
-  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier
-    collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword
-    evidence at the same confidence level'
+  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword evidence at the same confidence level'
 - version: 1.1.0
   date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 references:
@@ -180,6 +208,7 @@ references:
 - https://www.legislation.gov.au/C2018A00029/latest/text
 - https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/preventing-preparing-for-and-responding-to-data-breaches/data-breach-preparation-and-response
 - https://handbook.apra.gov.au/standard/cps-234
+- https://attack.mitre.org/
 remediation:
   catalog_quality_2026_06_02:
     status: applied

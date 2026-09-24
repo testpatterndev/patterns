@@ -1,57 +1,65 @@
 schema: testpattern/v1
 name: Bonus and incentive allocations
 slug: global-top500-070-bonus-and-incentive-allocations
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to bonus and incentive allocations in Australian contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
+  Detects bonus and incentive allocations (STI/LTI awards, bonus pool allocations, performance bonuses) for an identified employee or participant, with award amounts, percentage of base, scorecard results or payment dates.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Primary: a bonus/incentive phrase (bonus allocation/pool/payout/award, incentive payment/plan/award, performance bonus, short/long-term incentive, variable or at-risk pay). 75 tier requires a populated person field (employee/staff name or number, participant, recipient, position number or title, work unit) with a non-placeholder value within 300 characters. 85 tier additionally requires a populated award detail (award amount/value/target, percentage of base, payment/vesting date, or scorecard/multiplier result) and an independent corroborative term (remuneration committee, fixed remuneration, pro rata, eligible, gateway). All tiers exclude template/fixture text (template-exclusion); enforce tiers also exclude guidance, policy, training and media-release framing. 65 is discovery-only (primary alone) and will surface policies, guidance, blank forms and statistics.
 pattern: >-
-  (?is)\b(?:bonus\s+allocation|incentive\s+payment|performance\s+bonus|bonus\s+pool|incentive\s+plan|bonus\s+payout|short[\s-]+term\s+incentive|long[\s-]+term\s+incentive|variable\s+pay|bonus\s+amount)\b
+  (?i)\b(?:bonus\s+(?:allocation|pool|payout|award|entitlement|letter)|incentive\s+(?:payment|plan|award|allocation)|performance\s+bonus|(?:short|long)[\s-]+term\s+incentive|variable\s+pay|at[\s-]+risk\s+(?:pay|remuneration))\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated person field and 85 adds a record-specific populated detail plus independent corroboration. Person values are customer-defined (employee IDs, position numbers), so the field regexes use labelled loose values with a placeholder guard. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
   - global
 regulations:
-  - AML/CTF Act (Cth)
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
+  - Fair Work Act 2009 (Cth)
+  - Fair Work Regulations 2009 (Cth)
   - Privacy Act 1988 (Cth)
-  - TIA Act 1979 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
   - GDPR
 frameworks:
   - ISO 27001
   - ISO 27701
 data_categories:
   - pii
+  - employment
 corroborative_evidence:
   keywords:
-    - bonus and incentive allocations
-    - bonus
-    - incentive
-    - allocations
-    - employment
-    - workforce
-    - records
+    - remuneration committee
+    - fixed remuneration
+    - pro rata
+    - eligible
+    - gateway
+    - clawback
+    - payroll
+    - performance year
+    - calibration
+    - KPI
   proximity: 300
 test_cases:
   should_match:
-    - value: bonus allocation
-      description: Primary topic phrase match
-    - value: incentive payment
-      description: Case-insensitive topic phrase match
-    - value: performance bonus
-      description: Alternative topic phrase match
-    - value: bonus pool
-      description: Additional topic phrase match
+    - value: "Short-term incentive award letter\nParticipant: Avery Teston\nEmployee ID: 4471820\nTarget: 15% of base\nAward value: $18,240\nPayment date: 15/09/2026\nApproved by the remuneration committee; clawback provisions apply."
+      description: '85: STI award letter with participant, target, value and payment date'
+      synthetic: true
+    - value: "Performance bonus schedule\nEmployee: Morgan Teston\nScorecard result: 112%\nAmount: USD 9,400\nPro rata for 10 months of the performance year."
+      description: '85: Bonus schedule row with scorecard and amount'
+      synthetic: true
+    - value: "Bonus allocation - Sales team\nEmployee name: Jordan Staffson\nIncluded in the Q3 allocation list pending sign-off."
+      description: '75: Allocation naming the employee, no amount'
+      synthetic: true
   should_not_match:
+    - value: The short-term incentive plan rewards eligible employees. This policy explains how bonus pool funding and gateways work.
+      description: Policy text - must stay below 75
+    - value: "Bonus allocation form\nEmployee name: __________\nAmount: $__________\nPayment date: ___/___/____"
+      description: Blank form - must stay below 75
+    - value: The bank cut its bonus pool by 20% this year, according to a media release.
+      description: News / media release - must stay below 75
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
@@ -59,12 +67,14 @@ test_cases:
     - value: employee interview
       description: Generic word pair from old broad template should not match
 false_positives:
-  - description: Common words and phrases related to bonus and incentive allocations appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Policies, directives, fact sheets, guidance and training material that name the record type.
+    mitigation: Enforce tiers require a populated person field; guidance text has labels without values and guidance/training/media-release framing is excluded.
+  - description: Blank forms, templates and HR system configuration.
+    mitigation: Blank lines, square- and angle-bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded.
+  - description: Aggregate statistics and news reporting.
+    mitigation: No populated person field, so these stay at 65 discovery.
+  - description: Records that identify the person only in free text (no field label) fall to 65.
+    mitigation: Accepted precision trade-off; extend the person-field regex with the customer employee-id format to recover recall.
 exports:
   - purview_xml
   - yaml
@@ -75,71 +85,86 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_bonus_incentive
+      id_match: Regex_top500_070_bonus_and_incentive_allocations_primary
       matches:
-        - ref: Evidence_bonus_incentive
-          min_count: 2
-          unique_results: true
+        - ref: Regex_top500_070_bonus_and_incentive_allocations_person_field
+        - ref: Regex_top500_070_bonus_and_incentive_allocations_record_detail
+        - ref: Keyword_top500_070_bonus_and_incentive_allocations_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_070_bonus_and_incentive_allocations_guidance_exclusion
     - confidence_level: 75
-      id_match: Pattern_bonus_incentive
+      id_match: Regex_top500_070_bonus_and_incentive_allocations_primary
       matches:
-        - ref: Evidence_bonus_incentive
+        - ref: Regex_top500_070_bonus_and_incentive_allocations_person_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_070_bonus_and_incentive_allocations_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_bonus_incentive
+      id_match: Regex_top500_070_bonus_and_incentive_allocations_primary
       matches:
-        - ref: Evidence_bonus_incentive
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-    - id: Pattern_bonus_incentive
+    - id: Regex_top500_070_bonus_and_incentive_allocations_primary
       pattern: >-
-        (?is)\b(?:bonus\s+allocation|incentive\s+payment|performance\s+bonus|bonus\s+pool|incentive\s+plan|bonus\s+payout|short[\s-]+term\s+incentive|long[\s-]+term\s+incentive|variable\s+pay|bonus\s+amount)\b
-    - id: Pattern_au_top500_070_bonus_and_incentive_allocations_label_context
-      pattern: (?i)\b(?:bonus\s+and\s+incentive\s+allocations)\b
+        (?i)\b(?:bonus\s+(?:allocation|pool|payout|award|entitlement|letter)|incentive\s+(?:payment|plan|award|allocation)|performance\s+bonus|(?:short|long)[\s-]+term\s+incentive|variable\s+pay|at[\s-]+risk\s+(?:pay|remuneration))\b
+    - id: Regex_top500_070_bonus_and_incentive_allocations_person_field
+      pattern: >-
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number|title)|work\s+unit|business\s+unit|participant|recipient)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_top500_070_bonus_and_incentive_allocations_record_detail
+      pattern: >-
+        (?i)\b(?:amount|value|payable|total|target|opportunity|STI|LTI|award\s+value)\s*(?:\([^)]{1,20}\))?\s*[:\-]\s*(?:(?:AUD|USD|GBP|NZD|A\$|US\$|NZ\$|\$|£|€)\s?\d{1,3}(?:,?\d{3}){0,3}(?:\.\d{2})?)|\b\d{1,3}(?:\.\d{1,2})?\s*%\s+of\s+(?:base|salary|fixed|TFR|FAR)\b|\b(?:payment|vesting|pay)\s+date\s*[:\-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})|\b(?:scorecard|multiplier|outcome)\s*(?:rating|result)?\s*[:\-]\s*\d{1,3}(?:\.\d{1,2})?\s*%?
   keywords:
-    - id: Evidence_bonus_incentive
+    - id: Keyword_top500_070_bonus_and_incentive_allocations_corroborative
       groups:
         - match_style: word
           terms:
-            - bonus allocation
-            - incentive payment
-            - performance bonus
-            - bonus pool
-            - incentive plan
-            - bonus payout
-            - short-term incentive
-            - long-term incentive
-            - text: STI
+            - remuneration committee
+            - fixed remuneration
+            - pro rata
+            - eligible
+            - gateway
+            - clawback
+            - payroll
+            - performance year
+            - calibration
+            - text: KPI
               case_sensitive: true
-            - text: LTI
-              case_sensitive: true
-            - variable pay
-            - bonus amount
       strength: specific
-    - id: Keyword_au_top500_070_bonus_and_incentive_allocations_domain_context
+    - id: Keyword_top500_070_bonus_and_incentive_allocations_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - bonus and incentive allocations
-            - bonus
-            - incentive
-            - allocations
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
       strength: domain
 risk_description: >-
-  This detector identifies bonus allocation, incentive award, variable-pay allocation, and related remuneration decision language. A populated allocation record can expose individual award amounts, performance judgements, budget decisions, and comparative treatment, leading to financial targeting, resentment, manipulation, or unfair negotiating advantage. Scheme descriptions and calculation templates can match without revealing any recipient or approved amount. Risk 8 SENSITIVE reflects serious employee and business harm from actual allocations; PROTECTED would require an organisation-wide unreleased pool, market-sensitive executive decisions, or significant corporate damage.
+  The classifier identifies a individual bonus or incentive allocation record about an identified person, gated on a populated person field (75) plus a record-specific populated detail (85). Disclosure exposes an identifiable employee's variable pay and performance outcome, enabling pay comparisons and workplace conflict. Policies, guidance, blank forms, training and news stay at 65 discovery. Risk 8 supports SENSITIVE Personal-Privacy (OFFICIAL: Sensitive).
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -148,9 +173,17 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
+references:
+  - title: Fair Work Regulations 2009 (Cth) - regs 3.31-3.46 employee records and pay slips
+    url: https://www.legislation.gov.au/F2009L02356/latest/text
+  - title: OAIC - Employee records exemption
+    url: https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/organisations/employee-records-exemption
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): rebuilt tiers - 65 primary phrase (discovery), 75 primary + populated person field (employee/staff name or number, position number/title, work unit), 85 adds a record-specific populated detail regex plus an independent corroborative keyword group; removed the self-corroborating Evidence/label-context groups so a single phrase no longer reaches 75/85; added guidance/training/media-release exclusion to enforce tiers; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys; regulations now cite Fair Work Act 2009 (Cth), Fair Work Regulations 2009 (Cth) with the privacy statutes (removed AML/CTF, TIA, My Health Records and HRIPA boilerplate); references now cite primary sources.'
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 673 without changing detector or package metadata.'

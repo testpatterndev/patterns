@@ -1,27 +1,23 @@
 schema: testpattern/v1
 name: Indigenous Data Reference
 slug: global-indigenous-data-reference
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
-description: Detects references to Aboriginal and Torres Strait Islander data requiring cultural sensitivity and community consent considerations.
+description: >-
+  Detects person-linked Aboriginal and Torres Strait Islander data - Indigenous status and origin fields and Indigenous data, health data or identifiers attached to an identified person record - as well as discovery-grade Indigenous data governance references.
 operation: >-
-  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_indigenous_data_phrase matches phrases such as Aboriginal data, Torres Strait Islander data, Indigenous data, First Nations
-  data, data sovereignty, AIATSIS, Native Title, Closing the Gap, and cultural heritage data. Three confidence tiers: High (85) requires Indigenous context + data governance keywords with template
-  exclusion logic; Medium (75) requires Indigenous context keywords; Low (65) requires only the regex match. Evidence uses 2 keyword groups (9 Indigenous context terms, 10 data governance terms)
-  within 300-character proximity. Template/sample exclusion prevents false positives from training materials.
+  The primary regex matches Aboriginal/Torres Strait Islander/Indigenous/First Nations data, health data, community, heritage or identifier phrases, Indigenous data sovereignty, AIATSIS, cultural (heritage) data, and Indigenous status / Aboriginal and/or Torres Strait Islander origin labels. 65 (discovery only): phrase alone - data governance frameworks, policy and research guidance stay here. 75: phrase plus a populated identified-person field (name, DOB, client/patient/member/participant ID). 85: person field plus a populated cultural field (language group, community, nation, clan, mob, Traditional Owner group, cultural identity) plus independent record evidence (Elder, kinship, Sorry Business, community-controlled service, land council, Stolen Generations). Template and guidance/policy framing excluded from 75/85. Converted from keyword_list to regex.
+pattern: (?i)\b(?:(?:Aboriginal|Torres\s+Strait\s+Islander|Indigenous|First\s+Nations)\s+(?:data|health\s+data|community|heritage|identifier)|Indigenous\s+(?:data\s+)?sovereignty|data\s+sovereignty|AIATSIS|cultural\s+(?:heritage\s+)?data|Indigenous\s+status|Aboriginal\s+(?:and/or|or)\s+Torres\s+Strait\s+Islander\s+(?:origin|status))\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative evidence keywords are needed for reliable identification since Indigenous-related
-  terms can appear in non-data contexts.
+  Low: most uses of the phrases are governance and policy text. Enforce tiers now require a populated identified-person field, and 85 also requires a cultural field and independent record evidence.
 jurisdictions:
   - global
 regulations:
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+  - IPA 2009 (Qld)
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -31,17 +27,23 @@ data_categories:
   - indigenous
 test_cases:
   should_match:
-    - value: Aboriginal data sovereignty principles apply to this dataset
-      description: Matches 'Aboriginal data' and 'data sovereignty' via Pattern_indigenous_data_phrase
-    - value: Torres Strait Islander health data collected with community consent
-      description: Matches 'Torres Strait Islander health data' via Pattern_indigenous_data_phrase
-    - value: Indigenous data governance framework per AIATSIS guidelines
-      description: Matches 'Indigenous data' and 'AIATSIS' via Pattern_indigenous_data_phrase
+    - value: "Client intake record\nClient name: Riley Ashworth\nDate of birth: 14/05/2001\nIndigenous status: Aboriginal\nLanguage group: Kuku Yalanji\nCommunity: Mossman\nKinship contact: Aunty (Elder) to be present at the next appointment at the Aboriginal Medical Service."
+      description: Person record with Indigenous status, populated cultural fields and kinship evidence (85)
+      synthetic: true
+    - value: "Participant record\nParticipant ID: P-20417\nName: Casey Rourke\nIndigenous status recorded; consent for data linkage pending."
+      description: Person record naming Indigenous status with identifiers only (75)
+      synthetic: true
   should_not_match:
-    - value: Indigenous plants found in the region
+    - value: "Indigenous plants found in the region"
       description: No Indigenous data phrase matched by the Purview regex
-    - value: The community garden project was successful
+    - value: "The community garden project was successful"
       description: No Indigenous data phrase present
+    - value: "Policy guidance: this procedure explains how Indigenous data and Indigenous status details are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Client registration\nName: ____________________\nDate of birth: ____________________\nIndigenous status: ____________________\nLanguage group: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: a national framework on Indigenous data sovereignty was launched, giving Aboriginal community organisations a say in how Indigenous health data is used."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: References to Indigenous in geographical or botanical contexts.
     mitigation: Require data-specific keywords alongside Indigenous references.
@@ -50,7 +52,7 @@ exports:
 scope: narrow
 risk_rating: 7
 risk_description: >-
-  The TestPattern keyword detector recognises Aboriginal, Torres Strait Islander, Indigenous, First Nations, data sovereignty, AIATSIS, Native Title, Closing the Gap, and cultural-heritage data references. A genuine match may concern community-governed health, land, identity, or cultural information where unauthorised disclosure undermines consent, collective rights, trust, and personal privacy. Geographical, botanical, policy, and training references remain plausible false positives because the concept does not prove a restricted dataset. Risk 7 SENSITIVE Personal-Privacy fits credible community and personal harm; PROTECTED requires restricted cultural knowledge, severe legal or safety consequences, or significant community-wide damage.
+  The detector recognises Aboriginal and Torres Strait Islander data, Indigenous status and data-sovereignty references and enforces only when they sit with a populated person identifier; governance and policy text stays at 65 discovery. A genuine match may concern community-governed health, land, identity, or cultural information where unauthorised disclosure undermines consent, collective rights, trust, and personal privacy. Geographical, botanical, policy, and training references remain plausible false positives because the concept does not prove a restricted dataset. Risk 7 SENSITIVE Personal-Privacy fits credible community and personal harm; PROTECTED requires restricted cultural knowledge, severe legal or safety consequences, or significant community-wide damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -62,65 +64,94 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
-  regexes:
-    - id: Pattern_indigenous_data_phrase
-      pattern: >-
-        (?i)\b(?:(?:Aboriginal|Torres\s+Strait\s+Islander|Indigenous|First\s+Nations)\s+(?:data|health\s+data|community|heritage|identifier)|data\s+sovereignty|AIATSIS|Native\s+Title|Closing\s+the\s+Gap|cultural\s+(?:heritage\s+)?data)\b
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_indigenous_data_phrase
       matches:
-        - ref: Evidence_indigenous_context
-        - ref: Evidence_data_governance
+        - ref: Regex_global_indigenous_data_reference_person_fields
+        - ref: Regex_global_indigenous_data_reference_cultural_fields
+        - ref: Evidence_indigenous_record_evidence
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_indigenous_data_reference_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_indigenous_data_phrase
       matches:
-        - ref: Evidence_indigenous_context
+        - ref: Regex_global_indigenous_data_reference_person_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_indigenous_data_reference_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_indigenous_data_phrase
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Pattern_indigenous_data_phrase
+      pattern: (?i)\b(?:(?:Aboriginal|Torres\s+Strait\s+Islander|Indigenous|First\s+Nations)\s+(?:data|health\s+data|community|heritage|identifier)|Indigenous\s+(?:data\s+)?sovereignty|data\s+sovereignty|AIATSIS|cultural\s+(?:heritage\s+)?data|Indigenous\s+status|Aboriginal\s+(?:and/or|or)\s+Torres\s+Strait\s+Islander\s+(?:origin|status))\b
+    - id: Regex_global_indigenous_data_reference_person_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|employee(?:\s+name)?|(?:employee|staff|member|customer|client|patient|participant|respondent|person|applicant|voter|record)\s*(?:no\.?|number|ID)|staff\s+member|member(?:\s+name)?|patient(?:\s+name)?|client(?:\s+name)?|customer(?:\s+name)?|applicant(?:\s+name)?|data\s+subject|resident(?:\s+name)?)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_global_indigenous_data_reference_cultural_fields
+      pattern: (?i)\b(?:language\s+group|community|nation|clan|mob|Traditional\s+Owner\s+group|cultural\s+identity|Elder\s+contact)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_indigenous_context
+    - id: Evidence_indigenous_record_evidence
       groups:
         - match_style: word
           terms:
-            - Aboriginal
-            - Indigenous
-            - Torres Strait
-            - First Nations
-            - traditional
-            - cultural
-            - community
-            - elders
-            - country
-      strength: domain
-    - id: Evidence_data_governance
+            - Elder
+            - kinship
+            - Sorry Business
+            - community-controlled
+            - land council
+            - Stolen Generations
+            - Aboriginal Medical Service
+      strength: specific
+    - id: Keyword_global_indigenous_data_reference_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - data
-            - governance
-            - sovereignty
-            - collection
-            - consent
-            - protocol
-            - ethics
-            - community
-            - custodian
-            - stewardship
-      strength: domain
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+            - public policy document
+            - public policy guidance
+            - public dataset
+            - aggregate statistics
+            - aggregate report
+            - academic paper
+            - blank questionnaire
+            - awareness campaign
+            - data governance framework
+            - CARE principles
+            - Maiam nayri Wingara principles
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75 was gated only by record-context keywords (bare words 'Aboriginal', 'Indigenous', 'community', 'cultural') that appear in policy and survey-design text, and 85 evidence could repeat the primary. 75 now requires the attribute to sit with a populated identified-person field (name, DOB, member/employee/patient ID) and 85 requires person fields plus a populated cultural field (language group, community, nation, mob) plus independent record evidence; policy text naming the category stays at 65. Bare-phrase tests replaced with populated person records; added policy, blank-form and news decoys; public-context exclusions folded into the guidance exclusion group. Primary: dropped 'Native Title' and 'Closing the Gap' (policy programmes), added Indigenous status / origin labels. Regulations: removed HRIPA (Cth) and My Health Records Act 2012 (Cth); references added."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 548 without changing detector or package metadata.'
@@ -149,3 +180,10 @@ keywords:
   - cultural heritage data
   - Indigenous identifier
   - AIATSIS
+references:
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-sensitive-information
+    title: OAIC - What is sensitive information
+  - url: https://humanrights.gov.au/our-work/race-discrimination
+    title: Race discrimination - Australian Human Rights Commission
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)

@@ -1,21 +1,24 @@
 schema: testpattern/v1
 name: Cybercrime Technical Evidence Package
 slug: cybercrime-technical-evidence-package
-version: 1.3.0
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects cybercrime investigation technical evidence including digital forensics, malware analysis, cryptocurrency tracing, dark web investigations, and covert online personas. Disclosure enables cybercriminals to develop countermeasures.
-operation: 'Keyword proximity: primary keywords (cybercrime investigation, digital forensic analysis, malware reverse engineering, cryptocurrency tracing, dark web investigation) within 300 characters of technical indicators. Trainable classifier recommended. Negative keyword exclusion for public advisories.'
+operation: >-
+  Primary: cybercrime investigation phrases (cybercrime investigation report, digital forensic analysis/examination, network intrusion investigation, malware reverse engineering, cryptocurrency tracing, dark web investigation, IP attribution report, covert online persona). 65 = phrase only (discovery). 75 = phrase plus a populated person/case field, a labelled case reference, a SHA-256 hash or a Bitcoin address. 85 = phrase plus two distinct populated fields plus independent evidence (QPS Cybercrime Squad, ACSC, malware sample, C2 server, cryptocurrency wallet, Tor hidden service ...). Threat reports, advisories, conferences and academic framing excluded.
 pattern: (?i)\b(cybercrime\s+investigation\s+(?:report|evidence|file)|digital\s+forensic\s+(?:analysis|examination|report)|network\s+intrusion\s+investigation|malware\s+(?:reverse\s+engineering|analysis\s+report)|cryptocurrency\s+(?:tracing|investigation)|dark\s+web\s+investigation|IP\s+attribution\s+(?:report|analysis)|covert\s+online\s+persona)\b
 confidence: medium
-confidence_justification: 'Medium confidence: requires co-occurrence of cybercrime investigation terminology with technical forensic indicators and classification markers unique to genuine investigation reports.'
+confidence_justification: >-
+  Medium confidence: enforcement requires populated investigation fields or machine artefacts; case numbers are unpublished, so the reference is a documented label-anchored fallback.
 jurisdictions:
   - global
 regulations:
-- "Criminal Code 1899 (Qld)"
+  - Criminal Code 1899 (Qld)
+  - Criminal Code Act 1995 (Cth)
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - law-enforcement
 corroborative_evidence:
@@ -40,16 +43,25 @@ corroborative_evidence:
 
     - law-enforcement
     - en-government-classification
+customisation:
+  - key: case-reference-number
+    kind: identifier-format
+    identifier: case-reference-number
+    target: purview.regexes/Regex_cybercrime_technical_evidence_package_case_reference
+    mode: replace
+    affects_tiers: [75]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#case-reference-number). Earlier versions used the CYBER-YYYY-NNNN format, which does not appear in any published source.
 test_cases:
   should_match:
-    - value: 'PROTECTED Law-Enforcement. QPS Cybercrime Squad — Digital Forensic Analysis Report. Case: CYBER-2025-0234. Network intrusion investigation. Malware reverse engineering: custom Cobalt Strike variant. IP attribution traced C2 server to Eastern Europe. SHA-256: a3f2b8c9d1e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0.'
-      description: QPS cybercrime forensic analysis with malware and IP attribution
+    - value: 'PROTECTED Law-Enforcement. QPS Cybercrime Squad — Digital Forensic Analysis Report. Case number: CY2025-0234. Network intrusion investigation. Malware reverse engineering: custom Cobalt Strike variant. IP attribution traced C2 server to Eastern Europe. SHA-256: a3f2b8c9d1e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0.'
+      description: QPS cybercrime forensic analysis with malware and IP attribution (reaches 75)
     - value: 'RESTRICTED. Dark web investigation — Operation SHADOWNET. Covert online persona on dark web marketplace. Cryptocurrency tracing: Bitcoin through three mixing services. ACSC coordination for takedown.'
-      description: Dark web investigation with cryptocurrency tracing
+      description: Dark web investigation with cryptocurrency tracing (65 discovery only - prose without populated record fields)
     - value: 'Cybercrime technical evidence package. Digital forensic examination of 6 seized devices. Malware analysis: custom ransomware. Cryptocurrency investigation: 47 BTC traced. Dark web investigation confirms subject on two forums.'
-      description: Multi-device forensic with ransomware and crypto evidence
-    - value: "Digital Forensic\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Digital Forensic recorded against the subject; handling restricted."
-      description: Populated justice record reaching the 75/85 structure gate
+      description: Multi-device forensic with ransomware and crypto evidence (65 discovery only - prose without populated record fields)
+    - value: "QPS Cybercrime Squad — digital forensic examination report\nSuspect: Avery Teston\nDate of birth: 04/02/1991\nCase number: CY2026-0417\nMalware sample recovered from the seized laptop; C2 server traced through a Tor hidden service."
+      description: 'Populated forensic report: suspect, DOB and case number plus malware / C2 evidence (reaches 85)'
       synthetic: true
   should_not_match:
     - value: The ACSC published its annual threat report noting a 23% increase in ransomware. The report recommended multi-factor authentication.
@@ -60,6 +72,10 @@ test_cases:
       description: Academic thesis on malware analysis
     - value: "Policy guidance: this procedure explains how records about Digital Forensic are handled, who may access them and how long they are kept. It contains no records about any person or system."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: "Digital forensic examination request\nSuspect: __________\nDate of birth: __________\nCase number: __________"
+      description: Blank form / template with unfilled fields (must stay below 75)
+    - value: "News: police said the network intrusion investigation into the council breach is continuing and no arrests have been made."
+      description: News or training text naming the topic (must stay below 75)
 false_positives:
   - description: Published cybersecurity threat reports
     mitigation: 'Negative keyword exclusion: ''annual threat report'', ''published'', ''advisory''. Require case identifiers.'
@@ -84,13 +100,11 @@ purview:
           min_count: 2
           unique_results: true
         - ref: Evidence_cybercrime_technical_evidence_package_corroborative_terms
-        - ref: Pattern_cybercrime_technical_evidence_package_sha256_hash
-        - ref: Pattern_cybercrime_technical_evidence_package_bitcoin_address
-        - ref: Pattern_cybercrime_technical_evidence_package_cyber_case_reference
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
+            - Keyword_noise_exclusion
             - Filter_cybercrime_technical_evidence_package_exclusion
     - confidence_level: 75
       id_match: Pattern_cybercrime_technical_evidence_package_cybercrime_terms
@@ -98,11 +112,14 @@ purview:
         - type: any
           refs:
             - Regex_cybercrime_technical_evidence_package_record_structure
-            - Evidence_cybercrime_technical_evidence_package_corroborative_terms
+            - Regex_cybercrime_technical_evidence_package_case_reference
+            - Pattern_cybercrime_technical_evidence_package_sha256_hash
+            - Pattern_cybercrime_technical_evidence_package_bitcoin_address
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
+            - Keyword_noise_exclusion
             - Filter_cybercrime_technical_evidence_package_exclusion
     - confidence_level: 65
       discovery_only: true
@@ -112,6 +129,7 @@ purview:
           min_matches: 0
           max_matches: 0
           refs:
+            - Keyword_noise_exclusion
             - Filter_cybercrime_technical_evidence_package_exclusion
   regexes:
     - id: Pattern_cybercrime_technical_evidence_package_cybercrime_terms
@@ -120,11 +138,12 @@ purview:
       pattern: \b[a-fA-F0-9]{64}\b
     - id: Pattern_cybercrime_technical_evidence_package_bitcoin_address
       pattern: \b(?:1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}\b
-    - id: Pattern_cybercrime_technical_evidence_package_cyber_case_reference
-      pattern: \bCYBER-\d{4}-\d{3,5}\b
     - id: Regex_cybercrime_technical_evidence_package_record_structure
       pattern: >-
         (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_cybercrime_technical_evidence_package_case_reference
+      pattern: >-
+        (?i)\b(?:case|file|matter|reference)\s+(?:no\.?|number|ID|#)\s*[:#]?\s*(?:[A-Z]{1,4}[/-]?)?\d[A-Z0-9/-]{3,20}\b
   keywords:
     - id: Evidence_cybercrime_technical_evidence_package_corroborative_terms
       groups:
@@ -160,6 +179,10 @@ purview:
             - publicly available
 
       strength: noise
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
 risk_rating: 8
 risk_description: >-
   The detector identifies a cybercrime investigation evidence package containing digital-forensic findings, malware analysis, cryptocurrency tracing, dark-web activity, seized-device results, or covert online personas. Disclosure can show a suspect which infrastructure, wallets, tooling, and attribution evidence investigators have identified, enabling evidence destruction, asset movement, or technical countermeasures. Public threat reports, conference material, academic research, training, and ordinary corporate incident response are excluded, leaving a bounded law-enforcement package rather than an enterprise security platform. Risk 8 supports SENSITIVE Legal; PROTECTED would require active covert identities, critical-system exploit access, or compromise spanning multiple major operations.
@@ -167,10 +190,17 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Legal
-references: []
+references:
+  - title: Criminal Code Act 1899 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-1899-009
+  - title: Criminal Code Act 1995 (Cth)
+    url: https://www.legislation.gov.au/C2004A04868/latest/text
 created: '2026-02-20'
 updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): rebuilt tiers - 75 needs a populated investigation field, a labelled case reference, a SHA-256 hash or a Bitcoin address; 85 needs two distinct record fields plus independent cyber-forensic evidence; removed the invented CYBER-YYYY-NNNN regex in favour of the case-reference-number labelled fallback (identifier-format slot); every tier now also carries the shared template-exclusion NOT gate; tests converted with an 85 positive and blank-form/news decoys; added Criminal Code Act 1995 (Cth) and references.'
   - version: 1.3.0
     date: '2026-09-24'
     description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."

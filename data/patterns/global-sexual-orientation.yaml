@@ -1,8 +1,8 @@
 schema: testpattern/v1
 name: Sexual Orientation
 slug: global-sexual-orientation
-version: 1.2.0
-type: keyword_list
+version: 1.3.0
+type: regex
 pattern_class: concept
 engine: universal
 description: >-
@@ -15,20 +15,11 @@ description: >-
   Article 9 and Australian anti-discrimination and privacy law. Topic-grade detector, low
   confidence by design.
 operation: >-
-  The primary regex matches orientation-specific phrases only. The 65 tier is discovery-only.
-  The 75 tier additionally requires a person-record context, and the 85 tier requires a
-  populated orientation or relationship attribution. Public policy, aggregate, awareness,
-  training, and blank-questionnaire contexts are excluded from every tier. This is not a
-  structured-token detector and does not classify gender identity.
-pattern: '(?i)\b(?:sexual\s+orientations?|identif(?:y|ies|ied)\s+as\s+(?:gay|lesbian|bisexual|queer)|same-sex\s+(?:partner|spouse)|coming\s+out\s+as\s+(?:gay|lesbian|bisexual|queer))\b'
+  The primary regex matches the explicit sexual orientation phrase, orientation-specific identification and coming-out statements, and same-sex partner/spouse references. 65 (discovery only): phrase alone - policy, guidance, news and survey-design text naming the category stays here. 75: phrase plus a populated identified-person field (name, DOB, employee/member/customer/patient/participant number or ID, data subject). 85: person field plus a populated orientation value (heterosexual, gay, lesbian, bisexual, pansexual, asexual, queer) that is not part of the primary statement plus independent record evidence (recorded as, response selected, disclosed to, optional demographic question, diversity survey, next of kin). Template framing and guidance/policy/public-aggregate framing are excluded from 75/85. Converted from keyword_list to regex so the tier logic decides matches.
+pattern: (?i)\b(?:sexual\s+orientations?|identif(?:y|ies|ied)\s+as\s+(?:gay|lesbian|bisexual|queer)|same-sex\s+(?:partner|spouse)|coming\s+out\s+as\s+(?:gay|lesbian|bisexual|queer))\b
 confidence: low
 confidence_justification: >-
-  Low by design. Sexual orientation is a GDPR Article 9 special category with no fixed format,
-  so it is detected purely by topic vocabulary. The bare word "orientation" appears constantly
-  in non-sensitive prose (employee orientation, building orientation); the regex is scoped to
-  full disclosure phrases only and requires person-record and attribution evidence to raise
-  precision. LGBTQ+ or Pride terminology alone is not a primary match because it can describe
-  public events, communities, or gender identity rather than a person's sexual orientation.
+  Low by design: the attribute has no fixed format. Enforce tiers now require the attribute to be tied to an identified person record (a populated name/DOB/ID field), and 85 also requires a separately populated orientation value plus independent record evidence, so policy text, surveys-in-design and news naming the category stay at 65 discovery.
 jurisdictions:
   - global
   - au
@@ -56,37 +47,35 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: 'Sexual orientation disclosure topic pending review.'
-      description: Exact 65 discovery probe - orientation topic without a data-subject record
-    - value: 'HR diversity survey includes a sexual orientation field.'
-      description: Exact 75 probe - person-record context without a populated response
-    - value: 'Patient intake record: sexual orientation recorded as bisexual; response selected voluntarily.'
-      description: Exact 85 probe - person record plus populated orientation attribution
-    - value: "HR file notes the employee's sexual orientation as part of the diversity survey."
-      description: Sexual orientation phrase present
-    - value: 'The member profile records sexual orientation under optional demographic fields.'
-      description: Explicit sexual-orientation field present
-    - value: 'He mentioned coming out as gay to his manager last year.'
-      description: Coming out as / identifies as gay terms present
-    - value: 'The intake form notes that she identifies as bisexual under optional demographic questions.'
-      description: Identifies as bisexual term present
+    - value: "HR diversity survey - individual response\nEmployee ID: E40917\nName: Avery Teston\nSexual orientation: Bisexual\nResponse selected voluntarily; recorded as confidential."
+      description: Person record with a populated orientation value and survey-response evidence (85)
+      synthetic: true
+    - value: "Patient intake record\nPatient name: Casey Rourke\nNotes: same-sex partner listed as support person."
+      description: Person record with a same-sex partner reference only (75)
+      synthetic: true
   should_not_match:
-    - value: 'The new employee orientation begins Monday morning.'
+    - value: "The new employee orientation begins Monday morning."
       description: Near-miss ("orientation" alone), no sexual-orientation disclosure
     - value: "The building's orientation faces north for solar efficiency."
       description: Unrelated "orientation" (architectural), no disclosure vocabulary
-    - value: 'The team celebrated Pride month with a company-wide event.'
+    - value: "The team celebrated Pride month with a company-wide event."
       description: Topical mention ("Pride"), no personal disclosure phrase
-    - value: 'Public policy document reports aggregate LGBTQ community demographics.'
+    - value: "Public policy document reports aggregate LGBTQ community demographics."
       description: Public aggregate material is not a person-linked orientation disclosure
-    - value: 'Sample template: patient intake record with optional demographic response Example Value.'
+    - value: "Sample template: patient intake record with optional demographic response Example Value."
       description: Adjacent template language is not a populated orientation record
-    - value: 'Patient intake record lists preferred pronouns as they and them.'
+    - value: "Patient intake record lists preferred pronouns as they and them."
       description: Sibling gender-expression data is excluded from the orientation-only Purview primary
-    - value: 'Employee profile records transgender status and gender identity.'
+    - value: "Employee profile records transgender status and gender identity."
       description: Gender identity is a distinct attribute and must not satisfy this classifier
-    - value: 'The organisation published its LGBTQ+ inclusion policy for Pride month.'
+    - value: "The organisation published its LGBTQ+ inclusion policy for Pride month."
       description: Community and policy terminology without a person-linked orientation
+    - value: "Policy guidance: this procedure explains how sexual orientation details are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Optional demographic questions\nName: ____________________\nEmployee ID: ____________________\nSexual orientation: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the national survey will ask about sexual orientation for the first time, and advocates say the question must stay optional."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: >-
       The bare word "orientation" appears in unrelated contexts (employee orientation,
@@ -109,33 +98,34 @@ exports:
 scope: broad
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_global_sexual_orientation
       matches:
-        - ref: Evidence_orientation_record_context
-        - ref: Evidence_orientation_attribution
+        - ref: Regex_global_sexual_orientation_person_fields
+        - ref: Regex_global_sexual_orientation_orientation_value
+        - ref: Evidence_orientation_record_evidence
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-            - Evidence_orientation_public_context
+            - Keyword_noise_exclusion
+            - Keyword_global_sexual_orientation_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_global_sexual_orientation
       matches:
-        - ref: Evidence_orientation_record_context
+        - ref: Regex_global_sexual_orientation_person_fields
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-            - Evidence_orientation_public_context
+            - Keyword_noise_exclusion
+            - Keyword_global_sexual_orientation_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_global_sexual_orientation
@@ -144,56 +134,48 @@ purview:
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-            - Evidence_orientation_public_context
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_global_sexual_orientation
-      pattern: '(?i)\b(?:sexual\s+orientations?|identif(?:y|ies|ied)\s+as\s+(?:gay|lesbian|bisexual|queer)|same-sex\s+(?:partner|spouse)|coming\s+out\s+as\s+(?:gay|lesbian|bisexual|queer))\b'
+      pattern: (?i)\b(?:sexual\s+orientations?|identif(?:y|ies|ied)\s+as\s+(?:gay|lesbian|bisexual|queer)|same-sex\s+(?:partner|spouse)|coming\s+out\s+as\s+(?:gay|lesbian|bisexual|queer))\b
+    - id: Regex_global_sexual_orientation_person_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|employee(?:\s+name)?|(?:employee|staff|member|customer|client|patient|participant|respondent|person|applicant|voter|record)\s*(?:no\.?|number|ID)|staff\s+member|member(?:\s+name)?|patient(?:\s+name)?|client(?:\s+name)?|customer(?:\s+name)?|applicant(?:\s+name)?|data\s+subject|resident(?:\s+name)?)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_global_sexual_orientation_orientation_value
+      pattern: (?i)(?<!as\s)\b(?:heterosexual|gay|lesbian|bisexual|pansexual|asexual|queer)\b
   keywords:
-    - id: Evidence_orientation_record_context
+    - id: Evidence_orientation_record_evidence
       groups:
         - match_style: word
           terms:
-            - data subject profile
-            - HR file
-            - HR diversity survey
-            - employee profile
-            - patient intake
-            - intake form
-            - case record
-            - case note
-            - survey response
-            - member profile
-            - client record
-            - relationship record
-      strength: domain
-    - id: Evidence_orientation_attribution
-      groups:
-        - match_style: word
-          terms:
-            - self-identifies as
-            - self-identified as
             - recorded as
-            - recorded value
-            - 'sexual orientation:'
-            - disclosed orientation
-            - disclosed to
             - response selected
-            - partner name
-            - partner named
-            - spouse name
-            - response code
+            - disclosed to
+            - optional demographic
+            - diversity survey
+            - next of kin
       strength: specific
-    - id: Evidence_orientation_public_context
+    - id: Keyword_global_sexual_orientation_guidance_exclusion
       groups:
         - match_style: word
           terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
             - public policy document
             - public policy guidance
             - public dataset
             - aggregate statistics
-            - awareness campaign
+            - aggregate report
+            - academic paper
             - blank questionnaire
+            - awareness campaign
             - training course
             - public report
       strength: exclusion
@@ -213,8 +195,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-07-12'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.3.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75 was gated only by record-context keywords (HR file, intake form, case record) that appear in policy and survey-design text, and 85 evidence could repeat the primary. 75 now requires the attribute to sit with a populated identified-person field (name, DOB, member/employee/patient ID) and 85 requires person fields plus a separately populated orientation value plus independent record evidence; policy text naming the category stays at 65. Bare-phrase tests replaced with populated person records; added policy, blank-form and news decoys; public-context exclusions folded into the guidance exclusion group."
   - version: 1.2.0
     date: '2026-07-19'
     description: 'Consolidate the retired Australian alias into the global detector: add Australian legal and workforce evidence, align the top-level and Purview primaries, remove transgender/gender-identity/LGBTQ-policy scope, retain 65 discovery, and require person-record plus populated orientation evidence at 75/85.'
@@ -243,6 +228,8 @@ keywords:
   - coming out as queer
 references:
   - url: https://gdpr-info.eu/art-9-gdpr/
-    title: GDPR Article 9 — processing of special categories of personal data (sex life and sexual orientation)
+    title: GDPR Article 9 - processing of special categories of personal data (sex life and sexual orientation)
   - url: https://humanrights.gov.au/our-work/sex-discrimination
-    title: Sex discrimination — Australian Human Rights Commission
+    title: Sex discrimination - Australian Human Rights Commission
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-sensitive-information
+    title: OAIC - What is sensitive information

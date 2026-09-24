@@ -1,19 +1,20 @@
 schema: testpattern/v1
 name: Security Incident Report
 slug: global-security-incident-report
-version: 1.4.0
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
-description: Detects security incident reports containing forensic findings, root causes, and response gaps.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+engine: boost_regex
+description: 'Detects populated cyber security incident reports: incident report / post-incident review titles together with incident record fields (incident ID, severity, detection time, affected hosts, source IPs) or technical artefacts (IPv4 addresses, CVE identifiers).'
+operation: 'Primary: security incident report/analysis, cyber (security) incident, incident investigation/forensic report, post-incident review/analysis. 65 (discovery only) = primary alone. 75 = primary plus one populated incident record field (incident/ticket ID, severity, priority, detected / date reported, reported by, affected host/system/asset/user, hostname, source/destination IP, malware family, hash) or a technical artefact (IPv4 address, CVE ID). 85 = primary plus two distinct structure hits plus independent response or root-cause evidence (containment, eradication, forensic analysis, indicators of compromise, root cause, contributing factor ...). All tiers exclude template/fixture text. Converted from keyword_list to a tier-gated regex classifier; the legacy top-level keyword list is kept as descriptive metadata only.'
+pattern: (?i)\b(?:security\s+incident\s+(?:report|analysis)|cyber\s*(?:security)?\s+incident|incident\s+(?:investigation|forensic)\s+report|post[\s-]?incident\s+(?:review|analysis))\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: 'Medium: incident-report titles also appear in policy, guidance and news, so enforcement requires populated incident fields or technical artefacts; 85 adds response/root-cause evidence.'
 jurisdictions:
   - global
 regulations:
-- "NDB Scheme (Cth)"
-- "SOCI Act 2018 (Cth)"
-- "TIA Act 1979 (Cth)"
+  - NDB Scheme (Cth)
+  - SOCI Act 2018 (Cth)
 frameworks:
 - CIS Controls
 - DISP
@@ -25,27 +26,44 @@ data_categories:
   - security
 test_cases:
   should_match:
-    - value: 'Security incident report received for review.'
-      description: Exact 65 discovery probe - report phrase without response or root-cause findings
-    - value: 'Security incident report: containment and recovery actions completed.'
-      description: Exact 75 probe - incident-response evidence without a root-cause conclusion
-    - value: 'Security incident report: forensic analysis confirmed the root cause after containment.'
-      description: Exact 85 probe - incident-response and root-cause evidence
+    - value: |-
+        Security incident report - INC-2026-0412
+        Severity: High
+        Detected: 12/08/2026 02:14 AEST
+        Affected host: fin-app02.corp.internal (10.20.30.41)
+        Source IP: 203.0.113.77
+        Root cause: unpatched CVE-2025-21298 allowed code execution; containment completed by isolating the host.
+      description: 85 - populated incident record with technical artefacts and root-cause/containment evidence
+      synthetic: true
+    - value: |-
+        Post-incident review
+        Incident ID: SIR-0917
+        Reported by: Service Desk
+        Two staff reported the same phishing email; no further action required.
+      description: 75 - populated incident fields without response or root-cause evidence
+      synthetic: true
+    - value: Security incident report received for review.
+      description: 65 discovery - title only
     - value: 'Security incident report: forensic analysis and root cause analysis findings'
-      description: Test match 1
-    - value: 'Indicators of compromise (IOC) identified: malware analysis and threat actor attribution'
-      description: Test match 2
-    - value: 'Breach investigation: attack vector, compromise assessment, and incident forensics'
-      description: Test match 3
+      description: 65 discovery - title and topic words without populated fields
   should_not_match:
     - value: Security guard incident report
-      description: Non-match 1
+      description: Physical security usage
     - value: Minor traffic incident
-      description: Non-match 2
-    - value: 'Sample template for documenting a cyber event, causal findings, and containment actions.'
+      description: Traffic usage
+    - value: Our incident response policy explains how a security incident report is written, reviewed and closed, and who approves containment actions.
+      description: Policy guidance - no populated incident fields (65 at most)
+    - value: |-
+        Security incident report form
+        Incident ID: ________
+        Severity: [select]
+        Affected host: ________
+        Source IP: <address>
+      description: Blank report template - placeholder fields are rejected
+    - value: The council confirmed a cyber security incident on Monday and said a post-incident review would be published next month.
+      description: News item - no populated incident fields
+    - value: Sample template for documenting a cyber event, causal findings, and containment actions.
       description: Adjacent template language is not a populated cyber-incident record
-    - value: 'The public catalogue lists a cyber-event review document.'
-      description: Public catalogue metadata has no security-incident primary
     - value: 'Data breach report: OAIC notification sent to affected individuals.'
       description: Sibling breach-report language does not satisfy the security-incident primary
 false_positives:
@@ -67,7 +85,7 @@ sensitivity_labels:
   ca_gov: "Protected B"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -76,8 +94,14 @@ purview:
     - confidence_level: 85
       id_match: Regex_security_incident
       matches:
-        - ref: Keyword_incident_response
-        - ref: Keyword_root_cause
+        - ref: Regex_global_security_incident_report_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 1
+          refs:
+            - Keyword_incident_response
+            - Keyword_root_cause
         - type: any
           min_matches: 0
           max_matches: 0
@@ -86,7 +110,7 @@ purview:
     - confidence_level: 75
       id_match: Regex_security_incident
       matches:
-        - ref: Keyword_incident_response
+        - ref: Regex_global_security_incident_report_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -103,8 +127,9 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_security_incident
-      pattern: >-
-        (?i)\b(?:security\s+incident\s+(?:report|analysis)|cyber\s*(?:security)?\s+incident|incident\s+(?:investigation|forensic)\s+report|post[\s-]?incident\s+(?:review|analysis))\b
+      pattern: (?i)\b(?:security\s+incident\s+(?:report|analysis)|cyber\s*(?:security)?\s+incident|incident\s+(?:investigation|forensic)\s+report|post[\s-]?incident\s+(?:review|analysis))\b
+    - id: Regex_global_security_incident_report_record_structure
+      pattern: (?i)\b(?:incident\s+(?:ID|number|no\.?|reference|ref)|ticket\s+(?:ID|number|no\.?)|severity|priority|detected|detection\s+(?:time|date)|date\s+(?:detected|reported)|reported\s+by|affected\s+(?:hosts?|systems?|assets?|users?|accounts?)|hostname|asset\s+ID|(?:source|destination|attacker)\s+IP|user\s+account|malware\s+family|SHA-?256|MD5)\s*[:#]\s*(?!(?:n/?a|tbc|tba|unknown)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9._:/@-]{1,63}|\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b|\bCVE-\d{4}-\d{4,7}\b
   keywords:
     - id: Keyword_incident_response
       groups:
@@ -114,14 +139,14 @@ purview:
             - incident handling
             - containment
             - eradication
-            - recovery
             - lessons learned
             - forensic analysis
             - forensic investigation
-            - timeline
             - indicators of compromise
             - text: IOC
               case_sensitive: true
+            - isolated the host
+            - isolating the host
       strength: domain
     - id: Keyword_root_cause
       groups:
@@ -133,34 +158,19 @@ purview:
               case_sensitive: true
             - contributing factor
             - causal factor
-            - 5 whys
-            - fishbone diagram
             - post-mortem
       strength: specific
-    - id: Keyword_security_assessment
-      groups:
-        - match_style: word
-          terms:
-            - security assessment
-            - security audit
-            - security review
-            - security testing
-            - security evaluation
-            - executive summary
-            - findings summary
-            - risk summary
-            - CVSS
-            - text: CWE
-              case_sensitive: true
-            - vulnerability scan
-            - Nessus
-            - Qualys
-            - Nmap
-            - attack surface
-      strength: specific
+references:
+  - title: ASD ACSC - Report a cyber security incident
+    url: https://www.cyber.gov.au/report-and-recover/report
+  - title: Security of Critical Infrastructure Act 2018 (Cth)
+    url: https://www.legislation.gov.au/C2018A00029/latest/text
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): Type keyword_list -> regex (primary promoted to the top-level pattern) so tier gates, not bare keyword-list hits, decide detection. 75 now requires a populated incident record field or technical artefact (new Regex_..._record_structure: incident ID, severity, detected, affected host, source IP, hash, IPv4, CVE) instead of generic incident-response words; 85 requires two distinct structure hits plus response or root-cause evidence (the old 85 was reachable on topic words alone). Dropped the generic recovery/timeline terms and the unused security-assessment group; recommended_confidence 85 -> 75. Tests rebuilt with populated synthetic incident records and policy, blank-template and news decoys. Regulations: removed TIA Act 1979 (not applicable). Added ACSC reporting and SOCI Act references.'
   - version: 1.4.0
     date: '2026-07-19'
     description: 'Targeted blocker remediation: add a discovery-only 65 report tier, make 75 require incident-response evidence, retain 85 for response plus root-cause evidence, and add exact-tier and sibling/public/template probes.'

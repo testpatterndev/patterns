@@ -1,21 +1,23 @@
 schema: testpattern/v1
 name: Procurement Tender Evaluation with Pricing
 slug: procurement-tender-evaluation-with-pricing
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects weighted evaluation matrices scoring tender responses, including commercial pricing from multiple bidders in government procurement processes.
-operation: 'Keyword proximity: tender/procurement terms within 300 characters of evaluation/scoring terms and pricing/cost indicators. Requires co-occurrence with confidentiality or probity context. Optional regex for tender reference numbers.'
+operation: >-
+  Primary: tender evaluation phrases (tender evaluation, evaluation report/matrix/panel report, weighted scores, value for money assessment, evaluation of tenders/offers). 65 = phrase only (discovery). 75 = phrase plus two distinct scores (n/5, n/10 ... n/100). 85 = 75 plus a dollar price plus either a labelled tender / RFx reference or a PROTECTED / confidential / commercial-in-confidence / probity marker. Templates, published notices and QTenders guidance are excluded.
 pattern: "(?i)\\b(?:tender\\s+evaluation|evaluation\\s+(?:report|matrix|panel\\s+report|committee\\s+report)|weighted\\s+scores?|value\\s+for\\s+money\\s+assessment|evaluation\\s+of\\s+(?:tenders|offers|responses))\\b"
 confidence: medium
-confidence_justification: 'Medium confidence: tender evaluation documents with commercial pricing and probity markers are highly distinctive. The combination of procurement terminology with pricing and confidentiality markers virtually eliminates false positives.'
+confidence_justification: >-
+  Medium confidence: multiple scores with prices next to evaluation phrasing are specific to evaluation reports; agency tender numbers are customer-defined, so the reference is a documented label-anchored fallback.
 jurisdictions:
   - au
 regulations:
-- "Financial Accountability Act 2009 (Qld)"
+  - "Financial Accountability Act 2009 (Qld)"
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - financial
   - government
@@ -42,16 +44,28 @@ corroborative_evidence:
     - corporate-finance
 
     - government-services
+customisation:
+  - key: tender-reference-number
+    kind: identifier-format
+    identifier: tender-reference-number
+    target: purview.regexes/Regex_procurement_tender_evaluation_with_pricing_tender_reference
+    mode: replace
+    affects_tiers: [85]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#tender-reference-number). Earlier versions used the QLD-YYYY-NNNNN tender format, which does not appear in any published source.
 test_cases:
   should_match:
-    - value: 'PROTECTED — Tender Evaluation Report. RFT QLD-2026-04521: ICT Infrastructure Services. Evaluation committee scoring: Tenderer A — Technical: 78/100, Price: $14.2M. Tenderer B — Technical: 82/100, Price: $16.8M. Value for money assessment: Tenderer A recommended. Probity advisor: approved.'
-      description: Tender evaluation with multiple bidder pricing and scores
-    - value: 'Commercial-in-Confidence. Procurement evaluation matrix — Road construction RFP QLD-2026-03310. Weighted criteria: Price 40%, Methodology 30%, Experience 30%. Bidder pricing: Company X $45.6M, Company Y $52.1M, Company Z $48.3M. Recommendation to evaluation committee.'
-      description: Procurement evaluation with competitive pricing comparison
-    - value: 'PROTECTED — Evaluation committee only. Tender evaluation summary for RFT QLD-2026-08842. Probity-cleared scoring: Tenderer A 86/100 at $9.7M, Tenderer B 79/100 at $11.2M. Value for money: Tenderer A recommended.'
-      description: Tender evaluation summary with reference number, scores and pricing
+    - value: 'PROTECTED — Tender Evaluation Report. RFT number 2026-04521: ICT Infrastructure Services. Evaluation committee scoring: Tenderer A — Technical: 78/100, Price: $14.2M. Tenderer B — Technical: 82/100, Price: $16.8M. Value for money assessment: Tenderer A recommended. Probity advisor: approved.'
+      description: Tender evaluation with multiple bidder pricing and scores (reaches 85)
+    - value: 'Commercial-in-Confidence. Procurement evaluation matrix — Road construction RFP 2026-03310. Weighted criteria: Price 40%, Methodology 30%, Experience 30%. Bidder pricing: Company X $45.6M, Company Y $52.1M, Company Z $48.3M. Recommendation to evaluation committee.'
+      description: Procurement evaluation with competitive pricing comparison (65 discovery only - prose without populated record fields)
+    - value: 'PROTECTED — Evaluation committee only. Tender evaluation summary for RFT 2026-08842. Probity-cleared scoring: Tenderer A 86/100 at $9.7M, Tenderer B 79/100 at $11.2M. Value for money: Tenderer A recommended.'
+      description: Tender evaluation summary with reference number, scores and pricing (reaches 85)
     - value: "Tender evaluation report — RFT 2026-0417\nHarbour Networks: technical 38.5/50, experience 17/20, weighted score 78.2/100, price $418,960\nCoastline Data: technical 31/50, experience 15/20, weighted score 69.4/100, price $397,500\nEvaluation committee only — commercial-in-confidence."
-      description: Populated record with price / score lines reaching 75 and 85
+      description: Populated record with price / score lines reaching 75 and 85 (reaches 85)
+      synthetic: true
+    - value: "Tender evaluation matrix\nHarbour Networks: technical 38/50, experience 17/20\nCoastline Data: technical 31/50, experience 15/20"
+      description: Two or more distinct scores with evaluation phrasing, no price (reaches 75)
       synthetic: true
   should_not_match:
     - value: 'Request for Tender: ICT Infrastructure Services. Submissions close 30 March 2026. Published on QTenders for open public response.'
@@ -60,6 +74,10 @@ test_cases:
       description: Procurement policy template without real evaluation data
     - value: "The evaluation panel will assess offers against the published criteria and weightings in the invitation to tender. How to evaluate tenders is explained in the procurement guide."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: "Tender evaluation matrix\nTenderer: __________\nTechnical score: ___/50\nPrice: $________\nWeighted score: ___/100"
+      description: Blank evaluation matrix (must stay below 75)
+    - value: "News: after the tender evaluation the contract went to the lowest bidder at $12.4 million, the minister announced on 14/08/2026."
+      description: News article naming an evaluation, one price and a date (must stay below 75)
 false_positives:
   - description: Published tender notices and procurement advertisements on QTenders
     mitigation: Exclude documents containing 'submissions close', 'published on QTenders', 'invitation to tender' without evaluation data
@@ -84,7 +102,10 @@ purview:
           min_count: 2
           unique_results: true
         - ref: Pattern_procurement_tender_evaluation_with_pricing_dollar_amounts_with_optional_magnitude_s
-        - ref: Evidence_procurement_tender_evaluation_with_pricing_markers
+        - type: any
+          refs:
+            - Regex_procurement_tender_evaluation_with_pricing_tender_reference
+            - Evidence_procurement_tender_evaluation_with_pricing_markers
         - type: any
           min_matches: 0
           max_matches: 0
@@ -105,11 +126,7 @@ purview:
             - Filter_procurement_tender_evaluation_with_pricing_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match:
-        type: any
-        ids:
-          - Pattern_procurement_tender_evaluation_with_pricing_evaluation_terms
-          - Pattern_procurement_tender_evaluation_with_pricing_queensland_tender_reference_number
+      id_match: Pattern_procurement_tender_evaluation_with_pricing_evaluation_terms
       matches:
         - type: any
           min_matches: 0
@@ -121,12 +138,13 @@ purview:
     - id: Pattern_procurement_tender_evaluation_with_pricing_evaluation_terms
       pattern: >-
         (?i)\b(?:tender\s+evaluation|evaluation\s+(?:report|matrix|panel\s+report|committee\s+report)|weighted\s+scores?|value\s+for\s+money\s+assessment|evaluation\s+of\s+(?:tenders|offers|responses))\b
-    - id: Pattern_procurement_tender_evaluation_with_pricing_queensland_tender_reference_number
-      pattern: QLD-\d{4}-\d{3,6}
     - id: Pattern_procurement_tender_evaluation_with_pricing_dollar_amounts_with_optional_magnitude_s
-      pattern: \$[\d,.]+\s*[MBKmb]?
+      pattern: (?i)\$\d[\d,.]{0,15}(?:\s*(?:million|billion|bn|[MBK])\b)?
     - id: Pattern_procurement_tender_evaluation_with_pricing_score_format
-      pattern: \b\d{1,3}\.\d{1,2}\s*/\s*\d{1,3}\b|\b\d{1,3}\s*/\s*\d{1,3}\b
+      pattern: \b\d{1,3}(?:\.\d{1,2})?\s*/\s*(?:5|10|20|25|30|40|50|60|70|100)\b(?!/\d)
+    - id: Regex_procurement_tender_evaluation_with_pricing_tender_reference
+      pattern: >-
+        (?i)\b(?:(?:tender|contract|offer|invitation|RFx)\s+(?:no\.?|number|ref(?:erence)?|ID)|(?:RFT|RFQ|RFP|RFO|ITO)(?:\s+(?:no\.?|number|ref(?:erence)?))?)\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{2,20}\b
   keywords:
     - id: Evidence_procurement_tender_evaluation_with_pricing_markers
       groups:
@@ -158,10 +176,17 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Commercial-in-Confidence
-references: []
+references:
+  - title: Financial Accountability Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-009
+  - title: Queensland Procurement Policy 2026
+    url: https://www.forgov.qld.gov.au/finance-procurement-and-travel/procurement/procurement-resources/procurement-policies-and-frameworks/queensland-procurement-policy-2026
 created: '2026-02-20'
 updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): replaced the invented QLD-YYYY-NNNNN tender reference (previously a 65 alternative primary) with the new tender-reference-number labelled fallback (identifier-format slot), now one of the independent evidence options at 85; the score regex no longer matches dates (denominator must be a common scoring scale and not followed by /digit) and the dollar regex requires a digit; 85 = two distinct scores + a price + a tender reference or confidentiality/probity marker; tests converted to labelled RFT references with blank-matrix and news decoys; references added.'
   - version: 1.4.0
     date: '2026-09-24'
     description: "Primary was the unpublished QLD-YYYY-NNNNN tender reference, so no genuine evaluation report could fire. Primary is now evaluation-report phrasing; 75 requires two distinct score entries (n/N); 85 adds dollar amounts and confidentiality markers. The tender reference regex is kept only as optional discovery."

@@ -1,63 +1,82 @@
 schema: testpattern/v1
 name: Forensic disk images
 slug: global-top500-297-forensic-disk-images
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies forensic disk images patterns in security and access control contexts. Detects potential exposure
-  of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative
-  evidence: 8 keywords within 300 characters. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
-  text.'
-pattern: (?i)\b(?:E01|\.E01\b|dd\s+image|forensic\s+image|disk\s+image)\b
+description: >-
+  Detects forensic disk-image acquisition records: image or acquisition-log wording with evidence/exhibit numbers, examiner, device serials, image file names and verification hashes. Topic wording alone is discovery-only.
+operation: >-
+  Regex_forensic_image_primary (forensic/disk image, bit-stream copy or acquisition log wording) is discovery-only at 65. 75 requires the primary plus one populated structure: a populated acquisition field (evidence/exhibit/case number, examiner, acquisition date, device serial, image path, source media) or an image artefact (MD5/SHA1/SHA256 hash, .E01/.AD1/.dd/.raw/.img/.aff file name). 85 requires a populated acquisition field (evidence/exhibit/case number, examiner, acquisition date, device serial, image path, source media) (two distinct hits), an image artefact (MD5/SHA1/SHA256 hash, .E01/.AD1/.dd/.raw/.img/.aff file name), and independent forensic-handling (chain of custody, verification, imaging tool, seizure) evidence that does not repeat the primary. Every enforce tier rejects template/noise wording (template-exclusion) and guidance, policy, training and news framing (Keyword_forensic_image_guidance_exclusion).
+pattern: >-
+  (?i)\b(?:forensic\s+(?:disk\s+)?images?|disk\s+images?|bit[\s-]stream\s+(?:copy|image)|(?:dd|E01|raw)\s+image|acquisition\s+(?:log|report|summary))\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: the topic phrase alone is discovery-only; enforcement needs populated structure (a populated acquisition field (evidence/exhibit/case number, examiner, acquisition date, device serial, image path, source media) or an image artefact (MD5/SHA1/SHA256 hash, .E01/.AD1/.dd/.raw/.img/.aff file name)), and 85 needs two distinct structures plus independent forensic-handling (chain of custody, verification, imaging tool, seizure) evidence, so policies, blank forms and training text stay below 75.
 jurisdictions:
 - global
 regulations:
+- Privacy Act 1988 (Cth)
 - GDPR
+frameworks:
+- ISO 27001
+- NIST CSF
 data_categories:
-- credentials
 - security
 corroborative_evidence:
   keywords:
-  - forensic disk images
-  - forensic
-  - disk
-  - images
-  - security
-  - operations
-  - threat
-  - data
+  - chain of custody
+  - hash verified
+  - verification hash
+  - FTK Imager
+  - EnCase
+  - Guymager
+  - Tableau
+  - bit-for-bit
+  - seized
+  - unallocated space
   proximity: 300
 test_cases:
   should_match:
-  - value: E01
-    description: Topic phrase present
-  - value: E01
-    description: Topic phrase, lowercase
-  - value: this record references the E01 held on file
-    description: Topic phrase within surrounding text
+  - value: A forensic image of the laptop will be taken before it is reissued.
+    description: Discovery probe (65)
+    synthetic: true
+  - value: |-
+      Forensic image acquisition log
+      Exhibit number: EX-0412
+      Examiner: J. Staffson
+    description: Medium-tier probe (75) - populated acquisition fields
+    synthetic: true
+  - value: |-
+      Forensic image acquisition log - matter 2026-0412
+      Exhibit number: EX-0412
+      Device serial: S4EVNX0N912345
+      Examiner: J. Staffson
+      Image file: EX0412_laptop.E01
+      MD5: 9e107d9d372bb6826bd81d3542a419d6 - hash verified after acquisition with FTK Imager; chain of custody form signed.
+    description: High-tier probe (85) - several acquisition fields, image file and hash, custody context
+    synthetic: true
   should_not_match:
   - value: unrelated generic text
     description: No relevant phrase context
   - value: placeholder value 12345
-    description: Random text should not match phrase marker
-  - value: generic policy prose without anchors
-    description: Should reject generic mentions without structural anchor terms
-  - value: template example placeholder record identifier
-    description: Template/sample context should be excluded even when anchor words are present
+    description: Random text should not match
+  - value: 'Policy statement: forensic images must be stored on encrypted evidence drives with restricted access.'
+    description: Policy text
+    synthetic: true
+  - value: |-
+      Forensic image acquisition log template
+      Exhibit number: ________
+      Examiner: [insert]
+    description: Blank template
+    synthetic: true
+  - value: 'Course module 5: creating a forensic image with FTK Imager - acquire to case1.E01 and verify the MD5.'
+    description: Training framing
+    synthetic: true
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+- description: IT staff use "disk image" for OS deployment images.
+  mitigation: Enforcement needs acquisition fields (evidence/exhibit/examiner/device serial) or forensic image artefacts; 85 also needs custody/verification context.
 exports:
 - purview_xml
 - yaml
@@ -65,34 +84,42 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
   - dict: template-exclusion
     as: Keyword_noise_exclusion
     match_style: word
   pattern_tiers:
   - confidence_level: 85
-    id_match: Regex_forensic_disk
+    id_match: Regex_forensic_image_primary
     matches:
-    - ref: Keyword_forensic_disk
-    - ref: Pattern_global_top500_297_forensic_disk_images_label_context
+    - ref: Regex_forensic_image_acquisition_field
+      min_count: 2
+      unique_results: true
+    - ref: Regex_forensic_image_image_artefact
+    - ref: Keyword_forensic_image_context
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_forensic_image_guidance_exclusion
   - confidence_level: 75
-    id_match: Regex_forensic_disk
+    id_match: Regex_forensic_image_primary
     matches:
-    - ref: Keyword_forensic_disk
+    - type: any
+      refs:
+      - Regex_forensic_image_acquisition_field
+      - Regex_forensic_image_image_artefact
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_forensic_image_guidance_exclusion
   - confidence_level: 65
     discovery_only: true
-    id_match: Regex_forensic_disk
+    id_match: Regex_forensic_image_primary
     matches:
     - type: any
       min_matches: 0
@@ -100,43 +127,50 @@ purview:
       refs:
       - Keyword_noise_exclusion
   regexes:
-  - id: Regex_forensic_disk
-    pattern: (?i)\b(?:E01|\.E01\b|dd\s+image|forensic\s+image|disk\s+image)\b
-  - id: Pattern_global_top500_297_forensic_disk_images_label_context
-    pattern: (?i)\b(?:forensic\s+disk\s+images)\b
+  - id: Regex_forensic_image_primary
+    pattern: >-
+      (?i)\b(?:forensic\s+(?:disk\s+)?images?|disk\s+images?|bit[\s-]stream\s+(?:copy|image)|(?:dd|E01|raw)\s+image|acquisition\s+(?:log|report|summary))\b
+  - id: Regex_forensic_image_acquisition_field
+    pattern: >-
+      (?i)\b(?:evidence\s+(?:item|no\.?|number|ID)|exhibit\s+(?:no\.?|number|ID)|case\s+(?:no\.?|number)|examiner|acquired\s+by|acquisition\s+(?:date|started|completed)|device\s+serial|serial\s+number|write[\s-]blocker|image\s+(?:path|file(?:name)?)|source\s+(?:media|device)|sector\s+count)\s*[:=#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'._:@#+-]{1,60}
+  - id: Regex_forensic_image_image_artefact
+    pattern: >-
+      (?i)\b[a-fA-F0-9]{64}\b|\b[a-fA-F0-9]{40}\b|\b[a-fA-F0-9]{32}\b|\b[A-Za-z0-9_-]{1,60}\.(?:E01|Ex01|AD1|dd|raw|img|aff4?)\b
   keywords:
-  - id: Keyword_forensic_disk
+  - id: Keyword_forensic_image_context
     groups:
     - match_style: word
       terms:
-      - forensic disk image
-      - forensic image
-      - disk image
-      - dd image
-      - EnCase
-      - evidence file
       - chain of custody
-      - hash verification
-      - write blocker
-      - bit-for-bit copy
-      - acquisition
-      - digital forensics
+      - hash verified
+      - verification hash
+      - FTK Imager
+      - EnCase
+      - Guymager
+      - Tableau
+      - bit-for-bit
+      - seized
+      - unallocated space
     strength: specific
-  - id: Keyword_global_top500_297_forensic_disk_images_domain_context
+  - id: Keyword_forensic_image_guidance_exclusion
     groups:
     - match_style: word
       terms:
-      - forensic disk images
-      - forensic
-      - disk
-      - images
+      - policy statement
+      - guidance note
+      - best practice guide
+      - media release
+      - press release
+      - news report
+      - course module
+      - learning objectives
+      - awareness course
+      - webinar
+      - lesson plan
+      - quiz question
     strength: domain
-risk_description: The detector recognizes E01, dd image, forensic image, or disk image terminology, indicating a forensic-image
-  record or reference rather than inspecting the image bytes. An actual disk image can reproduce a user's entire storage device,
-  including documents, browsing history, credentials, deleted data, and evidence relevant to an investigation. The normal
-  affected scale is one endpoint and its user or custodian, with serious but contained exposure, while tooling documentation
-  and ordinary disk-image references remain false-positive contexts. Risk 8 SENSITIVE is retained for a genuine image; PROTECTED
-  would require a device holding protected material or evidence whose loss would cause significant damage.
+risk_description: >-
+  The detector now requires forensic-image wording plus populated acquisition fields, image file names or verification hashes before enforcing. An actual disk image can reproduce a user's entire storage device, including documents, browsing history, credentials, deleted data, and evidence relevant to an investigation. The normal affected scale is one endpoint and its user or custodian, with serious but contained exposure, while tooling documentation and ordinary disk-image references remain false-positive contexts. Risk 8 SENSITIVE is retained for a genuine image; PROTECTED would require a device holding protected material or evidence whose loss would cause significant damage.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -146,31 +180,26 @@ sensitivity_labels:
   nz_gov: CONFIDENTIAL
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: 'Quality pass (2026-09-24): primary tightened (bare E01 token removed); self-corroboration removed; 75 needs a populated acquisition field or image artefact; 85 needs two acquisition fields, a hash/image file and forensic-handling context; guidance exclusion; populated tests and decoys; GDPR kept and Privacy Act 1988 (Cth) added (images hold personal data); frameworks and NIST SP 800-86 reference added; credentials category removed.'
 - version: 1.3.1
   date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1848 without changing
-    detector or package metadata.'
+  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1848 without changing detector or package metadata.'
 - version: 1.3.0
   date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
+  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
 - version: 1.2.1
   date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
+  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
 - version: 1.2.0
   date: '2026-07-04'
-  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier
-    collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword
-    evidence at the same confidence level'
+  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword evidence at the same confidence level'
 - version: 1.1.0
   date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 references:
@@ -178,6 +207,7 @@ references:
 - https://www.legislation.gov.au/C2018A00029/latest/text
 - https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/preventing-preparing-for-and-responding-to-data-breaches/data-breach-preparation-and-response
 - https://handbook.apra.gov.au/standard/cps-234
+- https://csrc.nist.gov/pubs/sp/800/86/final
 remediation:
   catalog_quality_2026_06_02:
     status: applied

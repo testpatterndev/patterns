@@ -1,8 +1,8 @@
 schema: testpattern/v1
 name: Political Opinion & Affiliation
 slug: global-political-opinion
-version: 1.3.0
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
 engine: universal
 description: >-
@@ -11,22 +11,17 @@ description: >-
   political opinions as a special category of personal data with no fixed format — it is detectable
   only by topic vocabulary. Topic-grade detector, low confidence by design.
 operation: >-
-  Phrase regex matching indicative political-opinion terminology (party membership, registered
-  Democrat/Republican, campaign contribution, political donation). Detects the presence of
-  political-opinion subject matter; not a structured-token detector. Pair with corroborative keywords
-  to raise precision.
-pattern: '(?i)\b(?:political\s+affiliations?|political\s+opinions?|party\s+membership|party\s+affiliations?|voted\s+for|registered\s+(?:Democrat|Republican|Green|Libertarian|to\s+vote\s+as)|political\s+donations?|campaign\s+contributions?|political\s+party\s+member|partisan\s+affiliations?|voter\s+registration\s+party)\b'
+  The primary regex matches political affiliation/opinion, party membership or affiliation, voted-for and registered-party statements, political donations and campaign contributions. 65 (discovery only): phrase alone - policy, guidance, news and survey-design text naming the category stays here. 75: phrase plus a populated identified-person field (name, DOB, employee/member/customer/patient/participant number or ID, data subject). 85: person field plus a populated political field (party or party code, membership number/status, donation amount, contribution date/amount, electorate, division, voting intention, branch) plus independent record evidence (donor record, constituent, CRM note, membership file, campaign database, electoral roll, doorknock, supporter score). Template framing and guidance/policy/public-aggregate framing are excluded from 75/85. Converted from keyword_list to regex so the tier logic decides matches.
+pattern: (?i)\b(?:political\s+affiliations?|political\s+opinions?|party\s+membership|party\s+affiliations?|voted\s+for|registered\s+(?:Democrat|Republican|Green|Libertarian|to\s+vote\s+as)|political\s+donations?|campaign\s+contributions?|political\s+party\s+member|partisan\s+affiliations?|voter\s+registration\s+party)\b
 confidence: low
 confidence_justification: >-
-  Low by design. Political opinion is a GDPR Article 9 special category with no fixed format, so it is
-  detected purely by topic vocabulary. Phrases like "voted for" appear constantly in non-political
-  prose (awards, elections of officers, polls); pair with corroborative keywords (politics, election,
-  candidate, donor) within the proximity window and treat single hits as low confidence.
+  Low by design: the attribute has no fixed format. Enforce tiers now require the attribute to be tied to an identified person record (a populated name/DOB/ID field), and 85 also requires a populated political field plus independent record evidence, so policy text, surveys-in-design and news naming the category stay at 65 discovery.
 jurisdictions:
   - global
   - eu
 regulations:
   - GDPR
+  - Privacy Act 1988 (Cth)
 frameworks:
   - ISO 27001
   - NIST CSF
@@ -46,33 +41,31 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: 'Political affiliation disclosure topic pending review.'
-      description: Exact 65 discovery probe - political attribute topic without a person-linked record
-    - value: 'Constituent profile includes a political affiliation field.'
-      description: Exact 75 probe - political record context without a populated affiliation detail
-    - value: 'Donor record: political donation amount AUD 250; contribution date 12 July; party code GRN.'
-      description: Exact 85 probe - person-linked political record with populated donation/party details
-    - value: 'CRM note records the donor as a registered Democrat in the swing district.'
-      description: Registered Democrat term present
-    - value: 'The file lists each campaign contribution made during the election cycle.'
-      description: Campaign contribution term present
-    - value: 'Profile field captures party membership and political affiliation.'
-      description: Party membership / political affiliation terms present
-    - value: 'A political donation of record was flagged for the constituent.'
-      description: Political donation term present
+    - value: "Campaign database - donor record\nName: Avery Teston\nMember number: 0044718\nParty code: GRN\nDonation amount: AUD 250\nContribution date: 12/07/2026\nNote: political donation receipted; add to doorknock list."
+      description: Person record with populated political fields and donor-record evidence (85)
+      synthetic: true
+    - value: "Constituent contact\nName: Casey Rourke\nCustomer ID: C4471820\nMentioned party membership during the call."
+      description: Person record naming party membership without a populated political field (75)
+      synthetic: true
   should_not_match:
-    - value: 'The quarterly sales report shows revenue grew across all regions.'
+    - value: "The quarterly sales report shows revenue grew across all regions."
       description: Unrelated business prose, no political terms
-    - value: 'The committee registered the new vendor in the procurement system.'
+    - value: "The committee registered the new vendor in the procurement system."
       description: Near-miss prose ("registered" but not a party), no political opinion
-    - value: 'The team selected the winning design after a quick internal poll.'
+    - value: "The team selected the winning design after a quick internal poll."
       description: Unrelated prose, "poll" without political affiliation vocabulary
-    - value: 'Published election result includes aggregate party-support statistics.'
+    - value: "Published election result includes aggregate party-support statistics."
       description: Public aggregate political material is not a person-linked opinion record
-    - value: 'Sample template: campaign donor record, amount AUD 100, contribution date 1 July.'
+    - value: "Sample template: campaign donor record, amount AUD 100, contribution date 1 July."
       description: Adjacent template language is not a populated political-opinion record
-    - value: 'Membership file records appointment to the company board.'
+    - value: "Membership file records appointment to the company board."
       description: Sibling organisational membership does not satisfy the political primary
+    - value: "Policy guidance: this procedure explains how political opinion and party membership details are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Membership application\nName: ____________________\nMember number: ____________________\nParty: ____________________\nBranch: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the report on campaign contributions found that political donations from individuals rose sharply ahead of the state election."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: >-
       Phrases like "voted for" or "registered" appear in non-political contexts (board elections,
@@ -87,33 +80,34 @@ exports:
 scope: broad
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_political_opinion_topic
       matches:
-        - ref: Evidence_political_record_context
-        - ref: Evidence_political_attribution
+        - ref: Regex_global_political_opinion_person_fields
+        - ref: Regex_global_political_opinion_political_fields
+        - ref: Evidence_political_record_evidence
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-            - Evidence_political_public_context
+            - Keyword_noise_exclusion
+            - Keyword_global_political_opinion_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_political_opinion_topic
       matches:
-        - ref: Evidence_political_record_context
+        - ref: Regex_global_political_opinion_person_fields
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-            - Evidence_political_public_context
+            - Keyword_noise_exclusion
+            - Keyword_global_political_opinion_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_political_opinion_topic
@@ -122,38 +116,50 @@ purview:
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-            - Evidence_political_public_context
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_political_opinion_topic
-      pattern: '(?i)\b(?:political\s+affiliations?|political\s+opinions?|party\s+membership|party\s+affiliations?|voted\s+for|registered\s+(?:Democrat|Republican|Green|Libertarian|to\s+vote\s+as)|political\s+donations?|campaign\s+contributions?|political\s+party\s+member|partisan\s+affiliations?|voter\s+registration\s+party)\b'
+      pattern: (?i)\b(?:political\s+affiliations?|political\s+opinions?|party\s+membership|party\s+affiliations?|voted\s+for|registered\s+(?:Democrat|Republican|Green|Libertarian|to\s+vote\s+as)|political\s+donations?|campaign\s+contributions?|political\s+party\s+member|partisan\s+affiliations?|voter\s+registration\s+party)\b
+    - id: Regex_global_political_opinion_person_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|employee(?:\s+name)?|(?:employee|staff|member|customer|client|patient|participant|respondent|person|applicant|voter|record)\s*(?:no\.?|number|ID)|staff\s+member|member(?:\s+name)?|patient(?:\s+name)?|client(?:\s+name)?|customer(?:\s+name)?|applicant(?:\s+name)?|data\s+subject|resident(?:\s+name)?)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_global_political_opinion_political_fields
+      pattern: (?i)\b(?:party(?:\s+(?:code|name))?|membership\s+(?:no\.?|number|status|type)|donation(?:\s+amount)?|contribution(?:\s+(?:amount|date))?|electorate|division|voting\s+intention|branch)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_political_record_context
+    - id: Evidence_political_record_evidence
       groups:
         - match_style: word
           terms:
-            - voter record
             - donor record
+            - constituent
             - CRM note
-            - constituent profile
             - membership file
             - campaign database
-      strength: domain
-    - id: Evidence_political_attribution
-      groups:
-        - match_style: word
-          terms:
-            - donation amount
-            - contribution date
-            - party code
-            - member number
-            - registration status
-            - ballot choice recorded
+            - electoral roll
+            - doorknock
+            - supporter score
       strength: specific
-    - id: Evidence_political_public_context
+    - id: Keyword_global_political_opinion_guidance_exclusion
       groups:
         - match_style: word
           terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+            - public policy document
+            - public policy guidance
+            - public dataset
+            - aggregate statistics
+            - aggregate report
+            - academic paper
+            - blank questionnaire
+            - awareness campaign
             - published election result
             - public campaign website
             - aggregate polling
@@ -163,7 +169,7 @@ purview:
       strength: exclusion
 risk_rating: 7
 risk_description: >-
-  The Political Opinion and Affiliation keyword pattern detects statements about party membership, registered-party status, political donations, campaign contributions, or recorded political affiliation. Its normal positive cases can contain a person-linked CRM or donor fact rather than only a blank category label, so disclosure may expose an individual's beliefs and enable discrimination, pressure, profiling, or targeted campaigning. Low confidence leaves room for political commentary that is not attributable to a person, but the corroborated true positive concerns one person's sensitive viewpoint or association. Risk 7 and SENSITIVE Personal-Privacy reflect credible direct personal harm, while PROTECTED would require a high-consequence bulk register, coercive targeting context, or severe safety impact.
+  The Political Opinion and Affiliation detector recognises party membership, registered-party, political donation and campaign contribution statements and enforces only when they sit with a populated person identifier; policy and news text stays at 65 discovery. Its normal positive cases can contain a person-linked CRM or donor fact rather than only a blank category label, so disclosure may expose an individual's beliefs and enable discrimination, pressure, profiling, or targeted campaigning. Low confidence leaves room for political commentary that is not attributable to a person, but the corroborated true positive concerns one person's sensitive viewpoint or association. Risk 7 and SENSITIVE Personal-Privacy reflect credible direct personal harm, while PROTECTED would require a high-consequence bulk register, coercive targeting context, or severe safety impact.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -173,8 +179,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-06-13'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75 was gated only by record-context keywords (voter record, donor record, CRM note) that appear in policy and survey-design text, and 85 evidence could repeat the primary. 75 now requires the attribute to sit with a populated identified-person field (name, DOB, member/employee/patient ID) and 85 requires person fields plus a populated political field (party, membership, donation, electorate) plus independent record evidence; policy text naming the category stays at 65. Bare-phrase tests replaced with populated person records; added policy, blank-form and news decoys; public-context exclusions folded into the guidance exclusion group. Regulations: added Privacy Act 1988 (Cth)."
   - version: 1.3.0
     date: '2026-07-19'
     description: 'Targeted blocker remediation: add a 65 political-topic discovery tier, a 75 voter/donor/constituent-record tier, and an 85 populated affiliation/donation-detail tier, with exact-tier and sibling/public/template probes.'
@@ -204,4 +213,8 @@ keywords:
   - voter registration party
 references:
   - url: https://gdpr-info.eu/art-9-gdpr/
-    title: GDPR Article 9 — processing of special categories of personal data (political opinions)
+    title: GDPR Article 9 - processing of special categories of personal data (political opinions)
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-sensitive-information
+    title: OAIC - What is sensitive information
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)

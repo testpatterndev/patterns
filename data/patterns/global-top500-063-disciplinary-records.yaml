@@ -1,59 +1,65 @@
 schema: testpattern/v1
 name: Disciplinary records
 slug: global-top500-063-disciplinary-records
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to disciplinary records in Australian contexts. This information type is classified as personally identifiable information under applicable data protection
-  regulations.
+  Detects disciplinary records about an identified employee: written, formal or final warnings, disciplinary findings and outcomes, and show cause notices (including Queensland public sector notices under Public Sector Act 2022 s 91 and Discipline Directive 05/23) with allegations, particulars, the disciplinary ground or response dates.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 5 keywords within 300 characters. Keyword
-  lists: industry-hr. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Primary: a disciplinary phrase (disciplinary action/record/finding/outcome/hearing/decision/ground, written/formal/final warning, show cause notice, serious misconduct). 75 tier requires a populated person field (employee/staff name or number, subject employee, officer, position number or title, work unit) with a non-placeholder value within 300 characters. 85 tier additionally requires a populated disciplinary detail (numbered allegation, particulars, a PSA s 91(1)(x) ground, response due date or incident/warning date) and an independent corroborative term (code of conduct, procedural fairness, natural justice, support person, substantiated). All tiers exclude template/fixture text (template-exclusion); enforce tiers also exclude guidance, policy, training and media-release framing. 65 is discovery-only (primary alone) and will surface policies, guidance, blank forms and statistics.
 pattern: >-
-  (?is)\b(?:disciplinary\s+action|disciplinary\s+record|written\s+warning|formal\s+warning|disciplinary\s+hearing|disciplinary\s+outcome|show\s+cause|code\s+of\s+conduct|workplace\s+behaviour|workplace\s+behavior|corrective\s+action|final\s+warning)\b
+  (?i)\b(?:disciplinary\s+(?:action|record|finding|outcome|hearing|process|decision|ground)|(?:written|formal|final|first)\s+warning|show\s+cause\s+notice|notice\s+to\s+show\s+cause|serious\s+misconduct)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated person field and 85 adds a record-specific populated detail plus independent corroboration. Person values are customer-defined (employee IDs, position numbers), so the field regexes use labelled loose values with a placeholder guard. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
   - global
 regulations:
-  - AML/CTF Act (Cth)
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
+  - Fair Work Act 2009 (Cth)
+  - Public Sector Act 2022 (Qld)
   - Privacy Act 1988 (Cth)
-  - TIA Act 1979 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
   - GDPR
 frameworks:
   - ISO 27001
   - ISO 27701
 data_categories:
   - pii
+  - employment
 corroborative_evidence:
   keywords:
-    - disciplinary records
-    - disciplinary
-    - records
-    - employment
-    - workforce
+    - code of conduct
+    - procedural fairness
+    - natural justice
+    - support person
+    - substantiated
+    - reprimand
+    - reduction in classification
+    - termination of employment
+    - Public Sector Act 2022
+    - Directive 05/23
   proximity: 300
-  keyword_lists:
-    - industry-hr
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: disciplinary action
-      description: Primary topic phrase match
-    - value: disciplinary record
-      description: Case-insensitive topic phrase match
-    - value: written warning
-      description: Alternative topic phrase match
-    - value: formal warning
-      description: Additional topic phrase match
+    - value: "Show cause notice on disciplinary finding\nEmployee: Avery Teston\nPosition number: 30012345\nAllegation 1: On 14/08/2026 you accessed a client record without a work-related reason.\nDisciplinary ground: section 91(1)(b) of the Public Sector Act 2022.\nYou may bring a support person to any meeting."
+      description: '85: Qld PSA show cause notice with allegation and s 91 ground'
+      synthetic: true
+    - value: "Record of disciplinary outcome\nEmployee ID: 5520117\nDate of incident: 02/09/2026\nParticulars: Employee used abusive language toward a co-worker.\nOutcome: reprimand; procedural fairness steps completed."
+      description: '85: Disciplinary outcome record with incident date and particulars'
+      synthetic: true
+    - value: "Final warning\nStaff number: P0048213\nThis letter confirms the outcome of our meeting about repeated lateness."
+      description: '75: Final warning naming a staff number, no allegation detail'
+      synthetic: true
   should_not_match:
+    - value: A show cause notice must set out each allegation, the particulars and the disciplinary ground, and give the employee 14 days to respond.
+      description: Guidance text - must stay below 75
+    - value: "Show cause notice\nEmployee: __________\nAllegation 1: __________\nResponse due by: ___/___/____"
+      description: Blank notice template - must stay below 75
+    - value: Council officers received a formal warning after the audit, the Courier reported, and three face disciplinary action.
+      description: News report - must stay below 75
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
@@ -61,12 +67,14 @@ test_cases:
     - value: employee interview
       description: Generic word pair from old broad template should not match
 false_positives:
-  - description: Common words and phrases related to disciplinary records appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Policies, directives, fact sheets, guidance and training material that name the record type.
+    mitigation: Enforce tiers require a populated person field; guidance text has labels without values and guidance/training/media-release framing is excluded.
+  - description: Blank forms, templates and HR system configuration.
+    mitigation: Blank lines, square- and angle-bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded.
+  - description: Aggregate statistics and news reporting.
+    mitigation: No populated person field, so these stay at 65 discovery.
+  - description: Records that identify the person only in free text (no field label) fall to 65.
+    mitigation: Accepted precision trade-off; extend the person-field regex with the customer employee-id format to recover recall.
 exports:
   - purview_xml
   - yaml
@@ -77,65 +85,85 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_disciplinary_records
+      id_match: Regex_top500_063_disciplinary_records_primary
       matches:
-        - ref: Evidence_disciplinary_records
-          min_count: 2
-          unique_results: true
+        - ref: Regex_top500_063_disciplinary_records_person_field
+        - ref: Regex_top500_063_disciplinary_records_record_detail
+        - ref: Keyword_top500_063_disciplinary_records_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_063_disciplinary_records_guidance_exclusion
     - confidence_level: 75
-      id_match: Pattern_disciplinary_records
+      id_match: Regex_top500_063_disciplinary_records_primary
       matches:
-        - ref: Evidence_disciplinary_records
+        - ref: Regex_top500_063_disciplinary_records_person_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_063_disciplinary_records_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_disciplinary_records
+      id_match: Regex_top500_063_disciplinary_records_primary
       matches:
-        - ref: Evidence_disciplinary_records
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-    - id: Pattern_disciplinary_records
+    - id: Regex_top500_063_disciplinary_records_primary
       pattern: >-
-        (?is)\b(?:disciplinary\s+action|disciplinary\s+record|written\s+warning|formal\s+warning|disciplinary\s+hearing|disciplinary\s+outcome|show\s+cause|code\s+of\s+conduct|workplace\s+behaviour|workplace\s+behavior|corrective\s+action|final\s+warning)\b
-    - id: Pattern_au_top500_063_disciplinary_records_label_context
-      pattern: (?i)\b(?:disciplinary\s+records)\b
+        (?i)\b(?:disciplinary\s+(?:action|record|finding|outcome|hearing|process|decision|ground)|(?:written|formal|final|first)\s+warning|show\s+cause\s+notice|notice\s+to\s+show\s+cause|serious\s+misconduct)\b
+    - id: Regex_top500_063_disciplinary_records_person_field
+      pattern: >-
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number|title)|work\s+unit|business\s+unit|subject\s+employee|officer)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_top500_063_disciplinary_records_record_detail
+      pattern: >-
+        (?i)\ballegation\s*(?:no\.?\s*)?\d{0,2}\s*[:\-]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z][a-z]{2,}|\bparticulars\s*:\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z][a-z]{2,}|\b(?:section|s\.?)\s*91\s*\(\s*1\s*\)\s*\(\s*[a-h]\s*\)|\b(?:response|reply|submission)s?\s+(?:due|required)(?:\s+by)?\s*[:\-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})|\b(?:date\s+of\s+(?:incident|conduct|warning|meeting|alleged\s+conduct)|incident\s+date)\s*[:\-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})
   keywords:
-    - id: Evidence_disciplinary_records
+    - id: Keyword_top500_063_disciplinary_records_corroborative
       groups:
         - match_style: word
           terms:
-            - disciplinary action
-            - disciplinary record
-            - written warning
-            - formal warning
-            - misconduct
-            - disciplinary hearing
-            - disciplinary outcome
-            - show cause
             - code of conduct
-            - workplace behaviour
-            - corrective action
-            - final warning
-    - id: Keyword_au_top500_063_disciplinary_records_domain_context
+            - procedural fairness
+            - natural justice
+            - support person
+            - substantiated
+            - reprimand
+            - reduction in classification
+            - termination of employment
+            - Public Sector Act 2022
+            - Directive 05/23
+      strength: specific
+    - id: Keyword_top500_063_disciplinary_records_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - disciplinary records
-            - disciplinary
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
+      strength: domain
 risk_description: >-
-  This concept detector targets disciplinary record, disciplinary action, misconduct finding, warning letter, and related workplace conduct language. An authentic record may reveal allegations, investigation outcomes, sanctions, witness material, and continuing employment consequences, exposing the employee to reputational, financial, and relational harm. Conduct policies, manager training, and model warning letters can match without documenting a real person or finding. Risk 8 SENSITIVE reflects the serious impact of a populated disciplinary file; PROTECTED requires exceptional protected proceedings, a bulk case repository, or significant organisational damage.
+  The classifier identifies a disciplinary record, warning or show cause notice about an identified person, gated on a populated person field (75) plus a record-specific populated detail (85). Disclosure exposes conduct allegations and findings about an identifiable employee, with reputational, legal and employment consequences. Policies, guidance, blank forms, training and news stay at 65 discovery. Risk 8 supports SENSITIVE Personal-Privacy (OFFICIAL: Sensitive).
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -144,9 +172,19 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
+references:
+  - title: Public Sector Act 2022 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2022-034
+  - title: Queensland Government - Discipline (Directive 05/23)
+    url: https://www.forgov.qld.gov.au/pay-benefits-and-policy/directives-policies-circulars-and-guidelines/discipline-directive-0523
+  - title: OAIC - Employee records exemption
+    url: https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/organisations/employee-records-exemption
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): rebuilt tiers - 65 primary phrase (discovery), 75 primary + populated person field (employee/staff name or number, position number/title, work unit), 85 adds a record-specific populated detail regex plus an independent corroborative keyword group; removed the self-corroborating Evidence/label-context groups so a single phrase no longer reaches 75/85; added guidance/training/media-release exclusion to enforce tiers; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys; regulations now cite Fair Work Act 2009 (Cth), Public Sector Act 2022 (Qld) with the privacy statutes (removed AML/CTF, TIA, My Health Records and HRIPA boilerplate); references now cite primary sources.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 666 without changing detector or package metadata.'

@@ -1,23 +1,24 @@
 schema: testpattern/v1
 name: Cabinet Budget Review Committee Submission
 slug: cabinet-budget-review-committee-submission
-version: 1.4.1
+version: 1.5.0
 type: document_marker
 pattern_class: marking
 engine: universal
 description: Detects financial submissions to the QLD Cabinet Budget Review Committee (CBRC) containing agency funding bids, savings proposals, capital expenditure requests, and fiscal strategy options.
-operation: 'Document marker: header/footer containing ''CBRC'' or ''Cabinet Budget Review'' combined with ''PROTECTED'' or ''Cabinet-in-Confidence''. Also detects ''CBRC Submission No.'' followed by reference number pattern, or ''CBRC-'' prefix with digits. Keyword boost with fiscal strategy terms.'
-pattern: CBRC[-\s]?\d{1,4}|CBRC\s+Submission|Cabinet\s+Budget\s+Review\s+Committee
-confidence: high
-confidence_justification: 'High confidence: CBRC document markers and submission reference numbers are uniquely identifiable. These documents follow strict formatting conventions with mandatory headers and reference numbers.'
+operation: >-
+  Primary: Cabinet Budget Review Committee / CBRC (65 alone, discovery). 75 = primary + a PROTECTED / Cabinet-in-Confidence / not-for-disclosure marking + a labelled submission or decision number or a funding amount. 85 = primary + marking + labelled submission number + funding amount + fiscal or document-type evidence (new policy proposal, savings measure, capital bid, appropriation, efficiency dividend ...). Cabinet Handbook, media, training and template framing excluded.
+pattern: (?i)\b(?:CBRC|Cabinet\s+Budget\s+Review\s+Committee)\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: CBRC markings with a submission number and funding amounts are specific; submission numbering is unpublished, so the number is a documented label-anchored fallback and never enforces on its own.
 jurisdictions:
   - au
 regulations:
-- "Corporations Act 2001 (Cth)"
-- "Criminal Code 1899 (Qld)"
-- "RTI Act 2009 (Qld)"
+  - Criminal Code 1899 (Qld)
+  - RTI Act 2009 (Qld)
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - financial
   - government
@@ -40,16 +41,28 @@ corroborative_evidence:
     - corporate-finance
 
     - government-services
+customisation:
+  - key: cabinet-submission-number
+    kind: identifier-format
+    identifier: cabinet-submission-number
+    target: purview.regexes/Regex_cabinet_budget_review_committee_submission_submission_number
+    mode: replace
+    affects_tiers: [75, 85]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#cabinet-submission-number). Earlier versions used the CBRC-NNNN format, which does not appear in any published source.
 test_cases:
   should_match:
     - value: 'PROTECTED — CABINET-IN-CONFIDENCE. CBRC Submission No. 2026-0047. Agency: Department of Transport and Main Roads. Subject: New Policy Proposal — Bruce Highway Upgrade Stage 3. Funding sought: $1,240M over 4 years. Capital bid aligned with State Infrastructure Plan.'
-      description: Formal CBRC submission with reference number and funding bid
-    - value: 'Cabinet Budget Review Committee. CBRC-0089. Savings Measure: Consolidation of ICT shared services. Annual savings: $45M from FY27-28. PROTECTED. This submission is Cabinet-in-Confidence and must not be disclosed.'
-      description: CBRC savings measure submission
+      description: Formal CBRC submission with reference number and funding bid (reaches 85)
+    - value: 'Cabinet Budget Review Committee. Submission No. 0089. Savings Measure: Consolidation of ICT shared services. Annual savings: $45M from FY27-28. PROTECTED. This submission is Cabinet-in-Confidence and must not be disclosed.'
+      description: CBRC savings measure submission (reaches 85)
     - value: 'CBRC Submission — Fiscal Strategy Options. PROTECTED. Presented to Cabinet Budget Review Committee for consideration. Options: (A) Maintain current expenditure trajectory, (B) Implement 2% efficiency dividend across agencies, (C) Revenue measures package.'
-      description: CBRC fiscal strategy options paper
+      description: CBRC fiscal strategy options paper (65 discovery only - prose without populated record fields)
     - value: 'CBRC Submission No. 2026-0047; PROTECTED; Agency TMR; funding sought $1,240m; capital bid.'
-      description: One valid reference format with marking, agency, amount, and fiscal purpose is sufficient to enforce
+      description: One labelled submission number with marking, agency, amount and fiscal purpose (reaches 85)
+    - value: "Cabinet Budget Review Committee — PROTECTED. Submission No. 0112 lodged by the portfolio for the next meeting."
+      description: CBRC + marking + labelled submission number, no funding amount (reaches 75)
+      synthetic: true
   should_not_match:
     - value: The CBRC process is described in the Queensland Cabinet Handbook, which is publicly available. Departments submit new policy proposals through the CBRC process.
       description: Public description of the CBRC process — not a submission
@@ -57,15 +70,17 @@ test_cases:
       description: Media commentary about CBRC — no restricted content
     - value: The Cabinet Handbook describes the CBRC process.
       description: Public process material — handbook exclusion applies and no submission reference is present
-    - value: 'Training: CBRC-0047 funding bid $20m.'
-      description: Training-prefixed sample — training exclusion suppresses the credential-shaped reference
+    - value: 'Training: CBRC Submission No. 0047 funding bid $20m.'
+      description: Training-prefixed sample — training exclusion suppresses the labelled submission number
     - value: CBRC Submission No. 2026-0047
       description: Reference alone discovers but lacks marking and fiscal content, so it must not enforce
     - value: The public budget website explained how agencies prepare funding proposals.
       description: General budget-process guidance with no CBRC reference or submission heading
+    - value: "CBRC Submission No. ______\nPROTECTED — Cabinet-in-Confidence\nPortfolio: ______\nFunding sought: $______"
+      description: Blank submission cover sheet (must stay below 75)
 false_positives:
   - description: Public descriptions of the CBRC process in Cabinet Handbooks or training materials
-    mitigation: Require CBRC reference numbers or specific submission content (funding bids, dollar amounts) rather than just mentions of CBRC
+    mitigation: Require a Cabinet marking plus a labelled submission number or specific submission content (funding bids, dollar amounts) rather than just mentions of CBRC
   - description: Media commentary referencing CBRC
     mitigation: Exclude documents containing 'media reports', 'reports suggest', 'expected to' without submission markers
 exports:
@@ -81,21 +96,15 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match:
-        type: any
-        ids:
-          - Pattern_cabinet_budget_review_committee_submission_cbrc_reference_number_e_g_cbrc_0047
-          - Pattern_cabinet_budget_review_committee_submission_cbrc_submission_number_format
-          - Pattern_cabinet_budget_review_committee_submission_heading
+      id_match: Pattern_cabinet_budget_review_committee_submission_heading
       matches:
-        - ref: Evidence_cabinet_budget_review_committee_submission_document_type
         - ref: Evidence_cabinet_budget_review_committee_submission_markers
+        - ref: Regex_cabinet_budget_review_committee_submission_submission_number
         - ref: Pattern_cabinet_budget_review_committee_submission_dollar_amounts_for_funding_bids
         - type: any
-          min_matches: 1
           refs:
-            - Pattern_cabinet_budget_review_committee_submission_cbrc_reference_number_e_g_cbrc_0047
-            - Pattern_cabinet_budget_review_committee_submission_cbrc_submission_number_format
+            - Evidence_cabinet_budget_review_committee_submission_fiscal
+            - Evidence_cabinet_budget_review_committee_submission_document_type
         - type: any
           min_matches: 0
           max_matches: 0
@@ -103,20 +112,13 @@ purview:
             - Keyword_noise_exclusion
             - Filter_cabinet_budget_review_committee_submission_exclusion
     - confidence_level: 75
-      id_match:
-        type: any
-        ids:
-          - Pattern_cabinet_budget_review_committee_submission_cbrc_reference_number_e_g_cbrc_0047
-          - Pattern_cabinet_budget_review_committee_submission_cbrc_submission_number_format
-          - Pattern_cabinet_budget_review_committee_submission_heading
+      id_match: Pattern_cabinet_budget_review_committee_submission_heading
       matches:
-        - ref: Evidence_cabinet_budget_review_committee_submission_document_type
-        - type: any
-          min_matches: 1
-          refs:
-            - Evidence_cabinet_budget_review_committee_submission_fiscal
-            - Pattern_cabinet_budget_review_committee_submission_dollar_amounts_for_funding_bids
         - ref: Evidence_cabinet_budget_review_committee_submission_markers
+        - type: any
+          refs:
+            - Regex_cabinet_budget_review_committee_submission_submission_number
+            - Pattern_cabinet_budget_review_committee_submission_dollar_amounts_for_funding_bids
         - type: any
           min_matches: 0
           max_matches: 0
@@ -125,12 +127,7 @@ purview:
             - Filter_cabinet_budget_review_committee_submission_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match:
-        type: any
-        ids:
-          - Pattern_cabinet_budget_review_committee_submission_cbrc_reference_number_e_g_cbrc_0047
-          - Pattern_cabinet_budget_review_committee_submission_cbrc_submission_number_format
-          - Pattern_cabinet_budget_review_committee_submission_heading
+      id_match: Pattern_cabinet_budget_review_committee_submission_heading
       matches:
         - type: any
           min_matches: 0
@@ -139,28 +136,17 @@ purview:
             - Keyword_noise_exclusion
             - Filter_cabinet_budget_review_committee_submission_exclusion
   regexes:
-    - id: Pattern_cabinet_budget_review_committee_submission_cbrc_reference_number_e_g_cbrc_0047
-      pattern: CBRC[-\s]?\d{1,4}
     - id: Pattern_cabinet_budget_review_committee_submission_heading
-      pattern: (?i)\b(?:CBRC|Cabinet\s+Budget\s+Review\s+Committee)\s+Submission\b
-    - id: Pattern_cabinet_budget_review_committee_submission_cbrc_submission_number_format
-      pattern: CBRC\s+Submission\s+No\.?\s*\d+
+      pattern: (?i)\b(?:CBRC|Cabinet\s+Budget\s+Review\s+Committee)\b
     - id: Pattern_cabinet_budget_review_committee_submission_dollar_amounts_for_funding_bids
-      pattern: \$[\d,.]+\s*[MBKmb]?
+      pattern: (?i)\$\d[\d,.]{0,15}(?:\s*(?:million|billion|bn|[MBK])\b)?
+    - id: Regex_cabinet_budget_review_committee_submission_submission_number
+      pattern: (?i)\b(?:(?:CBRC|Cabinet)\s+)?(?:submission|decision)\s+(?:no\.?|number)\s*[:#]?\s*\d[\d/-]{1,12}\b
   keywords:
-    - id: Evidence_cabinet_budget_review_committee_submission_primary
-      groups:
-        - match_style: word
-          terms:
-            - CBRC
-            - Cabinet Budget Review
-            - Cabinet Budget Review Committee
-      strength: specific
     - id: Evidence_cabinet_budget_review_committee_submission_document_type
       groups:
         - match_style: word
           terms:
-            - submission
             - new policy proposal
             - savings measure
             - capital bid
@@ -200,15 +186,20 @@ purview:
       strength: noise
 risk_rating: 10
 risk_description: >-
-  This high-confidence document-marker detector identifies an actual Cabinet Budget Review Committee submission through CBRC reference numbers, submission language, fiscal terms, and PROTECTED or Cabinet-in-Confidence markers, rather than a public mention of the CBRC process. A true submission contains unannounced funding bids, savings measures, revenue options, appropriations, or capital priorities whose disclosure can move markets, distort procurement and lobbying, and compromise Cabinet's collective fiscal deliberation across government. The structured references and explicit markings materially reduce confusion with media commentary or the public Cabinet Handbook. Risk 10 and PROTECTED Financial are warranted because premature loss can cause broad privileged and fiscal-policy compromise with significant damage, and this is already the highest accepted QGISCF tier.
+  This document-marker detector identifies an actual Cabinet Budget Review Committee submission through the CBRC name with a labelled submission number or funding amounts, fiscal terms, and PROTECTED or Cabinet-in-Confidence markers, rather than a public mention of the CBRC process. A true submission contains unannounced funding bids, savings measures, revenue options, appropriations, or capital priorities whose disclosure can move markets, distort procurement and lobbying, and compromise Cabinet's collective fiscal deliberation across government. The labelled submission numbers, funding amounts and explicit markings materially reduce confusion with media commentary or the public Cabinet Handbook. Risk 10 and PROTECTED Financial are warranted because premature loss can cause broad privileged and fiscal-policy compromise with significant damage, and this is already the highest accepted QGISCF tier.
 sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: PROTECTED Cabinet-in-Confidence
-references: []
+references:
+  - title: Queensland Cabinet Handbook — 4.3 Cabinet Budget Review Committee
+    url: https://www.premiers.qld.gov.au/publications/categories/policies-and-codes/handbooks/cabinet-handbook/committees/review-committee.aspx
 created: '2026-02-20'
-updated: '2026-09-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): removed the invented CBRC-NNNN reference regex (the bare 'CBRC 0047' shape) and replaced the 'CBRC Submission No.' regex with the new cabinet-submission-number labelled fallback (identifier-format slot); the primary is now the committee name / CBRC acronym (65 discovery) instead of a reference shape; 75 = committee + PROTECTED/Cabinet-in-Confidence marking + a labelled submission number or funding amount; 85 = committee + marking + submission number + funding amount + fiscal or document-type evidence; the dollar regex now requires a digit; added a blank cover-sheet decoy; removed the irrelevant Corporations Act 2001 tag; references added. Removed 'submission' from the document-type evidence group (same span as the submission-number regex)."
   - version: 1.4.1
     date: '2026-09-14'
     description: 'Assign QGISCF category to PROTECTED Cabinet-in-Confidence; preserve classification tier and detection logic.'

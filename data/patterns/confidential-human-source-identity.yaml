@@ -1,12 +1,12 @@
 schema: testpattern/v1
 name: Confidential Human Source Identity
 slug: confidential-human-source-identity
-version: 1.5.0
+version: 1.6.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects documents containing the identities of police informants (confidential human sources, confidential / registered informants, registered sources) embedded within criminal organisations. Informant identity is the single most sensitive category of law enforcement information globally. Disclosure has historically resulted in murders and creates immediate lethal risk. Absorbs the former confidential-informant-identities classifier.
-operation: 'Keyword proximity: primary keywords (confidential human source, confidential / registered informant, registered source, source handler, source controller, CHIS, informant registration / file / handler / agreement / identity, source identity, covert source) within 300 characters. 65 = primary phrase only (discovery). 75 = primary plus one independent populated field: person record fields (name, DOB, informant, CNI ...), a labelled source identifier or handler field (CI number, informant number, registered source number, source code name, source reference, handler, controller), or a hand-authored source-management term (source reliability, source payment, informant management ...). Bare "CI" is never used on its own - only inside a labelled field such as "CI number:". 85 = two distinct person record fields, or two different independent evidence types. Negative keyword exclusion for policy, academic and media contexts.'
+operation: 'Keyword proximity: primary keywords (confidential human source, confidential / registered informant, registered source, source handler, source controller, CHIS, informant registration / file / handler / agreement / identity, source identity, covert source) within 300 characters. 65 = primary phrase only (discovery). 75 = primary plus one independent populated field: person record fields (name, DOB, informant, CNI ...), a labelled source identifier or handler field (CI number, informant number, registered source number, source code name, source reference, handler, controller), or a hand-authored source-management term (source reliability, source payment, informant management ...). Bare "CI" is never used on its own - only inside a labelled field such as "CI number:". 85 = two distinct populated structure hits (two person record fields, two source/handler fields, or one of each) plus independent source-management evidence or the COVERT marker. Negative keyword exclusion for policy, academic and media contexts.'
 pattern: (?i)\b(?:confidential\s+human\s+source|registered\s+(?:informant|source)|confidential\s+informant|source\s+handler|source\s+controller|informant\s+(?:registration|debriefing|handler|file|agreement|identity)|source\s+identity|covert\s+(?:human\s+)?source|CHIS|human\s+source\s+(?:report|file|record)|source\s+report|source\s+debriefing)\b
 confidence: medium
 confidence_justification: 'Medium confidence: confidential human source management terminology is highly specialised and rarely appears outside genuine law enforcement source handling records. The co-occurrence of CHIS terminology with handler references and source registration numbers is distinctive.'
@@ -55,13 +55,25 @@ test_cases:
       description: Informant registration application with risk assessment
     - value: 'Human source management review. Annual review of registered informant (source reference 2023-0421). Source handler reports continued access to target organisation. Source payment schedule: quarterly payments authorised under informant management policy. Identity protection measures reviewed and confirmed adequate.'
       description: Annual review of registered informant with payment and identity protection references
-    - value: "Confidential Human Source\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Confidential Human Source recorded against the subject; handling restricted."
-      description: Populated justice record reaching the 75/85 structure gate
+    - value: |-
+        Confidential Human Source
+        Name: Avery Teston
+        Date of birth: 04/02/1991
+        Reference number: RX22914471
+        Notes: Confidential Human Source recorded against the subject; handling restricted.
+      description: Populated justice record (name, DOB, reference) without source-management evidence - 75
       synthetic: true
-    - value: "PROTECTED Law-Enforcement. Registered informant file.\nCI number: 2291\nSource code name: KESTREL\nHandler: Det Sgt R. Walsh, Gold Coast CIB\nController: Insp L. Moreau\nSource reliability: B2\nAccess: associate of the target's cousin; attends the Nerang clubhouse weekly."
+    - value: |-
+        PROTECTED Law-Enforcement. Registered informant file.
+        CI number: 2291
+        Source code name: KESTREL
+        Handler: Det Sgt R. Walsh, Gold Coast CIB
+        Controller: Insp L. Moreau
+        Source reliability: B2
+        Access: associate of the target's cousin; attends the Nerang clubhouse weekly.
       description: Registered informant file with labelled CI number, code name, handler and reliability rating (85, absorbed confidential-informant phrasing)
       synthetic: true
-    - value: "Confidential informant debrief, 03/04/2026. Informant number: 0457. Informant advised that the vehicle is garaged at a Logan address and will be moved on Friday."
+    - value: 'Confidential informant debrief, 03/04/2026. Informant number: 0457. Informant advised that the vehicle is garaged at a Logan address and will be moved on Friday.'
       description: Confidential informant debrief with a single labelled informant number (75)
       synthetic: true
   should_not_match:
@@ -71,12 +83,19 @@ test_cases:
       description: Historical reference to published inquiry findings about informant management
     - value: A criminology textbook chapter discussing the ethics of confidential human source management in policing. The chapter examines cases where informant identities were compromised.
       description: Academic textbook discussing informant management ethics
-    - value: "Policy guidance: this procedure explains how records about Confidential Human Source are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    - value: 'Policy guidance: this procedure explains how records about Confidential Human Source are handled, who may access them and how long they are kept. It contains no records about any person or system.'
       description: Policy guidance naming the topic without any record (discovery only)
     - value: The magistrate was told a confidential informant had tipped off detectives that drugs were stored at the Woodridge property before the search warrant was executed.
       description: Court-reporting style mention of a confidential informant with no identifying fields (discovery only)
-    - value: "Procedure: a registered informant (CI) must be reviewed each year by the source controller, and Chief Inspector (CI) approval is needed before any reward is offered."
+    - value: 'Procedure: a registered informant (CI) must be reviewed each year by the source controller, and Chief Inspector (CI) approval is needed before any reward is offered.'
       description: Procedure text using bare "CI" in two different senses - bare CI must not act as a source identifier
+    - value: |-
+        Informant registration form
+        CI number: ________
+        Handler: ________
+        Source code name: [to be allocated]
+        Controller: ________
+      description: Blank registration template - placeholder source fields are rejected
 false_positives:
   - description: Policy documents describing informant management frameworks
     mitigation: 'Negative keyword exclusion: ''policy'', ''framework'', ''guidelines'', ''standard operating procedure''. Require proximity to actual source reference numbers or personal identifiers.'
@@ -107,6 +126,28 @@ purview:
           min_count: 2
           unique_results: true
         - type: any
+          min_matches: 1
+          refs:
+            - Evidence_confidential_human_source_identity_corroborative_terms
+            - Evidence_confidential_human_source_identity_classification_markers
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_confidential_human_source_identity_exclusion
+    - confidence_level: 85
+      id_match: Pattern_confidential_human_source_identity_chis_terms
+      matches:
+        - ref: Regex_confidential_human_source_identity_source_fields
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_confidential_human_source_identity_corroborative_terms
+            - Evidence_confidential_human_source_identity_classification_markers
+        - type: any
           min_matches: 0
           max_matches: 0
           refs:
@@ -120,6 +161,9 @@ purview:
           refs:
             - Regex_confidential_human_source_identity_record_structure
             - Regex_confidential_human_source_identity_source_fields
+        - type: any
+          min_matches: 1
+          refs:
             - Evidence_confidential_human_source_identity_corroborative_terms
             - Evidence_confidential_human_source_identity_classification_markers
         - type: any
@@ -156,11 +200,9 @@ purview:
     - id: Pattern_confidential_human_source_identity_chis_terms
       pattern: (?i)\b(?:confidential\s+human\s+source|registered\s+(?:informant|source)|confidential\s+informant|source\s+handler|source\s+controller|informant\s+(?:registration|debriefing|handler|file|agreement|identity)|source\s+identity|covert\s+(?:human\s+)?source|CHIS|human\s+source|source\s+report|source\s+debriefing)\b
     - id: Regex_confidential_human_source_identity_source_fields
-      pattern: >-
-        (?i)\b(?:(?:CI|CHS|CHIS|informant|confidential\s+informant|registered\s+(?:informant|source)|source)\s*(?:no\.?|number|ID|code\s*name|pseudonym|reference|ref\.?|registration\s+(?:no\.?|number))|(?:source\s+|informant\s+)?(?:handler|co-handler|controller))\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/.-]{0,30}
+      pattern: (?i)\b(?:(?:CI|CHS|CHIS|informant|confidential\s+informant|registered\s+(?:informant|source)|source)\s*(?:no\.?|number|ID|code\s*name|pseudonym|reference|ref\.?|registration\s+(?:no\.?|number))|(?:source\s+|informant\s+)?(?:handler|co-handler|controller))\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/.-]{0,30}
     - id: Regex_confidential_human_source_identity_record_structure
-      pattern: >-
-        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_confidential_human_source_identity_classification_markers
       groups:
@@ -203,7 +245,6 @@ purview:
             - university
             - inquiry findings
             - Fitzgerald
-
       strength: noise
 risk_rating: 10
 risk_description: >-
@@ -212,16 +253,23 @@ sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: PROTECTED Law-Enforcement
-references: []
+references:
+  - title: Police Powers and Responsibilities Act 2000 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2000-005
+  - title: Right to Information Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-013
 created: '2026-02-20'
 updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): Closed the remaining phrase-only 85 path: the any-2-of-4 tier could fire on a source-management term plus the COVERT marker with no populated structure. 85 is now three tiers that each need two distinct populated structure hits (two person record fields, two source/handler fields, or one of each) plus source-management evidence or the COVERT marker. 75 and 65 unchanged. The generic populated-record positive is re-described as 75; added a blank registration-template decoy. Added PPRA and RTI Act references.'
   - version: 1.5.0
     date: '2026-09-24'
     description: 'Merge global-top500-405-confidential-informant-identities into this classifier (Qld government classifier review 2026-09-24): primary gains confidential informant, registered source, informant file / handler / agreement / identity, source identity, covert (human) source and source debriefing phrasing. New Regex_..._source_fields evidence recognises populated labelled source identifiers and handler fields (CI number, informant number, registered source number, source code name / pseudonym / reference, handler, controller); bare "CI" is never matched on its own, only as a field label. 75 now accepts that field in addition to record structure / source-management terms. 85 restructured (the old tier needed every evidence type at once and no test reached it): two distinct person record fields, or two different independent evidence types among record fields, source fields, source-management terms and the COVERT marker. Not imported: cooperating witness, confidential source and intelligence source (witness / journalism / general-intelligence usage) and the absorbed self-corroborating label/domain tiers. Added an 85 informant file, a 75 debrief, and court-reporting and ambiguous-CI decoys. Risk unchanged at 10. Removed the CHS-YYYY-NNNN source-reference regex, a format found in no published source; labelled source references are covered by the source-fields regex.'
   - version: 1.4.0
     date: '2026-09-24'
-    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
+    description: '75-tier gating fix: the 75 tier was corroborated only by the primary''s own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1481 without changing detector or package metadata.'

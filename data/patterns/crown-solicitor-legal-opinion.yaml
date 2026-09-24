@@ -1,22 +1,24 @@
 schema: testpattern/v1
 name: Crown Solicitor Legal Opinion
 slug: crown-solicitor-legal-opinion
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects privileged legal opinions issued by the Queensland Crown Solicitor or Office of the Crown Solicitor. These documents constitute the highest level of legal professional privilege in Queensland Government and their disclosure permanently waives privilege under Evidence Act 1977 (Qld) s.14.
-operation: 'Primary detection: keyword proximity matching ''Crown Solicitor'' or ''Office of the Crown Solicitor'' within 200 characters of privilege indicators (''opinion'', ''advice'', ''privileged'', ''LPP''). Secondary detection: regex match for Crown Solicitor reference numbers (CS-YYYY-NNNN or OCS/NNNN/NN). Document marker detection: ''LEGAL PROFESSIONAL PRIVILEGE'' header near ''Crown Solicitor''. Corroborative evidence: 3 keywords within 300 characters. Exclusion: published court decisions with citation formats.'
-pattern: (?i)\b(?:Crown\s+Solicitor|Office\s+of\s+the\s+Crown\s+Solicitor|OCS)\b
+operation: >-
+  Primary: Crown Solicitor / Office of the Crown Solicitor (65 alone, discovery). 75 = primary + privilege or advice evidence (opinion, advice, privileged, LPP, legal professional privilege, instructing officer ...) + a populated document header field (To, From, Date, Subject, Re, Our ref, Matter no, Prepared for, Instructing officer) or a labelled matter number. 85 = primary + privilege/advice evidence + two distinct populated header fields. Published reasons, tabled reports, media, templates and examples are excluded.
+pattern: (?i)\b(?:Crown\s+Solicitor|Office\s+of\s+the\s+Crown\s+Solicitor)\b
 confidence: medium
-confidence_justification: 'Medium confidence: Crown Solicitor is a specific institutional role unique to government legal practice. Combined with privilege indicators and reference number formats, false positive rate is very low. Document marker patterns provide additional confidence layer.'
+confidence_justification: >-
+  Medium confidence: the Crown Solicitor entity with privilege language and a populated advice header is specific to Crown Law advice; Crown Law matter numbers are unpublished, so the reference is a documented label-anchored fallback.
 jurisdictions:
   - au
 regulations:
-- "Evidence Act 1977 (Qld)"
-- "RTI Act 2009 (Qld)"
+  - "Evidence Act 1977 (Qld)"
+  - "RTI Act 2009 (Qld)"
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - legal
   - government
@@ -39,28 +41,29 @@ corroborative_evidence:
     - corporate-legal
 
     - government-services
+customisation:
+  - key: case-reference-number
+    kind: identifier-format
+    identifier: case-reference-number
+    target: purview.regexes/Regex_crown_solicitor_legal_opinion_matter_reference
+    mode: replace
+    affects_tiers: [75]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#case-reference-number). Earlier versions used the CS-YYYY-NNNN / OCS/YYYY/NN matter format, which does not appear in any published source.
 test_cases:
   should_match:
-    - value: |-
-        LEGAL PROFESSIONAL PRIVILEGE
-        OFFICE OF THE CROWN SOLICITOR
-        Ref: CS-2025-0847
-
-        Privileged Legal Opinion
-        Re: State liability — Maryborough Hospital incident
-
-        This opinion is provided pursuant to instructions received from the Director-General, Queensland Health.
-      description: Crown Solicitor opinion with reference number and privilege header
-    - value: The Crown Solicitor has provided advice (ref OCS/2024/42) confirming that the State's position on this matter is protected by legal professional privilege. The advice should not be disclosed outside the instructing team.
-      description: Internal reference to Crown Solicitor privileged advice with OCS reference
+    - value: "LEGAL PROFESSIONAL PRIVILEGE\nOFFICE OF THE CROWN SOLICITOR\nOur ref: PL2025/0847\nMatter number: PL2025/0847\n\nPrivileged Legal Opinion\nRe: State liability — Maryborough Hospital incident\n\nThis opinion is provided pursuant to instructions received from the Director-General, Queensland Health."
+      description: Crown Solicitor opinion with reference number and privilege header (reaches 85)
+    - value: The Crown Solicitor has provided advice (matter number PL2024/0042) confirming that the State's position on this matter is protected by legal professional privilege. The advice should not be disclosed outside the instructing team.
+      description: Internal reference to Crown Solicitor privileged advice with a labelled matter number (reaches 75)
     - value: |-
         PROTECTED — Legal-Privilege
         Crown Solicitor Legal Opinion
         Prepared for: Department of Environment and Science
         Subject: LPP assessment — contaminated land liability at Pinkenba site
-      description: Crown Solicitor opinion with PROTECTED marking and LPP reference
-    - value: OFFICE OF THE CROWN SOLICITOR OCS/2024/42 - privileged legal opinion on State liability; LPP.
-      description: One valid OCS reference with entity, opinion, and privilege is sufficient — the CS reference scheme is not also required
+      description: Crown Solicitor opinion with PROTECTED marking and LPP reference (reaches 85)
+    - value: OFFICE OF THE CROWN SOLICITOR, matter no. PL2024/0042 - privileged legal opinion on State liability; LPP.
+      description: One labelled matter number with entity, opinion and privilege content (reaches 75)
   should_not_match:
     - value: In Smith v State of Queensland [2024] QSC 142, the Crown Solicitor appeared as counsel for the respondent. The published reasons for judgment are available on the Supreme Court website.
       description: Published court decision mentioning Crown Solicitor as counsel
@@ -70,12 +73,16 @@ test_cases:
       description: General description of Crown Solicitor role in educational context
     - value: The Office of the Crown Solicitor annual report was tabled.
       description: Annual report and tabled exclusions apply to all tiers
-    - value: Example CS-2025-0001 Crown Solicitor opinion.
+    - value: 'Example: matter number PL2025/0001, Crown Solicitor opinion.'
       description: Example context is suppressed by the exclusion group
-    - value: CS-2025-0847 Crown Solicitor.
-      description: Reference plus entity without opinion, advice, or privilege content must not enforce
+    - value: Matter number PL2025/0847, Crown Solicitor.
+      description: Matter number plus entity without opinion, advice or privilege content must not enforce
     - value: Government lawyers attended a professional-development seminar.
       description: Routine legal training with no Crown Solicitor entity, reference, or privilege content
+    - value: "Office of the Crown Solicitor — request for advice\nTo: __________\nFrom: __________\nDate: __________\nSubject: __________\nMatter number: __________"
+      description: Blank request-for-advice form (must stay below 75)
+    - value: "Training: the Crown Solicitor gave a seminar on legal professional privilege and how agencies should seek advice."
+      description: Training / seminar text (must stay below 75)
 false_positives:
   - description: Published court decisions where Crown Solicitor appeared as counsel
     mitigation: Negative match on citation formats [YYYY] QSC, [YYYY] QCA, [YYYY] HCA and keywords 'published reasons', 'judgment', 'tabled'
@@ -90,66 +97,58 @@ scope: wide
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match:
-        type: any
-        ids:
-          - Pattern_crown_solicitor_legal_opinion_crown_solicitor_reference_number_format_
-          - Pattern_crown_solicitor_legal_opinion_office_of_crown_solicitor_reference_ocs_
+      id_match: Pattern_crown_solicitor_legal_opinion_crown_solicitor_entity_name
       matches:
-        - ref: Pattern_crown_solicitor_legal_opinion_crown_solicitor_entity_name
+        - ref: Regex_crown_solicitor_legal_opinion_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_crown_solicitor_legal_opinion_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
+            - Keyword_noise_exclusion
             - Evidence_crown_solicitor_legal_opinion_exclusion
     - confidence_level: 75
-      id_match:
-        type: any
-        ids:
-          - Pattern_crown_solicitor_legal_opinion_crown_solicitor_reference_number_format_
-          - Pattern_crown_solicitor_legal_opinion_office_of_crown_solicitor_reference_ocs_
-          - Pattern_crown_solicitor_legal_opinion_crown_solicitor_entity_name
+      id_match: Pattern_crown_solicitor_legal_opinion_crown_solicitor_entity_name
       matches:
+        - type: any
+          refs:
+            - Regex_crown_solicitor_legal_opinion_record_structure
+            - Regex_crown_solicitor_legal_opinion_matter_reference
         - ref: Evidence_crown_solicitor_legal_opinion_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
+            - Keyword_noise_exclusion
             - Evidence_crown_solicitor_legal_opinion_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match:
-        type: any
-        ids:
-          - Pattern_crown_solicitor_legal_opinion_crown_solicitor_reference_number_format_
-          - Pattern_crown_solicitor_legal_opinion_office_of_crown_solicitor_reference_ocs_
-          - Pattern_crown_solicitor_legal_opinion_crown_solicitor_entity_name
+      id_match: Pattern_crown_solicitor_legal_opinion_crown_solicitor_entity_name
       matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
+            - Keyword_noise_exclusion
             - Evidence_crown_solicitor_legal_opinion_exclusion
   regexes:
-    - id: Pattern_crown_solicitor_legal_opinion_crown_solicitor_reference_number_format_
-      pattern: (?i)\bCS-\d{4}-\d{4}\b
-    - id: Pattern_crown_solicitor_legal_opinion_office_of_crown_solicitor_reference_ocs_
-      pattern: (?i)\bOCS/\d{4}/\d{2,4}\b
     - id: Pattern_crown_solicitor_legal_opinion_crown_solicitor_entity_name
       pattern: (?i)\b(?:Crown\s+Solicitor|Office\s+of\s+the\s+Crown\s+Solicitor)\b
+    - id: Regex_crown_solicitor_legal_opinion_matter_reference
+      pattern: >-
+        (?i)\b(?:case|file|matter|reference)\s+(?:no\.?|number|ID|#)\s*[:#]?\s*(?:[A-Z]{1,4}[/-]?)?\d[A-Z0-9/-]{3,20}\b
+    - id: Regex_crown_solicitor_legal_opinion_record_structure
+      pattern: >-
+        (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+(?:by|for)|Instructing\s+officer|Client|Author|Classification)\s*:\s*(?!_{2,}|\[|<)[A-Za-z0-9]
   keywords:
-    - id: Evidence_crown_solicitor_legal_opinion_primary
-      groups:
-        - match_style: word
-          terms:
-            - Crown Solicitor
-            - Office of the Crown Solicitor
-            - text: OCS
-              case_sensitive: true
-      strength: specific
     - id: Evidence_crown_solicitor_legal_opinion_corroborative
       groups:
         - match_style: word
@@ -185,10 +184,17 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Legal
-references: []
+references:
+  - title: Crown Law (Queensland) — About us
+    url: https://www.crownlaw.qld.gov.au/about/about-crown-law
+  - title: Evidence Act 1977 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-1977-047
 created: '2026-02-20'
-updated: '2026-07-16'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): the invented CS-YYYY-NNNN and OCS/YYYY/NN reference regexes were the primary detector; the primary is now the Crown Solicitor / Office of the Crown Solicitor entity name (65 discovery); 75 = entity + privilege/advice evidence + a populated document header field (To, From, Date, Subject, Our ref, Matter no ...) or a labelled matter number (case-reference-number fallback, identifier-format slot); 85 = entity + privilege/advice evidence + two distinct populated header fields; tests converted to labelled matter numbers with blank-form and training decoys; references added. Every tier now also carries the shared template-exclusion NOT gate.'
   - version: 1.4.0
     date: '2026-07-16'
     description: 'sit-alignment-validation-2026-07-16 wave1 (TP-00714): any-of primary across CS reference, OCS reference, and Crown Solicitor/Office entity patterns (previously all tiers keyed solely on CS-YYYY-NNNN, making the OCS-reference and unnumbered-opinion positives unreachable). Every enforcing path now requires the legal-opinion corroborative group (75 previously required only the primary keyword group with no opinion/privilege evidence); the new legal risk term added to the corroborative group per the approved evidence design. 85 keys on ONE reference scheme (CS or OCS, never both required) plus the entity pattern and corroborative evidence. The published/tabled/annual-report/template/example exclusion group is now NOT-gated on all tiers including 65/75 (previously only 85). Educational-context negative reworded (providing legal advice to -> acting for): under the approved design entity-plus-advice evidence intentionally enforces, so the old wording no longer describes a true negative. Adversarial test cases added.'

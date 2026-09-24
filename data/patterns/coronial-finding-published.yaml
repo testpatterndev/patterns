@@ -1,15 +1,17 @@
 schema: testpattern/v1
 name: Coronial Finding Published
 slug: coronial-finding-published
-version: 1.3.2
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects published coronial findings and recommendations under the Coroners Act 2003 (Qld). Although coronial findings are public documents, they contain sensitive details about the circumstances and cause of death, manner of death, and identity of deceased persons. Government agencies handling these documents should classify them as SENSITIVE Legal due to the distressing nature of the content.
-operation: 'Keyword proximity: a coronial finding phrase is discovery-only at 65, a Coroners Act 2003 reference enables 75 enforcement, and 85 additionally requires cause/manner-of-death structure plus investigation details. Negative keyword exclusion covers general health statistics, hospital annual reports, and academic materials.'
-pattern: (?i)\b(coronial\s+(?:finding|inquest|investigation|report)|(?:cause|manner|circumstances)\s+of\s+death|coroner(?:'s|s)?\s+(?:finding|recommendation|report|court)|Coroners\s+Act\s+2003|inquest\s+(?:into|findings?|recommendations?))\b
+operation: >-
+  Primary: coronial finding(s)/inquest/investigation/report, inquest into / findings of inquest / inquest findings or recommendations, coroner's finding/recommendation/report/court, non-inquest findings. 65 (discovery only): phrase alone - statistics, textbooks and news stay here. 75: phrase plus a populated findings-header field as used in published Queensland findings (citation, title of court, jurisdiction, file no(s), delivered on/at, hearing dates, findings of, catchwords, representation, counsel assisting, date/place of death, deceased). 85: two distinct populated header fields plus a named deceased ('Inquest into the death of <Name>' / 'death of <Name>') plus independent cause/manner evidence (cause of death, manner of death, autopsy, post-mortem, forensic pathologist, toxicology, Coroners Act 2003, recommendations). Template and guidance/training framing excluded from 75/85.
+pattern: (?i)\b(?:coronial\s+(?:findings?|inquest|investigation|report)|findings\s+of\s+inquest|inquest\s+(?:into|findings?|recommendations?)|coroner(?:'s|s)?\s+(?:findings?|recommendations?|report|court)|non-inquest\s+findings?)\b
 confidence: low
-confidence_justification: 'Medium confidence: requires co-occurrence of coronial investigation terminology with specific findings about cause of death, manner of death, and recommendations. General mortality statistics and health reports do not contain these detailed finding terms in combination.'
+confidence_justification: >-
+  Low-medium: coronial findings are published documents, so the classifier labels handling rather than secrecy. Enforce tiers need the published findings header structure; 85 also needs a named deceased and cause/manner evidence. Statistics, textbooks and news carry the phrases without the header fields and stay at 65.
 jurisdictions:
   - au
 regulations:
@@ -43,25 +45,25 @@ corroborative_evidence:
     - government-services
 test_cases:
   should_match:
-    - value: Coronial finding released by the court
-      description: Exact 65 discovery probe with a coronial phrase only
-    - value: Coronial finding under the Coroners Act 2003
-      description: Exact 75 probe with statutory provenance but no case findings
-    - value: 'Coronial finding under the Coroners Act 2003: cause of death recorded for the deceased'
-      description: Exact 85 probe with statutory, finding-structure, and investigation evidence
-    - value: 'Coroners Court of Queensland — Findings of Inquest. Coroners Act 2003 (Qld) s.45. Inquest into the death of [Name]. Delivered by Deputy State Coroner J. Hutton on 12 February 2026. Findings: The deceased [Name], aged 34, died on 18 September 2025 at Princess Alexandra Hospital, Brisbane. Cause of death: multi-organ failure secondary to sepsis. Manner of death: natural causes complicated by delayed diagnosis. I make the following recommendations pursuant to s.46: (1) Queensland Health review triage protocols for presentations with fever and abdominal pain.'
-      description: Coronial finding with cause of death, manner of death, and recommendations
-    - value: 'Coronial Investigation Report — Non-Inquest Finding. Coroners Act 2003 s.45(2). Death of [Name], aged 78. Reported death investigated by Coroner M. Bentley, Cairns Coroners Court. Autopsy performed by forensic pathologist Dr R. Singh at Cairns Hospital mortuary on 4 October 2025. Post-mortem finding: acute myocardial infarction. Cause of death: ischaemic heart disease. Circumstances: the deceased was found unresponsive at home by a neighbour. No suspicious circumstances identified. No inquest required.'
-      description: Non-inquest coronial finding with autopsy details and cause of death
-    - value: 'Inquest into the deaths arising from the Ravensbourne bus incident. State Coroner T. Ryan. Coroners Court of Queensland. Findings delivered 28 January 2026 pursuant to Coroners Act 2003 s.45. Four persons deceased. Cause of death (all four): multiple blunt force trauma consistent with high-speed vehicle collision. Manner of death: accident. Circumstances of death: the bus departed the Toowoomba Range road at a curve travelling at approximately 95 km/h. Recommendations: (1) Department of Transport and Main Roads install crash barriers at the identified curve. (2) Mandatory fatigue management for bus operators on mountain routes.'
-      description: Multi-death inquest finding with recommendations to government agencies
+    - value: "CORONERS COURT OF QUEENSLAND\nFINDINGS OF INQUEST\nCITATION: Inquest into the death of Morgan Ellisdale\nTITLE OF COURT: Coroners Court\nJURISDICTION: Brisbane\nFILE NO(s): 2025/04417\nDELIVERED ON: 12 February 2026\nFINDINGS OF: Deputy State Coroner Hutton\nCause of death: multi-organ failure secondary to sepsis. Recommendations are made under s 46 of the Coroners Act 2003."
+      description: Published findings header with a named deceased and cause-of-death evidence (85)
+      synthetic: true
+    - value: "Non-inquest findings\nDeceased: Casey Rourke\nFile number: 2025/08812"
+      description: Non-inquest findings with labelled deceased and file fields only (75)
+      synthetic: true
   should_not_match:
-    - value: The Australian Bureau of Statistics published its annual Causes of Death report for 2024. The leading cause of death was ischaemic heart disease (17,331 deaths), followed by dementia (15,209 deaths). Queensland recorded 34,127 registered deaths.
+    - value: "The Australian Bureau of Statistics published its annual Causes of Death report for 2024. The leading cause of death was ischaemic heart disease (17,331 deaths), followed by dementia (15,209 deaths). Queensland recorded 34,127 registered deaths."
       description: Published ABS causes of death statistics
-    - value: The Royal Brisbane and Women's Hospital published its 2024-25 annual report noting a mortality rate of 1.2% for admitted patients, consistent with national benchmarks. The hospital recorded 847 deaths during the reporting period.
+    - value: "The Royal Brisbane and Women's Hospital published its 2024-25 annual report noting a mortality rate of 1.2% for admitted patients, consistent with national benchmarks. The hospital recorded 847 deaths during the reporting period."
       description: Hospital annual report with aggregate mortality statistics
-    - value: A forensic pathology textbook chapter explains the process of coronial investigation in Queensland, including the role of the State Coroner, the circumstances requiring investigation under the Coroners Act 2003, and the types of findings available.
+    - value: "A forensic pathology textbook chapter explains the process of coronial investigation in Queensland, including the role of the State Coroner, the circumstances requiring investigation under the Coroners Act 2003, and the types of findings available."
       description: Forensic pathology textbook on coronial process
+    - value: "Policy guidance: this procedure explains how coronial findings are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Findings of inquest - cover sheet\nCITATION: ____________________\nFILE NO(s): ____________________\nDELIVERED ON: ____________________\nFINDINGS OF: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the coroner's findings into the bus crash recommended crash barriers on the range road, and the State Coroner said the inquest into the deaths had been difficult for families."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: ABS published causes of death statistics and mortality data
     mitigation: 'Negative keyword exclusion: ''ABS'', ''Australian Bureau of Statistics'', ''leading cause'', ''registered deaths'', ''published'''
@@ -77,115 +79,97 @@ exports:
 scope: narrow
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-    - tier: high
-      confidence_level: 85
+    - confidence_level: 85
       id_match: primary_keywords
       matches:
-        - ref: coroners_act_reference
-        - ref: cause_manner_death
+        - ref: Regex_coronial_finding_published_header_fields
+          min_count: 2
+          unique_results: true
+        - ref: Regex_coronial_finding_published_named_deceased
         - ref: corroborative_terms
-      description: Coronial finding with statutory provenance, death-finding structure, and case details
-    - tier: medium
-      confidence_level: 75
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_coronial_finding_published_guidance_exclusion
+    - confidence_level: 75
       id_match: primary_keywords
       matches:
-        - ref: coroners_act_reference
-      description: Coronial finding phrase with Coroners Act 2003 provenance
-    - tier: low
-      confidence_level: 65
-      id_match: primary_keywords
+        - ref: Regex_coronial_finding_published_header_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_coronial_finding_published_guidance_exclusion
+    - confidence_level: 65
       discovery_only: true
-      description: Coronial finding terminology retained for discovery inventory only
+      id_match: primary_keywords
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-    - id: coronial_finding_terms
-      pattern: (?i)\b(coronial\s+(?:finding|inquest|investigation|report)|inquest\s+(?:into|findings?|recommendations?))\b
-    - id: cause_manner_death
-      pattern: (?i)\b((?:cause|manner|circumstances)\s+of\s+death)\b
-    - id: coroners_act_reference
-      pattern: (?i)\bCoroners\s+Act\s+2003\b
-  keywords:
     - id: primary_keywords
-      words:
-        - coronial finding
-        - coronial inquest
-        - coronial investigation
-        - coronial report
-        - coroner's finding
-        - coroner's recommendation
-        - inquest into the death
-        - cause of death
-        - manner of death
-        - circumstances of death
-      strength: domain
-    - id: classification_markers
-      words:
-        - SENSITIVE
-        - Legal
-        - OFFICIAL
-        - Coroners Act 2003
-        - Coroners Court
-        - State Coroner
-        - Deputy State Coroner
-      strength: domain
+      pattern: (?i)\b(?:coronial\s+(?:findings?|inquest|investigation|report)|findings\s+of\s+inquest|inquest\s+(?:into|findings?|recommendations?)|coroner(?:'s|s)?\s+(?:findings?|recommendations?|report|court)|non-inquest\s+findings?)\b
+    - id: Regex_coronial_finding_published_header_fields
+      pattern: (?i)\b(?:citation|title\s+of\s+court|jurisdiction|file\s+no\.?|file\s+number|delivered\s+(?:on|at)|hearing\s+dates?|findings\s+of|catchwords|representation|counsel\s+assisting|date\s+of\s+death|place\s+of\s+death|deceased)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_coronial_finding_published_named_deceased
+      pattern: \b(?:[Ii]nquest\s+into\s+the\s+deaths?\s+of|[Dd]eath\s+of)\s+(?:(?:Mr|Mrs|Ms|Miss|Dr|Master)\.?\s+)?[A-Z][a-z]{1,20}\s+[A-Z][A-Za-z'-]{1,30}
+  keywords:
     - id: corroborative_terms
-      words:
-        - autopsy
-        - post-mortem
-        - forensic pathologist
-        - deceased
-        - blunt force trauma
-        - natural causes
-        - accident
-        - suspicious circumstances
-        - recommendations pursuant
-        - inquest required
-        - mortuary
-        - toxicology
-      strength: domain
-    - id: negative_keywords
-      words:
-        - ABS
-        - Australian Bureau of Statistics
-        - leading cause
-        - registered deaths
-        - published
-        - annual report
-        - mortality rate
-        - national benchmarks
-        - reporting period
-        - textbook
-        - chapter
-        - explains
-        - academic
-        - university
-      strength: domain
-  filters:
-    - type: exclude
-      description: Exclude published mortality statistics, hospital reports, and academic materials
-      keywords:
-        - Australian Bureau of Statistics
-        - ABS
-        - leading cause
-        - registered deaths
-        - annual report
-        - mortality rate
-        - national benchmarks
-        - textbook
-        - academic
-        - university
+      groups:
+        - match_style: word
+          terms:
+            - cause of death
+            - manner of death
+            - autopsy
+            - post-mortem
+            - forensic pathologist
+            - toxicology
+            - Coroners Act 2003
+            - recommendations
+      strength: specific
+    - id: Keyword_coronial_finding_published_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 risk_rating: 3
 risk_description: >-
-  The detector identifies a final published coronial finding or recommendation containing cause and manner of death, evidence summaries, agency findings, and the identity of the deceased. Although the subject matter may be distressing and personally sensitive, the normal true positive is an officially released public document whose lawful publication has already removed the core confidentiality interest. Misuse is mainly contextual republication or insensitive handling and generally causes limited incremental harm beyond the public finding itself. Risk 3 and OFFICIAL are proportionate; SENSITIVE would require an unpublished draft, suppressed detail, protected witness, or non-public evidence excluded from the released finding.
+  The detector identifies published coronial findings by combining coronial-finding language with the published findings header fields (citation, file number, delivered on, findings of, deceased), and at 85 a named deceased plus cause or manner of death. Although the subject matter may be distressing and personally sensitive, the normal true positive is an officially released public document whose lawful publication has already removed the core confidentiality interest. Misuse is mainly contextual republication or insensitive handling and generally causes limited incremental harm beyond the public finding itself. Risk 3 and OFFICIAL are proportionate; SENSITIVE would require an unpublished draft, suppressed detail, protected witness, or non-public evidence excluded from the released finding.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
   qgiscf_dlm: OFFICIAL
-references: []
+references:
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2003-013
+    title: Coroners Act 2003 (Qld)
 created: '2026-03-06'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): rebuilt tiers - the tier id_match pointed at an empty keyword group (primary_keywords had no terms), so the tiers never evaluated and 85 needed no structure. primary_keywords is now the coronial-finding regex; 75 needs a populated published-findings header field (citation, file no, delivered on, findings of, deceased) and 85 needs two header fields plus a named deceased plus cause/manner evidence. Cause-of-death and Coroners Act phrases moved from the primary to evidence. Placeholder-name tests replaced with populated findings; added policy, blank cover-sheet and news decoys; reference added."
   - version: 1.3.2
     date: '2026-07-19'
     description: 'Targeted finance/health blocker remediation: replace the sole discovery tier with materially distinct 65/75/85 coronial designs, require statutory provenance at 75 and death-finding plus case-detail evidence at 85, canonicalize matcher IDs, and add exact-tier probes.'
