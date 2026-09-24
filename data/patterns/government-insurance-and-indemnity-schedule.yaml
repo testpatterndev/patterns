@@ -1,12 +1,12 @@
 schema: testpattern/v1
-name: Government Insurance and Indemnity Schedule
+name: Government Insurance, Indemnity and Liability Schedule
 slug: government-insurance-and-indemnity-schedule
-version: 1.4.1
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
-description: Detects whole-of-government or agency-level insurance coverage schedules, self-insurance reserves, indemnity limits, and excess/deductible structures that reveal the State's financial exposure limits.
-operation: 'Keyword proximity: insurance/indemnity terms within 300 characters of schedule/coverage/limit terms and dollar amounts or aggregate/occurrence indicators. Requires confidentiality markers.'
+description: Detects whole-of-government or agency-level insurance coverage schedules, self-insurance reserves, indemnity limits, and excess/deductible structures, and quantified contract liability and insurance schedules (liability caps, limits of liability, required professional indemnity and public liability cover), that reveal the State's financial exposure limits. Absorbed global-top500-178-indemnity-and-liability-schedules (2026-09-24).
+operation: 'Keyword proximity around a dollar amount (id_match): 75 requires an insurance/indemnity term plus at least one distinctive schedule term (QGIF, Government Insurance Fund, indemnity, self-insurance, deductible, per occurrence, policy period, coverage gap, professional indemnity, public liability, liability cap, limit of liability); 85 additionally requires a schedule/coverage/limit term, at least 2 distinct distinctive terms, and a confidentiality marker (PROTECTED, confidential, Commercial-in-Confidence, not for disclosure, restricted). The dollar amount alone is discovery-only at 65. Claim-form, public-information, template and guidance (fact sheet, procurement guide, guidance note) wording vetoes every tier.'
 pattern: null
 confidence: medium
 confidence_justification: 'Medium confidence: the co-occurrence of government insurance fund terminology with coverage limits, deductibles, and confidentiality markers is specific to restricted insurance schedules. Published insurance summaries are excluded.'
@@ -36,8 +36,11 @@ corroborative_evidence:
     - aggregate
     - per occurrence
     - policy period
+    - liability cap
+    - limit of liability
     - PROTECTED
     - confidential
+    - Commercial-in-Confidence
   proximity: 300
   keyword_lists:
 
@@ -52,6 +55,19 @@ test_cases:
       description: Government-wide indemnity schedule with reserve and excess details
     - value: 'PROTECTED — Government Insurance Fund. Cyber liability schedule, policy period FY27. Limit $75M aggregate, deductible $2M per occurrence, self-insurance retention $10M. Restricted — not for disclosure.'
       description: QGIF cyber liability schedule with limits, deductible, and confidentiality markers
+    - value: |-
+        COMMERCIAL-IN-CONFIDENCE
+        Schedule 3 — Liability and Insurance
+        Contract: ICT Managed Services Agreement, contract no. ICT-2026-114
+        Supplier liability cap: $12,500,000 in aggregate for all claims under the contract
+        Professional indemnity insurance: $10M per claim, maintained for 6 years after expiry
+        Public liability insurance: $20M per occurrence
+        Indemnity: the Supplier indemnifies the State for third-party IP infringement claims without limit.
+      description: Contract liability and insurance schedule carried over from the absorbed liability-schedules scope (85)
+      synthetic: true
+    - value: 'Item 9 of the Contract Details is completed as follows: limit of liability for the Consultant is $3,000,000; the Consultant must hold professional indemnity insurance of not less than $2M for each claim.'
+      description: Populated contract-details liability item without a confidentiality marker (75)
+      synthetic: true
   should_not_match:
     - value: The Queensland Government Insurance Fund provides insurance coverage to government agencies. For information about QGIF, visit the Queensland Treasury website.
       description: Public information about QGIF — no coverage details
@@ -59,11 +75,17 @@ test_cases:
       description: Routine insurance claim form — no schedule details or dollar coverage amounts
     - value: 'PROTECTED — Draft. Corporate insurance cost summary: total premiums of $1.2M for the financial year, with a reserve of $400K held against outstanding claims. Confidential — not for disclosure.'
       description: shared financial substrate without distinctive signature must not fire
+    - value: 'Fact sheet — liability and indemnity in government contracts. Agencies should consider whether a liability cap is appropriate; for many ICT contracts a cap of $2 million or two times the contract price is common, and suppliers usually hold professional indemnity insurance.'
+      description: Procurement guidance with an illustrative figure - guidance framing vetoes every tier
+    - value: '14. Limitation of liability. The Supplier''s liability under this Contract is limited to the Liability Cap specified in Item 9 of the Contract Details. 15. Indemnity. The Supplier indemnifies the Customer against any loss arising from its negligence and holds the Customer harmless.'
+      description: Standard-form limitation of liability and indemnity clauses without any quantified amount
 false_positives:
   - description: Public information about government insurance arrangements
     mitigation: Require specific coverage limits, deductibles, or reserve amounts rather than general references to QGIF
   - description: Routine insurance claim forms
     mitigation: Exclude documents containing 'claim form', 'lodge a claim', 'incident report' without schedule context
+  - description: Standard-form contract clauses (limitation of liability, indemnity, hold harmless, warranty disclaimers) and procurement guidance discuss liability and insurance without a negotiated quantified schedule.
+    mitigation: A dollar amount is the primary, so unquantified boilerplate never matches; generic clause headings (limitation of liability, hold harmless, consequential damages, risk allocation) are deliberately not evidence; guidance framing (fact sheet, procurement guide, guidance note) vetoes every tier.
 exports:
   - purview_xml
   - yaml
@@ -125,6 +147,7 @@ purview:
             - self-insurance
             - QGIF
             - Government Insurance Fund
+            - indemnification
       strength: domain
     - id: Evidence_government_insurance_and_indemnity_schedule_schedule_terms
       groups:
@@ -153,6 +176,8 @@ purview:
             - coverage gap
             - professional indemnity
             - public liability
+            - liability cap
+            - limit of liability
       strength: specific
     - id: Evidence_government_insurance_and_indemnity_schedule_markers
       groups:
@@ -160,6 +185,7 @@ purview:
           terms:
             - PROTECTED
             - confidential
+            - Commercial-in-Confidence
             - not for disclosure
             - restricted
       strength: domain
@@ -173,19 +199,25 @@ purview:
             - for information about
             - visit the website
             - template
+            - fact sheet
+            - procurement guide
+            - guidance note
 
       strength: noise
 risk_rating: 7
 risk_description: >-
-  The detector finds a confidential agency or whole-of-government insurance schedule by combining coverage, indemnity, excess, deductible, limit, reserve, and monetary terms. Disclosure can reveal uninsured exposures, self-insurance thresholds, and financial limits that strengthen claims manipulation, negotiation pressure, or targeting of weakly covered assets. The normal unit is a composite coverage schedule, while public insurance summaries and routine claim forms can match portions of the vocabulary. Risk 7 SENSITIVE reflects credible moderate financial and operational harm; PROTECTED would require a comprehensive high-consequence exposure map capable of significant damage.
+  The detector finds a confidential agency or whole-of-government insurance schedule by combining coverage, indemnity, excess, deductible, limit, reserve, and monetary terms. Disclosure can reveal uninsured exposures, self-insurance thresholds, and financial limits that strengthen claims manipulation, negotiation pressure, or targeting of weakly covered assets. The normal unit is a composite coverage schedule or a quantified contract liability and insurance schedule (liability cap, required cover), while public insurance summaries, procurement guidance, standard-form clauses and routine claim forms can match portions of the vocabulary. Risk 7 SENSITIVE reflects credible moderate financial and operational harm; PROTECTED would require a comprehensive high-consequence exposure map capable of significant damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Commercial-in-Confidence
 references: []
 created: '2026-02-20'
-updated: '2026-09-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Merge global-top500-178-indemnity-and-liability-schedules into this classifier (Qld government classifier review 2026-09-24): added quantified contract-liability terms (liability cap, limit of liability) to the distinctive detail_terms signature group, indemnification to the insurance/indemnity primary group, and Commercial-in-Confidence to the confidentiality markers, so negotiated contract liability and insurance schedules reach 75/85 on the existing dollar-amount-anchored tiers. Added fact sheet, procurement guide and guidance note to the document exclusion filter. Not imported: the absorbed title-phrase primary and its self-corroborating tiers, and generic clause headings (limitation of liability, hold harmless, consequential damages, risk allocation, warranty disclaimer, insurance requirement, contractual liability) that appear in every standard-form contract and would re-open the shared-substrate co-firing fixed in 1.4.0. Added a populated contract liability schedule (85), a contract-details liability item (75), and procurement fact-sheet and standard-clause decoys. Name/description/operation updated; risk kept at 7 SENSITIVE Commercial-in-Confidence (the absorbed pattern was risk 8, but its contract-contained exposure does not exceed this classifier''s whole-of-government schedule risk).'
   - version: 1.4.1
     date: '2026-09-14'
     description: 'Approved Commercial-in-Confidence mapping; retain SENSITIVE classification and unchanged detection logic.'

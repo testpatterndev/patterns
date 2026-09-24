@@ -1,17 +1,32 @@
 schema: testpattern/v1
-name: GPS Coordinates (Decimal Degrees)
+name: Geographic Coordinates (Decimal Degrees, DMS, MGRS)
 slug: global-gps-coordinates
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects GPS Coordinates (Decimal Degrees) patterns. Requires location/GPS context keywords
-operation: 'Corroborative evidence: GPS/latitude/longitude geolocation keywords within 300 characters. Keyword lists: emerging-geolocation. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.'
-pattern: '(?<![\d.])-?(?:90\.0{4,}|[0-8]?\d\.\d{4,})\s*,\s*-?(?:180\.0{4,}|(?:1[0-7]\d|\d{1,2})\.\d{4,})(?!\d)'
+description: >-
+  Detects geographic coordinates as a decimal-degree latitude/longitude pair (e.g. -33.8688, 151.2093),
+  as a degrees-minutes-seconds (DMS) value with a hemisphere letter (e.g. 40° 26' 46" N), or as a
+  Military Grid Reference System (MGRS) reference (e.g. 4QFJ 12345 67890). The slug predates the DMS
+  and MGRS scope, which was absorbed from the former global-gps-coordinates-dms classifier.
+operation: >-
+  Reference: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion. Decimal pairs are bounded
+  to latitude -90..90 and longitude -180..180 with at least four decimal places. DMS values use
+  hemisphere-bounded ranges (N/S 0-90, E/W 0-180, minutes/seconds 0-59, zero subdivisions at the 90/180
+  endpoints) with degree/minute/second marks and a hemisphere letter. Decimal and DMS primaries share
+  the same tiers: 65 discovery-only, 75 with geolocation context, 85 with an explicit coordinate label
+  plus an operational location-record term. MGRS references (grid zone + 100 km square + easting/northing)
+  collide more easily with part numbers, so their 75/85 tiers require coordinate-system notation
+  (MGRS, grid reference, latitude, longitude, coordinate) rather than generic location words. Template
+  and public-map context are excluded from all tiers.
+pattern: (?<![\d.])-?(?:90\.0{4,}|[0-8]?\d\.\d{4,})\s*,\s*-?(?:180\.0{4,}|(?:1[0-7]\d|\d{1,2})\.\d{4,})(?!\d)|\b(?:90\s?[°º]\s?0{1,2}\s?['′]\s?0{1,2}(?:\.0+)?\s?["″]?\s?[NSns]\b|[0-8]?\d\s?[°º]\s?[0-5]?\d\s?['′]\s?[0-5]?\d(?:\.\d+)?\s?["″]?\s?[NSns]\b|180\s?[°º]\s?0{1,2}\s?['′]\s?0{1,2}(?:\.0+)?\s?["″]?\s?[EWew]\b|(?:1[0-7]\d|\d{1,2})\s?[°º]\s?[0-5]?\d\s?['′]\s?[0-5]?\d(?:\.\d+)?\s?["″]?\s?[EWew]\b)|(?<![A-Za-z0-9])\d{1,2}[C-HJ-NP-Xc-hj-np-x][A-HJ-NP-Za-hj-np-z][A-HJ-NP-Va-hj-np-v]\s?\d{2,5}\s?\d{2,5}(?![A-Za-z0-9])
 confidence: medium
 confidence_justification: >-
-  Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false positive rates. Added context gating and exclusion rules improve precision and reduce
-  incidental matches.
+  Medium confidence: the decimal and DMS shapes are geographically bounded and the DMS form requires
+  degree/minute/second marks and a hemisphere letter, but bare numbers can still be non-location data and
+  the MGRS shape can collide with part numbers. Enforcing tiers require location context, and MGRS
+  enforcement requires explicit coordinate-system notation.
 jurisdictions:
   - global
 regulations:
@@ -30,6 +45,9 @@ corroborative_evidence:
     - longitude
     - geolocation
     - decimal degrees
+    - degrees minutes seconds
+    - grid reference
+    - MGRS
   proximity: 300
   keyword_lists:
     - emerging-geolocation
@@ -49,6 +67,18 @@ test_cases:
       description: Melbourne GPS coordinates
     - value: '90.0000, -180.0000'
       description: Exact latitude/longitude endpoints with all-zero fractions are valid
+    - value: 'Incident location: latitude 27° 28′ 12″ S, longitude 153° 1′ 42.5″ E; device fix logged by field officer'
+      description: Exact 85 DMS probe - DMS pair with an explicit latitude/longitude label and operational incident/device-fix context
+    - value: 'Grid reference: 40° 26'' 46" N'
+      description: Exact 75 DMS probe - DMS latitude with a coordinate label but no operational record context
+    - value: '151° 12′ 33.4″ E'
+      description: DMS with prime/double-prime marks and decimal seconds (discovery-only 65)
+    - value: 90° 00' 00" N
+      description: Exact DMS latitude endpoint with zero minutes/seconds is valid
+    - value: 'Asset location survey point; MGRS grid reference: 4QFJ 12345 67890'
+      description: Exact 85 MGRS probe carried from global-gps-coordinates-dms - notation label plus operational asset/survey context
+    - value: 'MGRS grid reference: 4QFJ 12345 67890'
+      description: Exact 75 MGRS probe - coordinate-system label without an operational location record
   should_not_match:
     - value: '91.0000, 151.0000'
       description: Latitude above the 90-degree bound is geographically impossible
@@ -68,8 +98,24 @@ test_cases:
       description: Published mapping coordinate is vetoed from enforcement by public-map context
     - value: 'Sample template: asset location GPS coordinates -33.8688, 151.2093; survey point.'
       description: Template text contains high-tier evidence but is vetoed by the shared exclusion
-    - value: 'Grid reference: 40° 26'' 46" N'
-      description: Sibling DMS coordinate does not satisfy the decimal-degree primary
+    - value: 40° 60' 00" N
+      description: DMS minutes cannot be 60
+    - value: 180° 00' 01" E
+      description: Nonzero DMS seconds beyond the longitude endpoint are invalid
+    - value: 91° 10' 10" N
+      description: DMS latitude above 90 degrees is invalid
+    - value: 40 26 46
+      description: Three numbers with no degree marks or hemisphere - not DMS
+    - value: the survey crew recorded the grid reference in the field notebook
+      description: Prose mention of a grid reference with no actual coordinate
+    - value: 'News: the summit cairn at 16° 55′ 12″ S, 145° 46′ 30″ E is marked on the published map; rangers updated the site location signage.'
+      description: News-style decoy with DMS values, location words and record wording is vetoed by public-map context
+    - value: 'Training exercise handout: report your position in degrees minutes seconds, e.g. latitude 27° 28′ 12″ S, to the incident location desk.'
+      description: Training decoy with labelled DMS and incident wording is vetoed by the template exclusion
+    - value: 'Part number 4QFJ 12345 67890 shipped from warehouse bay 7 at the asset location.'
+      description: MGRS-shaped part number with a generic location word but no coordinate-system notation must not enforce
+    - value: 'Public map MGRS grid reference: 4QFJ 12345 67890'
+      description: Published MGRS mapping coordinate is vetoed by public-map context
 false_positives:
   - description: Common words and phrases related to gps coordinates (decimal degrees) appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -79,13 +125,17 @@ false_positives:
     mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
   - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
     mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: MGRS-like tokens (zone digits + letters + digit runs) appearing in part numbers or codes.
+    mitigation: MGRS enforcement tiers require coordinate-system notation (MGRS, grid reference, latitude, longitude, coordinate) rather than generic location words.
+  - description: Temperature or angle values written with a degree mark but no minutes/seconds or hemisphere.
+    mitigation: The DMS primary requires minutes, seconds and a hemisphere letter, excluding bare degree values.
 exports:
   - purview_xml
   - yaml
   - regex_copy
 scope: wide
 risk_description: >-
-  The rule detects one latitude-and-longitude pair in decimal degrees, identifying a point on the earth. The coordinate can aid surveillance or targeting only when it is current and linked to a person, protected facility, or sensitive activity. A normal isolated point may describe a public place, map example, survey location, or asset with no confidential association. Risk 4 OFFICIAL reflects low standalone harm; SENSITIVE requires attributable movement, protected-site, or operational context.
+  The rule detects one geographic point written as a decimal-degree latitude/longitude pair, a degrees-minutes-seconds value, or an MGRS grid reference. The coordinate can aid surveillance or targeting only when it is current and linked to a person, protected facility, or sensitive activity. A normal isolated point may describe a public place, map example, survey location, or asset with no confidential association. Risk 4 OFFICIAL reflects low standalone harm; SENSITIVE requires attributable movement, protected-site, or operational context.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -103,7 +153,11 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_gps_decimal
+      id_match:
+        type: any
+        ids:
+          - Regex_gps_decimal
+          - Regex_gps_dms
       matches:
         - ref: Pattern_global_gps_coordinates_label_context
         - ref: Keyword_location_record_context
@@ -113,8 +167,25 @@ purview:
           refs:
             - Keyword_noise_exclusion
             - Keyword_public_mapping_context
+      description: Decimal or DMS coordinate with an explicit coordinate label and operational location-record context
+    - confidence_level: 85
+      id_match: Regex_gps_mgrs
+      matches:
+        - ref: Keyword_coordinate_notation
+        - ref: Keyword_location_record_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_public_mapping_context
+      description: MGRS reference with coordinate-system notation and operational location-record context
     - confidence_level: 75
-      id_match: Regex_gps_decimal
+      id_match:
+        type: any
+        ids:
+          - Regex_gps_decimal
+          - Regex_gps_dms
       matches:
         - ref: Keyword_geolocation
         - type: any
@@ -123,9 +194,26 @@ purview:
           refs:
             - Keyword_noise_exclusion
             - Keyword_public_mapping_context
+      description: Decimal or DMS coordinate with geolocation context
+    - confidence_level: 75
+      id_match: Regex_gps_mgrs
+      matches:
+        - ref: Keyword_coordinate_notation
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_public_mapping_context
+      description: MGRS reference with explicit coordinate-system notation
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_gps_decimal
+      id_match:
+        type: any
+        ids:
+          - Regex_gps_decimal
+          - Regex_gps_dms
+          - Regex_gps_mgrs
       matches:
         - type: any
           min_matches: 0
@@ -133,11 +221,18 @@ purview:
           refs:
             - Keyword_noise_exclusion
             - Keyword_public_mapping_context
+      description: Bounded decimal, DMS, or MGRS coordinate for discovery inventory only
   regexes:
     - id: Regex_gps_decimal
       pattern: '(?<![\d.])-?(?:90\.0{4,}|[0-8]?\d\.\d{4,})\s*,\s*-?(?:180\.0{4,}|(?:1[0-7]\d|\d{1,2})\.\d{4,})(?!\d)'
+    - id: Regex_gps_dms
+      pattern: \b(?:90\s?[°º]\s?0{1,2}\s?['′]\s?0{1,2}(?:\.0+)?\s?["″]?\s?[NSns]\b|[0-8]?\d\s?[°º]\s?[0-5]?\d\s?['′]\s?[0-5]?\d(?:\.\d+)?\s?["″]?\s?[NSns]\b|180\s?[°º]\s?0{1,2}\s?['′]\s?0{1,2}(?:\.0+)?\s?["″]?\s?[EWew]\b|(?:1[0-7]\d|\d{1,2})\s?[°º]\s?[0-5]?\d\s?['′]\s?[0-5]?\d(?:\.\d+)?\s?["″]?\s?[EWew]\b)
+      description: DMS coordinate with hemisphere-bounded degree ranges, 0-59 minutes/seconds, and zero-subdivision endpoints (from global-gps-coordinates-dms)
+    - id: Regex_gps_mgrs
+      pattern: (?<![A-Za-z0-9])\d{1,2}[C-HJ-NP-Xc-hj-np-x][A-HJ-NP-Za-hj-np-z][A-HJ-NP-Va-hj-np-v]\s?\d{2,5}\s?\d{2,5}(?![A-Za-z0-9])
+      description: MGRS grid reference as authored in global-gps-coordinates-dms (zone/precision hardening still deferred)
     - id: Pattern_global_gps_coordinates_label_context
-      pattern: (?i)\b(?:gps\s+coordinates\s+\(decimal\s+degrees\)|gps|coordinates|decimal|degrees)\b
+      pattern: (?i)\b(?:gps\s+coordinates\s+\(decimal\s+degrees\)|gps|coordinates?|decimal|degrees|latitude|longitude|grid\s+reference|mgrs|dms)\b
   keywords:
     - id: Keyword_geolocation
       groups:
@@ -155,6 +250,23 @@ purview:
             - geo coordinates
             - position
             - waypoint
+            - grid reference
+            - MGRS
+            - DMS coordinate
+            - degrees minutes seconds
+      strength: domain
+    - id: Keyword_coordinate_notation
+      groups:
+        - match_style: word
+          terms:
+            - DMS coordinate
+            - degrees minutes seconds
+            - MGRS
+            - grid reference
+            - latitude
+            - longitude
+            - coordinate
+            - coordinates
       strength: domain
     - id: Keyword_global_gps_coordinates_domain_context
       groups:
@@ -177,6 +289,8 @@ purview:
             - device fix
             - field waypoint
             - geofence vertex
+            - site location
+            - device position
       strength: specific
     - id: Keyword_public_mapping_context
       groups:
@@ -189,8 +303,11 @@ purview:
             - public gazetteer
       strength: exclusion
 created: '2026-02-08'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: 'Merge global-gps-coordinates-dms into this classifier (Qld government classifier review 2026-09-24): add its hemisphere-bounded DMS regex as a second primary sharing the decimal-degree 65/75/85 tier logic (id_match any), carry its MGRS regex as a third primary whose 75/85 tiers keep the stricter coordinate-system-notation gate, extend the 85 label regex with latitude/longitude/grid reference/MGRS/DMS, add site-location/device-position record terms, DMS/MGRS false-positive notes, references, and carried-over DMS/MGRS positives, range negatives and public-map/training/part-number decoys; rename to reflect the wider notation scope (slug unchanged).'
   - version: 1.5.0
     date: '2026-07-19'
     description: 'Targeted blocker remediation: retain bounded coordinate pairs as 65 discovery, require geolocation context at 75 and an explicit coordinate label plus operational location-record context at 85; add public-map suppression and exact-tier/sibling/template probes.'
@@ -230,5 +347,10 @@ remediation:
       - 'Mapped non-canonical confidence 90 to 85.'
       - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
       - 'Aligned recommended_confidence to 85.'
+references:
+  - url: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion
+    title: Geographic coordinate conversion (DMS notation) - Wikipedia
+  - url: https://en.wikipedia.org/wiki/Military_Grid_Reference_System
+    title: Military Grid Reference System (MGRS) - Wikipedia
 
 risk_rating: 4

@@ -1,16 +1,22 @@
 schema: testpattern/v1
-name: Legal advice memoranda
+name: Legal advice memoranda and privileged legal communications
 slug: global-top500-163-legal-advice-memoranda
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies documents containing references to legal advice memoranda in international contexts. These are privileged
-  or confidential legal advice records; the category is not personally identifiable information.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 6 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:legal\s+advice\s+memoranda|legal\s+opinion|legal\s+memorandum|legal\s+counsel|solicitor\s+advice|legal\s+professional\s+privilege|privileged\s+communication|without\s+prejudice|legal\s+risk\s+assessment|general\s+counsel|in[\s-]+house\s+counsel|legal\s+briefing)\b
+description: Identifies legal advice memoranda, legal opinions and privileged lawyer-client communications (legal professional
+  privilege / client legal privilege, solicitor-client or attorney-client privilege, privilege logs). These are privileged
+  or confidential legal advice records; the category is not personally identifiable information, and a match does not prove
+  that privilege attaches. Absorbed global-top500-164-attorney-client-privileged-communications (2026-09-24).
+operation: 'Two primaries: Regex_legal_advice_memoranda (legal opinion / memorandum / counsel / advice phrases) and Regex_..._privilege_marker
+  (LPP / client legal privilege / privileged and confidential / solicitor- or attorney-client privilege / dominant purpose
+  / privilege log markings). Either alone is discovery-only at 65. 75 requires a primary plus at least 2 distinct populated
+  document header fields (To/From/Date/Subject/Our ref/Matter no...). 85 requires the advice primary plus 3 header fields,
+  or the advice primary plus 2 header fields plus an independent privilege marking (the privilege regex shares no phrase
+  with the advice primary). Template/sample text and explicit guidance framing (fact sheet, training module, e-learning,
+  FAQ, this/these guideline(s)) veto every enforcing tier.'
+pattern: (?is)\b(?:legal\s+advice\s+memorand(?:um|a)|legal\s+opinion|legal\s+memorandum|legal\s+counsel|solicitor\s+advice|without\s+prejudice|legal\s+risk\s+assessment|general\s+counsel|in[\s-]+house\s+counsel|legal\s+briefing|(?:subject\s+to\s+)?legal\s+professional\s+privilege|client\s+legal\s+privilege|privileged\s+(?:and|&)\s+confidential|(?:attorney|solicitor|lawyer)[\s-]+client\s+(?:privileged?|communications?)|litigation\s+privilege|work[\s-]+product\s+(?:doctrine|privilege)|privilege\s+log|prepared\s+for\s+the\s+dominant\s+purpose\s+of|privileged\s+communications?)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
   Added context gating and exclusion rules improve precision and reduce incidental matches.
@@ -29,33 +35,42 @@ data_categories:
 - legal
 corroborative_evidence:
   keywords:
-  - legal advice memoranda
-  - legal
-  - advice
-  - memoranda
-  - corporate
-  - governance
+  - legal professional privilege
+  - subject to legal professional privilege
+  - client legal privilege
+  - privileged and confidential
+  - prepared for the dominant purpose of
+  - solicitor-client privilege
+  - attorney-client privilege
+  - litigation privilege
+  - privilege log
   proximity: 300
 test_cases:
   should_match:
-  - value: legal advice memoranda
-    description: Primary topic phrase match
-  - value: legal opinion
-    description: Case-insensitive topic phrase match
-  - value: legal memorandum
-    description: Alternative topic phrase match
-  - value: legal counsel
-    description: Additional topic phrase match
+  - value: "PRIVILEGED AND CONFIDENTIAL - SUBJECT TO LEGAL PROFESSIONAL PRIVILEGE\nTo: Director-General\nFrom: Principal Lawyer, Legal Services Unit\nDate: 14 August 2026\nOur ref: LS-2026-03318\nRe: Legal opinion - termination of the Harbourside Constructions contract\nThis memorandum was prepared for the dominant purpose of providing legal advice. In our opinion the Department may terminate for default under clause 44, but there is a moderate risk the contractor will dispute the notice and seek delay costs of about $2.1M."
+    description: Privilege-marked legal opinion memo with populated header (85 via advice primary + header fields + independent privilege marking)
+    synthetic: true
+  - value: "From: Senior Legal Officer, Office of the General Counsel\nSubject: Privileged and confidential - client legal privilege\n\nHi Priya, you asked whether the grant recipient's data can be shared with the auditor. Our view is that disclosure is permitted under the funding agreement, but the recipient must be notified first. Please do not forward this beyond the matter team."
+    description: Privileged email advice with two header fields (85 via advice primary + 2 header fields + privilege marking)
+    synthetic: true
+  - value: "Privilege log\nMatter number: SC 4412/25\nPrepared by: Litigation Branch\nDoc 14 | 12/05/2025 | Email from in-house counsel to CFO re contract variation | Legal professional privilege claimed\nDoc 15 | 19/05/2025 | Draft advice from external solicitors | Litigation privilege claimed"
+    description: Populated privilege log carried over from the absorbed privileged-communications scope (85)
+    synthetic: true
+  - value: "Solicitor-client communication - privileged\nMatter no: LIT-2026-0071\nDate: 3 March 2026\nFile note of conference with counsel regarding discovery obligations and the documents the State should withhold."
+    description: Privilege-marked file note without advice-phrase wording (75 via privilege primary + 2 header fields)
+    synthetic: true
   - value: "To: Director-General\nFrom: Principal Legal Officer\nDate: 12/08/2026\nSubject: legal advice memoranda\nOur ref: LS2026-0412\nThis briefing sets out the legal advice memoranda for decision."
-    description: Populated doc record reaching the 75/85 structure gate
+    description: Populated doc record reaching the 85 structure gate (3+ header fields)
     synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
-  - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: board policy
-    description: Generic word pair from old broad template should not match
+  - value: "Legal professional privilege protects confidential communications prepared for the dominant purpose of giving legal advice. Officers should mark such documents 'Privileged and confidential' and consult in-house counsel before releasing them under the RTI Act."
+    description: Training-style explanation of LPP - both primaries hit but no populated record (discovery only)
+  - value: "Version: 3.0\nApproved by: General Counsel\nClassification: OFFICIAL\nThis fact sheet explains when legal professional privilege applies and how to mark privileged and confidential advice."
+    description: Guidance fact sheet with document header fields - guidance exclusion vetoes enforcement
+  - value: "The Premier refused to table the legal opinion on the stadium contract, with the Attorney-General citing legal professional privilege, it was reported on Tuesday."
+    description: News report naming a legal opinion and LPP without any record (discovery only)
+  - value: "From: Accounts Payable\nTo: Supplier Relations\nSubject: Remittance for invoice 88213\nPayment has been processed. This email may contain confidential or legally privileged information; if you are not the intended recipient please delete it."
+    description: Routine email with a generic confidentiality disclaimer - no privilege marker or advice phrase
   - value: "Policy guidance: this procedure explains how records about legal advice memoranda are handled, who may access them and how long they are kept. It contains no records about any person or system."
     description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
@@ -71,6 +86,12 @@ false_positives:
     significantly higher than specific identifier patterns.
   mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary
     validation.
+- description: Privilege training material, RTI guidance and news reports explain legal professional privilege, the dominant
+    purpose test and "privileged and confidential" markings without containing a privileged communication.
+  mitigation: Privilege markings alone are discovery-only; enforcement needs populated document header fields, and explicit
+    guidance framing (fact sheet, training module, e-learning, FAQ, this/these guideline(s)) vetoes enforcing tiers.
+- description: Generic email footers ("may contain confidential or legally privileged information") appear on routine mail.
+  mitigation: The privilege marker regex deliberately omits generic disclaimer wording (legally privileged, privileged information).
 exports:
 - purview_xml
 - yaml
@@ -95,6 +116,20 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_top500_163_legal_advice_memoranda_guidance_exclusion
+    - confidence_level: 85
+      id_match: Regex_legal_advice_memoranda
+      matches:
+        - ref: Regex_global_top500_163_legal_advice_memoranda_record_structure
+          min_count: 2
+          unique_results: true
+        - ref: Regex_global_top500_163_legal_advice_memoranda_privilege_marker
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_163_legal_advice_memoranda_guidance_exclusion
     - confidence_level: 75
       id_match: Regex_legal_advice_memoranda
       matches:
@@ -106,6 +141,19 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_top500_163_legal_advice_memoranda_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_top500_163_legal_advice_memoranda_privilege_marker
+      matches:
+        - ref: Regex_global_top500_163_legal_advice_memoranda_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_163_legal_advice_memoranda_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_legal_advice_memoranda
@@ -115,14 +163,39 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_global_top500_163_legal_advice_memoranda_privilege_marker
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_legal_advice_memoranda
-      pattern: (?is)\b(?:legal\s+advice\s+memoranda|legal\s+opinion|legal\s+memorandum|legal\s+counsel|solicitor\s+advice|legal\s+professional\s+privilege|privileged\s+communication|without\s+prejudice|legal\s+risk\s+assessment|general\s+counsel|in[\s-]+house\s+counsel|legal\s+briefing)\b
+      pattern: (?is)\b(?:legal\s+advice\s+memorand(?:um|a)|legal\s+opinion|legal\s+memorandum|legal\s+counsel|solicitor\s+advice|without\s+prejudice|legal\s+risk\s+assessment|general\s+counsel|in[\s-]+house\s+counsel|legal\s+briefing)\b
+    - id: Regex_global_top500_163_legal_advice_memoranda_privilege_marker
+      pattern: (?i)\b(?:(?:subject\s+to\s+)?legal\s+professional\s+privilege|client\s+legal\s+privilege|privileged\s+(?:and|&)\s+confidential|(?:attorney|solicitor|lawyer)[\s-]+client\s+(?:privileged?|communications?)|litigation\s+privilege|work[\s-]+product\s+(?:doctrine|privilege)|privilege\s+log|prepared\s+for\s+the\s+dominant\s+purpose\s+of|privileged\s+communications?)\b
     - id: Regex_global_top500_163_legal_advice_memoranda_record_structure
       pattern: >-
         (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!_{2,}|\[|<)[A-Za-z0-9]
-risk_description: The detector recognizes legal opinions, memoranda, counsel, privilege, without-prejudice, risk-assessment,
-  and legal-briefing language rather than proving that advice was sought or privilege attaches. A genuine memorandum can disclose
+  keywords:
+    - id: Keyword_global_top500_163_legal_advice_memoranda_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - fact sheet
+            - training module
+            - e-learning
+            - frequently asked questions
+            - this guideline
+            - these guidelines
+      strength: noise
+risk_description: The detector recognizes legal opinions, memoranda, counsel, without-prejudice, risk-assessment and legal-briefing
+  language, plus legal professional privilege, client legal privilege, solicitor- or attorney-client privilege, dominant-purpose
+  and privilege-log markings, rather than proving that advice was sought or privilege attaches. Disclosure of a privileged
+  communication may also waive privilege. A genuine memorandum can disclose
   counsel's analysis, admitted weaknesses, litigation exposure, recommended actions, and client facts, allowing an opponent
   or regulator to exploit the organization's position. The normal affected unit is one client matter and its participants,
   while reported judgments, legal training, and generic templates may use the same phrases. Risk 8 and SENSITIVE Legal reflect
@@ -139,6 +212,21 @@ sensitivity_labels:
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: 'Merge global-top500-164-attorney-client-privileged-communications into this classifier (Qld government classifier
+    review 2026-09-24): added a privilege-marker regex (legal professional privilege incl. "subject to", client legal privilege,
+    privileged and confidential, solicitor-/attorney-/lawyer-client privilege or communication, litigation privilege, work
+    product, privilege log, "prepared for the dominant purpose of", privileged communication). It is used as independent evidence
+    for a new 85 path (advice primary + 2 header fields + privilege marking) and as a second primary (65 discovery; 75 with 2
+    header fields) so privileged communications without advice wording are still detected. Moved legal professional privilege
+    and privileged communication out of the advice primary so the evidence never shares a span with it; widened "legal advice
+    memoranda" to memorandum/memoranda. Added a guidance exclusion (fact sheet, training module, e-learning, FAQ, this/these
+    guideline(s)) to enforcing tiers. Not imported: the absorbed self-corroborating topic tiers, legal hold (litigation-hold
+    notices are a different record), and the generic confidential legal / protected communication phrases. Replaced bare-phrase
+    tests with populated memo, email, privilege-log and file-note records plus LPP training, fact-sheet, news and email-disclaimer
+    decoys. Name and description updated for the merged scope; risk 8 and labels unchanged (both classifiers were risk 8 SENSITIVE
+    Legal).'
 - version: 1.3.0
   date: '2026-09-24'
   description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent doc record structure (Regex ..._record_structure); 85 requires 3 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."

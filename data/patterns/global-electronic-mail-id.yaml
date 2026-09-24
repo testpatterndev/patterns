@@ -1,24 +1,33 @@
 schema: testpattern/v1
 name: Electronic Mail Address
 slug: global-electronic-mail-id
-version: 2.3.0
+version: 2.4.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Identifies electronic mail addresses in RFC-compatible local-part@domain.tld format. Requires valid
-  top-level domain of 2+ characters. Uses word-boundary anchoring distinct from substring matching.
+  Identifies electronic mail addresses in local-part@domain.tld form using a pragmatic RFC 5322 /
+  WHATWG HTML Living Standard subset: bounded local-part (64 characters, per RFC 5321) and domain-label
+  quantifiers, not the full RFC 5322 address-list grammar (no quoted-string local parts, comments, or
+  domain literals). Unlike the WHATWG "valid e-mail address" definition, a dotted domain ending in an
+  alphabetic (or xn-- punycode) top-level label is required, so dotless intranet values such as
+  user@localhost are deliberately excluded. Retina image asset names (logo@2x.png) are rejected in the
+  primary. Absorbs the former global-email-address classifier.
 operation: >-
-  Regex matching email addresses with alphanumeric local part, @ separator, domain with dot-separated
-  labels, and TLD of 2+ characters. The bare format is discovery-only at 65, an explicit email or
-  correspondence label enforces at 75, and a labelled address in an independent customer,
-  account-holder, or communication record context reaches 85. Explicit templates are excluded from
-  enforcing tiers.
-pattern: \b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b
+  Validation: none (email addresses have no universal checksum). Reference: RFC 5322 section 3.4.1
+  (addr-spec), RFC 5321 section 4.5.3.1.1 (64-octet local-part limit), WHATWG HTML Living Standard
+  "valid e-mail address". The bare address is discovery-only at 65, an explicit email or correspondence
+  label enforces at 75, and a labelled address in an independent customer, contact-record, directory,
+  account-holder, or communication record context reaches 85. Explicit templates and published
+  public-contact context (public website, public directory, published contact, media enquiries, generic
+  mailbox) are excluded from the enforcing tiers.
+pattern: '\b[A-Za-z0-9][A-Za-z0-9.!#$%&''*+/=?^_{|}~-]{0,63}@(?![1-4]x\.(?:png|jpe?g|gif|webp|svg)\b)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?){0,7}\.(?:[A-Za-z]{2,24}|xn--[A-Za-z0-9-]{1,59})\b'
 confidence: high
 confidence_justification: >-
-  High confidence: the @ symbol with domain.tld structure is distinctive to email addresses.
-  TLD validation eliminates most non-email @ usage.
+  High confidence: the bounded local-part@domain.tld structure with an alphabetic top-level label is
+  distinctive to email addresses, and Retina asset names (logo@2x.png) are rejected in the primary.
+  Residual collisions (package@1.2.build-style version tokens) stay at the discovery-only 65 tier
+  unless an email label is present.
 jurisdictions:
   - global
 regulations:
@@ -30,9 +39,11 @@ regulations:
 - "NDB Scheme (Cth)"
 - "Privacy Act 1988 (Cth)"
 - "TIA Act 1979 (Cth)"
+- "CCPA/CPRA"
 frameworks:
 - ISO 27001
 - ISO 27701
+- SOC 2
 data_categories:
   - pii
   - contact-information
@@ -45,10 +56,15 @@ corroborative_evidence:
     - e-mail address
     - send to
     - reply to
+    - contact email
+    - personal email
+    - work email
+    - mailto
   proximity: 300
   keyword_lists:
 
     - correspondence-address-labels
+    - pii-personal
 test_cases:
   should_match:
     - value: alerts@agency.gov.au
@@ -59,6 +75,12 @@ test_cases:
       description: High-tier probe - labelled email in an independent customer-record context
     - value: Send to info@government.gov.au
       description: Medium-tier labelled government email address
+    - value: 'Customer contact record 44871; account holder Priya Raman; contact email: priya.raman77@northwind.com.au; preferred channel: email'
+      description: Exact 85 probe carried from global-email-address - labelled address in a populated contact record
+    - value: Please reach j.smith+news99@sub.example.co.uk today.
+      description: Plus-addressing local part with a multi-label subdomain and double TLD (bounded RFC 5322 subset)
+    - value: 'Employee directory record - work email: user_name-99@my-domain123.org'
+      description: Underscore/hyphen local part with a hyphenated, digit-bearing domain label in a directory record
   should_not_match:
     - value: The ratio is 3@4 per unit
       description: At symbol used in non-email context
@@ -68,9 +90,35 @@ test_cases:
       description: Social media mention, no local part
     - value: 'Documentation example: user@example.com'
       description: Reserved-domain example explicitly framed as documentation
+    - value: 'Asset manifest for the email banner: logo@2x.png, icon@3x.png'
+      description: Retina image asset filenames are rejected by the primary even beside an email label
+    - value: 'Public website contact email: media@agency.gov.au'
+      description: Published generic contact address is vetoed from enforcement by public-contact context
+    - value: 'Media release: for media enquiries email press@agency.gov.au. The customer record system upgrade is complete.'
+      description: News/media-release decoy with email label and record wording is vetoed by public-contact context
+    - value: 'Sample template: customer contact record; contact email: jane.doe@northwind.com.au'
+      description: Template text contains high-tier evidence but is vetoed by the shared exclusion
+    - value: 'Privacy policy: staff must not forward a customer email address or account holder details to personal mailboxes.'
+      description: Policy prose with email and record wording but no address value
+    - value: 'Customer profile URL: https://example.org/people/jane-doe'
+      description: Sibling contact locator contains no email-address primary
 false_positives:
   - description: At symbols in code, formulas, or social media handles.
-    mitigation: Require valid TLD of 2+ characters after the domain dot.
+    mitigation: Require a dotted domain with an alphabetic top-level label after the @.
+  - description: >-
+      Retina-resolution image asset filenames such as logo@2x.png or icon@3x.png structurally satisfy
+      local-part@domain.tld.
+    mitigation: >-
+      The primary rejects @1x-@4x followed by a common image extension; other asset tokens stay at the
+      discovery-only 65 tier unless email evidence is present.
+  - description: >-
+      Source annotations, changelog entries, or CI badge URLs containing an @ followed by a dotted
+      version-like token (e.g. package@1.2.build) can coincidentally satisfy the structural pattern.
+    mitigation: >-
+      Layer with file-type/content-type context (exclude source-code paths) and require email-label
+      evidence at the 75 tier.
+  - description: Published public-contact mailboxes (media enquiries, public website or directory contacts).
+    mitigation: Public-contact context is a NOT-group on the 75 and 85 tiers.
 exports:
   - purview_xml
   - yaml
@@ -105,6 +153,7 @@ purview:
           max_matches: 0
           refs:
             - Evidence_template_exclusion
+            - Evidence_public_email_context
     - confidence_level: 75
       id_match: Pattern_electronic_mail
       matches:
@@ -114,12 +163,13 @@ purview:
           max_matches: 0
           refs:
             - Evidence_template_exclusion
+            - Evidence_public_email_context
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_electronic_mail
   regexes:
     - id: Pattern_electronic_mail
-      pattern: \b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b
+      pattern: '\b[A-Za-z0-9][A-Za-z0-9.!#$%&''*+/=?^_{|}~-]{0,63}@(?![1-4]x\.(?:png|jpe?g|gif|webp|svg)\b)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?){0,7}\.(?:[A-Za-z]{2,24}|xn--[A-Za-z0-9-]{1,59})\b'
   keywords:
     - id: Evidence_correspondence_label
       groups:
@@ -137,6 +187,12 @@ purview:
             - forward to
             - cc
             - bcc
+            - e-mail
+            - contact email
+            - personal email
+            - work email
+            - send an email
+            - mailto
       strength: generic
     - id: Evidence_correspondence_context
       groups:
@@ -149,10 +205,35 @@ purview:
             - subscriber
             - notification
             - communication
+            - customer contact record
+            - contact record
+            - employee directory record
+            - recipient list
+            - client profile
       strength: domain
+    - id: Evidence_public_email_context
+      groups:
+        - match_style: word
+          terms:
+            - public website
+            - public directory
+            - published contact
+            - media enquiries
+            - generic mailbox
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-18'
+updated: '2026-09-24'
+references:
+  - url: https://www.rfc-editor.org/rfc/rfc5322#section-3.4.1
+    title: "RFC 5322 section 3.4.1 (Addr-Spec Specification)"
+  - url: https://www.rfc-editor.org/rfc/rfc5321#section-4.5.3.1.1
+    title: "RFC 5321 section 4.5.3.1.1 (local-part size limit)"
+  - url: https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address
+    title: "WHATWG HTML Living Standard: valid e-mail address"
 changelog:
+  - version: 2.4.0
+    date: '2026-09-24'
+    description: 'Merge global-email-address into this classifier (Qld government classifier review 2026-09-24): adopt its bounded RFC 5322/WHATWG-subset regex as the primary (keeping this pattern''s alphabetic/punycode TLD requirement and adding an @1x-@4x image-asset lookahead), fold in its email-label terms, contact/directory record-context terms, public-contact NOT-group, logo@2x.png and version-token false-positive notes, RFC/WHATWG references, CCPA/CPRA and SOC 2 tags, and carried-over populated positives plus public/template/asset decoys.'
   - version: 2.3.0
     date: '2026-07-18'
     description: 'Profile quality: add bare-address discovery, labelled medium, and independent record-context high tiers; exclude explicit templates and add exact-tier adversarial tests.'

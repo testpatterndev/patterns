@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Individual Name Record
 slug: au-individual-name-record
-version: 2.6.0
+version: 2.7.0
 type: keyword_proximity
 pattern_class: concept
 engine: boost_regex
@@ -13,7 +13,9 @@ operation: >-
   Capitalised two-to-four component name structure is the primary signal. The consolidated Australian
   dictionaries are supporting evidence only: 65 requires either dictionary and is discovery-only, 75
   adds an explicit person-to-name relation plus both dictionary classes, and 85 additionally requires
-  a name-field label. Strong business-suffix and formatted-address collisions veto enforcement.
+  a name-field label (including legal name, legal full name, full legal name, and family name). Placeholder
+  values after a field label (N/A, TBC, Not recorded, Full Name, blanks) do not count as a person relation.
+  Strong business-suffix and formatted-address collisions veto enforcement.
 case_sensitive: true
 confidence: medium
 confidence_justification: >-
@@ -50,6 +52,12 @@ test_cases:
       description: Vietnamese-Australian name pattern
     - value: Employee details for Raj Kumar Singh
       description: Indian-Australian name with context
+    - value: 'Identity verification record 20417 - full legal name: Aaliyah Abbasi; date of birth and document number verified'
+      description: Exact 85 probe carried from global-top500-001-legal-full-name - populated full-legal-name field in an identity record
+    - value: 'Change of name register entry. Family name: Nguyen; given name: Minh Oliver; legal full name: Minh Oliver Nguyen'
+      description: 85 probe - populated legal-full-name, family-name, and given-name fields in one record
+    - value: 'Member recorded as Oliver Bennett; legal name change lodged with the registry.'
+      description: Exact 75 probe - person-to-name relation with both dictionary classes but no labelled name field
   should_not_match:
     - value: Please review the attached quarterly sales figures before Friday.
       description: Generic business text with no name pattern
@@ -63,9 +71,26 @@ test_cases:
       description: Name-field wording and capitalised structure without Australian name-dictionary evidence
     - value: 'Sample: Customer name: Aaliyah Abbasi'
       description: High-like template fixture must be rejected by the shared exclusion dictionary
+    - value: 'Identity Verification Form. Legal full name of the applicant, including given name and family name, exactly as shown on the identity document.'
+      description: Blank-form instruction with the absorbed pattern's label phrasing but no populated name must not enforce
+    - value: 'Full legal name: Not Recorded; family name: TBC'
+      description: Placeholder values after legal-name field labels must not establish a person relation
+    - value: 'Legal name: Full Name'
+      description: Blank-form name placeholder after a legal-name label must not enforce
+    - value: 'Media release: Minister Oliver Bennett announced the legal name change reforms in Parliament today.'
+      description: News decoy with a real-looking name and legal-name phrasing but no record field or person relation stays below enforcement
+    - value: 'Training example: full legal name: Oliver Bennett'
+      description: Training fixture with a populated legal-name field is vetoed by the template exclusion
 false_positives:
   - description: Common surnames such as Brown, Young, or Green appear frequently as everyday words.
     mitigation: Use corroborative evidence keywords to filter. Require PII context.
+  - description: >-
+      Forms, policies, HR templates, and training material use legal-name field labels (legal name, full
+      legal name, family name) without any populated value.
+    mitigation: >-
+      Field labels are only record evidence; enforcement also needs a populated capitalised name with
+      dictionary evidence and a person relation, and placeholder values (N/A, TBC, Not recorded, Full Name,
+      blanks) after the label are rejected.
 exports:
   - purview_xml
   - yaml
@@ -140,9 +165,9 @@ purview:
     - id: Pattern_individual_name
       pattern: \b(?:[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}|[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}|[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20})\b
     - id: Pattern_individual_name_relation
-      pattern: (?i)\b(?:(?:full\s+name|legal\s+name|first\s+name|last\s+name|surname|given\s+name|middle\s+name|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+name|applicant|customer|client|patient|employee|member|holder|contact)\s*(?::|-|is)\s*(?:[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20})|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+(?:identified\s+as|recorded\s+as|named|details\s+for)\s+(?:[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}))\b
+      pattern: (?i)\b(?:(?:full\s+legal\s+name|legal\s+full\s+name|full\s+name|legal\s+name|first\s+name|last\s+name|surname|given\s+name|family\s+name|middle\s+name|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+name|applicant|customer|client|patient|employee|member|holder|contact)\s*(?::|-|is)\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|(?:full|legal|given|first|last|family)\s+name\b|_{2,}|\[|<)(?:[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20})|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+(?:identified\s+as|recorded\s+as|named|details\s+for)\s+(?:[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}))\b
     - id: Pattern_individual_name_field
-      pattern: (?i)\b(?:full\s+name|legal\s+name|first\s+name|last\s+name|surname|given\s+name|middle\s+name|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+name|applicant|customer|client|patient|employee|member|holder|contact)\s*(?::|-|is)\s*
+      pattern: (?i)\b(?:full\s+legal\s+name|legal\s+full\s+name|full\s+name|legal\s+name|first\s+name|last\s+name|surname|given\s+name|family\s+name|middle\s+name|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+name|applicant|customer|client|patient|employee|member|holder|contact)\s*(?::|-|is)\s*
     - id: Pattern_non_person_name_collision
       pattern: (?i)\b(?:(?:engineering|consulting|holdings|services|pty\s+ltd|ltd|limited|company|corporation|council|university)|(?:street|road|avenue|highway|parade|drive|lane|terrace|crescent)\s*,?\s*(?:NSW|QLD|VIC|TAS|SA|WA|NT|ACT|\d{4}))\b
   keywords:
@@ -152,6 +177,10 @@ purview:
           terms:
             - name
             - full name
+            - legal name
+            - legal full name
+            - full legal name
+            - family name
             - first name
             - last name
             - surname
@@ -168,8 +197,11 @@ purview:
             - contact
       strength: domain
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 2.7.0
+    date: '2026-09-24'
+    description: 'Merge global-top500-001-legal-full-name into this classifier (Qld government classifier review 2026-09-24): add legal full name, full legal name, and family name as record-field labels in the relation/field regexes and name-record evidence, add the repo placeholder guard (plus blank-form Full Name/Legal Name values) before relation values, and replace the absorbed bare-phrase tests with populated identity/change-of-name records and blank-form, placeholder, news, and training decoys. The absorbed topic-phrase tiers (label phrase corroborating itself) were not imported.'
   - version: 2.6.0
     date: '2026-07-19'
     description: 'Australian personal-name baseline: make capitalised name structure the primary signal with explicit component alternatives accepted by Purview; wire the consolidated 10,961-forename and 23,065-surname sources through keyword-dictionary references; distinguish dictionary-backed discovery, person-related medium, and explicit-field high tiers; veto strong business/address collisions; remove bare keyword fallback; add exact-tier and adversarial probes.'
