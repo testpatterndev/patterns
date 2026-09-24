@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
 import { purviewBanned } from './lib/purview-banned.mjs'
 import { validateCustomisations } from './lib/customisation.mjs'
+import { loadIdentifiers, validateIdentifier, renderIdentifierDocs } from './lib/identifiers.mjs'
 
 const BASE = fileURLToPath(new URL('..', import.meta.url))
 const patDir = join(BASE, 'data', 'patterns')
@@ -57,6 +58,14 @@ for (const kf of readdirSync(kwDir).filter(f => f.endsWith('.yaml'))) {
   for (const msg of validateCustomisations(d, { isDictionary: true })) errors.push(`${d.slug ?? kf}: ${msg}`)
 }
 
+// Identifier type registry (data/identifiers/*.yaml). Every definition must be fully
+// documented (what it is, labels, public format evidence, fallback, replacement steps and
+// overlay validation) — see scripts/lib/identifiers.mjs. Loaded before the pattern loop so
+// identifier-format customisation entries can be checked against it.
+const identifiers = loadIdentifiers(join(BASE, 'data', 'identifiers'))
+for (const [k, d] of identifiers) for (const msg of validateIdentifier(d)) errors.push(`identifier ${k}: ${msg}`)
+const identifierUsage = new Map()
+
 // Purview (Boost.RegEx) banned constructs — patterns with a purview block fail CI; others
 // warn. Implementation and the live upload evidence behind each rule live in
 // scripts/lib/purview-banned.mjs (tested by scripts/lib/__tests__/purview-banned.test.mjs).
@@ -70,7 +79,14 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   if ('status' in p && !['active', 'deprecated'].includes(p.status)) errors.push(`${f}: status must be active|deprecated, got '${p.status}'`)
   if (p.status === 'deprecated' && !(typeof p.deprecation_reason === 'string' && p.deprecation_reason.trim())) errors.push(`${f}: deprecated pattern requires a non-empty deprecation_reason`)
   if ('deprecation_reason' in p && p.status !== 'deprecated') errors.push(`${f}: deprecation_reason present but status is not 'deprecated'`)
-  for (const msg of validateCustomisations(p, { kwSlugs, isDictionary: false })) errors.push(`${p.slug ?? f}: ${msg}`)
+  for (const msg of validateCustomisations(p, { kwSlugs, isDictionary: false, identifiers })) errors.push(`${p.slug ?? f}: ${msg}`)
+  for (const c of Array.isArray(p.customisation) ? p.customisation : []) {
+    if (c?.kind === 'identifier-format' && c.identifier && p.status !== 'deprecated') {
+      if (!identifierUsage.has(c.identifier)) identifierUsage.set(c.identifier, [])
+      identifierUsage.get(c.identifier).push(p.slug)
+    }
+  }
+  if ('identifier_dependencies' in p) errors.push(`${p.slug ?? f}: identifier_dependencies is superseded — declare customisation entries of kind identifier-format referencing data/identifiers/`)
   if (typeof p.slug === 'string') patternSlugs.add(p.slug)
   if (typeof p.slug === 'string' && p.status === 'deprecated') deprecatedSlugs.add(p.slug)
 
@@ -124,6 +140,16 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   // should_not_match matching the top-level is covered tier-aware by
   // scripts/verify-pattern-testcases.mjs (hard failure for untiered patterns, discovery-aware
   // warning for gated ones), which runs as its own CI gate — no need to duplicate it here.
+}
+
+// ── Identifier guide freshness: docs/identifiers.md is generated from the registry ──
+{
+  const docPath = join(BASE, 'docs', 'identifiers.md')
+  const want = renderIdentifierDocs(identifiers, identifierUsage)
+  if (identifiers.size && (!existsSync(docPath) || readFileSync(docPath, 'utf-8').replace(/\r\n/g, '\n') !== want)) {
+    errors.push('docs/identifiers.md is stale — run `npm run build-identifier-docs` and commit the result')
+  }
+  for (const k of identifiers.keys()) if (!identifierUsage.has(k)) warns.push(`identifier ${k}: defined but not referenced by any classifier`)
 }
 
 // ── Package tag coverage: every pattern must have first-class package metadata ──
