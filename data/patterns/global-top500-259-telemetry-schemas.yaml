@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Telemetry schemas
 slug: global-top500-259-telemetry-schemas
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -40,6 +40,9 @@ test_cases:
     description: Alternative topic phrase match
   - value: application insights
     description: Additional topic phrase match
+  - value: "metrics collection\n{\n  \"event_name\": \"string\",\n  \"session_id\": \"uuid\",\n  \"user_id\": \"string\",\n  \"client_ip\": \"string\",\n  \"timestamp\": \"datetime\"\n}"
+    description: Populated schema record reaching the 75/85 structure gate
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -47,6 +50,8 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: source code config
     description: Generic word pair from old broad template should not match
+  - value: "Policy guidance: this procedure explains how records about metrics collection are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Authentication-related terminology in software documentation, security training materials, or system architecture
     descriptions without actual credentials.
@@ -65,71 +70,47 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 85
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_telemetry_schemas
-    matches:
-    - ref: Pattern_global_top500_259_telemetry_schemas_label_context
-    - ref: Keyword_global_top500_259_telemetry_schemas_domain_context
-    - ref: Keyword_telemetry_schemas
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_telemetry_schemas
-    matches:
-    - ref: Pattern_global_top500_259_telemetry_schemas_label_context
-    - ref: Keyword_global_top500_259_telemetry_schemas_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_telemetry_schemas
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_telemetry_schemas
+      matches:
+        - ref: Regex_global_top500_259_telemetry_schemas_record_structure
+          min_count: 3
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_telemetry_schemas
+      matches:
+        - ref: Regex_global_top500_259_telemetry_schemas_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_telemetry_schemas
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_telemetry_schemas
-    pattern: (?is)\b(?:metrics\s+collection|event\s+tracking|data\s+pipeline|application\s+insights|open\s+telemetry|trace\s+data|span\s+definition|metric\s+definition)\b
-  - id: Pattern_global_top500_259_telemetry_schemas_label_context
-    pattern: (?i)\b(?:telemetry\s+schemas)\b
-  keywords:
-  - id: Keyword_telemetry_schemas
-    groups:
-    - match_style: word
-      terms:
-      - telemetry
-      - schema
-      - instrumentation
-      - metrics collection
-      - event tracking
-      - data pipeline
-      - observability
-      - application insights
-      - open telemetry
-      - trace data
-      - span definition
-      - metric definition
-    strength: specific
-  - id: Keyword_global_top500_259_telemetry_schemas_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - telemetry schemas
-      - telemetry
-      - schemas
-    strength: domain
+    - id: Regex_telemetry_schemas
+      pattern: (?is)\b(?:metrics\s+collection|event\s+tracking|data\s+pipeline|application\s+insights|open\s+telemetry|trace\s+data|span\s+definition|metric\s+definition)\b
+    - id: Regex_global_top500_259_telemetry_schemas_record_structure
+      pattern: >-
+        (?i)"[a-z][a-z0-9_]{1,40}"\s*:\s*"(?:string|str|int|integer|long|float|double|number|bool|boolean|timestamp|datetime|date|uuid|guid|array|object|map|keyword|text)"|\b[a-z][a-z0-9_]{1,40}\s*:\s*(?:string|int|integer|long|float|double|bool|boolean|timestamp|datetime|uuid|guid|keyword)\b|\b(?:span_id|trace_id|session_id|device_id|user_id|event_name|event_type|client_ip)\b
 risk_description: The pattern recognises metrics collection, event tracking, data pipeline, or Application Insights language,
   indicating telemetry-design material without validating an actual schema. A genuine schema can expose event names, identifiers,
   operational signals, data routes, and monitoring coverage, enabling evasion, privacy inference, or targeted disruption of
@@ -145,8 +126,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent schema record structure (Regex ..._record_structure); 85 requires 3 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
 - version: 1.2.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1818 without changing
