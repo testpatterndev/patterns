@@ -1,50 +1,65 @@
 schema: testpattern/v1
 name: Strategic Plan/Roadmap
 slug: global-strategic-plan-roadmap
-version: 1.4.1
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
-description: Detects strategic plans, product roadmaps, and long-term business planning documents.
+description: >-
+  Detects populated internal strategic plans, product/technology roadmaps and business cases: the plan/roadmap/business-case phrase combined with document-control fields, dated roadmap milestones or financial targets. Public strategy statements and phrase-only mentions stay discovery-only.
 operation: >-
-  Keyword-based detection matching strategic plan, roadmap, go-to-market, and business case patterns. Corroborative
-  evidence: 13 keywords within 300 characters.
+  Pattern type: regex (boost_regex). Primary: strategic plan/planning/initiative, 3/5-year plan, product/technical/engineering/technology roadmap, roadmap document, business case, case for change, project initiation/charter. 65 (discovery only): primary alone. 75: primary plus one populated structure - document-control field (prepared by, owner, sponsor, approved by, version, review date, classification), a dated milestone line (e.g. 'Q3 FY27: Launch...'), or a financial line (revenue target, EBITDA, budget, investment, capex, funding, NPV, cost estimate) with a dollar value. 85: primary plus two distinct structures (the three above or a labelled KPI/OKR target percentage) plus an internal-distribution marker (confidential, internal only, not for distribution, commercial-in-confidence, embargoed). Template/sample and guidance/public-consultation framing excluded on every enforce tier.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Enforce tiers require populated document-control, milestone or financial structure; published strategy statements and consultation pages stay at 65 and 85 additionally needs a confidentiality marker. Medium-low signal: strategy content has no fixed format, and public-sector strategic plans with version tables can reach 75.
 jurisdictions:
   - global
 regulations:
-- "AML/CTF Act (Cth)"
-- "IPA 2009 (Qld)"
-- "Privacy Act 1988 (Cth)"
+  - IPA 2009 (Qld)
+  - Privacy Act 1988 (Cth)
 frameworks:
-- ISO 27001
-- NIST CSF
-- PCI-DSS
+  - ISO 27001
+  - NIST CSF
+  - PCI-DSS
 data_categories:
   - intellectual-property
   - business
 test_cases:
   should_match:
-    - value: 'Strategic plan 2026-2029: go-to-market strategy and roadmap'
-      description: Test match 1
-    - value: Product roadmap with strategic initiative priorities for implementation plan
-      description: Test match 2
-    - value: Business case and project charter for five-year plan
-      description: Test match 3
+    - value: "CONFIDENTIAL - NOT FOR DISTRIBUTION\nProduct roadmap FY27\nOwner: Alex Moreau, Chief Product Officer\nQ1 FY27: Launch instant payouts in New Zealand\nQ3 FY27: Retire legacy merchant portal\nInvestment: $4,800,000 capex approved by the executive committee."
+      description: Confidential roadmap - owner, dated milestones and investment (85)
+      synthetic: true
+    - value: "Strategic plan 2026-2029 (draft)\nPrepared by: Strategy and Performance Unit\nCirculated to the executive leadership team for comment."
+      description: Draft plan with a single document-control field (75)
+      synthetic: true
+    - value: "Business case and project charter for five-year plan"
+      description: Phrase-only mention (65 discovery)
   should_not_match:
-    - value: A strategic location near the highway
-      description: Non-match 1
-    - value: Plan your holiday itinerary
-      description: Non-match 2
+    - value: "Our published strategic plan sets five strategic objectives for 2026-2030. Have your say on the draft through community consultation until 30 November."
+      description: Published strategic plan consultation page
+      synthetic: true
+    - value: "STRATEGIC PLAN\nPrepared by: __________\nVersion: ____\nQ1: __________\nInvestment: $__________"
+      description: Blank plan form - placeholder values
+      synthetic: true
+    - value: "The retailer's five-year plan, outlined to analysts on Thursday, targets 20% online sales growth, a news report said."
+      description: News item
+      synthetic: true
+    - value: "A strategic location near the highway"
+      description: Unrelated strategic wording
+      synthetic: true
+    - value: "Plan your holiday itinerary"
+      description: Unrelated plan wording
+      synthetic: true
 false_positives:
-  - description: Generic use of strategic or plan in non-business contexts.
-    mitigation: Require business planning keywords like roadmap, GTM, or implementation plan.
+  - description: Published strategic plans, annual reports and consultation pages.
+    mitigation: Public framing is excluded and 85 requires an internal-distribution marker; populated public plans can still reach 75.
+  - description: Generic project documents using business case language.
+    mitigation: Business-case phrasing alone is discovery-only; enforce tiers need populated structure.
 exports:
   - yaml
 scope: narrow
 risk_rating: 5
 risk_description: >-
-  This TestPattern keyword concept detects strategic plan, roadmap, go-to-market, business-case, project-charter, and long-term implementation language. Public corporate or agency plans, routine project documents, and generic product roadmaps can match without revealing a confidential decision or competitive commitment. A detailed unpublished roadmap may be valuable, but the detector alone does not establish material priorities, investment, dependencies, release dates, or negotiation positions. Risk 5 and OFFICIAL are proportionate; SENSITIVE would require those actionable non-public strategic details in a current plan.
+  This TestPattern keyword concept detects strategic plan, roadmap, go-to-market, business-case, project-charter, and long-term implementation language. Public corporate or agency plans, routine project documents, and generic product roadmaps can match without revealing a confidential decision or competitive commitment. A detailed unpublished roadmap may be valuable, but the detector alone does not establish material priorities, investment, dependencies, release dates, or negotiation positions. Risk 5 and OFFICIAL are proportionate; SENSITIVE would require those actionable non-public strategic details in a current plan. Quality pass 2026-09-24: enforce tiers (75/85) now require populated record structure (labelled fields with real values, identifiers or data rows); phrase-only mentions in guidance, marketing, blank forms and news stay at 65 discovery.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -62,29 +77,46 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_strategic_plan
+      id_match: &id001
+        type: any
+        ids:
+          - Regex_strategic_plan
+          - Regex_roadmap
+          - Regex_business_case
       matches:
-        - ref: Keyword_strategy
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_global_strategic_plan_roadmap_document_control
+            - Regex_global_strategic_plan_roadmap_milestone
+            - Regex_global_strategic_plan_roadmap_financial
+            - Regex_global_strategic_plan_roadmap_kpi
         - ref: Keyword_confidential
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_strategic_plan_roadmap_guidance_exclusion
     - confidence_level: 75
-      id_match: Regex_roadmap
+      id_match: *id001
       matches:
-        - ref: Keyword_strategy
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_global_strategic_plan_roadmap_document_control
+            - Regex_global_strategic_plan_roadmap_milestone
+            - Regex_global_strategic_plan_roadmap_financial
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_strategic_plan_roadmap_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_business_case
+      id_match: *id001
       matches:
-        - ref: Keyword_planning
         - type: any
           min_matches: 0
           max_matches: 0
@@ -92,27 +124,20 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_strategic_plan
-      pattern: (?i)\b(?:strategic\s+(?:plan|planning|initiative)|(?:3|5|three|five)[\s\-]?year\s+plan)\b
+      pattern: (?i)\b(?:strategic\s+(?:plan|planning|initiative)|(?:3|5|three|five)[\s-]?year\s+plan)\b
     - id: Regex_roadmap
-      pattern: (?i)\b(?:(?:product|technical|engineering)\s+roadmap|roadmap\s+document)\b
+      pattern: (?i)\b(?:(?:product|technical|engineering|technology)\s+roadmap|roadmap\s+document)\b
     - id: Regex_business_case
       pattern: (?i)\b(?:business\s+case|case\s+for\s+change|project\s+(?:initiation|charter))\b
+    - id: Regex_global_strategic_plan_roadmap_document_control
+      pattern: (?i)\b(?:prepared\s+by|(?:document\s+|executive\s+)?owner|(?:executive\s+)?sponsor|approved\s+by|version|review\s+date|classification)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)[A-Z0-9$][A-Za-z0-9/&'.,$%-]{0,40}(?:[ \t]{1,3}[A-Za-z0-9&$][A-Za-z0-9/&'.,$%-]{0,30}){0,5}
+    - id: Regex_global_strategic_plan_roadmap_milestone
+      pattern: (?i)\b(?:Q[1-4]|H[12])[ \t]{0,2}(?:FY)?[ \t]{0,2}(?:20)?\d{2}(?:/\d{2})?[ \t]{0,3}[:–-][ \t]{0,3}[A-Z][a-z]{2,}
+    - id: Regex_global_strategic_plan_roadmap_financial
+      pattern: (?i)\b(?:revenue(?:\s+target)?|EBITDA|budget|investment|capex|opex|funding(?:\s+required)?|NPV|cost(?:\s+estimate)?|target\s+savings)[ \t]{0,3}[:#][ \t]{0,3}(?:AUD|USD|NZD|GBP|EUR|A\$|US\$|NZ\$|\$|£|€)[ \t]?(?:\d{1,3}(?:,\d{3}){1,4}|\d{1,12})(?:\.\d{2})?(?![\d,]\d)(?!\.\d)
+    - id: Regex_global_strategic_plan_roadmap_kpi
+      pattern: (?i)\b(?:target|KPI|OKR|key\s+result)[ \t]{0,3}[:#][^\n]{0,60}?\d{1,3}(?:\.\d)?[ \t]?%
   keywords:
-    - id: Keyword_strategy
-      groups:
-        - match_style: word
-          terms:
-            - strategy
-            - strategic direction
-            - strategic priorities
-            - strategic objectives
-            - strategic plan
-            - strategic initiative
-            - roadmap
-            - go-to-market
-            - text: GTM
-              case_sensitive: true
-      strength: domain
     - id: Keyword_confidential
       groups:
         - match_style: word
@@ -128,21 +153,45 @@ purview:
             - FOR AUTHORISED RECIPIENTS ONLY
             - DO NOT DISTRIBUTE
             - DO NOT FORWARD
-      strength: specific
-    - id: Keyword_planning
+            - commercial-in-confidence
+      strength: domain
+    - id: Keyword_global_strategic_plan_roadmap_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - planning
-            - business case
-            - project initiation
-            - project charter
-            - risk register
-            - implementation plan
-      strength: specific
+            - policy guidance
+            - guidance note
+            - this guideline
+            - this procedure
+            - fact sheet
+            - training module
+            - e-learning
+            - course notes
+            - media release
+            - press release
+            - news report
+            - frequently asked questions
+            - best practice guide
+            - white paper
+            - whitepaper
+            - webinar
+            - how-to guide
+            - user guide
+            - help centre article
+            - help center article
+            - strategic location
+            - holiday itinerary
+            - published strategic plan
+            - community consultation
+            - have your say
+      strength: noise
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: >-
+      Quality pass (2026-09-24): the 75 tier fired on 'Product roadmap' alone and 85 evidence repeated the primary ('strategic plan', 'strategic initiative'); all three primaries now share one ladder: 75 needs a populated document-control, dated-milestone or financial field and 85 needs two distinct structures plus an internal-distribution marker; converted type keyword_list -> regex (boost_regex) with a top-level pattern; added populated positives reaching 75 and 85 and consultation, blank-form and news decoys; dropped AML/CTF Act and added a verified ASX Listing Rules reference.
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 600 without changing detector or package metadata.'
@@ -176,3 +225,21 @@ keywords:
   - implementation plan
   - three-year plan
   - five-year plan
+pattern: (?i)\b(?:strategic\s+(?:plan|planning|initiative)|(?:3|5|three|five)[\s-]?year\s+plan)\b
+engine: boost_regex
+references:
+  - title: ASX Listing Rules and guidance notes (continuous disclosure of market-sensitive plans)
+    url: https://www.asx.com.au/about/regulation/rules-guidance-notes-and-waivers/asx-listing-rules-guidance-notes-and-waivers
+corroborative_evidence:
+  keywords:
+    - confidential
+    - restricted
+    - internal only
+    - not for distribution
+    - limited distribution
+    - EMBARGOED
+    - DRAFT - NOT FOR CIRCULATION
+    - FOR AUTHORIZED RECIPIENTS ONLY
+    - FOR AUTHORISED RECIPIENTS ONLY
+    - DO NOT DISTRIBUTE
+  proximity: 300

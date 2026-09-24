@@ -1,19 +1,15 @@
 schema: testpattern/v1
 name: Sealed court filing records
 slug: global-top500-416-sealed-court-filing-records
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies documents containing references to sealed court filing records in international contexts. This information
-  type is classified as personally identifiable information under applicable data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 1 keywords within 240 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:sealed\s+record|sealed\s+filing|court\s+seal|sealed\s+indictment|sealed\s+order|under\s+seal|sealed\s+docket|confidential\s+filing|sealed\s+proceeding|restricted\s+access|sealed\s+court\s+order|expunged\s+record)\b
+description: Identifies sealed or suppressed court filings (documents filed under seal, sealed orders and indictments, suppression / non-publication orders) with populated proceeding and party fields.
+operation: 'Primary: sealed record/filing/indictment/order/docket/proceeding, under seal, court seal, confidential filing, sealed court order, expunged record, suppression or non-publication order. 65 (discovery only) = primary alone. 75 = primary plus one populated proceeding or party field (proceeding/case/court/file number, applicant, respondent, defendant, accused, witness, victim, name, date of birth ...) with a non-placeholder value. 85 = primary plus two distinct populated fields plus independent filing evidence (affidavit, exhibit, sealed by order, not to be published, protected witness, pseudonym, in camera, closed court, registry). All tiers exclude template/fixture text.'
+pattern: (?is)\b(?:sealed\s+record|sealed\s+filing|court\s+seal|sealed\s+indictment|sealed\s+order|under\s+seal|sealed\s+docket|confidential\s+filing|sealed\s+proceeding|sealed\s+court\s+order|expunged\s+record|(?:suppression|non[\s-]publication)\s+order)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: 'Medium: sealing vocabulary is common in court rules, guidance and court reporting, so enforcement requires populated proceeding/party fields; 85 adds filing evidence the primary does not match.'
 jurisdictions:
 - global
 regulations:
@@ -21,28 +17,48 @@ regulations:
 - IPA 2009 (Qld)
 - Privacy Act 1988 (Cth)
 data_categories:
-- pii
+  - legal
+  - pii
 corroborative_evidence:
   keywords:
   - sealed court filing records
   proximity: 240
 test_cases:
   should_match:
-  - value: sealed record
-    description: Primary topic phrase match
-  - value: sealed filing
-    description: Case-insensitive topic phrase match
-  - value: court seal
-    description: Alternative topic phrase match
-  - value: sealed indictment
-    description: Additional topic phrase match
+    - value: |-
+        UNDER SEAL - not to be published
+        Supreme Court of Queensland
+        Proceeding number: BS 4471/26
+        Applicant: Harbour Freight Pty Ltd
+        Respondent: Jordan Staffson
+        Affidavit of Avery Teston with exhibits AT-1 to AT-9, sealed by order of the Court on 12/08/2026.
+      description: 85 - sealed filing with populated proceeding/party fields and affidavit/exhibit evidence
+      synthetic: true
+    - value: |-
+        Sealed filing notice
+        Case number: CV-2026-004471
+        The document is withheld from the public file pending the hearing.
+      description: 75 - one populated proceeding field without filing evidence
+      synthetic: true
+    - value: Suppression order copy placed on the matter file.
+      description: 65 discovery - topic phrase without populated fields
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
-  - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: mugshot victim
-    description: Generic word pair from old broad template should not match
+    - value: unrelated generic text without domain phrases
+      description: No relevant topic phrases present
+    - value: mugshot victim
+      description: Generic word pair should not match
+    - value: Court rules explain when a party may ask for a sealed filing and how the registry handles documents kept under seal.
+      description: Guidance - no populated fields (65 at most)
+    - value: |-
+        Application to file under seal
+        Proceeding number: ________
+        Applicant: ________
+        Respondent: [name]
+      description: Blank application form - placeholder fields are rejected
+    - value: A judge ordered the documents to remain under seal, the court heard on Tuesday.
+      description: Court reporting - no populated fields
+    - value: Access to the staff intranet is restricted access only.
+      description: Generic IT "restricted access" wording no longer matches the primary
 false_positives:
 - description: Common words and phrases related to sealed court filing records appearing in policy documents, training materials,
     HR templates, or compliance guidelines without actual personal data.
@@ -62,75 +78,64 @@ exports:
 - regex_copy
 scope: wide
 purview:
-  patterns_proximity: 240
-  recommended_confidence: 85
+  patterns_proximity: 300
+  recommended_confidence: 75
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_sealed_court
-    matches:
-    - ref: Pattern_global_top500_416_sealed_court_filing_records_label_context
-    - ref: Keyword_global_top500_416_sealed_court_filing_records_domain_context
-    - ref: Keyword_sealed_court
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_sealed_court
-    matches:
-    - ref: Pattern_global_top500_416_sealed_court_filing_records_label_context
-    - ref: Keyword_global_top500_416_sealed_court_filing_records_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_sealed_court
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_sealed_court
+      matches:
+        - ref: Regex_global_top500_416_sealed_court_filing_records_record_structure
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_sealed_filing_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_sealed_court
+      matches:
+        - ref: Regex_global_top500_416_sealed_court_filing_records_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_sealed_court
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_sealed_court
-    pattern: (?is)\b(?:sealed\s+record|sealed\s+filing|court\s+seal|sealed\s+indictment|sealed\s+order|under\s+seal|sealed\s+docket|confidential\s+filing|sealed\s+proceeding|restricted\s+access|sealed\s+court\s+order|expunged\s+record)\b
-  - id: Pattern_global_top500_416_sealed_court_filing_records_label_context
-    pattern: (?i)\b(?:sealed\s+court\s+filing\s+records)\b
+    - id: Regex_sealed_court
+      pattern: (?is)\b(?:sealed\s+record|sealed\s+filing|court\s+seal|sealed\s+indictment|sealed\s+order|under\s+seal|sealed\s+docket|confidential\s+filing|sealed\s+proceeding|sealed\s+court\s+order|expunged\s+record|(?:suppression|non[\s-]publication)\s+order)\b
+    - id: Regex_global_top500_416_sealed_court_filing_records_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|suspect|subject\s+(?:name|person)|person\s+of\s+interest|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#)|plaintiff|(?:proceeding|docket|claim|indictment)\s*(?:no\.?|number)|judge|registrar|date\s+filed)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-  - id: Keyword_sealed_court
-    groups:
-    - match_style: word
-      terms:
-      - sealed record
-      - sealed filing
-      - court seal
-      - sealed indictment
-      - sealed order
-      - under seal
-      - sealed docket
-      - confidential filing
-      - sealed proceeding
-      - restricted access
-      - sealed court order
-      - expunged record
-    strength: specific
-  - id: Keyword_global_top500_416_sealed_court_filing_records_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - sealed court filing records
-      - sealed
-      - court
-      - filing
-    strength: domain
+    - id: Keyword_sealed_filing_evidence
+      groups:
+        - match_style: word
+          terms:
+            - affidavit
+            - exhibit
+            - exhibits
+            - sealed by order
+            - not to be published
+            - protected witness
+            - pseudonym
+            - in camera
+            - closed court
+            - registry
+      strength: specific
 risk_description: This concept regex identifies sealed filings, sealed records, court seals, and sealed indictments with nearby
   legal context. A genuine filing may contain allegations, evidence, protected identities, or facts withheld from public access,
   so premature release can prejudice proceedings or defeat the court's protective purpose. The normal bounded filing creates
@@ -146,26 +151,23 @@ sensitivity_labels:
   nz_gov: CONFIDENTIAL
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
-- version: 1.2.1
-  date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1960 without changing
-    detector or package metadata.'
-- version: 1.2.0
-  date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
-- version: 1.1.1
-  date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
-- version: 1.1.0
-  date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  - version: 1.3.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): 75 now requires a populated proceeding/party field (new Regex_..._record_structure, justice family plus proceeding/docket labels) instead of label/domain phrases; 85 requires two distinct fields plus filing evidence (new Keyword_sealed_filing_evidence; the old evidence group repeated the primary). Primary drops the generic "restricted access" and adds suppression / non-publication order. Removed the label-context regex and self-overlapping groups; proximity 240 -> 300; recommended_confidence 85 -> 75. Replaced bare-phrase positives with populated synthetic filings; added guidance, blank-form, court-reporting and IT-wording decoys. data_categories pii -> legal, pii. No references added: no verifiable primary-source page was reachable.'
+  - version: 1.2.1
+    date: '2026-07-14'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1960 without changing detector or package metadata.'
+  - version: 1.2.0
+    date: '2026-07-09'
+    description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
+  - version: 1.1.1
+    date: '2026-07-09'
+    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.1.0
+    date: '2026-07-04'
+    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 references: []

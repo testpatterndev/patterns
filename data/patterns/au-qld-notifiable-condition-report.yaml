@@ -1,21 +1,24 @@
 schema: testpattern/v1
 name: QLD Notifiable Condition Report
 slug: au-qld-notifiable-condition-report
-version: 1.4.2
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
-description: Detects QLD notifiable condition reports for public health surveillance and disease notifications.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+description: >-
+  Detects Queensland notifiable condition reports - notifiable condition or disease notifications, communicable disease reports and public health notifications made under the Public Health Act 2005 (Qld) - when the phrase sits with populated case identifiers and notification fields.
+operation: >-
+  Primary: notifiable condition/disease report or notification, communicable disease report, public health notification, disease notification or surveillance, reportable condition/disease. 65 (discovery only): phrase alone. 75: phrase plus a populated patient/case identifier field. 85: identifier field plus a populated notification field (condition, organism, onset date, specimen/collection date, test result, notifying doctor or laboratory, vaccination status, occupation, setting) plus independent public-health response evidence (contact tracing, case investigation, outbreak, public health unit, Public Health Act 2005, close contacts, exclusion period). Template and guidance/training framing excluded from 75/85. Converted from keyword_list to regex.
+pattern: (?i)\b(?:notifiable\s+(?:condition|disease)\s+(?:report|notification)|communicable\s+disease\s+report|public\s+health\s+notification|disease\s+(?:surveillance|notification)|reportable\s+(?:condition|disease))\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium: enforce tiers need a populated case identifier; 85 also needs a notification field and public-health response evidence. Surveillance dashboards, guidelines and news carry the phrases without a case and stay at 65.
 jurisdictions:
   - au
 regulations:
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - Public Health Act 2005 (Qld)
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -26,25 +29,25 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: Notifiable condition report issued
-      description: Exact 65 discovery probe with a report phrase and no case detail
-    - value: Notifiable condition report with contact tracing
-      description: Exact 75 probe with public-health case response context
-    - value: Notifiable condition report under Public Health Act 2005 with contact tracing
-      description: Exact 85 probe with case response and statutory context
-    - value: 'Notifiable condition report: communicable disease notification with contact tracing to public health unit'
-      description: Communicable disease notification to a public health unit
-    - value: QLD Health notifiable condition notification with contact tracing and surveillance data
-      description: QLD Health case notification with surveillance details
-    - value: Public health notification for outbreak notification and case notification
-      description: Test match 3
+    - value: "NOTIFIABLE CONDITION REPORT - Pathology Queensland\nPatient name: Riley Ashworth\nDOB: 14/05/2019\nMedicare number: 2953 17720 1\nCondition: Pertussis\nSpecimen date: 15/09/2026\nNotifying laboratory: Pathology Queensland Central\nPublic health unit commenced contact tracing of close contacts at childcare."
+      description: Populated notification with case, notification fields and public-health response (85)
+      synthetic: true
+    - value: "Disease notification received\nPatient: Morgan Ellisdale\nURN: 118204"
+      description: Notification with labelled case identifiers only (75)
+      synthetic: true
   should_not_match:
-    - value: Notification of scheduled maintenance
+    - value: "Notification of scheduled maintenance"
       description: Non-match 1
-    - value: Disease prevention tips
+    - value: "Disease prevention tips"
       description: Non-match 2
-    - value: Reportable disease dashboard redesign
+    - value: "Reportable disease dashboard redesign"
       description: Product dashboard phrase must remain discovery-only
+    - value: "Policy guidance: this procedure explains how notifiable condition report forms are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Notifiable condition report form\nPatient name: ____________________\nDate of birth: ____________________\nCondition: ____________________\nOnset date: ____________________\nNotifying doctor: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: disease surveillance data show a rise in pertussis notifications, and public health units are urging parents to check vaccination status."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: Generic notification or disease in non-surveillance contexts.
     mitigation: Require notifiable condition or public health notification specific terms.
@@ -53,7 +56,7 @@ exports:
 scope: narrow
 risk_rating: 8
 risk_description: >-
-  This keyword classifier detects Queensland public-health notifications containing a notifiable condition, communicable-disease case, contact tracing, surveillance, outbreak, or case-notification language. A genuine report can identify an infected person, diagnosis, exposure contacts, locations, and public-health action, enabling stigma, retaliation, evasion of controls, or harm to an active investigation. The ordinary case is bounded to one notification or cluster rather than the full surveillance system, but its disclosure still creates serious individual and operational consequences. Risk 8 and SENSITIVE are justified; PROTECTED would require a major outbreak operation, protected source intelligence, or disclosure causing significant population-safety damage.
+  The detector recognises Queensland notifiable condition and disease notification language and enforces only when populated case identifier fields sit nearby; phrase-only text stays at 65 discovery. A genuine report can identify an infected person, diagnosis, exposure contacts, locations, and public-health action, enabling stigma, retaliation, evasion of controls, or harm to an active investigation. The ordinary case is bounded to one notification or cluster rather than the full surveillance system, but its disclosure still creates serious individual and operational consequences. Risk 8 and SENSITIVE are justified; PROTECTED would require a major outbreak operation, protected source intelligence, or disclosure causing significant population-safety damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -64,109 +67,85 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match:
-        type: any
-        ids:
-          - Pattern_notifiable_condition
-          - Pattern_disease_report
+      id_match: Pattern_notifiable_condition
       matches:
+        - ref: Regex_au_qld_notifiable_condition_report_case_fields
+        - ref: Regex_au_qld_notifiable_condition_report_notification_fields
         - ref: Evidence_case_response_context
-        - ref: Evidence_public_health_act
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_notifiable_condition_report_guidance_exclusion
     - confidence_level: 75
-      id_match:
-        type: any
-        ids:
-          - Pattern_notifiable_condition
-          - Pattern_disease_report
+      id_match: Pattern_notifiable_condition
       matches:
-        - ref: Evidence_case_response_context
+        - ref: Regex_au_qld_notifiable_condition_report_case_fields
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_notifiable_condition_report_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match:
-        type: any
-        ids:
-          - Pattern_notifiable_condition
-          - Pattern_disease_report
+      id_match: Pattern_notifiable_condition
       matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_notifiable_condition
-      pattern: (?i)\b(?:notifiable\s+(?:condition|disease)\s+(?:report|notification)|communicable\s+disease\s+report|public\s+health\s+notification)\b
-    - id: Pattern_disease_report
-      pattern: (?i)\b(?:disease\s+(?:surveillance|notification)|reportable\s+(?:condition|disease))\b
+      pattern: (?i)\b(?:notifiable\s+(?:condition|disease)\s+(?:report|notification)|communicable\s+disease\s+report|public\s+health\s+notification|disease\s+(?:surveillance|notification)|reportable\s+(?:condition|disease))\b
+    - id: Regex_au_qld_notifiable_condition_report_case_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|patient(?:\s+name)?|URN|UR\s*(?:no\.?|number)|MRN|medical\s+record\s+(?:no\.?|number)|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|IHI|DVA\s+(?:no\.?|number)|(?:patient|client|hospital|case|file|episode)\s*(?:no\.?|number|ID)|(?:referring|treating|requesting)\s+(?:doctor|practitioner|clinician|psychiatrist)|clinician|consultant)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_au_qld_notifiable_condition_report_notification_fields
+      pattern: (?i)\b(?:condition|disease|organism|pathogen|onset\s+date|date\s+of\s+onset|specimen\s+(?:date|type)|collection\s+date|test\s+result|result|notifying\s+(?:doctor|laboratory|practitioner)|laboratory|vaccination\s+status|occupation|setting)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_notifiable_disease
-      groups:
-        - match_style: word
-          terms:
-            - notifiable condition
-            - notifiable disease
-            - communicable disease
-            - reportable disease
-            - disease notification
-            - public health notification
-            - NOCS
-      strength: specific
-    - id: Evidence_public_health_act
-      groups:
-        - match_style: word
-          terms:
-            - Public Health Act 2005
-            - Section 70
-            - Section 71
-            - Public Health Regulation
-            - Schedule 1
-            - public health unit
-      strength: specific
-    - id: Evidence_qld_health_forms
-      groups:
-        - match_style: word
-          terms:
-            - Queensland Health
-            - Hospital and Health Service
-            - text: HHS
-              case_sensitive: true
-            - health.qld.gov.au
-            - QH-IMP
-            - Pathology Queensland
-            - Clinical Excellence Queensland
-      strength: specific
     - id: Evidence_case_response_context
       groups:
         - match_style: word
           terms:
             - contact tracing
             - case investigation
-            - laboratory confirmation
             - outbreak
-            - patient
-            - specimen
-            - surveillance data
+            - public health unit
+            - Public Health Act 2005
+            - close contacts
+            - exclusion period
+            - laboratory confirmed
       strength: specific
+    - id: Keyword_au_qld_notifiable_condition_report_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75/85 were gated by generic case-response words only. 75 now needs a populated case identifier and 85 needs case fields plus a notification field (condition, organism, onset/specimen date, notifying lab) plus public-health response evidence. Bare-phrase tests replaced with populated records plus policy, blank-form and news decoys. Regulations: removed HRIPA (Cth) and My Health Records Act 2012 (Cth), added Public Health Act 2005 (Qld); references added."
   - version: 1.4.2
     date: '2026-07-19'
     description: 'Targeted finance/health blocker remediation: keep report phrases at 65 discovery, require independent case-response evidence at 75 and Public Health Act context at 85, with exact-tier and notification-software probes.'
@@ -207,3 +186,10 @@ remediation:
       - 'Mapped non-canonical confidence 80 to 75.'
       - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
       - 'Aligned recommended_confidence to 85.'
+references:
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2005-048
+    title: Public Health Act 2005 (Qld)
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+    title: Information Privacy Act 2009 (Qld)
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)

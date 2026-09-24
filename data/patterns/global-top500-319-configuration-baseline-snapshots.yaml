@@ -1,72 +1,91 @@
 schema: testpattern/v1
 name: Configuration baseline snapshots
 slug: global-top500-319-configuration-baseline-snapshots
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies configuration baseline snapshots patterns in security and access control contexts. Detects potential
-  exposure of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 6 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:configuration\s+baseline|baseline\s+snapshot|system\s+configuration|configuration\s+management|golden\s+image|configuration\s+audit|endpoint\s+management|hardening\s+baseline|security\s+baseline)\b
+description: >-
+  Detects configuration baseline snapshots: baseline/snapshot wording with actual device or OS configuration lines and populated snapshot metadata. Topic wording alone is discovery-only.
+operation: >-
+  Regex_config_baseline_primary (configuration baseline, baseline snapshot, golden image, CIS/STIG/SOE baseline or config-snapshot wording) is discovery-only at 65. 75 requires the primary plus one populated structure: a device or OS configuration line (hostname/interface/ip address/snmp-server/access-list, Junos set, password/lockout/UAC/sshd settings) or a populated snapshot metadata field (captured/snapshot date, baseline version, device, OS version, build, firmware). 85 requires a device or OS configuration line (hostname/interface/ip address/snmp-server/access-list, Junos set, password/lockout/UAC/sshd settings) (two distinct hits), a populated snapshot metadata field (captured/snapshot date, baseline version, device, OS version, build, firmware), and independent compliance-drift (drift, deviation, compliant, hardening) evidence that does not repeat the primary. Every enforce tier rejects template/noise wording (template-exclusion) and guidance, policy, training and news framing (Keyword_config_baseline_guidance_exclusion).
+pattern: >-
+  (?i)\b(?:configuration\s+baseline|baseline\s+(?:configuration|snapshot|build)|golden\s+(?:image|config(?:uration)?)|(?:CIS|STIG|SOE)\s+baseline|running[\s-]config(?:uration)?\s+(?:backup|snapshot)|config(?:uration)?\s+snapshot)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: the topic phrase alone is discovery-only; enforcement needs populated structure (a device or OS configuration line (hostname/interface/ip address/snmp-server/access-list, Junos set, password/lockout/UAC/sshd settings) or a populated snapshot metadata field (captured/snapshot date, baseline version, device, OS version, build, firmware)), and 85 needs two distinct structures plus independent compliance-drift (drift, deviation, compliant, hardening) evidence, so policies, blank forms and training text stay below 75.
 jurisdictions:
 - global
 regulations:
-- GDPR
+- SOCI Act 2018 (Cth)
+frameworks:
+- ISO 27001
+- NIST CSF
+- CIS Controls
 data_categories:
-- credentials
 - security
 corroborative_evidence:
   keywords:
-  - configuration baseline snapshots
-  - configuration
-  - baseline
-  - snapshots
-  - operations
-  - resilience
+  - drift
+  - deviation
+  - non-compliant
+  - compliant
+  - hardening
+  - approved baseline
+  - CIS Benchmark
+  - checksum
+  - version control
+  - remediation
   proximity: 300
 test_cases:
   should_match:
-  - value: configuration baseline
-    description: Primary topic phrase match
-  - value: baseline snapshot
-    description: Case-insensitive topic phrase match
-  - value: system configuration
-    description: Alternative topic phrase match
-  - value: configuration management
-    description: Additional topic phrase match
+  - value: The configuration baseline is reviewed after each major release.
+    description: Discovery probe (65)
+    synthetic: true
+  - value: |-
+      Configuration baseline snapshot
+      Device: core-sw01
+      OS version: IOS-XE 17.9.4
+    description: Medium-tier probe (75) - populated snapshot metadata
+    synthetic: true
+  - value: |-
+      Configuration baseline snapshot - core-sw01
+      Captured: 2026-09-18 02:00
+      OS version: IOS-XE 17.9.4
+      hostname core-sw01
+      interface GigabitEthernet1/0/1
+       ip address 10.20.0.1 255.255.255.0
+      snmp-server community H4rb0urRO RO
+      Drift check: 2 deviations from the approved baseline (non-compliant).
+    description: High-tier probe (85) - several config lines, metadata and drift context
+    synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
+  - value: unrelated generic text
+    description: No relevant phrase context
   - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: backup outage
-    description: Generic word pair from old broad template should not match
+    description: Random text should not match
+  - value: 'Policy statement: all servers are built from the approved configuration baseline.'
+    description: Policy text
+    synthetic: true
+  - value: |-
+      Configuration baseline template
+      Device: ________
+      OS version: [insert]
+    description: Blank template
+    synthetic: true
+  - value: 'Course module 5: a golden image baseline sets MinimumPasswordLength = 14 and PasswordComplexity = 1.'
+    description: Training framing
+    synthetic: true
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+- description: Vendor hardening guides and CIS Benchmark documents quote settings.
+  mitigation: Guidance/training framing is excluded; 85 needs two configuration lines plus snapshot metadata.
 exports:
 - purview_xml
 - yaml
 - regex_copy
 scope: wide
-risk_description: The regex flags configuration baselines or snapshots, system configuration, configuration management, golden
-  images, audits, endpoint management, hardening baselines, and security baselines. A genuine snapshot can reveal exact settings,
-  enabled controls, software posture, deviations, and hardening assumptions that help an attacker identify weaknesses or reproduce
-  a trusted image. The normal affected scale is one platform, endpoint class, or managed environment and its operators, while
-  generic baseline standards and vendor guides can match without organisation-specific values. Risk 8 SENSITIVE reflects serious
-  contained control exposure; PROTECTED would require critical-system configurations or significant broad compromise potential.
+risk_description: >-
+  The detector now requires baseline/snapshot wording plus actual configuration lines or populated snapshot metadata before enforcing. A genuine snapshot can reveal exact settings, enabled controls, software posture, deviations, and hardening assumptions that help an attacker identify weaknesses or reproduce a trusted image. The normal affected scale is one platform, endpoint class, or managed environment and its operators, while generic baseline standards and vendor guides can match without organisation-specific values. Risk 8 SENSITIVE reflects serious contained control exposure; PROTECTED would require critical-system configurations or significant broad compromise potential.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -77,36 +96,42 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
   - dict: template-exclusion
     as: Keyword_noise_exclusion
     match_style: word
   pattern_tiers:
   - confidence_level: 85
-    id_match: Regex_configuration_baseline_snapshots
+    id_match: Regex_config_baseline_primary
     matches:
-    - ref: Pattern_global_top500_319_configuration_baseline_snapshots_label_context
-    - ref: Keyword_global_top500_319_configuration_baseline_snapshots_domain_context
-    - ref: Keyword_configuration_baseline_snapshots
+    - ref: Regex_config_baseline_config_line
+      min_count: 2
+      unique_results: true
+    - ref: Regex_config_baseline_snapshot_meta
+    - ref: Keyword_config_baseline_context
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_config_baseline_guidance_exclusion
   - confidence_level: 75
-    id_match: Regex_configuration_baseline_snapshots
+    id_match: Regex_config_baseline_primary
     matches:
-    - ref: Pattern_global_top500_319_configuration_baseline_snapshots_label_context
-    - ref: Keyword_global_top500_319_configuration_baseline_snapshots_domain_context
+    - type: any
+      refs:
+      - Regex_config_baseline_config_line
+      - Regex_config_baseline_snapshot_meta
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_config_baseline_guidance_exclusion
   - confidence_level: 65
     discovery_only: true
-    id_match: Regex_configuration_baseline_snapshots
+    id_match: Regex_config_baseline_primary
     matches:
     - type: any
       min_matches: 0
@@ -114,58 +139,66 @@ purview:
       refs:
       - Keyword_noise_exclusion
   regexes:
-  - id: Regex_configuration_baseline_snapshots
-    pattern: (?is)\b(?:configuration\s+baseline|baseline\s+snapshot|system\s+configuration|configuration\s+management|golden\s+image|configuration\s+audit|endpoint\s+management|hardening\s+baseline|security\s+baseline)\b
-  - id: Pattern_global_top500_319_configuration_baseline_snapshots_label_context
-    pattern: (?i)\b(?:configuration\s+baseline\s+snapshots)\b
+  - id: Regex_config_baseline_primary
+    pattern: >-
+      (?i)\b(?:configuration\s+baseline|baseline\s+(?:configuration|snapshot|build)|golden\s+(?:image|config(?:uration)?)|(?:CIS|STIG|SOE)\s+baseline|running[\s-]config(?:uration)?\s+(?:backup|snapshot)|config(?:uration)?\s+snapshot)\b
+  - id: Regex_config_baseline_config_line
+    pattern: >-
+      \bhostname\s+[A-Za-z0-9_-]{2,63}\b|\binterface\s+(?:GigabitEthernet|TenGigabitEthernet|Ethernet|Vlan|Port-channel|ge-|xe-)[0-9/.:-]{1,20}|\bip\s+address\s+\d{1,3}(?:\.\d{1,3}){3}\s+\d{1,3}(?:\.\d{1,3}){3}|\bsnmp-server\s+community\s+[^\s]{2,64}|\baccess-list\s+\d{1,4}\s+(?:permit|deny)|\bset\s+(?:system|interfaces|security)\s+[A-Za-z0-9-]{2,40}|\b(?:MinimumPasswordLength|PasswordComplexity|LockoutBadCount|EnableLUA|LmCompatibilityLevel|PermitRootLogin|PASS_MAX_DAYS)\s*[:=]?\s*[A-Za-z0-9]{1,20}
+  - id: Regex_config_baseline_snapshot_meta
+    pattern: >-
+      (?i)\b(?:captured|snapshot\s+(?:date|time|taken)|collected|baseline\s+(?:version|date|ID)|device|OS\s+version|build|firmware)\s*[:=#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'._:@#+-]{1,60}
   keywords:
-  - id: Keyword_configuration_baseline_snapshots
+  - id: Keyword_config_baseline_context
     groups:
     - match_style: word
       terms:
-      - configuration baseline
-      - baseline snapshot
-      - system configuration
-      - configuration management
-      - CMDB
-      - golden image
-      - configuration audit
-      - operations
-      - resilience
-      - endpoint management
-      - hardening baseline
-      - security baseline
+      - drift
+      - deviation
+      - non-compliant
+      - compliant
+      - hardening
+      - approved baseline
+      - CIS Benchmark
+      - checksum
+      - version control
+      - remediation
     strength: specific
-  - id: Keyword_global_top500_319_configuration_baseline_snapshots_domain_context
+  - id: Keyword_config_baseline_guidance_exclusion
     groups:
     - match_style: word
       terms:
-      - configuration baseline snapshots
-      - configuration
-      - baseline
-      - snapshots
+      - policy statement
+      - guidance note
+      - best practice guide
+      - media release
+      - press release
+      - news report
+      - course module
+      - learning objectives
+      - awareness course
+      - webinar
+      - lesson plan
+      - quiz question
     strength: domain
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: 'Quality pass (2026-09-24): primary narrowed to baseline/snapshot wording (system configuration, configuration management, endpoint management removed); self-corroboration removed; 75 needs a configuration line or populated snapshot metadata; 85 needs two configuration lines, metadata and drift context; guidance exclusion; populated tests and decoys; GDPR replaced with SOCI Act; frameworks and NIST SP 800-128 reference added; credentials category removed.'
 - version: 1.2.1
   date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1869 without changing
-    detector or package metadata.'
+  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1869 without changing detector or package metadata.'
 - version: 1.2.0
   date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
+  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
 - version: 1.1.1
   date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
+  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
 - version: 1.1.0
   date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 references:
@@ -173,6 +206,7 @@ references:
 - https://www.homeaffairs.gov.au/about-us/our-portfolios/emergency-management
 - https://www.disasterassist.gov.au/
 - https://www.oaic.gov.au/privacy/australian-privacy-principles-guidelines/chapter-11-app-11-security-of-personal-information
+- https://csrc.nist.gov/pubs/sp/800/128/upd1/final
 remediation:
   catalog_quality_2026_06_02:
     status: applied

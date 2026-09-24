@@ -1,61 +1,80 @@
 schema: testpattern/v1
 name: Failover architecture details
 slug: global-top500-305-failover-architecture-details
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies failover architecture details patterns in security and access control contexts. Detects potential
-  exposure of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 6 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:failover\s+architecture|high\s+availability|load\s+balancer|cluster\s+configuration|hot\s+standby|warm\s+standby|automatic\s+failover)\b
+description: >-
+  Detects failover and high-availability architecture details: failover/DR/HA architecture wording with populated node, VIP, site and listener fields plus internal IPs or hostnames. Topic wording alone is discovery-only.
+operation: >-
+  Regex_failover_primary (failover/DR/high-availability architecture, configuration or runbook wording) is discovery-only at 65. 75 requires the primary plus one populated structure: a populated node field (VIP, primary/secondary/standby node or site, DR site, listener, cluster name, witness) or a network artefact (IPv4 address, internal hostname). 85 requires a populated node field (VIP, primary/secondary/standby node or site, DR site, listener, cluster name, witness) (two distinct hits), a network artefact (IPv4 address, internal hostname), and independent replication/HA-mechanics (sync/async replication, quorum, split-brain, cutover) evidence that does not repeat the primary. Every enforce tier rejects template/noise wording (template-exclusion) and guidance, policy, training and news framing (Keyword_failover_guidance_exclusion).
+pattern: >-
+  (?i)\b(?:failover\s+(?:architecture|design|configuration|runbook|plan|procedure|topology)|disaster\s+recovery\s+(?:architecture|topology|runbook)|high[\s-]availability\s+(?:architecture|design|configuration|topology|cluster))\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: the topic phrase alone is discovery-only; enforcement needs populated structure (a populated node field (VIP, primary/secondary/standby node or site, DR site, listener, cluster name, witness) or a network artefact (IPv4 address, internal hostname)), and 85 needs two distinct structures plus independent replication/HA-mechanics (sync/async replication, quorum, split-brain, cutover) evidence, so policies, blank forms and training text stay below 75.
 jurisdictions:
 - global
 regulations:
-- GDPR
+- SOCI Act 2018 (Cth)
+frameworks:
+- ISO 27001
+- NIST CSF
 data_categories:
-- credentials
 - security
 corroborative_evidence:
   keywords:
-  - failover architecture details
-  - failover
-  - architecture
-  - details
-  - operations
-  - resilience
+  - replication
+  - synchronous
+  - asynchronous
+  - quorum
+  - split-brain
+  - RPO
+  - RTO
+  - DNS cutover
+  - Always On
+  - Pacemaker
   proximity: 300
 test_cases:
   should_match:
-  - value: failover architecture
-    description: Primary topic phrase match
-  - value: high availability
-    description: Case-insensitive topic phrase match
-  - value: load balancer
-    description: Alternative topic phrase match
-  - value: cluster configuration
-    description: Additional topic phrase match
+  - value: The failover architecture will be reviewed after the data-centre migration.
+    description: Discovery probe (65)
+    synthetic: true
+  - value: |-
+      Failover configuration - payroll DB
+      Primary node: sqlpay01
+      Standby node: sqlpay02
+    description: Medium-tier probe (75) - populated node fields
+    synthetic: true
+  - value: |-
+      High-availability cluster design - payroll
+      Primary node: sqlpay01.harbour.internal (10.20.8.11)
+      Standby node: sqlpay02.harbour.internal (10.40.8.11)
+      Listener: sqlpay-lsn, VIP: 10.20.8.50
+      Synchronous replication inside the site, asynchronous to the DR site; file-share witness prevents split-brain; DNS cutover for manual failover.
+    description: High-tier probe (85) - several node fields, IPs/hostnames and replication context
+    synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
+  - value: unrelated generic text
+    description: No relevant phrase context
   - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: backup outage
-    description: Generic word pair from old broad template should not match
+    description: Random text should not match
+  - value: 'Policy statement: tier 1 systems require a documented failover design with annual testing.'
+    description: Policy text
+    synthetic: true
+  - value: |-
+      Failover configuration template
+      Primary node: ________
+      VIP: [insert]
+    description: Blank template
+    synthetic: true
+  - value: 'Webinar notes: a high-availability cluster uses a witness and synchronous replication to avoid split-brain.'
+    description: Webinar framing
+    synthetic: true
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+- description: Cloud vendor reference architectures describe HA designs.
+  mitigation: Enforcement needs populated node fields or internal addresses; guidance/training framing is excluded.
 exports:
 - purview_xml
 - yaml
@@ -63,36 +82,42 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
   - dict: template-exclusion
     as: Keyword_noise_exclusion
     match_style: word
   pattern_tiers:
   - confidence_level: 85
-    id_match: Regex_failover_architecture
+    id_match: Regex_failover_primary
     matches:
-    - ref: Pattern_global_top500_305_failover_architecture_details_label_context
-    - ref: Keyword_global_top500_305_failover_architecture_details_domain_context
-    - ref: Keyword_failover_architecture
+    - ref: Regex_failover_node_field
+      min_count: 2
+      unique_results: true
+    - ref: Regex_failover_network_artefact
+    - ref: Keyword_failover_context
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_failover_guidance_exclusion
   - confidence_level: 75
-    id_match: Regex_failover_architecture
+    id_match: Regex_failover_primary
     matches:
-    - ref: Pattern_global_top500_305_failover_architecture_details_label_context
-    - ref: Keyword_global_top500_305_failover_architecture_details_domain_context
+    - type: any
+      refs:
+      - Regex_failover_node_field
+      - Regex_failover_network_artefact
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_failover_guidance_exclusion
   - confidence_level: 65
     discovery_only: true
-    id_match: Regex_failover_architecture
+    id_match: Regex_failover_primary
     matches:
     - type: any
       min_matches: 0
@@ -100,42 +125,52 @@ purview:
       refs:
       - Keyword_noise_exclusion
   regexes:
-  - id: Regex_failover_architecture
-    pattern: (?is)\b(?:failover\s+architecture|high\s+availability|load\s+balancer|cluster\s+configuration|hot\s+standby|warm\s+standby|automatic\s+failover)\b
-  - id: Pattern_global_top500_305_failover_architecture_details_label_context
-    pattern: (?i)\b(?:failover\s+architecture\s+details)\b
+  - id: Regex_failover_primary
+    pattern: >-
+      (?i)\b(?:failover\s+(?:architecture|design|configuration|runbook|plan|procedure|topology)|disaster\s+recovery\s+(?:architecture|topology|runbook)|high[\s-]availability\s+(?:architecture|design|configuration|topology|cluster))\b
+  - id: Regex_failover_node_field
+    pattern: >-
+      (?i)\b(?:VIP|virtual\s+IP|primary\s+(?:node|site|DB|database|server)|secondary\s+(?:node|site|server)|standby\s+(?:node|site|replica)|DR\s+site|listener|cluster\s+name|witness|heartbeat\s+(?:interface|network))\s*[:=#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'._:@#+-]{1,60}
+  - id: Regex_failover_network_artefact
+    pattern: >-
+      (?i)\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b
   keywords:
-  - id: Keyword_failover_architecture
+  - id: Keyword_failover_context
     groups:
     - match_style: word
       terms:
-      - failover architecture
-      - high availability
-      - active-passive
-      - active-active
-      - load balancer
-      - redundancy
-      - cluster configuration
       - replication
-      - hot standby
-      - warm standby
-      - automatic failover
+      - synchronous
+      - asynchronous
+      - quorum
       - split-brain
+      - text: RPO
+        case_sensitive: true
+      - text: RTO
+        case_sensitive: true
+      - DNS cutover
+      - Always On
+      - Pacemaker
     strength: specific
-  - id: Keyword_global_top500_305_failover_architecture_details_domain_context
+  - id: Keyword_failover_guidance_exclusion
     groups:
     - match_style: word
       terms:
-      - failover architecture details
-      - failover
-      - architecture
+      - policy statement
+      - guidance note
+      - best practice guide
+      - media release
+      - press release
+      - news report
+      - course module
+      - learning objectives
+      - awareness course
+      - webinar
+      - lesson plan
+      - quiz question
     strength: domain
-risk_description: This concept regex matches failover architecture, high availability, load balancer, cluster configuration,
-  standby, or automatic-failover terminology associated with resilience design. An actual architecture record can reveal active
-  and standby components, switching mechanisms, concentration points, and failover assumptions that support targeted disruption.
-  The usual affected unit is one service cluster or platform and its users, while product documentation and generic high-availability
-  designs can match without internal detail. Risk 7 SENSITIVE reflects moderate direct operational harm; PROTECTED would require
-  critical-service architecture or significant system-wide consequence.
+risk_description: >-
+  The detector now requires failover/HA architecture wording plus populated node/VIP fields or internal network artefacts before enforcing. An actual architecture record can reveal active and standby components, switching mechanisms, concentration points, and failover assumptions that support targeted disruption. The usual affected unit is one service cluster or platform and its users, while product documentation and generic high-availability designs can match without internal detail. Risk 7 SENSITIVE reflects moderate direct operational harm; PROTECTED would require critical-service architecture or significant system-wide consequence.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -145,26 +180,23 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: 'Quality pass (2026-09-24): primary narrowed to architecture/configuration/runbook wording (bare load balancer/high availability removed); self-corroboration removed; 75 needs a populated node field or internal network artefact; 85 needs two node fields, an artefact and replication context; guidance exclusion; populated tests and decoys; GDPR replaced with SOCI Act; frameworks and NIST SP 800-34 reference added; credentials category removed.'
 - version: 1.2.1
   date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1855 without changing
-    detector or package metadata.'
+  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1855 without changing detector or package metadata.'
 - version: 1.2.0
   date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
+  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
 - version: 1.1.1
   date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
+  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
 - version: 1.1.0
   date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 references:
@@ -172,6 +204,7 @@ references:
 - https://www.homeaffairs.gov.au/about-us/our-portfolios/emergency-management
 - https://www.disasterassist.gov.au/
 - https://www.oaic.gov.au/privacy/australian-privacy-principles-guidelines/chapter-11-app-11-security-of-personal-information
+- https://csrc.nist.gov/pubs/sp/800/34/r1/upd1/final
 remediation:
   catalog_quality_2026_06_02:
     status: applied

@@ -1,8 +1,8 @@
 schema: testpattern/v1
 name: Religious or Philosophical Beliefs
 slug: global-religious-beliefs
-version: 1.2.0
-type: keyword_list
+version: 1.3.0
+type: regex
 pattern_class: concept
 engine: universal
 description: >-
@@ -14,19 +14,11 @@ description: >-
   Australian anti-discrimination and privacy law. Topic-grade detector, low confidence by
   design.
 operation: >-
-  The primary regex matches explicit religious/philosophical-belief phrases and structured
-  religion, faith, or denomination labels. The 65 tier is discovery-only. The 75 tier requires
-  a person-record context, and the 85 tier additionally requires a populated belief,
-  denomination, observance, conversion, or accommodation statement. Public policy, aggregate,
-  museum, academic, comparative-religion, and blank-form contexts are excluded from every tier.
-pattern: '(?i)\b(?:religious\s+(?:or\s+philosophical\s+)?beliefs?|philosophical\s+beliefs?|religious\s+affiliations?|faith\s+affiliations?|belief\s+systems?|faith\s+traditions?|religious\s+(?:observance|preference|denominations?|conversion\s+record)|place\s+of\s+worship|(?:religion|faith|denomination)\s*(?::|(?:field|code|response)))\b'
+  The primary regex matches explicit religious/philosophical-belief phrases and structured religion, faith or denomination labels. 65 (discovery only): phrase alone - policy, guidance, news and survey-design text naming the category stays here. 75: phrase plus a populated identified-person field (name, DOB, employee/member/customer/patient/participant number or ID, data subject). 85: person field plus a named religion or denomination value (Catholic, Anglican, Muslim, Hindu, Sikh, Jewish, Buddhist, no religion ...) plus independent record evidence (chaplaincy, pastoral care, congregation, prayer, halal/kosher, Sabbath, Ramadan, religious leave). Template framing and guidance/policy/public-aggregate framing are excluded from 75/85. Converted from keyword_list to regex so the tier logic decides matches.
+pattern: (?i)\b(?:religious\s+(?:or\s+philosophical\s+)?beliefs?|philosophical\s+beliefs?|religious\s+affiliations?|faith\s+affiliations?|belief\s+systems?|faith\s+traditions?|religious\s+(?:observance|preference|denominations?|conversion\s+record)|place\s+of\s+worship|(?:religion|faith|denomination)\s*(?::|(?:field|code|response)))
 confidence: low
 confidence_justification: >-
-  Low by design. Religious or philosophical belief is a GDPR Article 9 special category with
-  no fixed format, so it is detected purely by topic vocabulary. Generic words like "believe"
-  or "religion" appear constantly in non-sensitive prose (corporate values statements,
-  educational content); the regex is scoped to full disclosure phrases only, and hits should
-  be paired with corroborative keywords (faith, congregation, worship) to raise precision.
+  Low by design: the attribute has no fixed format. Enforce tiers now require the attribute to be tied to an identified person record (a populated name/DOB/ID field), and 85 also requires a named religion or denomination value plus independent record evidence, so policy text, surveys-in-design and news naming the category stay at 65 discovery.
 jurisdictions:
   - global
   - au
@@ -54,35 +46,31 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: 'Religious affiliation disclosure topic pending review.'
-      description: Exact 65 discovery probe - belief topic without a data-subject record
-    - value: 'Employee file includes a religious affiliation field.'
-      description: Exact 75 probe - person-record context without a populated belief response
-    - value: 'Patient record: religious affiliation recorded as Hindu; denomination: Shaivism.'
-      description: Exact 85 probe - person record plus populated faith attribution
-    - value: 'The intake form records religious affiliation under section 4.'
-      description: Religious affiliation phrase present
-    - value: 'Profile notes his faith tradition and place of worship.'
-      description: Faith tradition / place of worship terms present
-    - value: 'HR file documents a religious conversion record from the chaplaincy referral.'
-      description: Religious conversion record term present
-    - value: 'The census field asks respondents to state their religious beliefs voluntarily.'
-      description: Religious beliefs phrase present
-    - value: 'Admission record captures religion: Sikh.'
-      description: Structured religion label in a person record
+    - value: "Patient admission record\nPatient name: Morgan Ellisdale\nMRN: 5540921\nDOB: 17/03/1968\nReligion: Hindu (Shaivism)\nPastoral care: chaplaincy visit requested; vegetarian dietary requirement."
+      description: Person record with a populated religion value and pastoral-care evidence (85)
+      synthetic: true
+    - value: "Employee file\nEmployee number: E40917\nName: Casey Rourke\nNotes: requested that religious affiliation not be shared with the roster team."
+      description: Person record naming religious affiliation without a populated value (75)
+      synthetic: true
   should_not_match:
-    - value: 'We believe in transparent pricing for all customers.'
+    - value: "We believe in transparent pricing for all customers."
       description: Generic corporate "believe", not a belief-system disclosure
-    - value: 'The museum exhibit covered world religions through history.'
+    - value: "The museum exhibit covered world religions through history."
       description: Topical/educational mention, no personal disclosure phrase
-    - value: 'Religious studies 101 is a required elective this semester.'
+    - value: "Religious studies 101 is a required elective this semester."
       description: Academic course listing, no disclosure phrase
-    - value: 'Public policy document reports aggregate congregation demographics.'
+    - value: "Public policy document reports aggregate congregation demographics."
       description: Public aggregate material is not a person-linked belief disclosure
-    - value: 'Sample template: patient record with stated faith Example Faith.'
+    - value: "Sample template: patient record with stated faith Example Faith."
       description: Adjacent template language is not a populated belief record
-    - value: 'Patient record lists a vegetarian dietary preference.'
+    - value: "Patient record lists a vegetarian dietary preference."
       description: Sibling preference record does not satisfy the religious-belief primary
+    - value: "Policy guidance: this procedure explains how religious beliefs and religious affiliation details are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Diversity survey\nName: ____________________\nEmployee number: ____________________\nReligion: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the census shows the share of people reporting no religion rose again, and faith traditions in the region continue to diversify."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: >-
       Generic corporate or educational use of "believe"/"religion"/"religious" (values
@@ -99,33 +87,34 @@ exports:
 scope: broad
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_global_religious_belief
       matches:
-        - ref: Evidence_belief_record_context
-        - ref: Evidence_belief_attribution
+        - ref: Regex_global_religious_beliefs_person_fields
+        - ref: Regex_global_religious_beliefs_religion_value
+        - ref: Evidence_belief_record_evidence
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-            - Evidence_belief_public_context
+            - Keyword_noise_exclusion
+            - Keyword_global_religious_beliefs_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_global_religious_belief
       matches:
-        - ref: Evidence_belief_record_context
+        - ref: Regex_global_religious_beliefs_person_fields
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-            - Evidence_belief_public_context
+            - Keyword_noise_exclusion
+            - Keyword_global_religious_beliefs_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_global_religious_belief
@@ -134,58 +123,55 @@ purview:
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
-            - Evidence_belief_public_context
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_global_religious_belief
-      pattern: '(?i)\b(?:religious\s+(?:or\s+philosophical\s+)?beliefs?|philosophical\s+beliefs?|religious\s+affiliations?|faith\s+affiliations?|belief\s+systems?|faith\s+traditions?|religious\s+(?:observance|preference|denominations?|conversion\s+record)|place\s+of\s+worship|(?:religion|faith|denomination)\s*(?::|(?:field|code|response)))\b'
+      pattern: (?i)\b(?:religious\s+(?:or\s+philosophical\s+)?beliefs?|philosophical\s+beliefs?|religious\s+affiliations?|faith\s+affiliations?|belief\s+systems?|faith\s+traditions?|religious\s+(?:observance|preference|denominations?|conversion\s+record)|place\s+of\s+worship|(?:religion|faith|denomination)\s*(?::|(?:field|code|response)))
+    - id: Regex_global_religious_beliefs_person_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|employee(?:\s+name)?|(?:employee|staff|member|customer|client|patient|participant|respondent|person|applicant|voter|record)\s*(?:no\.?|number|ID)|staff\s+member|member(?:\s+name)?|patient(?:\s+name)?|client(?:\s+name)?|customer(?:\s+name)?|applicant(?:\s+name)?|data\s+subject|resident(?:\s+name)?)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_global_religious_beliefs_religion_value
+      pattern: (?i)\b(?:Catholic|Roman\s+Catholic|Anglican|Uniting\s+Church|Presbyterian|Baptist|Pentecostal|Lutheran|Greek\s+Orthodox|Orthodox|Muslim|Islam|Sunni|Shia|Hindu|Buddhist|Sikh|Jewish|Judaism|Jehovah's\s+Witness|Latter-day\s+Saint|Baha'i|Shaivism|Vaishnavism|agnostic|atheist|no\s+religion)\b
   keywords:
-    - id: Evidence_belief_record_context
+    - id: Evidence_belief_record_evidence
       groups:
         - match_style: word
           terms:
-            - membership form
-            - patient record
-            - patient intake
-            - admission record
-            - employee file
-            - personnel record
-            - HR adjustment request
-            - profile field
-            - census response
-            - pastoral care file
-            - accommodation request
-      strength: domain
-    - id: Evidence_belief_attribution
-      groups:
-        - match_style: word
-          terms:
-            - stated faith
-            - recorded as
-            - faith recorded as
-            - 'religion:'
-            - 'faith:'
-            - 'denomination:'
-            - declared belief
-            - 'place of worship:'
-            - observance requirement
-            - observance requested
-            - religious accommodation approved
-            - converted to
+            - chaplain
+            - chaplaincy
+            - pastoral care
+            - congregation
+            - prayer room
+            - halal
+            - kosher
+            - Sabbath
+            - Ramadan
+            - religious leave
+            - dietary requirement
       strength: specific
-    - id: Evidence_belief_public_context
+    - id: Keyword_global_religious_beliefs_guidance_exclusion
       groups:
         - match_style: word
           terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
             - public policy document
             - public policy guidance
             - public dataset
             - aggregate statistics
-            - museum catalogue
-            - academic course
-            - comparative religion
-            - blank form
+            - aggregate report
+            - academic paper
             - blank questionnaire
+            - awareness campaign
+            - museum catalogue
+            - comparative religion
       strength: exclusion
 risk_rating: 7
 risk_description: >-
@@ -203,8 +189,11 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-07-12'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.3.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75 was gated only by record-context keywords (membership form, patient record, employee file) that appear in policy and survey-design text, and 85 evidence could repeat the primary. 75 now requires the attribute to sit with a populated identified-person field (name, DOB, member/employee/patient ID) and 85 requires person fields plus a named religion/denomination value plus independent record evidence; policy text naming the category stays at 65. Bare-phrase tests replaced with populated person records; added policy, blank-form and news decoys; public-context exclusions folded into the guidance exclusion group."
   - version: 1.2.0
     date: '2026-07-19'
     description: 'Consolidate the retired Australian alias into the global detector: add Australian legal and workforce/accommodation evidence, recognise structured religion and denomination fields, retain 65 discovery, and require person-record plus populated belief evidence at 75/85.'
@@ -234,6 +223,8 @@ keywords:
   - 'denomination:'
 references:
   - url: https://gdpr-info.eu/art-9-gdpr/
-    title: GDPR Article 9 — processing of special categories of personal data (religious or philosophical beliefs)
+    title: GDPR Article 9 - processing of special categories of personal data (religious or philosophical beliefs)
   - url: https://www.fairwork.gov.au/tools-and-resources/fact-sheets/rights-and-obligations/protection-from-discrimination-at-work
-    title: Protection from discrimination at work — Fair Work Ombudsman
+    title: Protection from discrimination at work - Fair Work Ombudsman
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-sensitive-information
+    title: OAIC - What is sensitive information

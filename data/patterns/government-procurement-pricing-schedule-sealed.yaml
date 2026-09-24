@@ -1,21 +1,23 @@
 schema: testpattern/v1
 name: Government Procurement Pricing Schedule - Sealed
 slug: government-procurement-pricing-schedule-sealed
-version: 1.4.0
+version: 1.5.0
 type: document_marker
 pattern_class: marking
 engine: universal
 description: Detects sealed pricing schedules submitted by tenderers as part of government procurement processes, held in confidence until evaluation is complete.
-operation: 'Document marker: pricing schedule / price submission / financial offer / commercial submission in document headers or filenames. Keyword proximity: tender/procurement terms within 300 characters of pricing/rates and sealed/confidential markers. Regex for structured pricing tables with tender reference numbers.'
+operation: >-
+  Primary: pricing schedule phrases (pricing/price schedule, schedule of rates, price submission, financial offer, commercial submission, sealed pricing, tender price, lump sum price, bill of quantities). 65 = phrase only (discovery). 75 = phrase plus three distinct dollar amounts or unit rates. 85 = 75 plus a labelled tender / RFx / contract reference plus a sealed / confidential / commercial-in-confidence / PROTECTED marker. Standing offers, published panel rates, templates and QTenders guidance are excluded.
 pattern: "(?i)\\b(?:pricing\\s+schedule|price\\s+schedule|schedule\\s+of\\s+rates|price\\s+submission|financial\\s+offer|commercial\\s+submission|sealed\\s+pricing|tender\\s+price|lump\\s+sum\\s+price|bill\\s+of\\s+quantities)\\b"
-confidence: high
-confidence_justification: 'High confidence: sealed procurement pricing with commercial-in-confidence markers and tender reference numbers is highly specific. Published contract prices and rate cards are excluded.'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: several distinct prices next to pricing-schedule phrasing are specific; agency tender numbers are customer-defined, so the reference is a documented label-anchored fallback.
 jurisdictions:
   - au
 regulations:
-- "Financial Accountability Act 2009 (Qld)"
+  - "Financial Accountability Act 2009 (Qld)"
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - financial
   - government
@@ -44,16 +46,28 @@ corroborative_evidence:
     - corporate-finance
 
     - government-services
+customisation:
+  - key: tender-reference-number
+    kind: identifier-format
+    identifier: tender-reference-number
+    target: purview.regexes/Regex_government_procurement_pricing_schedule_sealed_tender_reference
+    mode: replace
+    affects_tiers: [85]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#tender-reference-number). Earlier versions used the QLD-YYYY-NNNNN tender format, which does not appear in any published source.
 test_cases:
   should_match:
-    - value: 'COMMERCIAL-IN-CONFIDENCE — SEALED PRICING. Pricing Schedule — RFT QLD-2026-08912. Tenderer: ABC Construction Pty Ltd. Item 1: Site establishment — lump sum $1,200,000. Item 2: Concrete works — unit rate $450/m3. Item 3: Steel reinforcement — unit rate $2,800/tonne. Total tender price: $45,670,000. PROTECTED.'
-      description: Sealed pricing schedule with line-item costs and tender reference
-    - value: 'Price Submission — Financial Offer. RFP QLD-2026-04417: ICT Managed Services. Schedule of Rates: Service Desk — $85/ticket. Desktop Support — $95/hour. Network Administration — $145/hour. Annual contract value: $8.2M. Commercial-in-confidence. Not to be disclosed to other tenderers.'
-      description: IT services pricing schedule with hourly rates
-    - value: 'PROTECTED. Sealed Commercial Submission — Major Infrastructure Procurement, RFT QLD-2025-11203. Tenderer pricing breakdown: Design phase $12.4M, Construction phase $234.5M, Commissioning $8.9M. This pricing is commercial-in-confidence and must remain sealed until evaluation committee review.'
-      description: Major infrastructure sealed pricing with phase breakdown
+    - value: 'COMMERCIAL-IN-CONFIDENCE — SEALED PRICING. Pricing Schedule — RFT number: DTMR-2026-08912. Tenderer: ABC Construction Pty Ltd. Item 1: Site establishment — lump sum $1,200,000. Item 2: Concrete works — unit rate $450/m3. Item 3: Steel reinforcement — unit rate $2,800/tonne. Total tender price: $45,670,000. PROTECTED.'
+      description: Sealed pricing schedule with line-item costs and tender reference (reaches 85)
+    - value: 'Price Submission — Financial Offer. RFP number 2026-04417: ICT Managed Services. Schedule of Rates: Service Desk — $85/ticket. Desktop Support — $95/hour. Network Administration — $145/hour. Annual contract value: $8.2M. Commercial-in-confidence. Not to be disclosed to other tenderers.'
+      description: IT services pricing schedule with hourly rates (reaches 85)
+    - value: 'PROTECTED. Sealed Commercial Submission — Major Infrastructure Procurement, RFT 2025-11203. Tenderer pricing breakdown: Design phase $12.4M, Construction phase $234.5M, Commissioning $8.9M. This pricing is commercial-in-confidence and must remain sealed until evaluation committee review.'
+      description: Major infrastructure sealed pricing with phase breakdown (reaches 85)
     - value: "Schedule of rates — RFT 2026-0417 Network cabling services\nTenderer: Harbour Networks Pty Ltd\nItem 1 Site survey: $1,250.00\nItem 2 Cat6A outlet installed: $185.00/ea\nItem 3 Project management: $142.00/hr\nTotal tender price: $418,960.00\nCommercial-in-confidence — sealed pricing."
-      description: Populated record with price / score lines reaching 75 and 85
+      description: Populated record with price / score lines reaching 75 and 85 (reaches 85)
+      synthetic: true
+    - value: "Schedule of rates\nItem 1 Site survey: $1,250.00\nItem 2 Cat6A outlet installed: $185.00/ea\nItem 3 Project management: $142.00/hr"
+      description: Three distinct prices with pricing phrasing, no tender reference or marker (reaches 75)
       synthetic: true
   should_not_match:
     - value: 'Standing offer arrangement: Government ICT Panel. Published rates for Panel Category 1: $120-$180/hour depending on skill level. Available at QTenders.'
@@ -62,6 +76,10 @@ test_cases:
       description: Procurement template with example pricing format
     - value: "Tenderers must complete the pricing schedule in the approved format and submit it with their response. Late submissions will not be accepted. See QTenders for the invitation documents."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: "Pricing schedule — RFT number: __________\nItem 1: $________\nItem 2: $________\nTotal tender price: $________"
+      description: Blank pricing schedule (must stay below 75)
+    - value: "News: the department awarded the $45 million RFT 2025-1120 contract after the tender price came in under budget."
+      description: News article naming a tender and one price (must stay below 75)
 false_positives:
   - description: Published standing offer arrangement rates and panel pricing
     mitigation: Exclude documents containing 'standing offer', 'panel rates', 'published rates', 'available at QTenders'
@@ -85,7 +103,7 @@ purview:
         - ref: Pattern_government_procurement_pricing_schedule_sealed_dollar_amounts_with_optional_unit_rates_
           min_count: 3
           unique_results: true
-        - ref: Evidence_government_procurement_pricing_schedule_sealed_procurement
+        - ref: Regex_government_procurement_pricing_schedule_sealed_tender_reference
         - ref: Evidence_government_procurement_pricing_schedule_sealed_markers
         - type: any
           min_matches: 0
@@ -107,11 +125,7 @@ purview:
             - Filter_government_procurement_pricing_schedule_sealed_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match:
-        type: any
-        ids:
-          - Pattern_government_procurement_pricing_schedule_sealed_pricing_schedule_terms
-          - Pattern_government_procurement_pricing_schedule_sealed_queensland_tender_reference_number
+      id_match: Pattern_government_procurement_pricing_schedule_sealed_pricing_schedule_terms
       matches:
         - type: any
           min_matches: 0
@@ -123,23 +137,12 @@ purview:
     - id: Pattern_government_procurement_pricing_schedule_sealed_pricing_schedule_terms
       pattern: >-
         (?i)\b(?:pricing\s+schedule|price\s+schedule|schedule\s+of\s+rates|price\s+submission|financial\s+offer|commercial\s+submission|sealed\s+pricing|tender\s+price|lump\s+sum\s+price|bill\s+of\s+quantities)\b
-    - id: Pattern_government_procurement_pricing_schedule_sealed_queensland_tender_reference_number
-      pattern: QLD-\d{4}-\d{3,6}
     - id: Pattern_government_procurement_pricing_schedule_sealed_dollar_amounts_with_optional_unit_rates_
-      pattern: \$[\d,.]+(?:/[a-zA-Z23]+)?
+      pattern: \$\d[\d,.]{0,15}(?:/[a-zA-Z23]{1,6})?
+    - id: Regex_government_procurement_pricing_schedule_sealed_tender_reference
+      pattern: >-
+        (?i)\b(?:(?:tender|contract|offer|invitation|RFx)\s+(?:no\.?|number|ref(?:erence)?|ID)|(?:RFT|RFQ|RFP|RFO|ITO)(?:\s+(?:no\.?|number|ref(?:erence)?))?)\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{2,20}\b
   keywords:
-    - id: Evidence_government_procurement_pricing_schedule_sealed_procurement
-      groups:
-        - match_style: word
-          terms:
-            - tender
-            - procurement
-            - text: RFT
-              case_sensitive: true
-            - text: RFP
-              case_sensitive: true
-            - tenderer
-      strength: domain
     - id: Evidence_government_procurement_pricing_schedule_sealed_markers
       groups:
         - match_style: word
@@ -170,10 +173,17 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Commercial-in-Confidence
-references: []
+references:
+  - title: Financial Accountability Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-009
+  - title: Queensland Procurement Policy 2026
+    url: https://www.forgov.qld.gov.au/finance-procurement-and-travel/procurement/procurement-resources/procurement-policies-and-frameworks/queensland-procurement-policy-2026
 created: '2026-02-20'
 updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): replaced the invented QLD-YYYY-NNNNN tender reference (previously a 65 alternative primary) with the new tender-reference-number labelled fallback, now used as the second distinct structure at 85 (identifier-format slot); 75 = pricing phrase + three distinct dollar amounts; 85 = 75 + labelled tender/RFx reference + sealed/commercial-in-confidence marker; the dollar regex now requires a digit; tests converted to labelled RFT references with blank-schedule and news decoys; references added.'
   - version: 1.4.0
     date: '2026-09-24'
     description: "Primary was the unpublished QLD-YYYY-NNNNN tender reference, so no genuine pricing schedule could fire. Primary is now pricing-schedule phrasing; 75 requires three distinct dollar amounts (price lines); 85 adds procurement vocabulary and confidentiality markers. The tender reference regex is kept only as optional discovery."

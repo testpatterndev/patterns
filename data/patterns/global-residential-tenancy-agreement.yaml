@@ -1,62 +1,70 @@
 schema: testpattern/v1
 name: Residential Tenancy Agreement
 slug: global-residential-tenancy-agreement
-version: 1.4.2
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
-description: Detects residential tenancy agreements containing tenant PII, rental terms, and bond details.
+description: >-
+  Detects populated residential tenancy agreements (including Queensland Form 18a general tenancy agreements): the tenancy-agreement phrase combined with named tenant/lessor fields, a numbered premises address, a stated rent or bond amount, or a bond number. Phrase-only mentions stay discovery-only.
 operation: >-
-  Keyword-based detection matching residential tenancy, tenant, bond, and rental terms. Corroborative evidence: 14
-  keywords within 300 characters.
+  Pattern type: keyword proximity evaluated through purview tiers. Primary: residential tenancy agreement/act, Residential Tenancies Authority, (general) tenancy agreement, Form 18a, standard tenancy/rental agreement, lease agreement. 65 (discovery only): primary alone. 75: primary plus one populated field - named tenant/lessor/landlord/property manager, a numbered premises/property address, rent with a dollar value, or bond amount / bond number. 85: primary plus two distinct field types (the four above or a start/end date) plus tenancy-process evidence (entry condition report, breach notice, notice to vacate/leave, periodic/fixed term agreement, bond lodgement, RTA, routine inspection). Template/sample and guidance/news framing excluded on every enforce tier.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Enforce tiers require populated party, premises, rent or bond fields beside the tenancy phrase; renting guides, RTA fact sheets, rent statistics and blank Form 18a copies stay at 65. Medium because property-management correspondence can carry the same fields.
 jurisdictions:
   - global
 regulations:
-- "AML/CTF Act (Cth)"
-- "IPA 2009 (Qld)"
-- "NDB Scheme (Cth)"
-- "Privacy Act 1988 (Cth)"
-- "SOCI Act 2018 (Cth)"
+  - Residential Tenancies and Rooming Accommodation Act 2008 (Qld)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - Privacy Act 1988 (Cth)
 frameworks:
-- ISO 27001
-- ISO 27701
-- PCI-DSS
-- SOC 2
+  - ISO 27001
+  - ISO 27701
+  - PCI-DSS
+  - SOC 2
 data_categories:
   - legal
   - pii
   - financial
 test_cases:
   should_match:
-    - value: Form 18A issued
-      description: Exact 65 discovery probe with a tenancy-form marker and no populated details
-    - value: 'Form 18A: tenant details'
-      description: Exact 75 probe with a tenancy party detail
-    - value: 'Form 18A: tenant details and weekly rent $450'
-      description: Exact 85 probe with party and rent details
-    - value: 'Residential tenancy agreement: tenant bond lodgement with RTA'
-      description: Tenancy agreement with tenant and bond details
-    - value: Tenancy agreement rental amount $450/week with condition report
-      description: Test match 2
-    - value: Residential Tenancies Authority breach notice and entry notice
-      description: Test match 3
+    - value: "GENERAL TENANCY AGREEMENT (Form 18a)\nLessor: Harbour Property Trust\nProperty manager: Casey Rourke\nTenant 1: Avery Teston\nAddress of the premises: 7/22 Ocean Parade, Burleigh Heads QLD 4220\nRent: $620.00 per week\nRental bond: $2,480.00\nStart date: 01/10/2026\nThe entry condition report must be returned within 3 days."
+      description: Populated Form 18a - parties, premises, rent, bond and dates (85)
+      synthetic: true
+    - value: "Residential tenancy agreement\nTenant: Jordan Whitlock\nKeys collected from the agency."
+      description: Agreement with a single populated tenant field (75)
+      synthetic: true
   should_not_match:
-    - value: The tenant of the building is a restaurant
-      description: Non-match 1
-    - value: Tenancy of the land was disputed historically
-      description: Non-match 2
-    - value: Form 18A software demo
+    - value: "Renting guide: the residential tenancy agreement sets out the rent, the bond and the tenant's and lessor's obligations. Lodge the bond with the RTA within 10 days and complete an entry condition report."
+      description: Renting guide naming terms without values
+      synthetic: true
+    - value: "GENERAL TENANCY AGREEMENT (Form 18a)\nLessor: __________\nTenant 1: __________\nAddress of the premises: __________\nRent: $________ per week\nRental bond: $________"
+      description: Blank Form 18a - placeholder values
+      synthetic: true
+    - value: "Median weekly rent in Brisbane rose to $650 this year as tenancy agreement renewals slowed, the Residential Tenancies Authority reported."
+      description: Rent statistics news item
+      synthetic: true
+    - value: "The tenant of the building is a restaurant"
+      description: Commercial tenancy wording
+      synthetic: true
+    - value: "Tenancy of the land was disputed historically"
+      description: Historical wording
+      synthetic: true
+    - value: "Form 18A software demo"
       description: Product-demo wording must remain discovery-only
+      synthetic: true
 false_positives:
-  - description: Historical or metaphorical use of tenancy.
-    mitigation: Require residential tenancy-specific terms like RTA, bond lodgement, or condition report.
+  - description: RTA fact sheets, renting guides and rent statistics.
+    mitigation: No populated party, premises, rent or bond field, and guidance/news framing is excluded.
+  - description: Commercial lease agreements.
+    mitigation: "'lease agreement' is a primary, so populated commercial leases can reach 75/85; they are still confidential contracts."
 exports:
   - yaml
 scope: narrow
 risk_rating: 7
 risk_description: >-
-  The pattern identifies residential tenancy agreements containing named parties, premises, rent, bond, condition reports, authority notices, entry rights, and breach terms. Disclosure can expose a person's home address, occupancy, financial obligations, property condition, and dispute history, enabling privacy intrusion, targeted scams, or pressure in a tenancy dispute. The tenant, household, landlord, and agent may face moderate legal, personal, and financial harm within one lease, while the agreement does not itself authorize entry or payment. Risk 7 and SENSITIVE Legal fit a populated agreement, while a bulk tenancy register, severe safety context, or privileged housing-system access would be needed for PROTECTED.
+  The pattern identifies residential tenancy agreements containing named parties, premises, rent, bond, condition reports, authority notices, entry rights, and breach terms. Disclosure can expose a person's home address, occupancy, financial obligations, property condition, and dispute history, enabling privacy intrusion, targeted scams, or pressure in a tenancy dispute. The tenant, household, landlord, and agent may face moderate legal, personal, and financial harm within one lease, while the agreement does not itself authorize entry or payment. Risk 7 and SENSITIVE Legal fit a populated agreement, while a bulk tenancy register, severe safety context, or privileged housing-system access would be needed for PROTECTED. Quality pass 2026-09-24: enforce tiers (75/85) now require populated record structure (labelled fields with real values, identifiers or data rows); phrase-only mentions in guidance, marketing, blank forms and news stay at 65 discovery.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -67,7 +75,7 @@ sensitivity_labels:
   ca_gov: "Protected A"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -76,22 +84,37 @@ purview:
     - confidence_level: 85
       id_match: Regex_residential_tenancy
       matches:
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_global_residential_tenancy_agreement_party
+            - Regex_global_residential_tenancy_agreement_premises
+            - Regex_global_residential_tenancy_agreement_rent
+            - Regex_global_residential_tenancy_agreement_bond
+            - Regex_global_residential_tenancy_agreement_term
         - ref: Keyword_tenancy_obligations
-        - ref: Keyword_rent_financial_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_residential_tenancy_agreement_guidance_exclusion
     - confidence_level: 75
       id_match: Regex_residential_tenancy
       matches:
-        - ref: Keyword_tenancy_obligations
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_global_residential_tenancy_agreement_party
+            - Regex_global_residential_tenancy_agreement_premises
+            - Regex_global_residential_tenancy_agreement_rent
+            - Regex_global_residential_tenancy_agreement_bond
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_residential_tenancy_agreement_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_residential_tenancy
@@ -103,87 +126,71 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_residential_tenancy
-      pattern: >-
-        (?i)\b(?:residential\s+tenancy\s+(?:agreement|act)|residential\s+tenancies\s+authority|tenancy\s+agreement|form\s+18a|standard\s+(?:tenancy|rental)\s+agreement|lease\s+agreement)\b
+      pattern: (?i)\b(?:residential\s+tenancy\s+(?:agreement|act)|residential\s+tenancies\s+authority|(?:general\s+)?tenancy\s+agreement|form\s+18a|standard\s+(?:tenancy|rental)\s+agreement|lease\s+agreement)\b
+    - id: Regex_global_residential_tenancy_agreement_party
+      pattern: (?i)\b(?:tenants?(?:\s+\d)?|lessors?|landlords?|lessees?|property\s+manager|lessor'?s\s+agent)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)(?:(?:Mr|Mrs|Ms|Mx|Dr|Prof)\.?[ \t]{1,3})?[A-Z][A-Za-z'.-]{1,30}(?:[ \t]{1,3}[A-Z&][A-Za-z'.&-]{0,30}){0,5}
+    - id: Regex_global_residential_tenancy_agreement_premises
+      pattern: (?i)\b(?:(?:rental\s+)?premises|address\s+of\s+(?:the\s+)?premises|property\s+address|rental\s+property)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)\d{1,5}[A-Za-z]?(?:/\d{1,5}[A-Za-z]?)?[ \t]{1,3}[A-Z][A-Za-z'-]{1,30}
+    - id: Regex_global_residential_tenancy_agreement_rent
+      pattern: (?i)\b(?:(?:weekly|fortnightly|monthly)\s+)?rent(?:\s+amount)?[ \t]{0,3}[:#][ \t]{0,3}(?:AUD|USD|NZD|GBP|EUR|A\$|US\$|NZ\$|\$|£|€)[ \t]?(?:\d{1,3}(?:,\d{3}){1,4}|\d{1,12})(?:\.\d{2})?(?![\d,]\d)(?!\.\d)
+    - id: Regex_global_residential_tenancy_agreement_bond
+      pattern: (?i)\b(?:(?:rental\s+)?bond(?:\s+amount)?[ \t]{0,3}[:#][ \t]{0,3}(?:AUD|USD|NZD|GBP|EUR|A\$|US\$|NZ\$|\$|£|€)[ \t]?(?:\d{1,3}(?:,\d{3}){1,4}|\d{1,12})(?:\.\d{2})?(?![\d,]\d)(?!\.\d)|bond\s+(?:lodgement\s+)?(?:no\.?|number)[ \t]{0,3}[:#]?[ \t]{0,3}\d{5,12}\b)
+    - id: Regex_global_residential_tenancy_agreement_term
+      pattern: (?i)\b(?:start(?:ing)?\s+date|commencement\s+date|end\s+date|term\s+(?:starts|ends))[ \t]{0,3}[:#][ \t]{0,3}(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}[ \t]{1,3}(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}[ \t]{1,3}\d{4})
   keywords:
-    - id: Keyword_tenancy_terms
-      groups:
-        - match_style: word
-          terms:
-            - tenant obligations
-            - tenant details
-            - landlord
-            - lessor
-            - lessee
-            - residential tenancy
-            - tenancy agreement
-            - lease term
-            - periodic tenancy
-            - fixed term
-            - notice to vacate
-            - entry condition report
-      strength: specific
-    - id: Keyword_bond_rent
-      groups:
-        - match_style: word
-          terms:
-            - bond
-            - security deposit
-            - bond lodgement
-            - weekly rent
-            - fortnightly rent
-            - monthly rent
-            - rent in advance
-            - text: RTA
-              case_sensitive: true
-            - Residential Tenancies Authority
-      strength: specific
-    - id: Keyword_legal_general
-      groups:
-        - match_style: word
-          terms:
-            - agreement
-            - contract
-            - deed
-            - executed
-            - witnessed
-            - signature
-            - cooling off
-            - default
-            - termination
-            - entire agreement
-      strength: domain
     - id: Keyword_tenancy_obligations
       groups:
         - match_style: word
           terms:
-            - tenant details
-            - tenant obligations
-            - landlord
-            - lessor
-            - lessee
-            - premises
-            - condition report
             - entry condition report
+            - condition report
             - breach notice
+            - notice to vacate
+            - notice to leave
+            - periodic agreement
+            - fixed term agreement
+            - bond lodgement
+            - text: RTA
+              case_sensitive: true
+            - water charges
+            - routine inspection
             - entry notice
-      strength: specific
-    - id: Keyword_rent_financial_context
+      strength: domain
+    - id: Keyword_global_residential_tenancy_agreement_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - bond
-            - security deposit
-            - bond lodgement
-            - weekly rent
-            - fortnightly rent
-            - monthly rent
-            - rental amount
-            - rent in advance
-      strength: specific
+            - policy guidance
+            - guidance note
+            - this guideline
+            - this procedure
+            - fact sheet
+            - training module
+            - e-learning
+            - course notes
+            - media release
+            - press release
+            - news report
+            - frequently asked questions
+            - best practice guide
+            - white paper
+            - whitepaper
+            - webinar
+            - how-to guide
+            - user guide
+            - help centre article
+            - help center article
+            - renting guide
+            - tenant rights
+            - software demo
+      strength: noise
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: >-
+      Quality pass (2026-09-24): 75 and 85 were phrase-only keyword tiers; 75 now needs a populated tenant/lessor, premises address, rent or bond field and 85 needs two distinct field types plus tenancy-process evidence; removed evidence terms overlapping the primary; replaced the bare 'Form 18A issued' positive; added renting-guide, blank-form and statistics decoys; dropped AML/CTF Act and SOCI Act, added the Residential Tenancies and Rooming Accommodation Act 2008 (Qld) with verified references.
   - version: 1.4.2
     date: '2026-07-19'
     description: 'Targeted finance/health blocker remediation: align the evidence-gated detector to keyword_proximity, keep tenancy-form/instrument markers at 65 discovery, require populated party or obligation details at 75 and additional bond/rent details at 85, extend authority-notice coverage, and add exact-tier plus demo probes.'
@@ -226,3 +233,21 @@ remediation:
     changes:
       - 'Mapped non-canonical confidence 95 to 85.'
       - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
+references:
+  - title: Residential Tenancies and Rooming Accommodation Act 2008 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2008-073
+  - title: Residential Tenancies Authority - Forms for general tenancies
+    url: https://www.rta.qld.gov.au/forms-resources/forms/forms-for-general-tenancies
+corroborative_evidence:
+  keywords:
+    - entry condition report
+    - condition report
+    - breach notice
+    - notice to vacate
+    - notice to leave
+    - periodic agreement
+    - fixed term agreement
+    - bond lodgement
+    - RTA
+    - water charges
+  proximity: 300

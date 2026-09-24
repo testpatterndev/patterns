@@ -1,22 +1,24 @@
 schema: testpattern/v1
 name: QPS Incident Report
 slug: qps-incident-report
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects Queensland Police Service (QPS) incident reports containing operational details about reported offences, informant information, and occurrence records. These are non-covert operational documents that are sensitive due to informant and victim details but do not involve covert methodology or life-safety risks.
-operation: 'Keyword proximity: primary keywords (incident report, QPS, occurrence number, reporting officer, informant, offence code, QPRIME) within 300 characters of QPS reference formats (QP-YYYY-NNNNNNN, OCC-NNNNNNN) and classification markers. Negative keyword exclusion for published statistics, annual reports, and media releases.'
-pattern: (?i)\b(QPS\s+incident\s+report|occurrence\s+(?:number|report)|reporting\s+officer|offence\s+code|QPRIME\s+(?:entry|reference|record)|QP-\d{4}-\d{5,7}|OCC-\d{5,7})\b
+operation: >-
+  Primary: incident report phrases (QPS incident report, occurrence number/report, reporting officer, offence code, QPRIME entry/reference/record). 65 = phrase only (discovery). 75 = phrase plus a populated incident field (occurrence number, QPRIME reference, reporting/attending officer, informant, complainant, victim, witness, suspect, offence code, date of occurrence, location, badge ...) or a QPRIME occurrence number (QP + 10 digits). 85 = phrase plus two distinct populated fields plus independent evidence (witness statement, CCTV, forensic examination, statutory declaration, patrol group, badge number ...). Media releases, statistics, fiction and training framing excluded.
+pattern: (?i)\b(?:QPS\s+incident\s+report|occurrence\s+(?:number|report)|reporting\s+officer|offence\s+code|QPRIME\s+(?:entry|reference|record|occurrence))\b
 confidence: medium
-confidence_justification: 'Medium confidence: requires co-occurrence of QPS-specific incident reporting terminology with reference number formats that are unique to Queensland Police operational systems. These terms rarely appear together outside genuine incident reports.'
+confidence_justification: >-
+  Medium confidence: enforcement requires a populated incident record or a QPRIME occurrence number; phrase-only mentions stay at discovery.
 jurisdictions:
   - au
 regulations:
-- "PPRA 2000 (Qld)"
-- "Police Service Admin Act 1990 (Qld)"
+  - "PPRA 2000 (Qld)"
+  - "Police Service Admin Act 1990 (Qld)"
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - law-enforcement
   - government
@@ -45,12 +47,15 @@ corroborative_evidence:
     - en-government-classification
 test_cases:
   should_match:
-    - value: 'SENSITIVE Law-Enforcement. QPS Incident Report. Occurrence Number: OCC-0458723. Reporting Officer: Sgt M. Thompson, Badge 14892, Fortitude Valley Patrol Group. Date of Occurrence: 14 February 2026. Offence Code: 0711 — Assault Occasioning Bodily Harm. Informant: Ms J. Williams attended Fortitude Valley station at 2245hrs. QPRIME entry created.'
-      description: QPS incident report with occurrence number, reporting officer details, and QPRIME reference
-    - value: 'Queensland Police Service — QPRIME Record. Reference: QP-2026-0034521. Incident Classification: Break and Enter — Dwelling. Location: 42 Boundary Street, West End QLD 4101. Attending Officers: Const. A. Chen (Badge 22104), Const. R. Patel (Badge 22356). Complainant provided statutory declaration. Forensic examination requested. Offence code 0521 recorded.'
-      description: QPRIME record with QP reference number and forensic request
-    - value: 'QPS Occurrence Report — OCC-0612984. Traffic incident involving pedestrian at intersection of George and Elizabeth Streets, Brisbane CBD. Reporting officer Senior Constable D. Murray, South Brisbane District. Informant transported to RBWH. Witness statements obtained from three bystanders. Person of interest identified via CCTV. QPRIME updated.'
-      description: Traffic incident occurrence report with witness and person of interest details
+    - value: 'SENSITIVE Law-Enforcement. QPS Incident Report. Occurrence Number: QP2600458723. Reporting Officer: Sgt M. Thompson, Badge 14892, Fortitude Valley Patrol Group. Date of Occurrence: 14 February 2026. Offence Code: 0711 — Assault Occasioning Bodily Harm. Informant: Ms J. Williams attended Fortitude Valley station at 2245hrs. QPRIME entry created.'
+      description: QPS incident report with occurrence number, reporting officer details, and QPRIME reference (reaches 85)
+    - value: 'Queensland Police Service — QPRIME Record. QPRIME reference: QP2600345210. Incident Classification: Break and Enter — Dwelling. Location: 42 Boundary Street, West End QLD 4101. Attending Officers: Const. A. Chen (Badge 22104), Const. R. Patel (Badge 22356). Complainant provided statutory declaration. Forensic examination requested. Offence code 0521 recorded.'
+      description: QPRIME record with QP reference number and forensic request (reaches 85)
+    - value: 'QPS Occurrence Report — QP2600612984. Traffic incident involving pedestrian at intersection of George and Elizabeth Streets, Brisbane CBD. Reporting officer Senior Constable D. Murray, South Brisbane District. Informant transported to RBWH. Witness statements obtained from three bystanders. Person of interest identified via CCTV. QPRIME updated.'
+      description: Traffic incident occurrence report with witness and person of interest details (reaches 75)
+    - value: "QPS incident report\nOccurrence number: QP2600417731\nReporting officer: Senior Constable Avery Teston\nComplainant: Jordan Staffson\nDate of occurrence: 12/09/2026\nWitness statement taken; CCTV requested from the licensed venue; forensic examination of the scene booked."
+      description: 'Populated incident report: QPRIME occurrence number, reporting officer, complainant and date plus witness/CCTV evidence (reaches 85)'
+      synthetic: true
   should_not_match:
     - value: The Queensland Police Service Annual Statistical Review 2024-25 reported 285,432 offences across the state, a 3.2% decrease from the previous year. Assault offences decreased by 4.1% statewide.
       description: Published QPS crime statistics annual report
@@ -58,6 +63,10 @@ test_cases:
       description: QPS media release about a charged person
     - value: A crime fiction novel described how Detective Inspector Blake filed the occurrence report into the QPRIME system and assigned the case to the Fortitude Valley CIB.
       description: Crime fiction novel referencing police systems
+    - value: "QPS incident report — form\nOccurrence number: __________\nReporting officer: __________\nComplainant: __________\nDate of occurrence: __________"
+      description: Blank incident report form (must stay below 75)
+    - value: "Policy guidance: the reporting officer must record the occurrence number and offence code for every incident before the end of shift."
+      description: Policy guidance naming the fields without any values (must stay below 75)
 false_positives:
   - description: Published QPS annual statistical reviews and crime reports
     mitigation: 'Negative keyword exclusion: ''annual report'', ''statistical review'', ''published''. Require proximity to specific occurrence numbers.'
@@ -80,13 +89,12 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_qps_incident_report_qps_reference_number
+      id_match: Pattern_qps_incident_report_incident_report_terms
       matches:
-        - ref: Evidence_qps_incident_report_primary_keywords
-        - ref: Evidence_qps_incident_report_classification_markers
+        - ref: Regex_qps_incident_report_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_qps_incident_report_corroborative_terms
-        - ref: Pattern_qps_incident_report_occurrence_number
-        - ref: Pattern_qps_incident_report_incident_report_terms
         - type: any
           min_matches: 0
           max_matches: 0
@@ -94,9 +102,12 @@ purview:
             - Keyword_noise_exclusion
             - Filter_qps_incident_report_exclusion
     - confidence_level: 75
-      id_match: Pattern_qps_incident_report_qps_reference_number
+      id_match: Pattern_qps_incident_report_incident_report_terms
       matches:
-        - ref: Evidence_qps_incident_report_primary_keywords
+        - type: any
+          refs:
+            - Regex_qps_incident_report_record_structure
+            - Regex_qps_incident_report_qprime_occurrence_number
         - type: any
           min_matches: 0
           max_matches: 0
@@ -105,7 +116,7 @@ purview:
             - Filter_qps_incident_report_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_qps_incident_report_qps_reference_number
+      id_match: Pattern_qps_incident_report_incident_report_terms
       matches:
         - type: any
           min_matches: 0
@@ -114,49 +125,24 @@ purview:
             - Keyword_noise_exclusion
             - Filter_qps_incident_report_exclusion
   regexes:
-    - id: Pattern_qps_incident_report_qps_reference_number
-      pattern: \bQP-\d{4}-\d{5,7}\b
-    - id: Pattern_qps_incident_report_occurrence_number
-      pattern: \bOCC-\d{5,7}\b
     - id: Pattern_qps_incident_report_incident_report_terms
-      pattern: (?i)\b(QPS\s+incident\s+report|occurrence\s+(?:number|report)|reporting\s+officer|offence\s+code|QPRIME\s+(?:entry|reference|record))\b
+      pattern: >-
+        (?i)\b(?:QPS\s+incident\s+report|occurrence\s+(?:number|report)|reporting\s+officer|offence\s+code|QPRIME\s+(?:entry|reference|record|occurrence))\b
+    - id: Regex_qps_incident_report_qprime_occurrence_number
+      pattern: \bQP\d{10}\b
+    - id: Regex_qps_incident_report_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|occurrence\s+(?:no\.?|number)|QPRIME\s+(?:no\.?|number|ref(?:erence)?)|reporting\s+officer|attending\s+officers?|informant|complainant|victim|witness|suspect|person\s+of\s+interest|offence\s+code|date\s+of\s+occurrence|incident\s+classification|location|badge(?:\s+(?:no\.?|number))?|station)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_qps_incident_report_primary_keywords
-      groups:
-        - match_style: word
-          terms:
-            - incident report
-            - occurrence number
-            - occurrence report
-            - reporting officer
-            - attending officer
-            - offence code
-            - QPRIME entry
-            - QPRIME reference
-            - QPRIME record
-            - QPS incident
-      strength: specific
-    - id: Evidence_qps_incident_report_classification_markers
-      groups:
-        - match_style: word
-          terms:
-            - Queensland Police Service
-            - text: QPS
-              case_sensitive: true
-      strength: domain
     - id: Evidence_qps_incident_report_corroborative_terms
       groups:
         - match_style: word
           terms:
-            - informant
-            - complainant
-            - person of interest
             - witness statement
             - patrol group
             - badge number
             - forensic examination
             - statutory declaration
-            - attending officers
             - district office
             - police station
             - CCTV
@@ -188,10 +174,17 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Legal
-references: []
+references:
+  - title: Queensland Police Service — Court brief (QP9)
+    url: https://www.police.qld.gov.au/documents-for-purchase/court-brief-qp9
+  - title: Police Powers and Responsibilities Act 2000 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2000-005
 created: '2026-03-06'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): removed the invented QP-YYYY-NNNNNNN and OCC-NNNNNNN reference formats from the primary and top-level pattern; the real QPRIME occurrence number shape (QP + 10 digits, already used across the catalogue) now counts as 75 structure; the primary is the incident-report phrase list; 75 = phrase + a populated incident field or a QPRIME occurrence number; 85 = phrase + two distinct populated fields + independent evidence (witness statement, CCTV, forensic examination ...); removed the QPS/Queensland Police Service marker group and the evidence terms that are also record-field labels; tests converted to QPRIME numbers with an 85 positive, blank-form and policy decoys; references added.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1503 without changing detector or package metadata.'

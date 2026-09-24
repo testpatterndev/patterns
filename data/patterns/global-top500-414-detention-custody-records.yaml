@@ -1,50 +1,68 @@
 schema: testpattern/v1
 name: Detention custody records
 slug: global-top500-414-detention-custody-records
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies documents containing references to detention custody records in international contexts. This information
-  type is classified as personally identifiable information under applicable data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 1 keywords within 240 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
+description: Identifies detention and custody records about an identified person (watch-house custody records, booking and intake records, prisoner and detainee records) with populated person and custody fields.
+operation: 'Primary: detention/custody/inmate/booking/jail/intake/prisoner/incarceration record, custody log, detention or holding facility. 65 (discovery only) = primary alone. 75 = primary plus one populated person or custody field (name, date of birth, prisoner, detainee, offender, accused, booking/custody number, cell, charge, IOMS number, case/file/reference number ...) with a non-placeholder value. 85 = primary plus two distinct populated fields plus independent custodial evidence (watch house, cell check, observation log, medical screening, at risk, remanded in custody, bail refused, lodged in custody, property receipt, strip search). All tiers exclude template/fixture text.'
 pattern: (?is)\b(?:detention\s+record|custody\s+record|inmate\s+record|booking\s+record|jail\s+record|detention\s+facility|custody\s+log|intake\s+record|prisoner\s+record|holding\s+facility|incarceration\s+record)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: 'Medium: custody vocabulary appears in policy, news and oversight reports, so enforcement requires populated person/custody fields; 85 adds custodial-process evidence.'
 jurisdictions:
 - global
 regulations:
-- GDPR
-- AML/CTF Act (Cth)
-- IPA 2009 (Qld)
-- NDB Scheme (Cth)
-- Privacy Act 1988 (Cth)
+  - Corrective Services Act 2006 (Qld)
+  - PPRA 2000 (Qld)
+  - IPA 2009 (Qld)
+  - Privacy Act 1988 (Cth)
+  - GDPR
+frameworks:
+  - QGISCF
+  - ISO 27001
 data_categories:
-- pii
+  - law-enforcement
+  - pii
 corroborative_evidence:
   keywords:
   - detention custody records
   proximity: 240
 test_cases:
   should_match:
-  - value: detention record
-    description: Primary topic phrase match
-  - value: custody record
-    description: Case-insensitive topic phrase match
-  - value: inmate record
-    description: Alternative topic phrase match
-  - value: booking record
-    description: Additional topic phrase match
+    - value: |-
+        Watch house custody record
+        Prisoner: Riley Teston
+        Date of birth: 04/02/1991
+        Booking number: WH26-004471
+        Charge: Breach of bail
+        Medical screening completed; placed on 15-minute cell check observations; remanded in custody.
+      description: 85 - populated custody record with medical screening/cell check evidence
+      synthetic: true
+    - value: |-
+        Detention record - youth detention centre
+        Detainee: Morgan Teston
+        Admitted following a court order; transfer to the Brisbane centre is scheduled for Friday.
+      description: 75 - one populated detainee field without custodial-process evidence
+      synthetic: true
+    - value: Custody log extract attached to the complaint file.
+      description: 65 discovery - topic phrase without populated fields
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
-  - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: mugshot victim
-    description: Generic word pair from old broad template should not match
+    - value: unrelated generic text without domain phrases
+      description: No relevant topic phrases present
+    - value: mugshot victim
+      description: Generic word pair should not match
+    - value: The custody record policy sets out how officers complete a custody record and how long it is retained.
+      description: Policy guidance - no populated fields (65 at most)
+    - value: |-
+        Custody record
+        Prisoner: ________
+        Date of birth: __/__/____
+        Booking number: [auto-generated]
+        Charge: ________
+      description: Blank custody form - placeholder fields are rejected
+    - value: Two detainees escaped from the detention facility overnight, police said, and an inspector will review the custody log.
+      description: News item - no populated fields
 false_positives:
 - description: Common words and phrases related to detention custody records appearing in policy documents, training materials,
     HR templates, or compliance guidelines without actual personal data.
@@ -64,74 +82,65 @@ exports:
 - regex_copy
 scope: wide
 purview:
-  patterns_proximity: 240
-  recommended_confidence: 85
+  patterns_proximity: 300
+  recommended_confidence: 75
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_detention_custody
-    matches:
-    - ref: Pattern_global_top500_414_detention_custody_records_label_context
-    - ref: Keyword_global_top500_414_detention_custody_records_domain_context
-    - ref: Keyword_detention_custody
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_detention_custody
-    matches:
-    - ref: Pattern_global_top500_414_detention_custody_records_label_context
-    - ref: Keyword_global_top500_414_detention_custody_records_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_detention_custody
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_detention_custody
+      matches:
+        - ref: Regex_global_top500_414_detention_custody_records_record_structure
+          min_count: 2
+          unique_results: true
+        - ref: Keyword_custodial_process_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_detention_custody
+      matches:
+        - ref: Regex_global_top500_414_detention_custody_records_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_detention_custody
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_detention_custody
-    pattern: (?is)\b(?:detention\s+record|custody\s+record|inmate\s+record|booking\s+record|jail\s+record|detention\s+facility|custody\s+log|intake\s+record|prisoner\s+record|holding\s+facility|incarceration\s+record)\b
-  - id: Pattern_global_top500_414_detention_custody_records_label_context
-    pattern: (?i)\b(?:detention\s+custody\s+records)\b
+    - id: Regex_detention_custody
+      pattern: (?is)\b(?:detention\s+record|custody\s+record|inmate\s+record|booking\s+record|jail\s+record|detention\s+facility|custody\s+log|intake\s+record|prisoner\s+record|holding\s+facility|incarceration\s+record)\b
+    - id: Regex_global_top500_414_detention_custody_records_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|suspect|subject\s+(?:name|person)|person\s+of\s+interest|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#)|booking\s+(?:no\.?|number)|custody\s+(?:no\.?|number|ref(?:erence)?)|cell(?:\s+(?:no\.?|number))?|charges?|IOMS(?:\s+(?:no\.?|number))?|correctional\s+centre|facility)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-  - id: Keyword_detention_custody
-    groups:
-    - match_style: word
-      terms:
-      - detention record
-      - custody record
-      - inmate record
-      - detainee
-      - booking record
-      - jail record
-      - detention facility
-      - custody log
-      - intake record
-      - prisoner record
-      - holding facility
-      - incarceration record
-    strength: specific
-  - id: Keyword_global_top500_414_detention_custody_records_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - detention custody records
-      - detention
-      - custody
-    strength: domain
+    - id: Keyword_custodial_process_evidence
+      groups:
+        - match_style: word
+          terms:
+            - watch house
+            - cell check
+            - observation log
+            - medical screening
+            - at risk
+            - remanded in custody
+            - bail refused
+            - lodged in custody
+            - property receipt
+            - strip search
+            - safety observations
+      strength: specific
 risk_description: The detector finds detention, custody, inmate, and booking records within law-enforcement or custodial context.
   An actual record may expose a person's location, legal status, movements, health or vulnerability notes, and release arrangements,
   enabling harassment, discrimination, escape assistance, or interference with lawful custody. Consequences are serious for
@@ -147,29 +156,30 @@ sensitivity_labels:
   nz_gov: CONFIDENTIAL
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
-- version: 1.2.1
-  date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1958 without changing
-    detector or package metadata.'
-- version: 1.2.0
-  date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
-- version: 1.1.1
-  date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
-- version: 1.1.0
-  date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  - version: 1.3.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): 75 now requires a populated person/custody field (new Regex_..._record_structure, justice family plus booking/cell/charge/IOMS labels) instead of label/domain phrases; 85 requires two distinct fields plus custodial-process evidence (new Keyword_custodial_process_evidence; the old evidence group repeated the primary). Removed the label-context regex and self-overlapping groups; proximity 240 -> 300; recommended_confidence 85 -> 75. Replaced bare-phrase positives with populated synthetic custody records; added policy, blank-form and news decoys. Metadata: removed AML/CTF Act and NDB Scheme; added Corrective Services Act 2006 (Qld) and PPRA 2000 (Qld) with references; data_categories adds law-enforcement; frameworks QGISCF, ISO 27001.'
+  - version: 1.2.1
+    date: '2026-07-14'
+    description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1958 without changing detector or package metadata.'
+  - version: 1.2.0
+    date: '2026-07-09'
+    description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
+  - version: 1.1.1
+    date: '2026-07-09'
+    description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
+  - version: 1.1.0
+    date: '2026-07-04'
+    description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
-references: []
+references:
+  - title: Corrective Services Act 2006 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2006-029
+  - title: Police Powers and Responsibilities Act 2000 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2000-005
 remediation:
   catalog_quality_2026_06_02:
     status: applied

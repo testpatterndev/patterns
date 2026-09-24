@@ -1,27 +1,24 @@
 schema: testpattern/v1
 name: Personalization feature vectors
 slug: global-top500-379-personalization-feature-vectors
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to personalization feature vectors in Australian contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
-pattern: (?is)\b(?:personalization\s+feature\s+vectors|user\s+profile|machine\s+learning|behavioral\s+data)\b
+  Detects personalization feature vectors and user embeddings: a feature vector / user embedding / feature store export phrase combined with populated model data - numeric vectors, JSON records keyed by a user or customer ID, or labelled user identifiers. Phrase-only mentions (engineering guidance, course notes) stay discovery-only.
+operation: >-
+  Pattern type: regex (boost_regex). Primary: personalization (feature) vector(s), feature vector(s), user/customer embedding(s), embedding vector(s), feature store export/extract/snapshot, recommendation features. 65 (discovery only): primary alone. 75: primary plus one populated structure - a numeric vector of 4+ decimal values ([0.1142, -0.5521, ...]), a JSON field keyed user_id/customer_id/member_id/visitor_id/profile_id with a value, or a labelled user/customer/member/profile/visitor ID. 85: primary plus two distinct structures (the three above or a delimited column header pairing a user ID column with feature/embedding columns) plus profiling evidence (category_affinity, price_sensitivity, affinity, propensity, inferred interest, model version, nearest neighbours, cosine similarity, sensitive inference, health interest). Template/sample framing and guidance/help/news/training framing are excluded on every enforce tier.
+pattern: (?i)\b(?:personali[sz]ation\s+(?:feature\s+)?vectors?|feature\s+vectors?|user\s+embeddings?|customer\s+embeddings?|embedding\s+vectors?|feature\s+store\s+(?:exports?|extracts?|snapshots?)|recommendation\s+features)\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
+confidence_justification: >-
+  Enforce tiers require populated vectors or identifier-keyed records beside the feature-vector phrase; 'user profile', 'machine learning' and 'behavioral data' were removed from the primary as too generic. Engineering docs and ML course notes stay at 65, as do header-only extracts. Medium because model-training fixtures can carry realistic vectors.
 jurisdictions:
   - global
 regulations:
-  - AML/CTF Act (Cth)
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
-  - TIA Act 1979 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
   - GDPR
 frameworks:
   - ISO 27001
@@ -30,38 +27,46 @@ data_categories:
   - pii
 corroborative_evidence:
   keywords:
-    - personalization feature vectors
-    - personalization
-    - feature
-    - vectors
-    - customer
-    - commercial
-    - data
+    - category_affinity
+    - price_sensitivity
+    - affinity
+    - propensity
+    - inferred interest
+    - model version
+    - nearest neighbours
+    - cosine similarity
+    - sensitive inference
+    - health interest
   proximity: 300
 test_cases:
   should_match:
-    - value: personalization feature vectors
-      description: Primary topic phrase match
-    - value: user profile
-      description: Case-insensitive topic phrase match
-    - value: machine learning
-      description: Alternative topic phrase match
-    - value: behavioral data
-      description: Additional topic phrase match
+    - value: "Personalization feature vectors - feature store snapshot 2026-09-12\n{\"user_id\": \"u-2204471\", \"model\": \"recs-v7\", \"embedding\": [0.1142, -0.5521, 0.0873, 0.3310, -0.0457, 0.2291], \"category_affinity\": {\"baby\": 0.91, \"fertility\": 0.77}, \"price_sensitivity\": 0.34}"
+      description: Feature-store record - user_id, embedding vector and affinity evidence (85)
+      synthetic: true
+    - value: "User embeddings export\nUser ID: u-2204471\nSent to the recommendations team."
+      description: Single labelled user identifier (75)
+      synthetic: true
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: customer invoice
-      description: Generic word pair from old broad template should not match
+    - value: "Engineering guidance note: feature vectors are numeric representations of behaviour used by the recommender. Never store raw identifiers in the feature store; use the pseudonymous key."
+      description: Engineering guidance
+      synthetic: true
+    - value: "Feature vector export\nuser_id,f_1,f_2,f_3,f_4\n"
+      description: Blank extract - column header only (65)
+      synthetic: true
+    - value: "Course notes: personalization feature vectors let a model compare users by cosine similarity. In this lesson we compute embeddings for a toy dataset."
+      description: Course notes
+      synthetic: true
+    - value: "unrelated generic text without domain phrases"
+      description: Unrelated
+    - value: "customer invoice"
+      description: Generic word pair
 false_positives:
-  - description: Common words and phrases related to personalization feature vectors appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Privacy notices, help-centre articles, product pages and policies describing feature vectors and embeddings.
+    mitigation: They name the topic without populated rows, labelled values or identifiers, and guidance/help framing is excluded, so they stay at 65.
+  - description: Analytics training material and documentation with worked examples of feature vectors and embeddings.
+    mitigation: Training and template framing is excluded; unframed worked examples with realistic rows can still reach 75.
+  - description: News and industry commentary with aggregate statistics.
+    mitigation: Aggregate percentages are not keyed to a record identifier, so they do not satisfy the row or labelled-value structures.
 exports:
   - purview_xml
   - yaml
@@ -72,55 +77,106 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_personalization_feature_vectors
       matches:
-        - ref: Evidence_personalization_feature_vectors
-          min_count: 2
-          unique_results: true
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_global_top500_379_personalization_feature_vectors_column_header
+            - Regex_global_top500_379_personalization_feature_vectors_identifier
+            - Regex_global_top500_379_personalization_feature_vectors_numeric_vector
+            - Regex_global_top500_379_personalization_feature_vectors_json_identifier
+        - ref: Keyword_global_top500_379_personalization_feature_vectors_domain_evidence
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_379_personalization_feature_vectors_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_personalization_feature_vectors
       matches:
-        - ref: Evidence_personalization_feature_vectors
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_global_top500_379_personalization_feature_vectors_identifier
+            - Regex_global_top500_379_personalization_feature_vectors_numeric_vector
+            - Regex_global_top500_379_personalization_feature_vectors_json_identifier
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_379_personalization_feature_vectors_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_personalization_feature_vectors
       matches:
-        - ref: Evidence_personalization_feature_vectors
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_personalization_feature_vectors
-      pattern: (?is)\b(?:personalization\s+feature\s+vectors|user\s+profile|machine\s+learning|behavioral\s+data)\b
+      pattern: (?i)\b(?:personali[sz]ation\s+(?:feature\s+)?vectors?|feature\s+vectors?|user\s+embeddings?|customer\s+embeddings?|embedding\s+vectors?|feature\s+store\s+(?:exports?|extracts?|snapshots?)|recommendation\s+features)\b
+    - id: Regex_global_top500_379_personalization_feature_vectors_column_header
+      pattern: (?i)\b(?:(?:user|customer|member|profile|visitor)[ _]?(?:id|key|hash)\b\"?(?:[,;\t]|[ \t]{0,2}\|[ \t]{0,2})(?:[^\n]{0,200}?(?:[,;\t]|\|[ \t]{0,2}))?\"?(?:f_?\d{1,3}|feat(?:ure)?[ _]?\d{1,3}|emb(?:edding)?[ _]?\d{1,3}|embedding|vector|affinity[ _]?\w{1,30})|(?:f_?\d{1,3}|feat(?:ure)?[ _]?\d{1,3}|emb(?:edding)?[ _]?\d{1,3}|embedding|vector|affinity[ _]?\w{1,30})\b\"?(?:[,;\t]|[ \t]{0,2}\|[ \t]{0,2})(?:[^\n]{0,200}?(?:[,;\t]|\|[ \t]{0,2}))?\"?(?:user|customer|member|profile|visitor)[ _]?(?:id|key|hash))\b
+    - id: Regex_global_top500_379_personalization_feature_vectors_identifier
+      pattern: (?i)\b(?:(?:user|customer|member|profile|visitor)\s*ID)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)(?=[A-Za-z-]{0,8}\d)[A-Za-z0-9][A-Za-z0-9._@-]{3,64}
+    - id: Regex_global_top500_379_personalization_feature_vectors_numeric_vector
+      pattern: \[[ \t]{0,2}-?\d{1,3}\.\d{2,8}(?:[ \t]{0,2},[ \t]{0,2}-?\d{1,3}\.\d{2,8}){3,63}
+    - id: Regex_global_top500_379_personalization_feature_vectors_json_identifier
+      pattern: (?i)\"(?:user_id|customer_id|member_id|visitor_id|profile_id)\"[ \t]{0,2}:[ \t]{0,2}\"?[A-Za-z0-9_-]{3,64}
   keywords:
-    - id: Evidence_personalization_feature_vectors
+    - id: Keyword_global_top500_379_personalization_feature_vectors_domain_evidence
       groups:
         - match_style: word
           terms:
-            - personalization feature vectors
-            - personalization
-            - feature
-            - vectors
-            - customer
-            - commercial
-            - recommendation
-            - user profile
-            - embedding
-            - machine learning
-            - behavioral data
+            - category_affinity
+            - price_sensitivity
+            - affinity
+            - propensity
+            - inferred interest
+            - model version
+            - nearest neighbours
+            - cosine similarity
+            - sensitive inference
+            - health interest
+      strength: domain
+    - id: Keyword_global_top500_379_personalization_feature_vectors_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - policy guidance
+            - guidance note
+            - this guideline
+            - this procedure
+            - fact sheet
+            - training module
+            - e-learning
+            - course notes
+            - media release
+            - press release
+            - news report
+            - frequently asked questions
+            - best practice guide
+            - white paper
+            - whitepaper
+            - webinar
+            - how-to guide
+            - user guide
+            - help centre article
+            - help center article
+            - numeric representations
+            - toy dataset
+      strength: noise
 risk_description: >-
-  The concept detector finds personalisation feature vectors, user profiles, machine-learning features, and behavioural data used to tailor content or decisions. A populated vector can encode inferred interests, habits, propensities, and engagement patterns that may be reidentified or used for manipulation, exclusion, or opaque treatment of the subject. The normal record concerns one user or a model-ready cohort, while technical discussion of machine learning and generic profiles can be false positives. Risk 8 SENSITIVE Personal-Privacy reflects serious inferential and profiling harm; PROTECTED is not met without mass surveillance, protected populations, or significant compromise of a high-impact decision system.
+  The concept detector finds personalisation feature vectors, user profiles, machine-learning features, and behavioural data used to tailor content or decisions. A populated vector can encode inferred interests, habits, propensities, and engagement patterns that may be reidentified or used for manipulation, exclusion, or opaque treatment of the subject. The normal record concerns one user or a model-ready cohort, while technical discussion of machine learning and generic profiles can be false positives. Risk 8 SENSITIVE Personal-Privacy reflects serious inferential and profiling harm; PROTECTED is not met without mass surveillance, protected populations, or significant compromise of a high-impact decision system. Quality pass 2026-09-24: enforce tiers (75/85) now require populated records - rows keyed by an identifier, labelled values or identifiers - so topic mentions in guidance, marketing and news stay at 65 discovery.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -130,8 +186,12 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: >-
+      Quality pass (2026-09-24): 75 and 85 were corroborated only by the primary's own phrase list (same-span self-corroboration) so they fired on the bare topic phrase; 75 now needs a numeric vector, an identifier-keyed JSON record or a labelled user ID and 85 needs two distinct structures (header counts only toward 85) plus profiling evidence. Removed the self-corroborating evidence group (generic 'feature', 'vectors', 'customer', 'commercial') and generic primaries (user profile, machine learning, behavioral data). Replaced bare-phrase test values with populated synthetic records and added guidance, blank-extract and news decoys. Dropped AML/CTF Act, HRIPA, My Health Records Act and TIA Act.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 966 without changing detector or package metadata.'

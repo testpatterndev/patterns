@@ -1,39 +1,40 @@
 schema: testpattern/v1
 name: Payroll bank account details
 slug: global-top500-081-payroll-bank-account-details
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to payroll bank account details in financial and compliance documents. Commonly found in international regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects employee payroll bank account details: a payroll/salary account or direct-deposit phrase combined with a BSB, a bank account number or a named employee/payee field. Phrase-only mentions (policies, scam warnings) stay discovery-only.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative evidence: 7 keywords within 300 characters. Keyword lists:
-  financial-deposit-terms, industry-hr. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: \bpayroll\s+bank\s+account\s+details\b
-confidence: low
+  Pattern type: regex (boost_regex). Primary: payroll bank (account) details, salary/wage/pay (bank) account (details), direct deposit details/authorisation/form, employee bank details, bank account details for salary/payroll, nominated account for salary/wages. 65 (discovery only): primary alone. 75: primary plus one populated field - BSB (6 digits), bank account number (6-10 digits) or a named employee/staff number/payee/account holder. 85: primary plus two distinct field types (the three above or an allocation line with a percentage/amount) plus payroll evidence (net pay, pay cycle, pay run, pay period, payslip, superannuation, effective from, change of bank details). Template/sample framing and guidance/training framing excluded on every enforce tier.
+pattern: (?i)\b(?:payroll\s+bank(?:ing)?\s+(?:account\s+)?details|(?:salary|wages?|pay)\s+(?:bank\s+)?account(?:\s+details)?|direct\s+deposit\s+(?:details|authori[sz]ation|form)|employee\s+bank(?:ing)?\s+details|bank\s+account\s+details\s+for\s+(?:salary|payroll|pay|wages)|nominated\s+(?:bank\s+)?account\s+for\s+(?:salary|wages|pay))\b
+confidence: medium
 confidence_justification: >-
-  Low confidence marker: phrase-based artifact detection to bootstrap line-by-line coverage. Requires corroborative evidence and later hardening to high-confidence structural patterns. Added context
-  gating and exclusion rules improve precision and reduce incidental matches.
+  Enforce tiers need a populated BSB, account number or employee field beside the payroll phrase; the previous 75 tier fired on the phrase alone. Payroll-change scam warnings and self-service help pages stay at 65. Medium because HR onboarding correspondence with the same fields is itself sensitive.
 jurisdictions:
   - global
 regulations:
-  - GDPR
-  - AML/CTF Act (Cth)
+  - Privacy Act 1988 (Cth)
+  - Fair Work Act 2009 (Cth)
   - IPA 2009 (Qld)
   - NDB Scheme (Cth)
-  - Privacy Act 1988 (Cth)
-  - SOCI Act 2018 (Cth)
+  - GDPR
 data_categories:
   - financial
 corroborative_evidence:
   keywords:
-    - payroll bank account details
-    - payroll
-    - bank
-    - account
-    - details
-    - tax
-    - operations
+    - net pay
+    - pay cycle
+    - pay run
+    - pay period
+    - payslip
+    - superannuation
+    - effective from
+    - change of bank details
+    - payroll officer
+    - direct credit
   proximity: 300
   keyword_lists:
     - financial-deposit-terms
@@ -42,24 +43,33 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: 'Payroll bank account details'
-      description: Topic phrase present
-    - value: 'payroll bank account details'
-      description: Topic phrase, lowercase
-    - value: 'this record references the payroll bank account details held on file'
-      description: Topic phrase within surrounding text
+    - value: "Payroll bank account details - change form\nEmployee name: Avery Teston\nEmployee ID: 004471\nAccount name: A Teston\nBSB: 064-000\nAccount number: 12345678\nAllocation: 100% of net pay, effective from the pay run of 12/08/2026."
+      description: Populated change form - employee, BSB, account number and allocation (85)
+      synthetic: true
+    - value: "Direct deposit details received for new starter\nEmployee: Jordan Whitlock\nPlease key into the payroll system before Thursday."
+      description: Direct deposit note with a named employee only (75)
+      synthetic: true
+    - value: "this record references the payroll bank account details held on file"
+      description: Phrase-only reference (65 discovery)
   should_not_match:
-    - value: unrelated generic text
-      description: No relevant phrase context
-    - value: placeholder value 12345
-      description: Random text should not match phrase marker
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: "Policy guidance: employees can update their payroll bank account details in the self-service portal. Never send your BSB or account number by email."
+      description: HR guidance naming the fields without values
+      synthetic: true
+    - value: "Direct deposit authorisation form\nEmployee name: __________\nBSB: ___-___\nAccount number: __________"
+      description: Blank authorisation form - placeholder values
+      synthetic: true
+    - value: "Training module: scammers impersonate staff and ask payroll to change salary account details to a new BSB. Verify every request by phone."
+      description: Security awareness training
+      synthetic: true
+    - value: "unrelated generic text"
+      description: Unrelated
+    - value: "template example placeholder record identifier"
+      description: Template wording
 false_positives:
-  - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
-    mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
-  - description: In English (as the primary international business language), standard business terminology overlapping with financial detection keywords in routine correspondence and documentation.
-    mitigation: Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for higher precision.
+  - description: HR policies, payroll help pages and payroll-redirection scam warnings.
+    mitigation: No populated BSB, account number or employee field, and guidance/training framing is excluded.
+  - description: Supplier or customer bank details that mention salary accounts.
+    mitigation: Still requires a payroll/salary/direct-deposit phrase; reviewers should confirm the payee is an employee.
 exports:
   - purview_xml
   - yaml
@@ -73,25 +83,38 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 85
       id_match: Regex_payroll_bank_account
       matches:
-        - ref: Pattern_global_top500_081_payroll_bank_account_details_label_context
-        - ref: Keyword_global_top500_081_payroll_bank_account_details_domain_context
         - type: any
-          min_matches: 0
-          max_matches: 0
+          min_matches: 2
           refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_payroll_bank_account
-      matches:
+            - Regex_global_top500_081_payroll_bank_account_details_bsb
+            - Regex_global_top500_081_payroll_bank_account_details_account_number
+            - Regex_global_top500_081_payroll_bank_account_details_payee
+            - Regex_global_top500_081_payroll_bank_account_details_allocation
         - ref: Keyword_payroll_bank_account
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_top500_081_payroll_bank_account_details_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_payroll_bank_account
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_global_top500_081_payroll_bank_account_details_bsb
+            - Regex_global_top500_081_payroll_bank_account_details_account_number
+            - Regex_global_top500_081_payroll_bank_account_details_payee
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_081_payroll_bank_account_details_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_payroll_bank_account
@@ -103,36 +126,60 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_payroll_bank_account
-      pattern: \bpayroll\s+bank\s+account\s+details\b
-    - id: Pattern_global_top500_081_payroll_bank_account_details_label_context
-      pattern: (?i)\b(?:payroll\s+bank\s+account\s+details)\b
+      pattern: (?i)\b(?:payroll\s+bank(?:ing)?\s+(?:account\s+)?details|(?:salary|wages?|pay)\s+(?:bank\s+)?account(?:\s+details)?|direct\s+deposit\s+(?:details|authori[sz]ation|form)|employee\s+bank(?:ing)?\s+details|bank\s+account\s+details\s+for\s+(?:salary|payroll|pay|wages)|nominated\s+(?:bank\s+)?account\s+for\s+(?:salary|wages|pay))\b
+    - id: Regex_global_top500_081_payroll_bank_account_details_bsb
+      pattern: (?i)\bBSB(?:[ \t]{1,3}(?:no\.?|number))?[ \t]{0,3}[:#]?[ \t]{0,3}\d{3}[ \t-]?\d{3}\b
+    - id: Regex_global_top500_081_payroll_bank_account_details_account_number
+      pattern: (?i)\b(?:(?:bank\s+)?account|acct|a/c)[ \t]{0,3}(?:no\.?|number|#)[ \t]{0,3}[:#]?[ \t]{0,3}\d{6,10}\b
+    - id: Regex_global_top500_081_payroll_bank_account_details_payee
+      pattern: (?i)\b(?:employee(?:\s+(?:name|no\.?|number|ID))?|staff\s*(?:no\.?|number|ID)|payee|account\s+(?:name|holder))(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)[A-Z0-9$][A-Za-z0-9/&'.,$%-]{0,40}(?:[ \t]{1,3}[A-Za-z0-9&$][A-Za-z0-9/&'.,$%-]{0,30}){0,5}
+    - id: Regex_global_top500_081_payroll_bank_account_details_allocation
+      pattern: (?i)\b(?:allocation|split|remainder|percentage|amount)[ \t]{0,3}[:#][ \t]{0,3}(?:\d{1,3}[ \t]?%|remainder|balance|(?:AUD|USD|NZD|GBP|EUR|A\$|US\$|NZ\$|\$|£|€)[ \t]?(?:\d{1,3}(?:,\d{3}){1,4}|\d{1,12})(?:\.\d{2})?(?![\d,]\d)(?!\.\d))
   keywords:
     - id: Keyword_payroll_bank_account
       groups:
         - match_style: word
           terms:
-            - payroll bank account
-            - direct deposit
-            - bank details
-            - account number
-            - routing number
-            - BSB number
-            - salary account
-            - pay deposit
-            - banking details
-            - payroll transfer
-            - wage payment
-      strength: specific
-    - id: Keyword_global_top500_081_payroll_bank_account_details_domain_context
+            - net pay
+            - pay cycle
+            - pay run
+            - pay period
+            - payslip
+            - superannuation
+            - effective from
+            - change of bank details
+            - payroll officer
+            - direct credit
+      strength: domain
+    - id: Keyword_global_top500_081_payroll_bank_account_details_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - payroll bank account details
-            - payroll
-            - bank
-      strength: domain
+            - policy guidance
+            - guidance note
+            - this guideline
+            - this procedure
+            - fact sheet
+            - training module
+            - e-learning
+            - course notes
+            - media release
+            - press release
+            - news report
+            - frequently asked questions
+            - best practice guide
+            - white paper
+            - whitepaper
+            - webinar
+            - how-to guide
+            - user guide
+            - help centre article
+            - help center article
+            - self-service portal
+            - never send your
+      strength: noise
 risk_description: >-
-  The pattern recognises the phrase payroll bank account details with nearby payroll and financial-deposit vocabulary, indicating a payroll banking record rather than validating a specific account format. A genuine record can expose where wages are paid and support payroll diversion, supplier-style impersonation, or targeted fraud when paired with an employee name and change process. Published guidance, HR templates, and accounting discussion can match, and the low-confidence phrase does not prove that complete bank details are present. Risk 7 SENSITIVE reflects credible moderate employee financial harm from a true record; PROTECTED would require a payroll master file, authorisation data, or significant damage.
+  The pattern recognises the phrase payroll bank account details with nearby payroll and financial-deposit vocabulary, indicating a payroll banking record rather than validating a specific account format. A genuine record can expose where wages are paid and support payroll diversion, supplier-style impersonation, or targeted fraud when paired with an employee name and change process. Published guidance, HR templates, and accounting discussion can match, and the low-confidence phrase does not prove that complete bank details are present. Risk 7 SENSITIVE reflects credible moderate employee financial harm from a true record; PROTECTED would require a payroll master file, authorisation data, or significant damage. Quality pass 2026-09-24: enforce tiers (75/85) now require populated records - rows keyed by an identifier, labelled values or identifiers - so topic mentions in guidance, marketing and news stay at 65 discovery.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -142,8 +189,12 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: >-
+      Quality pass (2026-09-24): the two 75 tiers were satisfied by the primary phrase itself (label-context regex and a domain keyword group repeating 'payroll bank account details'); collapsed them into one 75 tier that needs a populated BSB, account number or employee/payee field, and an 85 tier that needs two distinct field types plus payroll evidence; broadened the primary to salary/wage account and direct-deposit wording; confidence low -> medium; replaced bare-phrase positives; added guidance, blank-form and training decoys; dropped AML/CTF Act and SOCI Act, added Fair Work Act 2009 (Cth), ISO 27001/27701 and verified references.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1642 without changing detector or package metadata.'
@@ -169,3 +220,11 @@ remediation:
       - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
 
 risk_rating: 7
+frameworks:
+  - ISO 27001
+  - ISO 27701
+references:
+  - title: Fair Work Ombudsman - Record-keeping and pay slips
+    url: https://www.fairwork.gov.au/tools-and-resources/fact-sheets/rights-and-obligations/record-keeping-pay-slips
+  - title: OAIC - What is personal information?
+    url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-personal-information

@@ -1,47 +1,65 @@
 schema: testpattern/v1
 name: Employee tax forms
 slug: global-top500-084-employee-tax-forms
-version: 1.2.1
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to employee tax forms in financial and compliance documents. Commonly found in international regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects completed employee tax and superannuation forms: PAYG payment summaries and employee income statements, superannuation standard choice form (NAT 13080), US Form W-2 and UK P60/P45, with the payee identified and TFN/SSN, gross payments or tax withheld amounts, USI/member number, payer ABN or financial year.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Keyword
-  lists: industry-hr. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:employee\s+tax\s+forms|tax\s+form|income\s+statement|payment\s+summary|tax\s+return|tax\s+declaration|PAYG\s+summary|annual\s+earnings|tax\s+certificate|employer\s+statement)\b
+  Primary: an employee tax form phrase (PAYG payment summary, employee income statement, Form W-2 / wage and tax statement, P60, P45, superannuation standard choice form, NAT 13080). 75 tier requires a populated person field (payee or employee name, surname/family name, given name, full name, employee number) with a non-placeholder value within 300 characters. 85 tier additionally requires a populated tax detail (labelled TFN or SSN, gross payments / tax withheld amount, USI or fund member number, payer ABN, or financial year) and an independent corroborative term (payer, ATO, IRS, HMRC, Single Touch Payroll). All tiers exclude template/fixture text (template-exclusion); enforce tiers also exclude guidance, policy, training and media-release framing. 65 is discovery-only (primary alone) and will surface policies, guidance, blank forms and statistics.
+pattern: >-
+  (?i)\b(?:PAYG\s+payment\s+summary|payment\s+summary\s*-\s*individual\s+non[\s-]business|employee\s+income\s+statement|income\s+statement\s+(?:for|from)\s+(?:your\s+)?employer|Form\s+W-2|wage\s+and\s+tax\s+statement|P60|P45|superannuation\s+standard\s+choice\s+form|NAT\s?13080|employee\s+tax\s+forms?)\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated person field and 85 adds a record-specific populated detail plus independent corroboration. Person values are customer-defined (employee IDs, position numbers), so the field regexes use labelled loose values with a placeholder guard. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
   - global
 regulations:
+  - Taxation Administration Act 1953 (Cth)
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
   - GDPR
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - financial
+  - pii
+  - employment
 corroborative_evidence:
   keywords:
-    - employee tax forms
-    - employee
-    - tax
-    - forms
-    - payroll
-    - operations
+    - payer
+    - ATO
+    - IRS
+    - HMRC
+    - Single Touch Payroll
+    - myGov
+    - tax return
+    - lodgement
+    - complying fund
+    - self-managed super fund
   proximity: 300
-  keyword_lists:
-    - industry-hr
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: employee tax forms
-      description: Primary topic phrase match
-    - value: tax form
-      description: Case-insensitive topic phrase match
-    - value: income statement
-      description: Alternative topic phrase match
-    - value: payment summary
-      description: Additional topic phrase match
+    - value: "PAYG payment summary - individual non-business\nPayee name: Avery Teston\nTax file number: 123 456 782\nFinancial year ending 30 June 2026\nGross payments: $84,512\nTotal tax withheld: $17,940\nPayer ABN: 51 824 753 556\nKeep for your tax return."
+      description: '85: Payment summary with payee, TFN, gross and tax withheld'
+      synthetic: true
+    - value: "Form W-2 Wage and Tax Statement 2025\nEmployee: Morgan Teston\nSSN: 123-45-6789\nWages, tips, other compensation: $71,250.00\nFederal income tax withheld: $8,904.00\nFile with your tax return."
+      description: '85: Completed W-2 with SSN and amounts'
+      synthetic: true
+    - value: "Superannuation standard choice form (NAT 13080)\nEmployee name: Jordan Staffson\nChoice: my existing super fund; fund details to follow."
+      description: '75: Super choice form naming the employee, no USI or TFN'
+      synthetic: true
   should_not_match:
+    - value: Your employer gives you an income statement through myGov instead of a PAYG payment summary. This fact sheet explains what the statement shows.
+      description: Fact sheet - must stay below 75
+    - value: "Superannuation standard choice form\nEmployee name: __________\nTax file number: ___ ___ ___\nUSI: __________"
+      description: Blank form - must stay below 75
+    - value: Employers issued 14 million PAYG payment summary and income statement records, the ATO said in a media release.
+      description: News / media release - must stay below 75
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
     - value: placeholder value 12345
@@ -49,10 +67,14 @@ test_cases:
     - value: payroll reimbursement
       description: Generic word pair from old broad template should not match
 false_positives:
-  - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
-    mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
-  - description: In English (as the primary international business language), standard business terminology overlapping with financial detection keywords in routine correspondence and documentation.
-    mitigation: Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for higher precision.
+  - description: Policies, directives, fact sheets, guidance and training material that name the record type.
+    mitigation: Enforce tiers require a populated person field; guidance text has labels without values and guidance/training/media-release framing is excluded.
+  - description: Blank forms, templates and HR system configuration.
+    mitigation: Blank lines, square- and angle-bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded.
+  - description: Aggregate statistics and news reporting.
+    mitigation: No populated person field, so these stay at 65 discovery.
+  - description: Records that identify the person only in free text (no field label) fall to 65.
+    mitigation: Accepted precision trade-off; extend the person-field regex with the customer employee-id format to recover recall.
 exports:
   - purview_xml
   - yaml
@@ -66,60 +88,85 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_employee_tax_forms
+    - confidence_level: 85
+      id_match: Regex_top500_084_employee_tax_forms_primary
       matches:
-        - ref: Pattern_global_top500_084_employee_tax_forms_label_context
-        - ref: Keyword_global_top500_084_employee_tax_forms_domain_context
+        - ref: Regex_top500_084_employee_tax_forms_person_field
+        - ref: Regex_top500_084_employee_tax_forms_record_detail
+        - ref: Keyword_top500_084_employee_tax_forms_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_top500_084_employee_tax_forms_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_top500_084_employee_tax_forms_primary
+      matches:
+        - ref: Regex_top500_084_employee_tax_forms_person_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_top500_084_employee_tax_forms_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_employee_tax_forms
+      id_match: Regex_top500_084_employee_tax_forms_primary
       matches:
-        - ref: Keyword_employee_tax_forms
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
   regexes:
-    - id: Regex_employee_tax_forms
-      pattern: (?is)\b(?:employee\s+tax\s+forms|tax\s+form|income\s+statement|payment\s+summary|tax\s+return|tax\s+declaration|PAYG\s+summary|annual\s+earnings|tax\s+certificate|employer\s+statement)\b
-    - id: Pattern_global_top500_084_employee_tax_forms_label_context
-      pattern: (?i)\b(?:employee\s+tax\s+forms)\b
+    - id: Regex_top500_084_employee_tax_forms_primary
+      pattern: >-
+        (?i)\b(?:PAYG\s+payment\s+summary|payment\s+summary\s*-\s*individual\s+non[\s-]business|employee\s+income\s+statement|income\s+statement\s+(?:for|from)\s+(?:your\s+)?employer|Form\s+W-2|wage\s+and\s+tax\s+statement|P60|P45|superannuation\s+standard\s+choice\s+form|NAT\s?13080|employee\s+tax\s+forms?)\b
+    - id: Regex_top500_084_employee_tax_forms_person_field
+      pattern: >-
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number|title)|work\s+unit|business\s+unit|payee|(?:payee|employee)(?:'s)?\s+(?:full\s+)?name|surname(?:\s+or\s+family\s+name)?|family\s+name|(?:first\s+)?given\s+names?|full\s+name|first\s+name)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_top500_084_employee_tax_forms_record_detail
+      pattern: >-
+        (?i)\b(?:tax\s+file\s+number|TFN)\s*(?:\([^)]{1,20}\))?\s*[:#]?\s*\d{3}\s?\d{3}\s?\d{2,3}\b|\b(?:SSN|social\s+security\s+(?:no\.?|number))\s*[:#]?\s*\d{3}-\d{2}-\d{4}\b|\b(?:payer|employer)(?:'s)?\s+ABN\s*[:#]?\s*\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b|\b(?:gross\s+(?:payments?|pay|salary|wages)|total\s+(?:tax\s+withheld|allowances)|tax\s+withheld|reportable\s+(?:fringe\s+benefits(?:\s+amount)?|employer\s+super(?:annuation)?\s+contributions)|federal\s+income\s+tax\s+withheld|wages,\s+tips,\s+other\s+compensation)\s*(?:\([^)]{1,20}\))?\s*[:\-]?\s*(?:(?:AUD|USD|GBP|NZD|A\$|US\$|NZ\$|\$|£|€)\s?\d{1,3}(?:,?\d{3}){0,3}(?:\.\d{2})?)|\b(?:USI|unique\s+superannuation\s+identifier|(?:fund\s+)?member\s+(?:no\.?|number))\s*(?:\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Z0-9-]{4,20}\b|\b(?:financial|tax)\s+year\s*(?:ending|ended)?\s*[:\-]?\s*(?:20\d{2}\s*[-/]\s*(?:20)?\d{2}|30\s+June\s+20\d{2})
   keywords:
-    - id: Keyword_employee_tax_forms
+    - id: Keyword_top500_084_employee_tax_forms_corroborative
       groups:
         - match_style: word
           terms:
-            - employee tax forms
-            - tax form
-            - text: W-2
+            - payer
+            - text: ATO
               case_sensitive: true
-            - income statement
-            - payment summary
+            - text: IRS
+              case_sensitive: true
+            - text: HMRC
+              case_sensitive: true
+            - Single Touch Payroll
+            - myGov
             - tax return
-            - tax declaration
-            - PAYG summary
-            - annual earnings
-            - tax certificate
-            - employer statement
+            - lodgement
+            - complying fund
+            - self-managed super fund
       strength: specific
-    - id: Keyword_global_top500_084_employee_tax_forms_domain_context
+    - id: Keyword_top500_084_employee_tax_forms_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - employee tax forms
-            - employee
-            - tax
-            - forms
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
       strength: domain
 risk_description: >-
-  This concept detector recognises employee tax forms, tax form, and income statement language supported by nearby HR terms. The normal match can be a form name, checklist, published guidance, or blank template because the regex does not require populated income, withholding, tax identifiers, or employee attribution. A completed employee tax form would be more consequential, but that richer record is not established by the detector's topic phrases alone. Risk 4 OFFICIAL fits the ordinary detected unit, while SENSITIVE requires an identified completed form containing income, tax number, withholding, or other actionable financial data.
+  The classifier identifies a completed employee tax or superannuation form (payment summary, income statement, W-2, P60/P45, super standard choice) about an identified person, gated on a populated person field (75) plus a record-specific populated detail (85). A completed form combines an identifiable employee's tax identifier with income, tax withheld and super fund details; misuse enables tax and identity fraud. Policies, guidance, blank forms, training and news stay at 65 discovery. Risk 4 supports OFFICIAL.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -128,9 +175,17 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+references:
+  - title: ATO - Superannuation standard choice form (NAT 13080)
+    url: https://www.ato.gov.au/forms-and-instructions/superannuation-standard-choice-form
+  - title: Taxation Administration Act 1953 (Cth)
+    url: https://www.legislation.gov.au/C1953A00001/latest/text
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.3.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): rebuilt tiers - 65 primary phrase (discovery), 75 primary + populated person field (employee/staff name or number, position number/title, work unit), 85 adds a record-specific populated detail regex plus an independent corroborative keyword group; removed the self-corroborating Evidence/label-context groups so a single phrase no longer reaches 75/85; added guidance/training/media-release exclusion to enforce tiers; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys; regulations now cite Taxation Administration Act 1953 (Cth) with the privacy statutes; references now cite primary sources.'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1645 without changing detector or package metadata.'

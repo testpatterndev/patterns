@@ -1,15 +1,15 @@
 schema: testpattern/v1
 name: LPP Claim Assessment
 slug: lpp-claim-assessment
-version: 1.5.0
+version: 1.6.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects internal assessments evaluating whether specific documents or communications attract legal professional privilege, including analysis of privilege vulnerabilities. These meta-privilege documents map where the State's privilege claims are strong and where they are vulnerable.
-operation: 'Primary detection: keyword proximity matching privilege assessment terms (''privilege claim'', ''privilege assessment'', ''LPP assessment'', ''privilege log'', ''privilege review'', ''waiver risk'') within 200 characters of analysis indicators (''assessment'', ''analysis'', ''vulnerable'', ''maintain'', ''claim'', ''PROTECTED''). Must co-occur with government entity context. Corroborative evidence: 3 keywords within 300 characters.'
-pattern: (?i)\b(?:privilege\s+(?:claim|assessment|log|review)|LPP\s+assessment|waiver\s+risk)\b
-confidence: low
-confidence_justification: 'Medium confidence: Privilege assessment terminology is specific to legal practice privilege management. Combined with government entity context and privilege vulnerability analysis language, false positives are minimal.'
+operation: 'Primary: privilege claim(s)/assessment/log/review, LPP (claim) assessment, waiver risk. 65 (discovery only) = primary alone. 75 = primary plus two distinct populated matter/document fields (Matter, Matter/File/RTI/Application number, Our ref, Documents assessed, Doc ID, Category X documents, Privilege claimed/basis/status, Prepared by/for, Date, To, From, Subject). 85 = primary plus three distinct fields plus an independent legal conclusion (vulnerable to challenge, privilege maintained/waived, dominant purpose (not) established, distribution defeated, mixed-purpose). Academic/guide/template and public-decision exclusions, the template-exclusion dictionary and the Qld court-citation filter apply to every tier.'
+pattern: (?i)\b(?:privilege\s+(?:claims?|assessment|log|review)|LPP\s+(?:claims?\s+)?assessment|waiver\s+risk)\b
+confidence: medium
+confidence_justification: 'Medium: privilege-assessment terms also appear in articles, judgments and guides, so enforcement requires populated matter/document fields; 85 adds a privilege conclusion. Tiers are heuristic evidence gates, not measured accuracy.'
 jurisdictions:
   - au
 regulations:
@@ -43,24 +43,16 @@ corroborative_evidence:
     - government-services
 test_cases:
   should_match:
-    - value: 'Privilege assessment intake note.'
-      description: Exact 65 discovery probe - assessment topic without matter facts or a legal conclusion
-    - value: 'Privilege assessment for Matter: RTI-771 covering documents 12-18.'
-      description: Exact 75 probe - populated matter context without a conclusion or privileged marking
-    - value: 'PROTECTED LPP assessment for Matter RTI-342: Crown Solicitor concludes documents 42-58 are vulnerable because distribution defeated dominant purpose.'
-      description: Exact 85 probe - populated matter, legal conclusion, and privileged/legal marking
     - value: |-
-        PROTECTED — LEGAL PROFESSIONAL PRIVILEGE
-        LPP Claim Assessment
-
-        Matter: State of Queensland — RTI Application No. 2025-0342
-
-        This assessment evaluates the privilege claims over 247 documents identified in the privilege log. Documents 42-58 are assessed as vulnerable to challenge due to mixed-purpose communication.
-      description: LPP claim assessment for RTI application with vulnerability analysis
-    - value: |-
-        Privilege Review — Confidential
-        The following privilege assessment has been prepared to identify waiver risk across the discovery set. The Crown Solicitor has advised that certain email chains may not maintain privilege due to wide circulation.
-      description: Privilege review identifying waiver risk
+        PROTECTED - LEGAL PROFESSIONAL PRIVILEGE
+        LPP claim assessment
+        Matter: Harbour Freight Pty Ltd v State of Queensland
+        File ref: CL2026-0412
+        Documents assessed: 247 (privilege log items 1-247)
+        Prepared by: Crown Solicitor
+        Documents 42-58 are vulnerable to challenge because distribution defeated dominant purpose.
+      description: 85 - populated matter/document fields plus a privilege conclusion
+      synthetic: true
     - value: |-
         CONFIDENTIAL
         Internal Assessment: Legal Professional Privilege Claims
@@ -69,20 +61,50 @@ test_cases:
         Privilege Vulnerability Analysis:
         - Category A documents: Strong LPP claim (dominant purpose established)
         - Category B documents: Moderate waiver risk (circulated beyond legal team)
-      description: Internal privilege vulnerability analysis with category ratings
-    - value: 'PROTECTED LPP Assessment RTI-342: Crown Solicitor finds emails 42-58 vulnerable to waiver because distribution defeated dominant purpose.'
-      description: Populated internal assessment with marking, matter, government lawyer, and waiver conclusion (reaches the 75 policy tier)
+      description: 85 - internal privilege vulnerability analysis with populated category ratings and a conclusion
+    - value: |-
+        Privilege review
+        Matter no: RTI-2026-0771
+        Prepared by: Legal Services Unit
+        Review of 34 email chains is under way.
+      description: 75 - two populated matter fields without a conclusion
+      synthetic: true
+    - value: |-
+        PROTECTED - LEGAL PROFESSIONAL PRIVILEGE
+        LPP Claim Assessment
+
+        Matter: State of Queensland - RTI Application No. 2025-0342
+
+        This assessment evaluates the privilege claims over 247 documents identified in the privilege log. Documents 42-58 are assessed as vulnerable to challenge due to mixed-purpose communication.
+      description: 65 discovery - only one populated field (Matter); conclusion present but structure insufficient
+    - value: Privilege assessment intake note.
+      description: 65 discovery - topic without matter facts
+    - value: 'Privilege assessment for Matter: RTI-771 covering documents 12-18.'
+      description: 65 discovery - a single populated matter field
+    - value: 'PROTECTED LPP assessment for Matter RTI-342: Crown Solicitor concludes documents 42-58 are vulnerable because distribution defeated dominant purpose.'
+      description: 65 discovery - one-line assessment without populated fields
+    - value: |-
+        Privilege Review - Confidential
+        The following privilege assessment has been prepared to identify waiver risk across the discovery set. The Crown Solicitor has advised that certain email chains may not maintain privilege due to wide circulation.
+      description: 65 discovery - prose without populated matter fields
   should_not_match:
     - value: This article discusses the doctrine of legal professional privilege in Australian law. The Evidence Act 1977 (Qld) section 14 sets out the statutory basis for privilege claims.
       description: Academic article on LPP doctrine
     - value: The court considered the privilege claim and upheld it in part. The published reasons discussed the dominant purpose test and its application to the documents in question.
-      description: Published court decision on privilege claim
+      description: Published court decision on a privilege claim (news/judgment)
     - value: A guide to managing privilege logs in large-scale litigation. This template provides a framework for recording privilege claims across document collections.
-      description: Template/guide for privilege log management
+      description: Guide/template for privilege log management
     - value: The employee claimed a travel privilege under the loyalty program.
       description: Non-legal privilege usage outside scope
     - value: 'Guide template: assess each privilege claim for waiver risk.'
-      description: Guide/template wording is blocked from the enforcing 75 tier by the authored exclusion group (discovery inventory only)
+      description: Guide/template wording blocked by the exclusion group
+    - value: |-
+        Privilege log
+        Doc ID: ________
+        Date: ________
+        Privilege claimed: [select]
+        Basis of claim: ________
+      description: Blank privilege log - placeholder fields are rejected
 false_positives:
   - description: Academic articles on the doctrine of legal professional privilege
     mitigation: Require co-occurrence with specific matter references, government entity names, or privilege vulnerability analysis
@@ -98,99 +120,66 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-    - tier: high
-      confidence_level: 85
-      id_match: primary
+    - confidence_level: 85
+      id_match: Regex_lpp_claim_assessment_primary
       matches:
-        - ref: Evidence_lpp_matter_context
+        - ref: Regex_lpp_claim_assessment_record_structure
+          min_count: 3
+          unique_results: true
         - ref: Evidence_lpp_conclusion
-        - ref: Evidence_lpp_marking
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - exclusion
-      description: Privilege assessment plus populated matter facts, a legal conclusion, and a privileged/legal marking
-    - tier: medium
-      confidence_level: 75
-      id_match: primary
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_lpp_claim_assessment_primary
       matches:
-        - ref: Evidence_lpp_matter_context
+        - ref: Regex_lpp_claim_assessment_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - exclusion
-      description: Privilege assessment plus populated matter or document context, gated by public/template exclusions
-    - tier: low
-      confidence_level: 65
-      id_match: primary
+            - Keyword_noise_exclusion
+    - confidence_level: 65
       discovery_only: true
+      id_match: Regex_lpp_claim_assessment_primary
       matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - exclusion
-      description: Privilege-assessment terminology for discovery inventory only
+            - Keyword_noise_exclusion
   regexes:
-    - pattern: (?i)\b(?:privilege\s+(?:claim|assessment|log|review)|LPP\s+assessment)\b
-      description: Privilege assessment terminology
-    - pattern: (?i)\bwaiver\s+risk\b
-      description: Privilege waiver risk phrase
+    - id: Regex_lpp_claim_assessment_primary
+      pattern: (?i)\b(?:privilege\s+(?:claims?|assessment|log|review)|LPP\s+(?:claims?\s+)?assessment|waiver\s+risk)\b
+    - id: Regex_lpp_claim_assessment_record_structure
+      pattern: (?i)\b(?:Matter|Matter\s+(?:no\.?|number)|File\s+(?:ref|no\.?|number)|Our\s+ref|RTI\s+(?:application\s+)?(?:no\.?|number)|Application\s+(?:no\.?|number)|Documents?\s+(?:assessed|range|numbers?)|Doc(?:ument)?\s+ID|Category\s+[A-Z]\s+documents|Privilege\s+(?:claimed|basis|status)|Basis\s+of\s+claim|Prepared\s+(?:by|for)|Date|To|From|Subject)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<)[A-Za-z0-9$]
   keywords:
-    - id: primary
-      groups:
-        - match_style: word
-          terms:
-            - privilege claim
-            - privilege assessment
-            - LPP assessment
-            - privilege log
-            - privilege review
-            - waiver risk
-      strength: domain
-    - id: Evidence_lpp_matter_context
-      groups:
-        - match_style: word
-          terms:
-            - 'Matter:'
-            - matter number
-            - text: RTI
-              case_sensitive: true
-            - documents
-            - email chains
-            - discovery set
-            - client file
-            - legal services
-      strength: domain
     - id: Evidence_lpp_conclusion
       groups:
         - match_style: word
           terms:
-            - vulnerable
             - vulnerable to challenge
+            - vulnerable to waiver
             - privilege maintained
             - privilege waived
             - dominant purpose established
             - dominant purpose not established
             - distribution defeated
             - mixed-purpose
-            - legal advice purpose
-      strength: domain
-    - id: Evidence_lpp_marking
-      groups:
-        - match_style: word
-          terms:
-            - legal professional privilege
-            - privileged and confidential
-            - PROTECTED
-            - CONFIDENTIAL
-            - Crown Solicitor
-            - State Solicitor
-            - prepared for legal advice
+            - not privileged
       strength: domain
     - id: exclusion
       groups:
@@ -216,10 +205,17 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Legal
-references: []
+references:
+  - title: Evidence Act 1977 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-1977-047
+  - title: Right to Information Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-013
 created: '2026-02-20'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): Replaced the legacy keyword primary with an id-bearing regex primary (also matches plural "privilege claims"). 75 now requires two distinct populated matter/document fields (new Regex_..._record_structure) instead of generic matter words (documents, RTI, Matter:); 85 requires three fields plus a privilege conclusion (the old 85 was reachable on keyword groups alone). Wired the shared template-exclusion dictionary (Keyword_noise_exclusion) into every tier alongside the existing exclusion group and citation filter; dropped the marking and matter-context keyword groups; "vulnerable" narrowed to "vulnerable to challenge/waiver"; recommended_confidence 85 -> 75; confidence low -> medium to match the gated design. Added populated 85/75 positives and a blank privilege-log decoy; one-line/prose positives re-described as 65. Added Evidence Act and RTI Act references.'
   - version: 1.5.0
     date: '2026-07-19'
     description: 'Targeted blocker remediation: split matter facts, legal conclusions, and privilege/marking evidence into canonical keyword references; make RTI case-sensitive; author 65 discovery, 75 populated-matter, and 85 matter-plus-conclusion-plus-marking tiers with exact probes while preserving public-decision and template exclusions.'

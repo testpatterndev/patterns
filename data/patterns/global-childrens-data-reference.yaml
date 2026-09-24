@@ -1,29 +1,24 @@
 schema: testpattern/v1
 name: Children's Data Reference
 slug: global-childrens-data-reference
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
-description: Detects references to children's personal data requiring heightened protection under Australian privacy law.
+description: >-
+  Detects personal data about an identified child - children's data, records and information, minors' personal information, and parental or guardian consent records - when the phrase sits with a populated child/parent identifier and consent or account fields.
 operation: >-
-  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_children_data_phrase matches phrases such as children's data, child record, child protection, minor's data, parental
-  consent, guardian consent, and under 16/18 data references. Three confidence tiers: High (85) requires child protection context + data operations keywords with template exclusion logic; Medium (75)
-  requires child protection context keywords; Low (65) requires only the regex match. Evidence uses 2 keyword groups (9 child protection terms, 9 data operations terms) within 300-character proximity.
-  Template/sample exclusion prevents false positives from training materials.
+  The primary regex matches children's data phrases (child/children's data, record, information, privacy, protection or consent; minor's data, personal information or consent; parental or guardian consent; under-16/18 data, consent or record). 65 (discovery only): phrase alone - privacy policies and guidance naming children's data stay here. 75: phrase plus a populated child or parent identifier field (child/student name, DOB, age, child/student/case/account ID, parent or guardian). 85: identifier field plus a populated consent/account field (consent given/status/date/method, relationship to child, age verification, account created/type, school, year level) plus independent children's-privacy evidence (under 13, COPPA, age assurance, age-appropriate design, Children's Online Privacy Code, safeguarding, best interests of the child). Template and guidance/policy framing excluded from 75/85. Converted from keyword_list to regex.
+pattern: (?i)\b(?:child(?:ren)?(?:'s)?\s+(?:data|record|information|privacy|protection|consent)|minor(?:'s)?\s+(?:data|personal\s+information|consent)|parental\s+consent|guardian\s+consent|under\s+(?:16|18)\s+(?:data|consent|record))\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative evidence keywords are needed for reliable identification since children-related
-  terms can appear in non-sensitive contexts.
+  Low: the phrases are mostly used in policy text. Enforce tiers now require a populated child/parent identifier; 85 also requires a consent or account field and children's-privacy evidence.
 jurisdictions:
   - global
 regulations:
-  - AML/CTF Act (Cth)
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
-  - TIA Act 1979 (Cth)
+  - NDB Scheme (Cth)
+  - IPA 2009 (Qld)
+  - GDPR
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -33,17 +28,23 @@ data_categories:
   - children
 test_cases:
   should_match:
-    - value: Children's data must be collected with parental consent
-      description: Matches 'parental consent' via Pattern_children_data_phrase
-    - value: Child protection records for minor under 16
-      description: Matches 'child protection' via Pattern_children_data_phrase
-    - value: The children's privacy policy requires guardian consent
-      description: Matches 'guardian consent' via Pattern_children_data_phrase
+    - value: "Parental consent record\nChild name: Riley Ashworth\nAge: 11\nAccount ID: KID-448120\nParent: Jordan Ashworth\nConsent obtained: 12/08/2026 via card verification\nUser is under 13 - COPPA verifiable consent flow completed."
+      description: Child account record with populated consent fields and children's-privacy evidence (85)
+      synthetic: true
+    - value: "Guardian consent received\nStudent name: Casey Rourke\nParent: Jordan Rourke"
+      description: Consent note with labelled child and parent fields only (75)
+      synthetic: true
   should_not_match:
-    - value: The children played in the park
+    - value: "The children played in the park"
       description: No children data phrase matched by the Purview regex
-    - value: Child-friendly restaurant menu
+    - value: "Child-friendly restaurant menu"
       description: No children data phrase present
+    - value: "Policy guidance: this procedure explains how children's data and parental consent records are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Parental consent form\nChild name: ____________________\nAge: ____________________\nParent: ____________________\nConsent obtained: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the regulator's draft Children's Online Privacy Code would require parental consent before apps collect children's data from users under 16."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: Generic references to children in non-data contexts.
     mitigation: Require data-specific keywords alongside children references.
@@ -52,7 +53,7 @@ exports:
 scope: narrow
 risk_rating: 5
 risk_description: >-
-  This keyword pattern detects phrases about children's data, child records, child protection, parental or guardian consent, and age-based data handling; it does not require an identified child. A normal match may be a privacy notice, consent procedure, or general safeguarding discussion, so disclosure often reveals only the subject being discussed. Actual harm becomes credible when the text also contains a child's identity, family circumstances, welfare history, health, education, or precise location. Risk 5 OFFICIAL is therefore appropriate for the reference-level detector, while SENSITIVE requires populated child-linked information or a substantive safeguarding record.
+  The detector recognises children's-data and parental-consent phrases and enforces only when they sit with a populated child or parent identifier; privacy notices and consent procedures stay at 65 discovery. A normal match may be a privacy notice, consent procedure, or general safeguarding discussion, so disclosure often reveals only the subject being discussed. Actual harm becomes credible when the text also contains a child's identity, family circumstances, welfare history, health, education, or precise location. Risk 5 OFFICIAL is therefore appropriate for the reference-level detector, while SENSITIVE requires populated child-linked information or a substantive safeguarding record.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -64,64 +65,94 @@ sensitivity_labels:
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
-  regexes:
-    - id: Pattern_children_data_phrase
-      pattern: >-
-        (?i)\b(?:child(?:ren)?(?:'s)?\s+(?:data|record|information|privacy|protection|consent)|minor(?:'s)?\s+(?:data|personal\s+information|consent)|parental\s+consent|guardian\s+consent|under\s+(?:16|18)\s+(?:data|consent|record))\b
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_children_data_phrase
       matches:
-        - ref: Evidence_child_protection_context
-        - ref: Evidence_data_operations
+        - ref: Regex_global_childrens_data_reference_child_fields
+        - ref: Regex_global_childrens_data_reference_consent_fields
+        - ref: Evidence_childrens_privacy_evidence
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_childrens_data_reference_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_children_data_phrase
       matches:
-        - ref: Evidence_child_protection_context
+        - ref: Regex_global_childrens_data_reference_child_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_childrens_data_reference_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_children_data_phrase
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Pattern_children_data_phrase
+      pattern: (?i)\b(?:child(?:ren)?(?:'s)?\s+(?:data|record|information|privacy|protection|consent)|minor(?:'s)?\s+(?:data|personal\s+information|consent)|parental\s+consent|guardian\s+consent|under\s+(?:16|18)\s+(?:data|consent|record))\b
+    - id: Regex_global_childrens_data_reference_child_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|child(?:'s)?(?:\s+name)?|young\s+person|minor|student(?:\s+name)?|(?:child|student|case|client|account)\s*(?:no\.?|number|ID)|age|parent(?:\s+name)?|guardian(?:\s+name)?)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_global_childrens_data_reference_consent_fields
+      pattern: (?i)\b(?:consent\s+(?:given|status|date|obtained|method)|relationship\s+to\s+child|age\s+verification(?:\s+method)?|account\s+(?:created|type)|school|year\s+level)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_child_protection_context
+    - id: Evidence_childrens_privacy_evidence
       groups:
         - match_style: word
           terms:
-            - child
-            - children
-            - minor
-            - youth
-            - student
-            - parental
-            - guardian
-            - juvenile
-            - adolescent
-      strength: domain
-    - id: Evidence_data_operations
+            - under 13
+            - text: COPPA
+              case_sensitive: true
+            - age assurance
+            - age-appropriate design
+            - Children's Online Privacy Code
+            - safeguarding
+            - best interests of the child
+      strength: specific
+    - id: Keyword_global_childrens_data_reference_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - data
-            - collection
-            - storage
-            - processing
-            - database
-            - record
-            - template
-            - scan
-            - capture
-      strength: domain
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+            - public policy document
+            - public policy guidance
+            - public dataset
+            - aggregate statistics
+            - aggregate report
+            - academic paper
+            - blank questionnaire
+            - awareness campaign
+            - privacy policy
+            - privacy notice
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75 was gated only by record-context keywords (bare words 'child', 'minor', 'student', 'guardian') that appear in policy and survey-design text, and 85 evidence could repeat the primary. 75 now requires the attribute to sit with a populated identified-person field (name, DOB, member/employee/patient ID) and 85 requires person fields plus a populated consent/account field plus independent record evidence; policy text naming the category stays at 65. Bare-phrase tests replaced with populated person records; added policy, blank-form and news decoys; public-context exclusions folded into the guidance exclusion group. Regulations: removed AML/CTF Act, HRIPA, My Health Records Act and TIA Act; references added. Note: uk_gov SECRET label is out of band for risk 5 but was not flagged by the audit, so it is left for label review."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 528 without changing detector or package metadata.'
@@ -148,3 +179,10 @@ keywords:
   - student minor
   - child welfare
   - guardian consent
+references:
+  - url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
+    title: Regulation (EU) 2016/679 (GDPR) - Article 8 conditions applicable to a child's consent
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-personal-information
+    title: OAIC - What is personal information
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)

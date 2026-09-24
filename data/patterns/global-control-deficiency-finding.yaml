@@ -1,57 +1,71 @@
 schema: testpattern/v1
 name: Control Deficiency Finding
 slug: global-control-deficiency-finding
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: concept
-description: Detects control deficiency findings from internal audits and compliance assessments.
+description: >-
+  Detects populated internal-control deficiency findings (control deficiency, significant deficiency, material weakness, ICFR weakness) that carry a finding reference, rating, accountable owner or remediation due date. Definitions and accounting guidance stay discovery-only.
 operation: >-
-  A material weakness, significant deficiency, control deficiency, ICFR weakness, or internal-control
-  issue is discovery-only at 65. Control-testing, key-control, ITGC, segregation-of-duties, access-control,
-  or application-control evidence raises it to 75. The 85 tier additionally requires remediation,
-  corrective action, an owner, target date, follow-up, or closure evidence. Enforcing tiers reject
-  templates and examples.
+  Pattern type: regex. Primary: material weakness, significant deficiency, control deficiency, internal control over financial reporting / issue / weakness, ICFR deficiency/weakness. 65 (discovery only): primary alone. 75: primary plus one populated field - finding/issue/observation/exception ID or reference containing a digit, a rating/severity/priority value, a named action/control owner or responsible officer, or a due/target date. 85: primary plus two distinct field types (the four above or a test-result line such as exceptions noted / items tested with a count) plus control-testing evidence (test of controls, ITGC, segregation of duties, user access review, operating/design effectiveness, compensating control). Template/sample and guidance framing excluded on every enforce tier.
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Enforce tiers require populated finding fields beside the deficiency phrase; accounting guides, standards text and news about a company's material weakness carry no such fields and stay at 65. Medium because audit methodology documents with worked examples can still match.
 jurisdictions:
   - global
 regulations:
-- "AML/CTF Act (Cth)"
-- "IPA 2009 (Qld)"
-- "Privacy Act 1988 (Cth)"
+  - Corporations Act 2001 (Cth)
+  - SOX
+  - IPA 2009 (Qld)
+  - Privacy Act 1988 (Cth)
 frameworks:
-- ISO 27001
-- NIST CSF
-- PCI-DSS
+  - ISO 27001
+  - NIST CSF
+  - PCI-DSS
 data_categories:
   - security
   - audit
 test_cases:
   should_match:
-    - value: 'Control deficiency'
-      description: Low-tier probe - deficiency phrase without control-testing detail
-    - value: 'Control deficiency: test of controls found an access-control and segregation-of-duties failure.'
-      description: Medium-tier probe - control-testing evidence without remediation tracking
-    - value: 'Significant deficiency: control testing found an ITGC access-control failure; corrective action owner and target date assigned.'
-      description: High-tier probe - tested control failure plus remediation tracking
+    - value: "INTERNAL AUDIT - CONTROL DEFICIENCY\nFinding ID: IA-2026-014\nRating: Significant deficiency\nControl owner: Jordan Staffson, Financial Controller\nTarget date: 30/11/2026\nTest of controls over the user access review found 7 of 25 privileged accounts not reviewed; segregation of duties conflict in the payments module."
+      description: Populated finding - ID, rating, owner, date and testing evidence (85)
+      synthetic: true
+    - value: "Control deficiency - accounts payable\nAction owner: Casey Rourke\nVendor master changes were approved by the same officer who entered them."
+      description: Finding with a single populated owner field (75)
+      synthetic: true
   should_not_match:
-    - value: Quality control procedures
-      description: Quality-control sibling
-    - value: Remote control battery replacement
-      description: Consumer-device sibling
-    - value: 'The public accounting guide defines a significant deficiency.'
-      description: Public guidance contains only the deficiency phrase
-    - value: 'Template example: significant deficiency from control testing with an ITGC failure, corrective action owner, and target date.'
-      description: Template contains otherwise high-tier evidence
+    - value: "Policy guidance: a control deficiency exists when the design or operation of a control does not allow staff to prevent or detect misstatements. Rate each finding and record an owner and a target date."
+      description: Methodology guidance without populated fields
+      synthetic: true
+    - value: "CONTROL DEFICIENCY\nFinding ID: __________\nRating: __________\nControl owner: __________\nTarget date: __________"
+      description: Blank finding form - placeholder values
+      synthetic: true
+    - value: "Auditors reported a material weakness in internal control over financial reporting at the retailer, sending its shares down 8% on Tuesday."
+      description: News about a public disclosure
+      synthetic: true
+    - value: "Quality control procedures"
+      description: Unrelated control wording
+      synthetic: true
+    - value: "Remote control battery replacement"
+      description: Unrelated control wording
+      synthetic: true
+    - value: "The public accounting guide defines a significant deficiency."
+      description: Accounting guide definition
+      synthetic: true
+    - value: "Template example: significant deficiency from control testing with an ITGC failure, corrective action owner, and target date."
+      description: Template framing
+      synthetic: true
 false_positives:
-  - description: Generic control in non-audit contexts.
-    mitigation: Require audit-specific terms like deficiency, material weakness, or finding severity.
+  - description: Auditing standards, accounting guides and training defining control deficiencies.
+    mitigation: No populated finding fields, and guidance framing is excluded.
+  - description: Public company disclosures of a material weakness in annual reports.
+    mitigation: Public disclosures rarely carry finding IDs, owners and due dates; if they do they reach 75 and should be treated as published.
 exports:
   - yaml
 scope: narrow
 risk_rating: 8
 risk_description: >-
-  The medium-confidence TestPattern keyword detector identifies control-deficiency findings through material weakness, significant deficiency, severity, remediation, management response, and compensating-control terms. A normal match may reveal unresolved audit weaknesses that enable evasion, fraud, or targeted exploitation and can damage assurance and regulatory confidence. Generic control language remains a documented false positive, making enforcement dependent on finding and remediation context. Risk 8 SENSITIVE Government fits serious contained control evidence; PROTECTED requires a systemic exploitable failure, critical-service compromise, or credible significant damage.
+  The medium-confidence TestPattern keyword detector identifies control-deficiency findings through material weakness, significant deficiency, severity, remediation, management response, and compensating-control terms. A normal match may reveal unresolved audit weaknesses that enable evasion, fraud, or targeted exploitation and can damage assurance and regulatory confidence. Generic control language remains a documented false positive, making enforcement dependent on finding and remediation context. Risk 8 SENSITIVE Government fits serious contained control evidence; PROTECTED requires a systemic exploitable failure, critical-service compromise, or credible significant damage. Quality pass 2026-09-24: enforce tiers (75/85) now require populated record structure (labelled fields with real values, identifiers or data rows); phrase-only mentions in guidance, marketing, blank forms and news stay at 65 discovery.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -62,7 +76,7 @@ sensitivity_labels:
   ca_gov: "Protected B"
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -71,29 +85,59 @@ purview:
     - confidence_level: 85
       id_match: Regex_control_deficiency
       matches:
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_global_control_deficiency_finding_reference
+            - Regex_global_control_deficiency_finding_rating
+            - Regex_global_control_deficiency_finding_owner
+            - Regex_global_control_deficiency_finding_due_date
+            - Regex_global_control_deficiency_finding_testing
         - ref: Keyword_control_testing
-        - ref: Keyword_remediation
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_control_deficiency_finding_guidance_exclusion
     - confidence_level: 75
       id_match: Regex_control_deficiency
       matches:
-        - ref: Keyword_control_testing
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_global_control_deficiency_finding_reference
+            - Regex_global_control_deficiency_finding_rating
+            - Regex_global_control_deficiency_finding_owner
+            - Regex_global_control_deficiency_finding_due_date
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_control_deficiency_finding_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_control_deficiency
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_control_deficiency
-      pattern: >-
-        (?i)\b(?:material\s+weakness(?:es)?|significant\s+deficien(?:cy|cies)|control\s+deficien(?:cy|cies)|internal\s+control\s+(?:over\s+financial\s+reporting|issue|weakness)|icfr\s+(?:deficiency|weakness))\b
+      pattern: (?i)\b(?:material\s+weakness(?:es)?|significant\s+deficien(?:cy|cies)|control\s+deficien(?:cy|cies)|internal\s+control\s+(?:over\s+financial\s+reporting|issue|weakness)|icfr\s+(?:deficiency|weakness))\b
+    - id: Regex_global_control_deficiency_finding_reference
+      pattern: (?i)\b(?:(?:audit\s+)?(?:finding|issue|observation|exception|deficiency|recommendation|action)\s*(?:no\.?|number|ID|ref(?:erence)?|#))(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)(?=[A-Z/.-]{0,12}\d)[A-Z0-9][A-Z0-9/.-]{0,24}
+    - id: Regex_global_control_deficiency_finding_rating
+      pattern: (?i)\b(?:(?:risk\s+)?rating|severity|risk\s+level|classification|priority|deficiency\s+type)[ \t]{0,3}[:#][ \t]{0,3}(?:extreme|high|medium|moderate|low|critical|significant(?:\s+deficiency)?|material\s+weakness|major|minor|P[1-4])\b
+    - id: Regex_global_control_deficiency_finding_owner
+      pattern: (?i)\b(?:(?:action\s+|control\s+|process\s+|risk\s+)?owner|responsible\s+(?:officer|manager|executive|person|area)|accountable\s+(?:officer|executive))(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)(?:(?:Mr|Mrs|Ms|Mx|Dr|Prof)\.?[ \t]{1,3})?[A-Z][A-Za-z'.-]{1,30}(?:[ \t]{1,3}[A-Z&][A-Za-z'.&-]{0,30}){0,5}
+    - id: Regex_global_control_deficiency_finding_due_date
+      pattern: (?i)\b(?:due\s+date|target\s+(?:date|completion(?:\s+date)?)|remediation\s+date|agreed\s+(?:completion\s+)?date|revised\s+due\s+date)[ \t]{0,3}[:#][ \t]{0,3}(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}[ \t]{1,3}(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}[ \t]{1,3}\d{4})
+    - id: Regex_global_control_deficiency_finding_testing
+      pattern: (?i)\b(?:exceptions?\s+(?:noted|identified|found)|population\s+size|items?\s+tested|sample\s+size|deviations?\s+noted)[ \t]{0,3}[:#]?[ \t]{0,3}\d{1,5}\b
   keywords:
     - id: Keyword_control_testing
       groups:
@@ -105,45 +149,50 @@ purview:
             - detective control
             - preventive control
             - IT general controls
-            - ITGC
-            - application controls
+            - text: ITGC
+              case_sensitive: true
             - segregation of duties
-            - access controls
-      strength: specific
-    - id: Keyword_remediation
-      groups:
-        - match_style: word
-          terms:
-            - remediation
-            - remediate
-            - corrective action
-            - action plan
-            - implementation plan
-            - due date
-            - target date
-            - owner
-            - responsible
-            - follow-up
-            - closure
+            - user access review
+            - operating effectiveness
+            - design effectiveness
+            - compensating control
       strength: domain
-    - id: Keyword_audit_general
+    - id: Keyword_global_control_deficiency_finding_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - internal audit
-            - audit report
-            - audit findings
-            - audit opinion
-            - audit scope
-            - audit objective
-            - audit conclusion
-            - audit recommendation
-            - IIA standards
-            - IPPF
-      strength: specific
+            - policy guidance
+            - guidance note
+            - this guideline
+            - this procedure
+            - fact sheet
+            - training module
+            - e-learning
+            - course notes
+            - media release
+            - press release
+            - news report
+            - frequently asked questions
+            - best practice guide
+            - white paper
+            - whitepaper
+            - webinar
+            - how-to guide
+            - user guide
+            - help centre article
+            - help center article
+            - quality control procedures
+            - remote control
+            - accounting guide
+            - defines a
+      strength: noise
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: >-
+      Quality pass (2026-09-24): 75 and 85 were phrase-only keyword tiers; 75 now needs a populated finding reference, rating, owner or due date and 85 needs two distinct field types plus control-testing evidence; replaced the bare 'Control deficiency' positive; added guidance, blank-form and news decoys; dropped AML/CTF Act, added Corporations Act 2001 (Cth) and SOX with verified PCAOB/APRA references.
   - version: 1.4.0
     date: '2026-07-19'
     description: 'Profile quality: align the regex-backed detector type; add deficiency discovery, control-testing medium, and remediation-tracking high tiers; add public/template adversarial probes.'
@@ -179,3 +228,21 @@ remediation:
     status: applied
     changes:
       - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
+references:
+  - title: PCAOB AS 2201 - An Audit of Internal Control Over Financial Reporting
+    url: https://pcaobus.org/oversight/standards/auditing-standards/details/AS2201
+  - title: APRA CPS 220 Risk Management
+    url: https://handbook.apra.gov.au/standard/cps-220
+corroborative_evidence:
+  keywords:
+    - test of controls
+    - control testing
+    - key control
+    - detective control
+    - preventive control
+    - IT general controls
+    - ITGC
+    - segregation of duties
+    - user access review
+    - operating effectiveness
+  proximity: 300

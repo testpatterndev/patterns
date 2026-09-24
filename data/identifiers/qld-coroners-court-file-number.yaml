@@ -1,0 +1,54 @@
+schema: testpattern/identifier-v1
+key: qld-coroners-court-file-number
+name: Coroners Court of Queensland file number
+issuer: Coroners Court of Queensland
+description: >-
+  The coronial file number assigned to a reported death, cited on findings, inquest notices and coronial briefs.
+appears_in:
+  - Coronial findings and inquest notices
+  - Coronial briefs and investigation files
+  - Correspondence with the Coroners Court
+labels:
+  - File No(s)
+  - File number
+  - Coronial file number
+public_format:
+  status: partial
+  pattern: \b(?:19|20)\d{2}/\d{1,5}\b
+  source: https://www.courts.qld.gov.au/__data/assets/pdf_file/0006/616758/cif-brown-hw-20190612.pdf
+  notes: >-
+    Published findings print the file number as year/sequence under the heading 'FILE NO(s):' (for example 2015/2427). Internal prefixes and suffixes used in the court's case management system are not published. The earlier catalogue used an invented COR-YYYY-NNN format.
+fallback:
+  pattern: (?i)\b(?:file\s+no\.?(?:\(s\))?|file\s+number|coronial\s+(?:file|reference|case)\s+(?:no\.?|number))\s*[:#]?\s*(?:19|20)\d{2}/\d{1,5}\b
+  precision: medium
+  rationale: >-
+    The published year/sequence shape next to a file-number label is specific enough to corroborate coronial content; bare year/sequence values are too common (dates, other registries) to use unlabelled.
+  samples:
+    - 'FILE NO(s): 2015/2427'
+    - File number 2026/0187
+    - Coronial file no. 2025/3310
+replacement:
+  customer_supplies:
+    - A description of the coronial file number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+    - The label text used on documents and exports (for example the exact field heading).
+    - 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+    - Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+  steps:
+    - Collect the customer inputs listed above during the engagement discovery session.
+    - Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+    - If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+    - Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+    - Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+  validation:
+    - Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+    - The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+    - The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+    - Overlay values never appear in build logs or readiness output (counts and keys only).
+  example_overlay:
+    pattern: (?i)\bfile\s+no\.?(?:\(s\))?\s*[:#]?\s*20\d{2}/\d{4}\b
+    samples:
+      - 'FILE NO(s): 2015/2427'
+      - File no. 2026/0187
+      - 'file no: 2025/3310'
+sensitivity: >-
+  Identifies a reported death; before findings are published it links the deceased, family and witnesses to an open investigation.

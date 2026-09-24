@@ -1,29 +1,28 @@
 schema: testpattern/v1
 name: Employment/HR Sensitive Data
 slug: global-employment-hr-sensitive-data
-version: 1.3.1
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
-description: Detects references to sensitive employment and human resources data including performance reviews, disciplinary actions, and workplace investigations.
+engine: boost_regex
+description: >-
+  Detects sensitive employment case records about an identified worker: workplace investigations, disciplinary action and show cause notices, grievance and harassment complaints, workers compensation and return to work plans, termination and redundancy notices.
 operation: >-
-  Keyword-only pattern using Purview regex engine. The Purview regex Pattern_hr_sensitive_phrase matches phrases such as disciplinary action, performance review, workplace investigation, workplace
-  bullying, workplace misconduct, termination letter, unfair dismissal, workers compensation, grievance process, harassment complaint, return to work plan, and redundancy notice. Three confidence
-  tiers: High (85) requires HR context + employment operations keywords with template exclusion logic; Medium (75) requires HR context keywords; Low (65) requires only the regex match. Evidence uses 2
-  keyword groups (8 HR context terms, 10 employment operations terms) within 300-character proximity. Template/sample exclusion prevents false positives from training materials.
+  Primary: an HR case phrase (disciplinary action, workplace investigation/bullying/misconduct, termination letter/notice, unfair dismissal, workers compensation, grievance or harassment complaint, return to work plan, redundancy notice, show cause notice, work capacity certificate). 75 tier requires a populated person field (employee/staff name or number, position number or title, work unit, worker, claimant, complainant, respondent or subject employee) with a non-placeholder value within 300 characters. 85 tier additionally requires a populated case detail (numbered allegation, incident/injury/termination date, claim/case/matter number, substantiated/upheld finding, or suitable duties from a date) and an independent corroborative term (witness, medical certificate, procedural fairness, support person, natural justice). All tiers exclude template/fixture text (template-exclusion); enforce tiers also exclude guidance, policy, training and media-release framing. 65 is discovery-only (primary alone) and will surface policies, guidance, blank forms and statistics.
+pattern: >-
+  (?i)\b(?:disciplinary\s+action|performance\s+review|workplace\s+(?:investigation|bullying|misconduct)|termination\s+(?:letter|notice)|unfair\s+dismissal|workers?'?\s+compensation|grievance\s+(?:process|procedure|complaint)|harassment\s+complaint|return\s+to\s+work\s+plan|redundancy\s+notice|show\s+cause\s+notice|work\s+capacity\s+certificate)\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence: keyword-based detection relies on phrase-matching regex within the Purview engine. Corroborative evidence keywords are needed for reliable identification since HR-related terms
-  can appear in non-sensitive contexts.
+  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated person field and 85 adds a record-specific populated detail plus independent corroboration. Person values are customer-defined (employee IDs, position numbers), so the field regexes use labelled loose values with a placeholder guard. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
   - global
 regulations:
-  - AML/CTF Act (Cth)
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
+  - Fair Work Act 2009 (Cth)
+  - Public Sector Act 2022 (Qld)
+  - Work Health and Safety Act 2011 (Qld)
   - Privacy Act 1988 (Cth)
-  - TIA Act 1979 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -31,28 +30,58 @@ data_categories:
   - pii
   - employment
   - sensitive-data
+corroborative_evidence:
+  keywords:
+    - witness
+    - medical certificate
+    - procedural fairness
+    - support person
+    - natural justice
+    - rehabilitation
+    - diagnosis
+    - WorkCover
+    - treating doctor
+    - investigator
+  proximity: 300
 test_cases:
   should_match:
-    - value: Disciplinary action taken regarding workplace misconduct
-      description: Matches 'disciplinary action' and 'workplace misconduct' via Pattern_hr_sensitive_phrase
-    - value: Performance review summary and salary review documentation
-      description: Matches 'performance review' via Pattern_hr_sensitive_phrase
-    - value: Workers compensation claim and return to work plan
-      description: Matches 'workers compensation' and 'return to work plan' via Pattern_hr_sensitive_phrase
+    - value: "Workplace investigation - findings\nSubject employee: Avery Teston\nCase number: WI-2026-044\nAllegation 1: Inappropriate comments to a colleague on 12/08/2026.\nFinding: Substantiated. Two witness interviews held; procedural fairness letter issued."
+      description: '85: Investigation findings with subject employee, allegation, case number and finding'
+      synthetic: true
+    - value: "Workers' compensation claim update\nEmployee ID: 5520117\nClaim number: WC4471820\nDate of injury: 03/07/2026\nRehabilitation: fit for suitable duties from 01/09/2026; WorkCover notified."
+      description: '85: Workers compensation claim update with claim number and injury date'
+      synthetic: true
+    - value: "Return to work plan\nWorker: Jordan Staffson\nGraduated hours agreed with the treating doctor, reviewed fortnightly."
+      description: '75: Return to work plan naming the worker, no case detail'
+      synthetic: true
   should_not_match:
+    - value: This policy explains how a workplace investigation is run and how disciplinary action is decided, including procedural fairness.
+      description: Policy text - must stay below 75
+    - value: "Termination letter\nEmployee name: __________\nTermination date: ___/___/____\nReason: __________"
+      description: Blank letter template - must stay below 75
+    - value: The Commission heard an unfair dismissal claim from a former council worker, according to a media release.
+      description: News / media release - must stay below 75
     - value: HR department phone number
       description: No HR sensitive phrase matched by the Purview regex
     - value: Employment opportunities available
       description: No HR sensitive phrase present
 false_positives:
-  - description: Generic HR terms such as employment or salary in non-sensitive contexts.
-    mitigation: Require specific sensitive HR keywords like disciplinary, grievance, or misconduct.
+  - description: Policies, directives, fact sheets, guidance and training material that name the record type.
+    mitigation: Enforce tiers require a populated person field; guidance text has labels without values and guidance/training/media-release framing is excluded.
+  - description: Blank forms, templates and HR system configuration.
+    mitigation: Blank lines, square- and angle-bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded.
+  - description: Aggregate statistics and news reporting.
+    mitigation: No populated person field, so these stay at 65 discovery.
+  - description: Records that identify the person only in free text (no field label) fall to 65.
+    mitigation: Accepted precision trade-off; extend the person-field regex with the customer employee-id format to recover recall.
 exports:
+  - purview_xml
   - yaml
+  - regex_copy
 scope: narrow
 risk_rating: 7
 risk_description: >-
-  The keyword concept looks for employment matters such as disciplinary action, performance review, workplace investigation, harassment, grievance, workers compensation, redundancy, and termination. A genuine case document can expose allegations, health or return-to-work circumstances, adverse findings, and decisions affecting an identifiable worker's livelihood and reputation. Policies, training, industrial-relations commentary, and blank forms can use the same language without containing a personal case, so the match must be confirmed in context. Risk 7 SENSITIVE is justified for the normal populated HR matter; PROTECTED would require an exceptional bulk dossier, severe protected investigation, or significant organisational damage.
+  The classifier identifies a sensitive employment case record (discipline, investigation, grievance, workers compensation, termination or redundancy) about an identified person, gated on a populated person field (75) plus a record-specific populated detail (85). Disclosure exposes allegations, health and injury details, adverse findings and decisions affecting an identifiable worker's livelihood and reputation. Policies, guidance, blank forms, training and news stay at 65 discovery. Risk 7 supports SENSITIVE Personal-Privacy (OFFICIAL: Sensitive).
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -65,65 +94,97 @@ purview:
   patterns_proximity: 300
   recommended_confidence: 75
   regexes:
-    - id: Pattern_hr_sensitive_phrase
+    - id: Regex_employment_hr_sensitive_data_primary
       pattern: >-
-        (?i)\b(?:disciplinary\s+action|performance\s+review|workplace\s+(?:investigation|bullying|misconduct)|termination\s+(?:letter|notice)|unfair\s+dismissal|workers?\s+compensation|grievance\s+(?:process|procedure|complaint)|harassment\s+complaint|return\s+to\s+work\s+plan|redundancy\s+notice)\b
+        (?i)\b(?:disciplinary\s+action|performance\s+review|workplace\s+(?:investigation|bullying|misconduct)|termination\s+(?:letter|notice)|unfair\s+dismissal|workers?'?\s+compensation|grievance\s+(?:process|procedure|complaint)|harassment\s+complaint|return\s+to\s+work\s+plan|redundancy\s+notice|show\s+cause\s+notice|work\s+capacity\s+certificate)\b
+    - id: Regex_employment_hr_sensitive_data_person_field
+      pattern: >-
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number|title)|work\s+unit|business\s+unit|complainant|respondent|subject\s+employee|worker(?:\s+name)?|claimant)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_employment_hr_sensitive_data_record_detail
+      pattern: >-
+        (?i)\ballegation\s*(?:no\.?\s*)?\d{0,2}\s*[:\-]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z][a-z]{2,}|\b(?:date\s+of\s+(?:incident|injury|termination|dismissal|complaint)|incident\s+date|injury\s+date|termination\s+date)\s*[:\-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})|\b(?:claim|case|matter|file|complaint)\s*(?:no\.?|number|ref|ID|#)\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Z0-9/-]{2,20}\b|\b(?:outcome|finding|decision)\s*[:\-]\s*(?:partially\s+|not\s+)?(?:substantiated|upheld)|\bsuitable\s+duties\s+from\s+(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_hr_sensitive_phrase
+      id_match: Regex_employment_hr_sensitive_data_primary
       matches:
-        - ref: Evidence_hr_context
-        - ref: Evidence_employment_operations
+        - ref: Regex_employment_hr_sensitive_data_person_field
+        - ref: Regex_employment_hr_sensitive_data_record_detail
+        - ref: Keyword_employment_hr_sensitive_data_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_employment_hr_sensitive_data_guidance_exclusion
     - confidence_level: 75
-      id_match: Pattern_hr_sensitive_phrase
+      id_match: Regex_employment_hr_sensitive_data_primary
       matches:
-        - ref: Evidence_hr_context
+        - ref: Regex_employment_hr_sensitive_data_person_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_employment_hr_sensitive_data_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_hr_sensitive_phrase
+      id_match: Regex_employment_hr_sensitive_data_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   keywords:
-    - id: Evidence_hr_context
+    - id: Keyword_employment_hr_sensitive_data_corroborative
       groups:
         - match_style: word
           terms:
-            - employee
-            - staff
-            - worker
-            - personnel
-            - human resources
-            - text: HR
-              case_sensitive: true
-            - payroll
-            - workforce
-      strength: domain
-    - id: Evidence_employment_operations
+            - witness
+            - medical certificate
+            - procedural fairness
+            - support person
+            - natural justice
+            - rehabilitation
+            - diagnosis
+            - WorkCover
+            - treating doctor
+            - investigator
+      strength: specific
+    - id: Keyword_employment_hr_sensitive_data_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - employee
-            - staff
-            - personnel
-            - text: HR
-              case_sensitive: true
-            - human resources
-            - payroll
-            - workforce
-            - workplace
-            - manager
-            - supervisor
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
       strength: domain
+references:
+  - title: OAIC - Employee records exemption
+    url: https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/organisations/employee-records-exemption
+  - title: Queensland Government - Workplace investigations (Directive 01/24)
+    url: https://www.forgov.qld.gov.au/pay-benefits-and-policy/directives-policies-circulars-and-guidelines/workplace-investigations-directive-0124
+  - title: Queensland Government - Discipline (Directive 05/23)
+    url: https://www.forgov.qld.gov.au/pay-benefits-and-policy/directives-policies-circulars-and-guidelines/discipline-directive-0523
 created: '2026-02-09'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): converted keyword_list to regex type with a top-level pattern; rebuilt tiers - 65 primary phrase (discovery), 75 primary + populated person field (employee/staff name or number, position number/title, work unit), 85 adds a record-specific populated detail regex plus an independent corroborative keyword group; removed the self-corroborating Evidence/label-context groups so a single phrase no longer reaches 75/85; added guidance/training/media-release exclusion to enforce tiers; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys; regulations now cite Fair Work Act 2009 (Cth), Public Sector Act 2022 (Qld), Work Health and Safety Act 2011 (Qld) with the privacy statutes (removed AML/CTF, TIA, My Health Records and HRIPA boilerplate); references now cite primary sources.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 541 without changing detector or package metadata.'
@@ -135,20 +196,3 @@ changelog:
     description: case/evidence metadata update
 author: testpattern-community
 license: MIT
-keywords:
-  - performance review
-  - disciplinary action
-  - workplace investigation
-  - termination letter
-  - redundancy notice
-  - unfair dismissal
-  - workers compensation
-  - workplace injury
-  - grievance
-  - misconduct
-  - probation period
-  - salary review
-  - remuneration details
-  - workplace bullying
-  - harassment complaint
-  - return to work plan

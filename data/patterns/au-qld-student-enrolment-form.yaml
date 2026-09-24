@@ -1,23 +1,23 @@
 schema: testpattern/v1
 name: QLD Student Enrolment Form
 slug: au-qld-student-enrolment-form
-version: 1.4.0
-type: keyword_list
+version: 1.5.0
+type: regex
 pattern_class: concept
-description: Detects QLD student enrolment forms containing children's personal information and family details.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+description: >-
+  Detects completed Queensland student enrolment forms and applications - student, school or prep enrolment forms, applications for enrolment and SEF-1 records with child and family details - when the phrase sits with populated student identifiers and enrolment fields.
+operation: >-
+  Primary: student/school/prep enrolment form, application or record, application for (student) enrolment, enrolment application (form), SEF-1. 65 (discovery only): phrase alone. 75: phrase plus a populated student or parent identifier field. 85: identifier field plus a populated enrolment field (residential address, previous school, country of birth, language background, Indigenous status, visa, emergency contact, medical conditions, allergies, custody or court orders, year level applied, proposed start date) plus independent Queensland school-system evidence. Template and guidance/training framing excluded from 75/85. Converted from keyword_list to regex.
+pattern: (?i)\b(?:(?:student|school|prep)\s+enrolment\s+(?:form|application|record)|application\s+for\s+(?:student\s+)?enrolment|enrolment\s+application(?:\s+form)?|SEF-1)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium: enforce tiers need a populated student or parent identifier; 85 also needs an enrolment field and school-system evidence. Enrolment procedures and school websites carry the phrases without a child record and stay at 65.
 jurisdictions:
   - au
 regulations:
-  - AML/CTF Act (Cth)
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
-  - TIA Act 1979 (Cth)
+  - IPA 2009 (Qld)
+  - Education (General Provisions) Act 2006 (Qld)
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -28,29 +28,29 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: 'Student enrolment form available for collection.'
-      description: Exact 65 discovery probe - form phrase without populated student fields
-    - value: 'Student enrolment form - student name, date of birth, year level, and emergency contact recorded.'
-      description: Exact 75 probe - populated enrolment fields without Queensland education-authority evidence
-    - value: 'Education Queensland student enrolment form - student name, date of birth, year level, parent guardian, and emergency contact recorded.'
-      description: Exact 85 probe - populated form plus Queensland education-authority evidence
-    - value: 'Student enrolment form: parent details and emergency contact information'
-      description: Test match 1
-    - value: QLD school enrolment application with immunisation and medical conditions
-      description: Test match 2
-    - value: Prep enrolment student details and guardian details form
-      description: Test match 3
+    - value: "Application for student enrolment - Harbourview State School\nStudent name: Riley Ashworth\nDate of birth: 14/05/2019\nYear level applied for: Prep\nResidential address: 14 Wattlebird Street, Stafford QLD 4053\nLanguage spoken at home: Vietnamese\nEmergency contact: Jordan Ashworth 0412 345 678"
+      description: Populated enrolment application with student, enrolment fields and school evidence (85)
+      synthetic: true
+    - value: "Student enrolment form received\nStudent: Casey Rourke\nParent: Jordan Rourke"
+      description: Enrolment form with labelled student fields only (75)
+      synthetic: true
   should_not_match:
-    - value: Enrolment in the loyalty program
+    - value: "Enrolment in the loyalty program"
       description: Non-match 1
-    - value: Student discount available
+    - value: "Student discount available"
       description: Non-match 2
-    - value: 'Sample template for a pupil admission record: legal name, birth date, grade, telephone.'
+    - value: "Sample template for a pupil admission record: legal name, birth date, grade, telephone."
       description: Adjacent template language is not a populated student-enrolment record
-    - value: 'The public website provides a school admission process guide.'
+    - value: "The public website provides a school admission process guide."
       description: Public guidance has no student-enrolment primary or populated student fields
-    - value: 'Customer loyalty sign-up with reward preferences.'
+    - value: "Customer loyalty sign-up with reward preferences."
       description: Sibling membership language does not satisfy the student-form primary
+    - value: "Policy guidance: this procedure explains how student enrolment form records are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Student enrolment form\nStudent name: ____________________\nDate of birth: ____________________\nResidential address: ____________________\nEmergency contact: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: schools are reminding families that the prep enrolment application for 2027 opens next month and that proof of age is needed."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: Generic enrolment in non-school contexts.
     mitigation: Require school enrolment specific terms like parent details or immunisation.
@@ -59,7 +59,7 @@ exports:
 scope: narrow
 risk_rating: 7
 risk_description: >-
-  This Queensland enrolment concept covers student enrolment forms and associated parent, guardian, emergency-contact, immunisation, and medical fields. A completed form can expose a child's identity, family relationships, contact routes, health needs, and school placement in one administrative record, enabling targeted privacy or safety harm. Generic enrolment instructions, school brochures, and blank forms may trigger without carrying any student's data. Risk 7 SENSITIVE Government reflects the populated form's combined personal content; PROTECTED would require a bulk enrolment register, acute safeguarding information, or significant life-safety consequence.
+  The detector recognises student enrolment form and application language and enforces only when populated student or parent identifier fields sit nearby; phrase-only text stays at 65 discovery. A completed form can expose a child's identity, family relationships, contact routes, health needs, and school placement in one administrative record, enabling targeted privacy or safety harm. Generic enrolment instructions, school brochures, and blank forms may trigger without carrying any student's data. Risk 7 SENSITIVE Government reflects the populated form's combined personal content; PROTECTED would require a bulk enrolment register, acute safeguarding information, or significant life-safety consequence.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -70,31 +70,34 @@ sensitivity_labels:
   ca_gov: Protected A
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_student_form
       matches:
-        - ref: Evidence_enrolment_fields
+        - ref: Regex_au_qld_student_enrolment_form_student_fields
+        - ref: Regex_au_qld_student_enrolment_form_enrolment_fields
         - ref: Evidence_qld_education_forms
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_student_enrolment_form_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_student_form
       matches:
-        - ref: Evidence_enrolment_fields
+        - ref: Regex_au_qld_student_enrolment_form_student_fields
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_student_enrolment_form_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_student_form
@@ -102,27 +105,16 @@ purview:
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-    - id: Pattern_qld_education
-      pattern: (?i)\b(?:department\s+of\s+education|education\s+queensland|state\s+school|queensland\s+(?:state\s+)?school)\b
     - id: Pattern_student_form
-      pattern: (?i)\b(?:student\s+enrolment\s+(?:form|application)|sef-1|application\s+for\s+(?:student\s+)?enrolment)\b
+      pattern: (?i)\b(?:(?:student|school|prep)\s+enrolment\s+(?:form|application|record)|application\s+for\s+(?:student\s+)?enrolment|enrolment\s+application(?:\s+form)?|SEF-1)\b
+    - id: Regex_au_qld_student_enrolment_form_student_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|student(?:\s+name)?|pupil|child|candidate(?:\s+name)?|EQ\s*ID|LUI|USI|year\s+level|grade\s+level|parent(?:\s+name)?|guardian|carer|(?:student|candidate|enrolment|applicant|file)\s*(?:no\.?|number|ID)|home\s+group|class)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_au_qld_student_enrolment_form_enrolment_fields
+      pattern: (?i)\b(?:residential\s+address|address|previous\s+school|country\s+of\s+birth|language\s+(?:spoken\s+at\s+home|background)|Indigenous\s+status|visa\s+(?:subclass|type)|emergency\s+contact|medical\s+conditions?|allergies|custody|court\s+orders?|year\s+level\s+applied(?:\s+for)?|proposed\s+start\s+date)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_student_enrolment
-      groups:
-        - match_style: word
-          terms:
-            - student enrolment
-            - enrolment form
-            - application for enrolment
-            - student status
-            - year level
-            - language background
-            - parent guardian
-            - emergency contact
-      strength: specific
     - id: Evidence_qld_education_forms
       groups:
         - match_style: word
@@ -130,38 +122,32 @@ purview:
             - Department of Education
             - Education Queensland
             - State School
-            - SEF-1
-            - ppr.qed.qld.gov.au
-            - education.qld.gov.au
+            - State High School
+            - OneSchool
             - eq.edu.au
+            - education.qld.gov.au
       strength: specific
-    - id: Evidence_qld_government
+    - id: Keyword_au_qld_student_enrolment_form_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - Queensland Government
-            - State of Queensland
-            - QLD Government
-            - qld.gov.au
-            - Information Privacy Act 2009
-            - Queensland Privacy Principles
-      strength: specific
-    - id: Evidence_enrolment_fields
-      groups:
-        - match_style: word
-          terms:
-            - student name
-            - date of birth
-            - year level
-            - residential address
-            - parent guardian
-            - emergency contact
-            - medical condition
-            - previous school
-      strength: domain
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75/85 were gated by field-name keywords that match blank forms, and a bare 'State School' provenance regex could act as primary. 75 now needs a populated student identifier and 85 needs student fields plus a populated enrolment field plus school-system evidence. Tests replaced with populated records plus policy, blank-form and news decoys. Regulations: removed AML/CTF Act, HRIPA, My Health Records Act, NDB and TIA Act; added Education (General Provisions) Act 2006 (Qld); references added."
   - version: 1.4.0
     date: '2026-07-19'
     description: 'Targeted blocker remediation: add a 65 discovery form tier, require populated student/guardian fields at 75 and Queensland education-authority evidence at 85, plus exact-tier and sibling/public/template probes.'
@@ -195,3 +181,10 @@ remediation:
     changes:
       - 'Mapped non-canonical confidence 95 to 85.'
       - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
+references:
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2006-039
+    title: Education (General Provisions) Act 2006 (Qld)
+  - url: https://ppr.qed.qld.gov.au/pp/enrolment-in-state-primary-secondary-and-special-schools-procedure
+    title: Queensland Department of Education - Enrolment in state primary, secondary and special schools procedure
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+    title: Information Privacy Act 2009 (Qld)

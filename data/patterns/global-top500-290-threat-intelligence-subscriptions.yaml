@@ -1,62 +1,80 @@
 schema: testpattern/v1
 name: Threat intelligence subscriptions
 slug: global-top500-290-threat-intelligence-subscriptions
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies threat intelligence subscriptions patterns in security and access control contexts. Detects potential
-  exposure of sensitive security information in international systems.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses word-boundary phrase matching with flexible whitespace. Corroborative
-  evidence: 7 keywords within 300 characters. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test
-  text.'
-pattern: (?i)\b(?:threat\s+intelligence|stix|taxii|misp|intel\s+feed)\b
+description: >-
+  Detects threat-intelligence subscription records - licence and account details, feed API keys, TAXII endpoints and collection IDs for commercial or community CTI feeds. Subscription wording alone is discovery-only.
+operation: >-
+  Regex_ti_subscription_primary (threat-intelligence subscription/feed/platform, TAXII collection or MISP instance wording) is discovery-only at 65. 75 requires the primary plus one populated structure: a populated subscription field (subscription/licence/account ID, API key, client ID, collection ID, renewal date) or a TAXII/feed API endpoint URL or collection UUID. 85 requires a populated subscription field (subscription/licence/account ID, API key, client ID, collection ID, renewal date), a TAXII/feed API endpoint URL or collection UUID, and independent subscription-context (fees, renewal, STIX/TLP, ISAC, quotas) evidence that does not repeat the primary. Every enforce tier rejects template/noise wording (template-exclusion) and guidance, policy, training and news framing (Keyword_ti_subscription_guidance_exclusion).
+pattern: >-
+  (?i)\b(?:threat\s+intel(?:ligence)?\s+(?:subscriptions?|feeds?|platform|service|licen[cs]es?|portal)|TAXII\s+(?:collection|server|feed|endpoint)|MISP\s+(?:instance|feed|community|sync)|CTI\s+(?:feed|subscription|platform))\b
 confidence: medium
-confidence_justification: structural regex with domain-specific anchors and constrained context replaces phrase-only marker.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium confidence: the topic phrase alone is discovery-only; enforcement needs populated structure (a populated subscription field (subscription/licence/account ID, API key, client ID, collection ID, renewal date) or a TAXII/feed API endpoint URL or collection UUID), and 85 needs two distinct structures plus independent subscription-context (fees, renewal, STIX/TLP, ISAC, quotas) evidence, so policies, blank forms and training text stay below 75.
 jurisdictions:
 - global
 regulations:
-- GDPR
+- SOCI Act 2018 (Cth)
+frameworks:
+- ISO 27001
+- NIST CSF
 data_categories:
-- credentials
 - security
 corroborative_evidence:
   keywords:
-  - threat intelligence subscriptions
-  - threat
-  - intelligence
-  - subscriptions
-  - security
-  - operations
-  - data
+  - annual fee
+  - renewal
+  - poll interval
+  - STIX
+  - TLP
+  - sharing agreement
+  - ISAC
+  - vendor contact
+  - licensed users
+  - feed quota
   proximity: 300
 test_cases:
   should_match:
-  - value: Threat intelligence
-    description: Topic phrase present
-  - value: threat intelligence
-    description: Topic phrase, lowercase
-  - value: this record references the threat intelligence held on file
-    description: Topic phrase within surrounding text
+  - value: Procurement approved renewal of the threat intelligence subscription for another year.
+    description: Discovery probe (65) - subscription wording only
+    synthetic: true
+  - value: |-
+      Threat intelligence feed onboarding
+      Subscription ID: HTX-448210
+      API key: 9b1f7c22e4a84d0f
+    description: Medium-tier probe (75) - populated subscription fields
+    synthetic: true
+  - value: |-
+      TAXII collection access - Harbour Health SOC
+      Account ID: HH-SOC-0194
+      API key: 9b1f7c22e4a84d0f
+      Endpoint: https://intel.tidewatercti.net/taxii2/collections/5f8c2d1e-7a44-4b0e-9c31-2e7f1a6d9b40/objects/
+      Poll interval 15 minutes; renewal due 30/06/2027, annual fee AUD 48,000.
+    description: High-tier probe (85) - account fields, TAXII endpoint URL with collection UUID, renewal and fee context
+    synthetic: true
   should_not_match:
   - value: unrelated generic text
     description: No relevant phrase context
   - value: placeholder value 12345
-    description: Random text should not match phrase marker
-  - value: generic policy prose without anchors
-    description: Should reject generic mentions without structural anchor terms
-  - value: template example placeholder record identifier
-    description: Template/sample context should be excluded even when anchor words are present
+    description: Random text should not match
+  - value: 'Policy statement: threat intelligence feeds must be sourced from vetted providers and reviewed annually.'
+    description: Policy text without subscription details
+    synthetic: true
+  - value: |-
+      Threat intelligence subscription template
+      Subscription ID: ________
+      API key: [insert]
+    description: Blank template
+    synthetic: true
+  - value: 'Webinar recap: how a threat intelligence platform uses STIX and TAXII collections to share indicators.'
+    description: Training/webinar framing
+    synthetic: true
 false_positives:
-- description: Authentication-related terminology in software documentation, security training materials, or system architecture
-    descriptions without actual credentials.
-  mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general
-    security terminology.
-- description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer
-    documentation.
-  mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce
-    false positives from technical writing.
+- description: Vendor marketing and CTI explainers describe feeds, TAXII and MISP.
+  mitigation: Topic wording is discovery-only; enforcement needs populated subscription fields or endpoints and guidance/news framing is excluded.
 exports:
 - purview_xml
 - yaml
@@ -64,34 +82,40 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
   - dict: template-exclusion
     as: Keyword_noise_exclusion
     match_style: word
   pattern_tiers:
   - confidence_level: 85
-    id_match: Regex_threat_intelligence_subscriptions
+    id_match: Regex_ti_subscription_primary
     matches:
-    - ref: Keyword_threat_intelligence_subscriptions
-    - ref: Pattern_global_top500_290_threat_intelligence_subscriptions_label_context
+    - ref: Regex_ti_subscription_subscription_field
+    - ref: Regex_ti_subscription_feed_endpoint
+    - ref: Keyword_ti_subscription_context
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_ti_subscription_guidance_exclusion
   - confidence_level: 75
-    id_match: Regex_threat_intelligence_subscriptions
+    id_match: Regex_ti_subscription_primary
     matches:
-    - ref: Keyword_threat_intelligence_subscriptions
+    - type: any
+      refs:
+      - Regex_ti_subscription_subscription_field
+      - Regex_ti_subscription_feed_endpoint
     - type: any
       min_matches: 0
       max_matches: 0
       refs:
       - Keyword_noise_exclusion
+      - Keyword_ti_subscription_guidance_exclusion
   - confidence_level: 65
     discovery_only: true
-    id_match: Regex_threat_intelligence_subscriptions
+    id_match: Regex_ti_subscription_primary
     matches:
     - type: any
       min_matches: 0
@@ -99,44 +123,53 @@ purview:
       refs:
       - Keyword_noise_exclusion
   regexes:
-  - id: Regex_threat_intelligence_subscriptions
-    pattern: (?i)\b(?:threat\s+intelligence|stix|taxii|misp|intel\s+feed)\b
-  - id: Pattern_global_top500_290_threat_intelligence_subscriptions_label_context
-    pattern: (?i)\b(?:threat\s+intelligence\s+subscriptions)\b
+  - id: Regex_ti_subscription_primary
+    pattern: >-
+      (?i)\b(?:threat\s+intel(?:ligence)?\s+(?:subscriptions?|feeds?|platform|service|licen[cs]es?|portal)|TAXII\s+(?:collection|server|feed|endpoint)|MISP\s+(?:instance|feed|community|sync)|CTI\s+(?:feed|subscription|platform))\b
+  - id: Regex_ti_subscription_subscription_field
+    pattern: >-
+      (?i)\b(?:subscription\s+(?:ID|no\.?|number)|licen[cs]e\s+(?:key|ID|no\.?|number)|account\s+ID|contract\s+(?:no\.?|number)|API\s+(?:key|token|secret)|client\s+(?:ID|secret)|collection\s+ID|feed\s+ID|renewal\s+date|seats|entitlement)\s*[:=#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'._:@#+-]{1,60}
+  - id: Regex_ti_subscription_feed_endpoint
+    pattern: >-
+      (?i)\bhttps?://[a-z0-9.-]{3,100}/(?:taxii2?|api/v\d|feeds?|collections|events)/[A-Za-z0-9/_.-]{0,100}|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b
   keywords:
-  - id: Keyword_threat_intelligence_subscriptions
+  - id: Keyword_ti_subscription_context
     groups:
     - match_style: word
       terms:
-      - threat intelligence
-      - stix
-      - taxii
-      - misp
-      - intel feed
-      - threat feed
-      - cyber threat
-      - indicator sharing
-      - threat platform
-      - intelligence subscription
-      - threat report
-      - adversary tracking
+      - annual fee
+      - renewal
+      - poll interval
+      - text: STIX
+        case_sensitive: true
+      - text: TLP
+        case_sensitive: true
+      - sharing agreement
+      - text: ISAC
+        case_sensitive: true
+      - vendor contact
+      - licensed users
+      - feed quota
     strength: specific
-  - id: Keyword_global_top500_290_threat_intelligence_subscriptions_domain_context
+  - id: Keyword_ti_subscription_guidance_exclusion
     groups:
     - match_style: word
       terms:
-      - threat intelligence subscriptions
-      - threat
-      - intelligence
-      - subscriptions
+      - policy statement
+      - guidance note
+      - best practice guide
+      - media release
+      - press release
+      - news report
+      - course module
+      - learning objectives
+      - awareness course
+      - webinar
+      - lesson plan
+      - quiz question
     strength: domain
-risk_description: This concept pattern recognizes threat intelligence, STIX, TAXII, MISP, or intel-feed terminology but does
-  not capture a subscription credential, endpoint, contract, or proprietary feed contents. Disclosure of the topic may reveal
-  that an organisation consumes threat intelligence, yet direct misuse requires additional information about providers, access
-  tokens, collection priorities, or defensive integrations. The affected party is usually the subscribing security team, with
-  bounded commercial or reconnaissance harm from a single generic mention and frequent public use of these standards. Risk
-  5 OFFICIAL reflects that contextual value; SENSITIVE would require an actual confidential subscription record or integration
-  configuration.
+risk_description: >-
+  The detector now requires threat-intelligence subscription wording plus populated account, licence, API-key or TAXII endpoint details before enforcing. Disclosure of the topic may reveal that an organisation consumes threat intelligence, yet direct misuse requires additional information about providers, access tokens, collection priorities, or defensive integrations. The affected party is usually the subscribing security team, with bounded commercial or reconnaissance harm from a single generic mention and frequent public use of these standards. Risk 5 OFFICIAL reflects that contextual value; SENSITIVE would require an actual confidential subscription record or integration configuration.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -146,31 +179,26 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: 'Quality pass (2026-09-24): primary narrowed to subscription/feed/TAXII/MISP wording (bare STIX/TAXII/MISP tokens moved out); same-span keyword self-corroboration removed; 75 needs populated subscription fields or a TAXII/feed endpoint; 85 needs both plus independent subscription context; guidance exclusion added; populated tests and policy/template/webinar decoys; GDPR replaced with SOCI Act; frameworks and OASIS CTI/ISM references added; credentials category removed.'
 - version: 1.3.1
   date: '2026-07-14'
-  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1841 without changing
-    detector or package metadata.'
+  description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1841 without changing detector or package metadata.'
 - version: 1.3.0
   date: '2026-07-09'
-  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are
-    scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived
-    by scripts/derive-pattern-class.mjs + spot review'
+  description: 'C1 verdict-model: add pattern_class: concept — classification-harness verdict class (concept patterns are scored as topic classifiers with decoy hits expected, not failed detectors; identifier/marking scoring unchanged); derived by scripts/derive-pattern-class.mjs + spot review'
 - version: 1.2.1
   date: '2026-07-09'
-  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context,
-    generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead
-    weight to compiled purview.keywords (no behavior change)'
+  description: 'Noise-gate sweep: remove dead shared_keywords import(s) data-record-context as Evidence_data_record_context, generic-data-labels as Evidence_generic_data_labels — declared but referenced by no tier, so the import only added dead weight to compiled purview.keywords (no behavior change)'
 - version: 1.2.0
   date: '2026-07-04'
-  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier
-    collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword
-    evidence at the same confidence level'
+  description: 'Restore the pattern_tiers entry for the previously-orphaned domain-specific keyword group: a same-bucket tier collapse (Task 5) kept only the weak, self-referential label/domain-context evidence and discarded the substantive keyword evidence at the same confidence level'
 - version: 1.1.0
   date: '2026-07-04'
-  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical
-    tier.
+  description: Mapped non-canonical confidence 80 to 75.; Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 author: testpattern-community
 license: MIT
 remediation:
@@ -180,3 +208,6 @@ remediation:
     - Mapped non-canonical confidence 80 to 75.
     - Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 risk_rating: 5
+references:
+- https://oasis-open.github.io/cti-documentation/
+- https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/ism

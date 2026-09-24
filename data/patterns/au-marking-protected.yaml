@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Marking - PROTECTED
 slug: au-marking-protected
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -42,33 +42,45 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: "Document footer candidate PROTECTED"
-      description: Low-tier probe - uppercase candidate without a formal marking field
-    - value: "Classification: PROTECTED"
+    - value: |-
+        Page 4 of 12
+        PROTECTED
+      description: Discovery probe (65) - bare page-footer banner with no formal marking field or government context
+    - value: 'Classification: PROTECTED'
       description: Medium-tier probe - formal classification field without a complete header
-    - value: "Subject [SEC=PROTECTED]"
+    - value: Subject [SEC=PROTECTED]
       description: Operational email subject marking reaches the balanced tier
-    - value: "Australian Government PSPF briefing\nPROTECTED"
+    - value: |-
+        Australian Government PSPF briefing
+        PROTECTED
       description: Medium-tier probe - standalone banner corroborated by explicit government marking context
-    - value: "X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=PROTECTED, CAVEAT=SH:CABINET"
+    - value: 'X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=PROTECTED, CAVEAT=SH:CABINET'
       description: High-tier probe - complete Australian protective-marking header with caveat
-    - value: "Security Classification: SECRET"
+    - value: 'Security Classification: SECRET'
       description: Formal SECRET marking rolls up into PROTECTED handling at the medium tier
   should_not_match:
-    - value: "wetlands are a protected area under the act"
+    - value: wetlands are a protected area under the act
       description: lowercase English word (case-sensitive exclusion)
-    - value: "the configuration file is UNPROTECTED"
+    - value: the configuration file is UNPROTECTED
       description: UNPROTECTED must not match PROTECTED
-    - value: "Memo [SEC=OFFICIAL]"
+    - value: Memo [SEC=OFFICIAL]
       description: OFFICIAL belongs to au-marking-official
-    - value: "ROTATE THE API SECRET KEY QUARTERLY"
+    - value: ROTATE THE API SECRET KEY QUARTERLY
       description: SECRET-collocation excluded from the SECRET roll-up tier by the secret-collocation NOT group
-    - value: "PROTECTED SPECIES - PUBLIC CONSERVATION NOTICE"
+    - value: PROTECTED SPECIES - PUBLIC CONSERVATION NOTICE
       description: Incidental uppercase prose must not enforce
-    - value: "Public marking guide: Classification: PROTECTED"
+    - value: 'Public marking guide: Classification: PROTECTED'
       description: Public guidance quotes a formal marking field
-    - value: "Template example: X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=PROTECTED, CAVEAT=SH:CABINET"
+    - value: 'Template example: X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=PROTECTED, CAVEAT=SH:CABINET'
       description: Template contains a complete formal header
+    - value: |-
+        Blank cover sheet
+        Security classification: ________
+        Protective marking: [select from the approved list]
+        Dissemination limiting marker: ________
+      description: Blank template - empty classification fields must not enforce
+    - value: 'Protective security training material: an email subject line such as [SEC=PROTECTED] shows the marking applied to a message.'
+      description: Training content quoting a SEC= subject marking is suppressed by the public-marking exclusion (never reaches 75)
 false_positives:
   - description: Uppercase PROTECTED in non-marking contexts (e.g. "PROTECTED SPECIES").
     mitigation: Explicit PSPF/QGISCF government context or a structured marking field is required above discovery; the complete header remains the strict 85 path.
@@ -143,7 +155,7 @@ purview:
     - id: Regex_au_protected_complete_header
       pattern: '\bX-Protective-Marking:\s*VER=[0-9]{4}\.[0-9]+,\s*NS=gov\.au,\s*SEC=(?:PROTECTED|TOP-SECRET|SECRET)\b(?:,\s*CAVEAT=[A-Z0-9:/-]+)?'
     - id: Regex_au_protected_formal_label
-      pattern: '\b(?:SEC(?:URITY CLASSIFICATION)?|Security Classification|CLASSIFICATION|Classification|PROTECTIVE MARKING|Protective Marking|MARKING|Marking)\s*[:=]\s*(?:PROTECTED|(?:TOP[\s-]+)?SECRET)\b'
+      pattern: '\b(?:SEC(?:URITY\s+CLASSIFICATION)?|Security\s+Classification|CLASSIFICATION|Classification|PROTECTIVE\s+MARKING|Protective\s+Marking|MARKING|Marking)\s*[:=]\s*(?:PROTECTED|(?:TOP[\s-]+)?SECRET)\b'
     - id: Regex_au_protected_candidate
       pattern: '\b(?:PROTECTED|(?:TOP[\s-]+)?SECRET)\b'
   keywords:
@@ -197,9 +209,17 @@ purview:
             - style guide
             - training material
       strength: exclusion
+references:
+  - title: Protective Security Policy Framework (PSPF)
+    url: https://www.protectivesecurity.gov.au/
+  - title: Criminal Code Act 1995 (Cth)
+    url: https://www.legislation.gov.au/C2004A04868/latest/text
 created: '2026-06-29'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): marking classifier retained by design (formal field / complete X-Protective-Marking header remain the enforcement signals; tiers unchanged). Fixed PDF-unsafe literal spaces in the formal-label regex (SECURITY CLASSIFICATION, Security Classification, PROTECTIVE MARKING, Protective Marking now use \s+). Replaced the bare "Document footer candidate" probe with a realistic page-footer banner; added blank cover-sheet and training-material decoys. Added PSPF and Criminal Code references.'
   - version: 1.3.0
     date: '2026-07-19'
     description: 'Profile quality: retain bare banners as 65 discovery, enforce formal labels or explicitly government-corroborated banners at the recommended 75 tier, reserve 85 for complete headers, preserve SECRET roll-up, exclude collocations/public guides/templates, and add exact-tier probes.'

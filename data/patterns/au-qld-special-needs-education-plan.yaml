@@ -1,26 +1,24 @@
 schema: testpattern/v1
 name: Special Education and Special Needs Learning Plans
 slug: au-qld-special-needs-education-plan
-version: 1.5.1
-type: keyword_list
+version: 1.6.0
+type: regex
 pattern_class: concept
 description: >-
-  Detects special education and special needs learning plans, including Queensland individual education / special needs
-  plans with children's disability and learning-support details, goals, adjustments, and review dates, and equivalent
-  special education plan records in Australian education contexts.
+  Detects special education and special needs learning plans for a named student - personalised learning plans, individual curriculum/education/support plans, Education Adjustment Program profiles and student support plans with disability, adjustment and goal details - when the plan phrase sits with populated student identifiers and plan fields.
 operation: >-
-  Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters. Consolidated coverage (merge
-  qg-5): also covers the former au-top500-345-special-education-plans detector scope.
+  Primary: personalised learning plan, individual(ised) curriculum/education/support/learning plan, Education Adjustment Program (profile), special needs (education) plan, student support plan, NCCD adjustment. 65 (discovery only): phrase alone. 75: phrase plus a populated student identifier field. 85: student field plus a populated plan field (disability/impairment category, verified disability, diagnosis, adjustment level/category, learning goals, support hours or needs, review date, case manager, responsible or specialist teacher) plus independent school/support evidence (Department of Education, State School, OneSchool, guidance officer, speech-language pathologist, occupational therapist, parent consultation, reasonable adjustment, Disability Standards for Education). Template and guidance/training framing excluded from 75/85. Converted from keyword_list to regex.
+pattern: (?i)\b(?:personali[sz]ed\s+learning\s+plan|individual(?:ised)?\s+(?:curriculum|education(?:al)?|support|learning)\s+plan|education\s+adjustment\s+program(?:\s+profile)?|special\s+needs\s+(?:education\s+)?plan|student\s+support\s+plan|NCCD\s+adjustment)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium: enforce tiers need a populated student identifier; 85 also needs a plan field and school/support evidence. Inclusion policies and professional-learning material stay at 65.
 jurisdictions:
   - au
 regulations:
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+  - Education (General Provisions) Act 2006 (Qld)
+  - Disability Standards for Education 2005 (Cth)
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -33,31 +31,29 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: Individual education plan review meeting.
-      description: Exact 65 discovery probe - plan phrase without populated student-plan fields
-    - value: Individual education plan - student name, year level, learning goals, and review date recorded.
-      description: Exact 75 probe - populated plan fields without Queensland education-authority evidence
-    - value: >-
-        Education Queensland individual education plan - student name, year level, learning goals, responsible teacher,
-        and review date recorded.
-      description: Exact 85 probe - populated plan plus Queensland education-authority evidence
-    - value: Individual education plan (IEP) with verified disability and learning support
-      description: Test match 1
-    - value: 'QLD Education Adjustment Program: special needs reasonable adjustment'
-      description: Test match 2
-    - value: Special education support plan for student with learning difficulty
-      description: Test match 3
+    - value: "Individual education plan - Harbourview State School\nStudent name: Riley Ashworth\nYear level: 4\nDisability category: Autism spectrum disorder (verified)\nAdjustment level: Substantial\nLearning goals: independent transitions between activities\nReview date: 20/11/2026\nPrepared with the guidance officer after parent consultation."
+      description: Populated individual education plan with student, plan fields and school-support evidence (85)
+      synthetic: true
+    - value: "Personalised learning plan meeting\nStudent: Casey Rourke\nParent: Jordan Rourke"
+      description: Plan meeting note with labelled student fields only (75)
+      synthetic: true
   should_not_match:
-    - value: Special needs of the business
+    - value: "Special needs of the business"
       description: Non-match 1
-    - value: Education reform announcement
+    - value: "Education reform announcement"
       description: Non-match 2
-    - value: 'Sample template for a learner support record: learner name, year, goals, review date.'
+    - value: "Sample template for a learner support record: learner name, year, goals, review date."
       description: Adjacent template language is not a populated special-needs plan
-    - value: The public policy discusses classroom adjustment planning requirements.
+    - value: "The public policy discusses classroom adjustment planning requirements."
       description: Public policy has no special-needs-plan primary or populated student fields
-    - value: Individual business continuity plan for special operational needs.
+    - value: "Individual business continuity plan for special operational needs."
       description: Sibling planning language does not satisfy the education-plan primary
+    - value: "Policy guidance: this procedure explains how individual education plan documents are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Individual education plan\nStudent name: ____________________\nYear level: ____________________\nDisability category: ____________________\nLearning goals: ____________________\nReview date: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "Training: this professional learning session shows teachers how a personalised learning plan links reasonable adjustment decisions to the Disability Standards for Education."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: Generic special needs or education references.
     mitigation: Require IEP, EAP, or verified disability specific terms.
@@ -78,31 +74,34 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_special_needs_plan
       matches:
-        - ref: Evidence_student_plan_fields
-        - ref: Evidence_qld_education_forms
+        - ref: Regex_au_qld_special_needs_education_plan_student_fields
+        - ref: Regex_au_qld_special_needs_education_plan_plan_fields
+        - ref: Evidence_school_support_context
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_special_needs_education_plan_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_special_needs_plan
       matches:
-        - ref: Evidence_student_plan_fields
+        - ref: Regex_au_qld_special_needs_education_plan_student_fields
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_special_needs_education_plan_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_special_needs_plan
@@ -110,71 +109,52 @@ purview:
         - type: any
           min_matches: 0
           max_matches: 0
-          children:
-            - ref: Evidence_template_exclusion
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_special_needs_plan
-      pattern: (?i)\b(?:personalised\s+learning\s+plan|individual\s+(?:curriculum|education|support)\s+plan|plp|icp|issp)\b
-    - id: Pattern_education_support
-      pattern: (?i)\b(?:disability\s+support|special\s+needs|reasonable\s+adjustment|inclusive\s+education)\b
+      pattern: (?i)\b(?:personali[sz]ed\s+learning\s+plan|individual(?:ised)?\s+(?:curriculum|education(?:al)?|support|learning)\s+plan|education\s+adjustment\s+program(?:\s+profile)?|special\s+needs\s+(?:education\s+)?plan|student\s+support\s+plan|NCCD\s+adjustment)\b
+    - id: Regex_au_qld_special_needs_education_plan_student_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|student(?:\s+name)?|pupil|child|candidate(?:\s+name)?|EQ\s*ID|LUI|USI|year\s+level|grade\s+level|parent(?:\s+name)?|guardian|carer|(?:student|candidate|enrolment|applicant|file)\s*(?:no\.?|number|ID)|home\s+group|class)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_au_qld_special_needs_education_plan_plan_fields
+      pattern: (?i)\b(?:(?:disability|impairment)\s+category|verified\s+disability|diagnosis|adjustment(?:\s+(?:level|category|type))?|level\s+of\s+adjustment|learning\s+goals?|goal\s+\d|support\s+(?:hours|provided|needs)|review\s+date|case\s+manager|responsible\s+teacher|specialist\s+teacher)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_special_needs
-      groups:
-        - match_style: word
-          terms:
-            - Personalised Learning Plan
-            - text: PLP
-              case_sensitive: true
-            - Individual Curriculum Plan
-            - text: ICP
-              case_sensitive: true
-            - Individual Support Plan
-            - ISSP
-            - disability support
-            - reasonable adjustment
-            - inclusive education
-            - special needs education plan
-            - student special needs assessment
-      strength: specific
-    - id: Evidence_qld_education_forms
+    - id: Evidence_school_support_context
       groups:
         - match_style: word
           terms:
             - Department of Education
             - Education Queensland
             - State School
-            - SEF-1
-            - ppr.qed.qld.gov.au
-            - education.qld.gov.au
-            - eq.edu.au
-      strength: specific
-    - id: Evidence_qld_government
-      groups:
-        - match_style: word
-          terms:
-            - Queensland Government
-            - State of Queensland
-            - QLD Government
-            - qld.gov.au
-            - Information Privacy Act 2009
-            - Queensland Privacy Principles
-      strength: specific
-    - id: Evidence_student_plan_fields
-      groups:
-        - match_style: word
-          terms:
-            - student name
-            - year level
-            - learning goals
-            - adjustment category
-            - responsible teacher
-            - review date
+            - OneSchool
+            - guidance officer
+            - speech-language pathologist
+            - occupational therapist
             - parent consultation
-            - support hours
-      strength: domain
+            - reasonable adjustment
+            - Disability Standards for Education
+      strength: specific
+    - id: Keyword_au_qld_special_needs_education_plan_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75/85 were gated by field-name keywords ('student name', 'year level') that match blank forms. 75 now needs a populated student identifier and 85 needs student fields plus a populated plan field plus school/support evidence. Bare acronym primaries (PLP/ICP/ISSP, case-insensitive) removed. Tests replaced with populated records plus policy, blank-form and training decoys. Regulations: removed HRIPA, My Health Records Act and NDB; added Education (General Provisions) Act 2006 (Qld) and Disability Standards for Education 2005 (Cth); references added."
   - version: 1.5.1
     date: '2026-07-19'
     description: >-
@@ -226,3 +206,10 @@ remediation:
     changes:
       - Mapped non-canonical confidence 95 to 85.
       - Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.
+references:
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2006-039
+    title: Education (General Provisions) Act 2006 (Qld)
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+    title: Information Privacy Act 2009 (Qld)
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)

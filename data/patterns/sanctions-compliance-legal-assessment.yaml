@@ -1,19 +1,20 @@
 schema: testpattern/v1
 name: Sanctions Compliance Legal Assessment
 slug: sanctions-compliance-legal-assessment
-version: 1.5.0
+version: 1.6.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects internal legal assessments evaluating compliance with sanctions regimes (DFAT, OFAC, EU). Disclosure reveals identified compliance gaps, risk exposures, and remediation strategies before implementation, exposing the organisation to criminal prosecution under the Autonomous Sanctions Act 2011.
-operation: 'Primary detection: keyword proximity matching sanctions terms (''sanctions'', ''sanctioned'', ''DFAT'', ''OFAC'', ''sanctions list'') within 200 characters of legal assessment terms (''legal assessment'', ''compliance assessment'', ''legal opinion'', ''risk assessment'', ''privilege'', ''PROTECTED''). Corroborative evidence: 3 keywords within 300 characters.'
-pattern: (?i)\b(?:sanctions?|DFAT|OFAC|sanctioned\s+(?:entity|person|list))\b
-confidence: low
-confidence_justification: 'Medium confidence: Sanctions + legal/compliance assessment + privilege markers targets internal compliance vulnerability analysis. The combination eliminates public sanctions lists and news reporting about sanctions regimes.'
+operation: 'Primary: sanction(s) (compliance/assessment/screening/exposure/risk/regime/list), DFAT, OFAC, sanctioned entity/person/party. 65 (discovery only) = primary alone. 75 = primary plus two distinct populated memo or screening fields (To, From, Date, Subject, Re, Prepared by/for, Matter, Our ref, Counterparty, Entity, Vendor, Supplier, Payment reference/date/amount, Amount, Jurisdiction, Screening result/date/tool, List match, Regime, Control). 85 = primary plus three distinct fields plus a concrete compliance finding (compliance/screening gap, material deficiency, breach exposure, control failure, remediation required, counterparties requiring due diligence). Public-list, academic, enforcement and template exclusions apply to every tier.'
+pattern: (?i)\b(?:sanctions?(?:\s+(?:compliance|assessment|screening|exposure|risk|regime|list))?|DFAT|OFAC|sanctioned\s+(?:entity|person|party))\b
+confidence: medium
+confidence_justification: 'Medium: sanctions vocabulary is common in public lists, news, academic analysis and sport, so enforcement requires a populated legal memo or screening record; 85 adds a concrete compliance finding.'
 jurisdictions:
   - global
 regulations:
-- "Autonomous Sanctions Act 2011 (Cth)"
+  - Autonomous Sanctions Act 2011 (Cth)
+  - Charter of the United Nations Act 1945 (Cth)
 frameworks:
 - QGISCF
 data_categories:
@@ -38,42 +39,57 @@ corroborative_evidence:
     - corporate-legal
 test_cases:
   should_match:
-    - value: 'Sanctions compliance working note.'
-      description: Exact 65 discovery probe - sanctions topic without legal assessment or a concrete finding
-    - value: 'Sanctions compliance legal assessment for DFAT screening controls.'
-      description: Exact 75 probe - internal legal-assessment context without a populated exposure finding or marking
-    - value: 'PRIVILEGED DFAT sanctions legal assessment: screening gaps permit Vendor X payment, creating breach exposure and requiring remediation.'
-      description: Exact 85 probe - legal assessment, concrete finding, and privilege marking
     - value: |-
-        PROTECTED — LEGAL PROFESSIONAL PRIVILEGE
+        PRIVILEGED - prepared for counsel
+        Sanctions legal assessment
+        To: Chief Financial Officer
+        From: Head of Legal
+        Date: 12/08/2026
+        Counterparty: Northwind Maritime FZE
+        Screening result: Partial match to a DFAT Consolidated List entry
+        The assessment identifies a screening gap: payments of $412,000 were released before the alert was cleared, creating breach exposure under the Autonomous Sanctions Act 2011.
+      description: 85 - populated memo and screening fields plus a concrete screening-gap finding
+      synthetic: true
+    - value: |-
+        PROTECTED - LEGAL PROFESSIONAL PRIVILEGE
         Sanctions Compliance Legal Assessment
 
         Prepared for: Chief Financial Officer
         Subject: DFAT Consolidated List Screening Gaps
 
         This privileged legal assessment identifies three compliance gaps in the current sanctions screening process. Payments to Entity X may constitute a breach of the Autonomous Sanctions Act 2011.
-      description: Sanctions compliance assessment identifying screening gaps
-    - value: This confidential legal opinion addresses the organisation's exposure under OFAC secondary sanctions. The risk assessment identifies 12 counterparties requiring enhanced due diligence. Compliance gaps in the current screening process require immediate remediation.
-      description: Legal opinion on OFAC sanctions exposure
+      description: 75 - two populated memo fields; finding present but only two fields
     - value: |-
-        CONFIDENTIAL — PRIVILEGED
-        Sanctions Risk Assessment
-
-        The legal assessment of our sanctions compliance framework identifies material deficiencies in screening of sanctioned entities on the DFAT consolidated list. Remediation strategy attached.
-      description: Sanctions risk assessment with remediation strategy
-    - value: 'PRIVILEGED DFAT legal assessment: Autonomous Sanctions compliance gap permits Vendor X payment; exposure high; remediation of control SC-4 recommended before any further payment.'
-      description: Internal regime assessment with identified gap, exposure, and remediation (reaches the 75 policy tier)
+        Sanctions screening review
+        Counterparty: Harbour Shipping Services
+        Screening date: 03/06/2026
+        No list match; file closed.
+      description: 75 - two populated screening fields without a finding
+      synthetic: true
+    - value: Sanctions compliance working note.
+      description: 65 discovery - topic without populated fields
+    - value: 'PRIVILEGED DFAT sanctions legal assessment: screening gaps permit Vendor X payment, creating breach exposure and requiring remediation.'
+      description: 65 discovery - one-line assessment without populated fields
+    - value: This confidential legal opinion addresses the organisation's exposure under OFAC secondary sanctions. The risk assessment identifies 12 counterparties requiring enhanced due diligence. Compliance gaps in the current screening process require immediate remediation.
+      description: 65 discovery - prose opinion without populated fields
   should_not_match:
     - value: The Australian Government has imposed sanctions on several entities under the Autonomous Sanctions Act 2011. The DFAT consolidated list of sanctioned persons is publicly available on the DFAT website.
-      description: Public information about Australian sanctions regime
+      description: Public guidance about the Australian sanctions regime
     - value: This article discusses the development of international sanctions regimes including OFAC, EU, and Australian sanctions frameworks. The academic analysis examines enforcement trends.
       description: Academic article on sanctions law
     - value: A media report noted that the company was fined for breaching OFAC sanctions. The published enforcement action details are available on the OFAC website.
-      description: News about published sanctions enforcement action
+      description: News about a published enforcement action
     - value: OFAC published an updated sanctions list and public guidance.
-      description: Public list activity without internal assessment evidence (discovery inventory only)
+      description: Public list activity (discovery inventory only)
     - value: The sports league imposed sanctions for a rules breach.
-      description: Non-regulatory disciplinary sanctions outside scope (no corroborative legal-assessment evidence)
+      description: Non-regulatory disciplinary sanctions
+    - value: |-
+        Sanctions screening record
+        Counterparty: ________
+        Screening result: [select]
+        Date: ________
+        List match: ________
+      description: Blank screening template - placeholder fields are rejected
 false_positives:
   - description: Public sanctions lists and DFAT consolidated list
     mitigation: Negative match on 'publicly available', 'DFAT website', 'consolidated list published'. Require legal/compliance assessment context
@@ -89,71 +105,53 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-    - tier: high
-      confidence_level: 85
-      id_match: primary
+    - confidence_level: 85
+      id_match: Regex_sanctions_compliance_primary
       matches:
-        - ref: Evidence_sanctions_legal_assessment
+        - ref: Regex_sanctions_compliance_record_structure
+          min_count: 3
+          unique_results: true
         - ref: Evidence_sanctions_finding
-        - ref: Evidence_sanctions_marking
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - exclusion
-      description: Sanctions matter with legal-assessment context, a concrete exposure/control finding, and a privilege or confidentiality marking
-    - tier: medium
-      confidence_level: 75
-      id_match: primary
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_sanctions_compliance_primary
       matches:
-        - ref: Evidence_sanctions_legal_assessment
+        - ref: Regex_sanctions_compliance_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - exclusion
-      description: Sanctions/regime phrase plus independent legal-assessment context, gated by public-source exclusions
-    - tier: low
-      confidence_level: 65
-      id_match: primary
+            - Keyword_noise_exclusion
+    - confidence_level: 65
       discovery_only: true
+      id_match: Regex_sanctions_compliance_primary
       matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - exclusion
-      description: Sanctions/regime terminology for discovery inventory only
+            - Keyword_noise_exclusion
   regexes:
-    - pattern: (?i)\b(?:DFAT|OFAC)\b
-      description: Sanctions authority abbreviation
-    - pattern: (?i)\bsanctions?\s+(?:compliance|assessment|screening)\b
-      description: Sanctions compliance phrase
+    - id: Regex_sanctions_compliance_primary
+      pattern: (?i)\b(?:sanctions?(?:\s+(?:compliance|assessment|screening|exposure|risk|regime|list))?|DFAT|OFAC|sanctioned\s+(?:entity|person|party))\b
+    - id: Regex_sanctions_compliance_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Prepared\s+(?:by|for)|Matter(?:\s+(?:no\.?|number))?|Our\s+ref|Counterparty|Entity|Vendor|Supplier|Payment\s+(?:ref(?:erence)?|date|amount)|Amount|Jurisdiction|Screening\s+(?:result|date|tool)|List\s+match|Regime|Control(?:\s+(?:ID|ref))?)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<)[A-Za-z0-9$]
   keywords:
-    - id: primary
-      groups:
-        - match_style: word
-          terms:
-            - sanctions
-            - DFAT
-            - OFAC
-            - sanctions list
-            - sanctioned entity
-            - sanctions compliance
-      strength: domain
-    - id: Evidence_sanctions_legal_assessment
-      groups:
-        - match_style: word
-          terms:
-            - legal assessment
-            - compliance assessment
-            - legal opinion
-            - risk assessment
-            - internal counsel advice
-            - legal review
-      strength: domain
     - id: Evidence_sanctions_finding
       groups:
         - match_style: word
@@ -168,18 +166,7 @@ purview:
             - control failure
             - remediation required
             - counterparties requiring
-            - permits Vendor
-      strength: domain
-    - id: Evidence_sanctions_marking
-      groups:
-        - match_style: word
-          terms:
-            - privilege
-            - privileged
-            - legal professional privilege
-            - PROTECTED
-            - CONFIDENTIAL
-            - prepared for counsel
+            - potential breach
       strength: domain
     - id: exclusion
       groups:
@@ -206,10 +193,17 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Legal
-references: []
+references:
+  - title: Autonomous Sanctions Act 2011 (Cth)
+    url: https://www.legislation.gov.au/C2011A00038/latest/text
+  - title: DFAT - Australia and sanctions
+    url: https://www.dfat.gov.au/international-relations/security/sanctions
 created: '2026-02-20'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): Replaced the legacy keyword primary with an id-bearing regex primary. 75 now requires two distinct populated legal-memo or screening-record fields (new Regex_..._record_structure: counterparty, screening result, payment, To/From/Date ...) instead of legal-assessment keywords; 85 requires three fields plus a concrete compliance finding (the old 85 was reachable on keyword groups alone; the test-fitted "permits Vendor" term was removed). Wired the shared template-exclusion dictionary into every tier with the existing exclusion group and filter; dropped the legal-assessment and marking groups; recommended_confidence 85 -> 75; confidence low -> medium to match the gated design. Added populated 85/75 positives and a blank screening-template decoy; one-line/prose positives re-described as 65. Regulations: added Charter of the United Nations Act 1945 (Cth); added legislation and DFAT references.'
   - version: 1.5.0
     date: '2026-07-19'
     description: 'Targeted blocker remediation: split legal-assessment, concrete exposure/finding, and privilege/marking evidence into canonical keyword references; add distinct 65 discovery, 75 legal-context, and 85 populated privileged-assessment tiers with exact probes while preserving public-list, academic, enforcement, and sports negatives.'

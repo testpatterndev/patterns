@@ -1,59 +1,60 @@
 schema: testpattern/v1
 name: Admissions review notes
 slug: global-top500-350-admissions-review-notes
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies documents containing references to admissions review notes in international contexts. This information
-  type is classified as personally identifiable information under applicable data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 7 keywords within 300 characters. Uses additional domain-context evidence and explicit
-  exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:admissions\s+review|admission\s+decision|applicant\s+evaluation|enrollment\s+decision|acceptance\s+letter|rejection\s+letter|admissions\s+committee|selection\s+criteria|applicant\s+profile|interview\s+notes|offer\s+of\s+admission)\b
+description: >-
+  Identifies admissions review notes about individual applicants - admissions reviews, decisions, committee notes and files, applicant evaluations, ratings and rankings, reader notes, offers of admission and acceptance/rejection letters - when the phrase sits with populated applicant identifiers and evaluation fields.
+operation: >-
+  Pattern type: regex (boost_regex engine). Primary: admission(s) review/decision/committee/notes/file/assessment, applicant evaluation/rating/ranking, enrolment decision, offer of admission, acceptance/rejection letter, reader notes/rating. 65 (discovery only): phrase alone. 75: phrase plus a populated applicant identifier field (applicant/student name or number, application ID, DOB). 85: identifier field plus a populated evaluation field (reviewer/reader/interviewer, academic/overall/interview rating or score, rank, ATAR, GPA, test scores, recommendation, outcome, committee vote) plus independent admissions evidence (admit, waitlist, deferred, holistic review, personal statement, extracurricular, first-generation, interview panel). Template and guidance/training framing excluded from 75/85.
+pattern: (?i)\b(?:admissions?\s+(?:review|decision|committee|notes?|file|assessment)|applicant\s+(?:evaluation|rating|ranking)|enrol(?:l)?ment\s+decision|offer\s+of\s+admission|(?:acceptance|rejection)\s+letter|reader\s+(?:notes|rating))\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: enforce tiers need a populated applicant identifier; 85 also needs an evaluation field and admissions evidence. Admissions policies, selection criteria pages and news stay at 65.
 jurisdictions:
 - global
+frameworks:
+  - ISO 27001
+  - ISO 27701
 regulations:
-- GDPR
-- AML/CTF Act (Cth)
-- HRIPA (Cth)
-- IPA 2009 (Qld)
-- My Health Records Act 2012 (Cth)
-- NDB Scheme (Cth)
-- Privacy Act 1988 (Cth)
-- TIA Act 1979 (Cth)
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+  - GDPR
+  - FERPA
 data_categories:
 - pii
 corroborative_evidence:
   keywords:
-  - admissions review notes
-  - admissions
-  - review
-  - notes
-  - education
-  - research
-  - administration
+    - waitlist
+    - holistic review
+    - personal statement
+    - extracurricular
+    - first-generation
+    - interview panel
   proximity: 300
 test_cases:
   should_match:
-  - value: admissions review
-    description: Primary topic phrase match
-  - value: admission decision
-    description: Case-insensitive topic phrase match
-  - value: applicant evaluation
-    description: Alternative topic phrase match
-  - value: enrollment decision
-    description: Additional topic phrase match
+    - value: "Admissions committee notes - Round 2\nApplicant name: Avery Teston\nApplication ID: 2026-AD-44718\nReader 1: J. Staffson\nAcademic rating: 4/5\nInterview score: 38/40\nRecommendation: Admit - strong personal statement, first-generation applicant."
+      description: Populated admissions committee notes with applicant, evaluation fields and admissions evidence (85)
+      synthetic: true
+    - value: "Admission decision letter prepared\nApplicant: Casey Rourke\nApplication number: 88120451"
+      description: Decision letter note with labelled applicant fields only (75)
+      synthetic: true
   should_not_match:
-  - value: unrelated generic text without domain phrases
-    description: No relevant topic phrases present
-  - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
-  - value: student grant
-    description: Generic word pair from old broad template should not match
+    - value: "unrelated generic text without domain phrases"
+      description: No relevant topic phrases present
+    - value: "placeholder value 12345"
+      description: Random text should not match topic-specific regex
+    - value: "student grant"
+      description: Generic word pair from old broad template should not match
+    - value: "Policy guidance: this procedure explains how admissions committee notes are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Applicant evaluation form\nApplicant name: ____________________\nApplication ID: ____________________\nAcademic rating: ____________________\nRecommendation: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the admissions committee will move to holistic review next year, and every offer of admission will be issued through the online portal."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
 - description: Common words and phrases related to admissions review notes appearing in policy documents, training materials,
     HR templates, or compliance guidelines without actual personal data.
@@ -72,12 +73,8 @@ exports:
 - yaml
 - regex_copy
 scope: wide
-risk_description: The detector finds admissions-review, admission-decision, applicant-evaluation, or enrolment-decision material
-  within education context, representing evaluative case notes rather than a public admissions rule. Disclosure can expose
-  subjective judgments, ranking factors, vulnerabilities, or disputed reasons and may bias reviewers, distress an applicant,
-  or enable manipulation of an active selection process. The ordinary case affects one applicant or a limited cohort and causes
-  serious privacy and opportunity harm without granting institutional access. Risk 8 and SENSITIVE are justified; PROTECTED
-  would require a bulk applicant dossier, privileged decision-system compromise, or significant institution-wide damage.
+risk_description: >-
+  The detector finds admissions review, decision, committee and applicant-evaluation language and enforces only when populated applicant identifier fields sit nearby; phrase-only text stays at 65 discovery. Disclosure can expose subjective judgments, ranking factors, vulnerabilities, or disputed reasons and may bias reviewers, distress an applicant, or enable manipulation of an active selection process. The ordinary case affects one applicant or a limited cohort and causes serious privacy and opportunity harm without granting institutional access. Risk 8 and SENSITIVE are justified; PROTECTED would require a bulk applicant dossier, privileged decision-system compromise, or significant institution-wide damage.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -88,77 +85,85 @@ sensitivity_labels:
   ca_gov: Protected A
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
-  - dict: template-exclusion
-    as: Keyword_noise_exclusion
-    match_style: word
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
-  - confidence_level: 85
-    id_match: Regex_admissions_review
-    matches:
-    - ref: Pattern_global_top500_350_admissions_review_notes_label_context
-    - ref: Keyword_global_top500_350_admissions_review_notes_domain_context
-    - ref: Keyword_admissions_review
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 75
-    id_match: Regex_admissions_review
-    matches:
-    - ref: Pattern_global_top500_350_admissions_review_notes_label_context
-    - ref: Keyword_global_top500_350_admissions_review_notes_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
-  - confidence_level: 65
-    discovery_only: true
-    id_match: Regex_admissions_review
-    matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_admissions_review_notes
+      matches:
+        - ref: Regex_global_top500_350_admissions_review_notes_applicant_fields
+        - ref: Regex_global_top500_350_admissions_review_notes_evaluation_fields
+        - ref: Keyword_global_top500_350_admissions_review_notes_admissions_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_350_admissions_review_notes_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_admissions_review_notes
+      matches:
+        - ref: Regex_global_top500_350_admissions_review_notes_applicant_fields
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_350_admissions_review_notes_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_admissions_review_notes
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-  - id: Regex_admissions_review
-    pattern: (?is)\b(?:admissions\s+review|admission\s+decision|applicant\s+evaluation|enrollment\s+decision|acceptance\s+letter|rejection\s+letter|admissions\s+committee|selection\s+criteria|applicant\s+profile|interview\s+notes|offer\s+of\s+admission)\b
-  - id: Pattern_global_top500_350_admissions_review_notes_label_context
-    pattern: (?i)\b(?:admissions\s+review\s+notes)\b
+    - id: Regex_admissions_review_notes
+      pattern: (?i)\b(?:admissions?\s+(?:review|decision|committee|notes?|file|assessment)|applicant\s+(?:evaluation|rating|ranking)|enrol(?:l)?ment\s+decision|offer\s+of\s+admission|(?:acceptance|rejection)\s+letter|reader\s+(?:notes|rating))\b
+    - id: Regex_global_top500_350_admissions_review_notes_applicant_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|student(?:\s+name)?|pupil|child|candidate(?:\s+name)?|EQ\s*ID|LUI|USI|year\s+level|grade\s+level|parent(?:\s+name)?|guardian|carer|(?:student|candidate|enrolment|applicant|file)\s*(?:no\.?|number|ID)|home\s+group|class|applicant(?:\s+name)?|application\s*(?:no\.?|number|ID))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_global_top500_350_admissions_review_notes_evaluation_fields
+      pattern: (?i)\b(?:(?:reviewer|reader|assessor|interviewer)(?:\s+\d)?|(?:academic|overall|personal|interview)\s+(?:rating|score)|rating|score|rank(?:ing)?|ATAR|GPA|test\s+scores?|recommendation|outcome|committee\s+vote)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-  - id: Keyword_admissions_review
-    groups:
-    - match_style: word
-      terms:
-      - admissions review
-      - admission decision
-      - applicant evaluation
-      - enrollment decision
-      - acceptance letter
-      - rejection letter
-      - admissions committee
-      - selection criteria
-      - applicant profile
-      - interview notes
-      - offer of admission
-      - waitlist
-    strength: specific
-  - id: Keyword_global_top500_350_admissions_review_notes_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - admissions review notes
-      - admissions
-      - review
-      - notes
-    strength: domain
+    - id: Keyword_global_top500_350_admissions_review_notes_admissions_evidence
+      groups:
+        - match_style: word
+          terms:
+            - admit
+            - waitlist
+            - deferred
+            - holistic review
+            - personal statement
+            - extracurricular
+            - first-generation
+            - interview panel
+      strength: specific
+    - id: Keyword_global_top500_350_admissions_review_notes_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+- version: 1.3.0
+  date: '2026-09-24'
+  description: "Quality pass (2026-09-24): rebuilt tiers - the old tiers were corroborated by the primary's own phrases and no positive reached an enforce tier. 75 now needs a populated applicant identifier and 85 needs applicant fields plus an evaluation field (reader, rating, score, recommendation) plus admissions evidence. Primary tightened (dropped generic 'selection criteria', 'applicant profile', 'interview notes'). Bare-phrase tests replaced with populated records plus policy, blank-form and news decoys. Regulations: removed AML/CTF Act, HRIPA, My Health Records Act, IPA and TIA Act; added FERPA; frameworks added; expired HESF 2015 reference replaced."
 - version: 1.2.1
   date: '2026-07-14'
   description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1896 without changing
@@ -180,9 +185,12 @@ changelog:
 author: testpattern-community
 license: MIT
 references:
-- https://www.legislation.gov.au/F2015L01639/latest/text
-- https://www.legislation.gov.au/C2004A03712/latest/text
-- https://www.teqsa.gov.au/
+  - url: https://studentprivacy.ed.gov/ferpa
+    title: FERPA - U.S. Department of Education Student Privacy Policy Office
+  - url: https://www.legislation.gov.au/F2021L00488/latest/text
+    title: Higher Education Standards Framework (Threshold Standards) 2021
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)
 remediation:
   catalog_quality_2026_06_02:
     status: applied

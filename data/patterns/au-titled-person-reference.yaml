@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Titled Person Reference
 slug: au-titled-person-reference
-version: 2.6.1
+version: 2.7.0
 type: keyword_proximity
 pattern_class: concept
 engine: boost_regex
@@ -10,25 +10,18 @@ description: >-
   documents. Uses structural regex for honorific + capitalised name components with corroborative
   evidence from the consolidated Australian forename and surname dictionaries.
 operation: >-
-  Honorific plus two-to-three capitalised name components is the primary signal. The 65 tier retains
-  title structure for discovery, 75 requires either consolidated Australian name dictionary, and 85
-  requires both forename and surname evidence. Template exclusion applies to every tier, and strong
-  business-suffix or formatted-address collisions cannot enforce.
+  Primary: honorific (Mr, Mrs, Miss, Ms, Dr, Prof, Rev, Hon, Sir, Dame, Lord, Lady) followed by two or three capitalised name tokens (case-sensitive). 65 (discovery only): titled name alone. 75: titled name plus at least one Australian forename or surname registry hit plus a populated contact/identity field (phone, mobile, email, address, DOB, customer/client/member/employee/patient/account/reference number). 85: titled name plus both forename and surname registry hits plus two distinct populated contact/identity fields. Business-name and street-address collisions and template framing are excluded from 75/85.
+pattern: \b(?:Mr|Mrs|Miss|Ms|Dr|Prof|Rev|Hon|Sir|Dame|Lord|Lady)\.?\s+(?:[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}|[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20})\b
 case_sensitive: true
 confidence: medium
 confidence_justification: >-
-  Medium confidence: salutation prefix provides strong signal but names following salutations may be
-  partial or ambiguous in some document formats.
+  Medium: a titled name alone is common in correspondence and public text, so enforce tiers now need an independent populated contact or identity field next to the name; the registry dictionaries confirm the tokens are plausible names but are not counted as independent evidence.
 jurisdictions:
   - au
 regulations:
-- "AML/CTF Act (Cth)"
-- "HRIPA (Cth)"
-- "IPA 2009 (Qld)"
-- "My Health Records Act 2012 (Cth)"
-- "NDB Scheme (Cth)"
-- "Privacy Act 1988 (Cth)"
-- "TIA Act 1979 (Cth)"
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+  - IPA 2009 (Qld)
 frameworks:
 - ISO 27001
 - ISO 27701
@@ -37,29 +30,30 @@ data_categories:
   - personal-name
 test_cases:
   should_match:
-    - value: Dr Zorvane Qartz
-      description: Exact 65 discovery probe - titled capitalised structure without Australian dictionary evidence
-    - value: Dr Aaliyah Zorvane
-      description: Exact 75 probe - titled structure with one consolidated Australian dictionary hit
-    - value: 'Contact name: Dr Aaliyah Abbasi; personnel record'
-      description: Exact 85 probe - titled structure with both dictionaries, a populated field label, and person-record context
-    - value: Dear Dr Sarah Thompson
-      description: Doctor with full name
-    - value: 'Attention: Prof. James Wilson'
-      description: Professor with period abbreviation
-    - value: The Hon. Justice Michael Kirby
-      description: Honourable title with two name components
+    - value: "Contact record\nMs Sarah Thompson\nMobile: 0412 345 678\nEmail: s.thompson@harbourclinic.com.au\nCustomer number: C4471820"
+      description: Titled name with both registry hits and two distinct contact/identity fields (85)
+      synthetic: true
+    - value: "Dr Aaliyah Zorvane\nPhone: 07 3000 1234"
+      description: Titled name with one registry hit and one contact field (75)
+      synthetic: true
+    - value: "Attention: Prof. James Wilson"
+      description: Titled name alone (65 discovery)
+      synthetic: true
   should_not_match:
-    - value: The weather forecast predicts rain across the region this weekend.
+    - value: "The weather forecast predicts rain across the region this weekend."
       description: Generic non-name text with no salutation present
-    - value: The mrs clause in the contract
+    - value: "The mrs clause in the contract"
       description: Lowercase clause wording does not satisfy the case-sensitive titled-name structure
-    - value: Dr Brown Engineering Pty Ltd lodged the tender.
+    - value: "Dr Brown Engineering Pty Ltd lodged the tender."
       description: Titled business-name collision present in both Australian dictionaries must not reach enforcement
-    - value: 'Dr Victoria Road, QLD 4000'
+    - value: "Dr Victoria Road, QLD 4000"
       description: Titled formatted-address collision present in both Australian dictionaries must not reach enforcement
-    - value: 'Sample: Dear Dr Aaliyah Abbasi'
+    - value: "Sample: Dear Dr Aaliyah Abbasi"
       description: High-like titled-name fixture must be rejected by the shared exclusion dictionary
+    - value: "The Hon. Justice Michael Kirby delivered the lecture on constitutional law at the university."
+      description: Public figure named in prose without contact or identity fields (no enforce tier)
+    - value: "Contact details\nName: ____________________\nPhone: ____________________\nEmail: ____________________\nCustomer number: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
 false_positives:
   - description: Salutations preceding non-name words in informal text or brand references.
     mitigation: Require capitalised words following the salutation and corroborative family-name dictionary.
@@ -69,7 +63,7 @@ exports:
 scope: wide
 risk_rating: 5
 risk_description: >-
-  A Titled Person Reference match combines an honorific such as Dr, Professor, or Justice with one to three capitalised name components and name-dictionary evidence. It can expose an identifiable person's name and role cue, which may aid correlation, unwanted contact, or a tailored professional pretext. Names and titles are often public, and the match contains no account, case, contact route, or credential. Risk 5 and OFFICIAL recognise a likely populated identity reference while reserving SENSITIVE for a name linked to substantive private or operational information.
+  A Titled Person Reference match combines an honorific with two or three capitalised name tokens and, to enforce, name-registry evidence plus a populated contact or identity field (phone, email, address, DOB or customer/member number); a titled name alone stays at 65 discovery. It can expose an identifiable person's name and role cue, which may aid correlation, unwanted contact, or a tailored professional pretext. Names and titles are often public, and the match contains no account, case, contact route, or credential. Risk 5 and OFFICIAL recognise a likely populated identity reference while reserving SENSITIVE for a name linked to substantive private or operational information.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -95,11 +89,11 @@ purview:
     - confidence_level: 85
       id_match: Pattern_titled_person
       matches:
-        - ref: Evidence_salutation
         - ref: Evidence_au_forename_registry
         - ref: Evidence_au_surname_registry
-        - ref: Pattern_titled_person_record_label
-        - ref: Evidence_titled_person_record_context
+        - ref: Regex_au_titled_person_reference_contact_fields
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -109,12 +103,12 @@ purview:
     - confidence_level: 75
       id_match: Pattern_titled_person
       matches:
-        - ref: Evidence_salutation
         - type: any
           min_matches: 1
           refs:
             - Evidence_au_forename_registry
             - Evidence_au_surname_registry
+        - ref: Regex_au_titled_person_reference_contact_fields
         - type: any
           min_matches: 0
           max_matches: 0
@@ -125,7 +119,6 @@ purview:
       discovery_only: true
       id_match: Pattern_titled_person
       matches:
-        - ref: Evidence_salutation
         - type: any
           min_matches: 0
           max_matches: 0
@@ -134,58 +127,16 @@ purview:
   regexes:
     - id: Pattern_titled_person
       pattern: \b(?:Mr|Mrs|Miss|Ms|Dr|Prof|Rev|Hon|Sir|Dame|Lord|Lady)\.?\s+(?:[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}|[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20})\b
-    - id: Pattern_titled_person_record_label
-      pattern: >-
-        (?i)\b(?:contact|customer|client|patient|employee|member|applicant|holder)\s+(?:name|record)\s*[:#-]?\s*(?:Mr|Mrs|Miss|Ms|Dr|Prof|Rev|Hon|Sir|Dame|Lord|Lady)\b
+    - id: Regex_au_titled_person_reference_contact_fields
+      pattern: (?i)\b(?:phone|mobile|tel(?:ephone)?|e-?mail|(?:postal\s+|residential\s+)?address|date\s+of\s+birth|DOB|(?:customer|client|member|employee|patient|account|reference|ref)\s*(?:no\.?|number|ID))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
     - id: Pattern_non_person_name_collision
       pattern: (?i)\b(?:(?:engineering|consulting|holdings|services|pty\s+ltd|ltd|limited|company|corporation|council|university)|(?:street|road|avenue|highway|parade|drive|lane|terrace|crescent)\s*,?\s*(?:NSW|QLD|VIC|TAS|SA|WA|NT|ACT|\d{4}))\b
-  keywords:
-    - id: Evidence_salutation
-      groups:
-        - match_style: word
-          terms:
-            - Mr
-            - Mr.
-            - Mrs
-            - Mrs.
-            - Miss
-            - Ms
-            - Ms.
-            - Dr
-            - Dr.
-            - Prof
-            - Prof.
-            - Professor
-            - Rev
-            - Rev.
-            - Reverend
-            - Hon
-            - Hon.
-            - Honourable
-            - Sir
-            - Dame
-            - Lord
-            - Lady
-            - Mx
-            - Mx.
-      strength: domain
-    - id: Evidence_titled_person_record_context
-      groups:
-        - match_style: word
-          terms:
-            - personnel record
-            - identity record
-            - contact record
-            - customer record
-            - client record
-            - patient record
-            - employee record
-            - member record
-            - applicant record
-      strength: specific
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 2.7.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): 75 fired on a titled name alone ('Dr Aaliyah Zorvane') because the salutation keyword and registry dictionaries match inside the primary span. Removed the salutation evidence; 75 now needs a registry hit plus a populated contact/identity field (phone, email, address, DOB, customer/member/employee number) and 85 needs both registries plus two distinct contact/identity fields. Bare-name positives replaced with populated contact records; added a public-figure prose decoy and a blank contact form. Regulations: removed AML/CTF Act, HRIPA, My Health Records Act and TIA Act; references added."
   - version: 2.6.1
     date: '2026-07-19'
     description: 'Make the 85 tier demonstrably cumulative by requiring a populated titled-person field label and person-record context in addition to both Australian name dictionaries.'
@@ -212,3 +163,8 @@ changelog:
     description: Bound inner quantifier in repeated name-component group to remove Purview-flagged nested-quantifier shape
 author: testpattern-community
 license: MIT
+references:
+  - url: https://www.oaic.gov.au/privacy/your-privacy-rights/your-personal-information/what-is-personal-information
+    title: OAIC - What is personal information
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)

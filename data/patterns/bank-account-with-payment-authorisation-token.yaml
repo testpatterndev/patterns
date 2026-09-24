@@ -1,21 +1,23 @@
 schema: testpattern/v1
 name: Bank Account with Payment Authorisation Token
 slug: bank-account-with-payment-authorisation-token
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects government bank account details (BSB + account number) combined with payment authorisation credentials, approval tokens, or signing authorities that together enable the initiation of payments.
-operation: Regex for BSB format within 300 characters of account number pattern and authorisation/approval context keywords. High confidence when PROTECTED header present. Distinguished from routine BSB+account (SENS_Fin) by requiring authorisation/signing context.
+operation: >-
+  BSB shape (65 alone, discovery) within 300 characters of a 6-10 digit account number and authorisation context. 75 = BSB + account number + either a labelled payment authorisation reference (payment token, authorisation/approval/release code or number) or both authorisation vocabulary and a payment-method term (EFT, BECS, ABA file, batch payment ...). 85 = BSB + account number + payment-method term + a PROTECTED/confidential/dual-authorisation marker or authorisation vocabulary. Template, 'pay your' and supplier-registration framing excluded.
 pattern: \b\d{3}-?\d{3}\b
 confidence: medium
-confidence_justification: 'Medium confidence: BSB + account number + payment authorisation credentials is a highly specific combination. The requirement for authorisation context (not just banking details) distinguishes this from routine SENS_Fin BSB detection.'
+confidence_justification: >-
+  Medium confidence: BSB plus account number plus payment-authorisation context is a specific combination; authorisation references are system-specific, so the token is a documented label-anchored fallback.
 jurisdictions:
   - au
 regulations:
-- "Financial Accountability Act 2009 (Qld)"
+  - "Financial Accountability Act 2009 (Qld)"
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - financial
   - government
@@ -41,16 +43,28 @@ corroborative_evidence:
     - corporate-finance
 
     - government-services
+customisation:
+  - key: payment-authorisation-reference
+    kind: identifier-format
+    identifier: payment-authorisation-reference
+    target: purview.regexes/Regex_bank_account_with_payment_authorisation_token_payment_authorisation_reference
+    mode: replace
+    affects_tiers: [75]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#payment-authorisation-reference). Earlier versions used the AUTH-YYYY-NNNNN token format, which does not appear in any published source.
 test_cases:
   should_match:
-    - value: 'PROTECTED — Payment Authorisation File. BSB: 064-000, Account: 12345678. Payment token: AUTH-2026-00451. Authorised signatory: J. Smith (Delegate Level 3). Batch payment approved for $2,450,000 via BECS direct entry. Released for processing.'
-      description: Payment authorisation with BSB, account, and approval token
+    - value: 'PROTECTED — Payment Authorisation File. BSB: 064-000, Account: 12345678. Payment token: PT88205531. Authorised signatory: J. Smith (Delegate Level 3). Batch payment approved for $2,450,000 via BECS direct entry. Released for processing.'
+      description: Payment authorisation with BSB, account, and approval token (reaches 85)
     - value: 'EFT Payment Instruction — PROTECTED. Account BSB 084-004 Account No 98765432. Signing authority: Dual authorisation required. First approver: A. Jones (approved). Second approver: B. Williams (approved). Payment amount: $890,000. ABA file generated.'
-      description: Dual-authorised payment with BSB and signing authority
-    - value: 'PROTECTED — Batch payment authorisation. BSB: 032-001, Account: 45678901. Authorised signatory: K. Brown (Delegate Level 4). Payment token: AUTH-2026-00872. Released for processing via BECS direct entry.'
-      description: Batch payment with BSB, account, and approval token
+      description: Dual-authorised payment with BSB and signing authority (reaches 85)
+    - value: 'PROTECTED — Batch payment authorisation. BSB: 032-001, Account: 45678901. Authorised signatory: K. Brown (Delegate Level 4). Payment token: PT88207720. Released for processing via BECS direct entry.'
+      description: Batch payment with BSB, account, and approval token (reaches 85)
     - value: 'BSB 032-001 Account 45678901; dual authorisation by K Brown and S Tran; ABA file released for processing.'
-      description: Account number plus dual authorisation and release evidence satisfy the non-token enforcing branch
+      description: Account number plus dual authorisation and release evidence satisfy the non-token enforcing branch (reaches 85)
+    - value: "Payment release record\nBSB 064-000 Account 12345678\nPayment token: PT88205531"
+      description: BSB + account + labelled payment token, no payment-method or marker evidence (reaches 75)
+      synthetic: true
   should_not_match:
     - value: 'Please update your bank details for salary payments. BSB: ___ Account: ___. Submit to HR with a void cheque or bank statement.'
       description: Blank bank details form — no authorisation context
@@ -58,12 +72,16 @@ test_cases:
       description: Routine supplier onboarding prose with no BSB, account, or token values
     - value: 'Pay your fee to BSB 064-000 account 12345678.'
       description: Inbound payment instruction — pay-your exclusion applies and there is no authorisation evidence
-    - value: 'Example: BSB 111-222 account 12345678 AUTH-2026-0001.'
+    - value: 'Example: BSB 111-222 account 12345678 payment token PT00000001.'
       description: Example-prefixed training text — noise exclusion overrides credential-shaped content
     - value: 'BSB 064-000 payment BSB payment.'
       description: BSB with repeated generic payment words — no account number or authorisation path, so no enforcement
     - value: Accounts receivable reconciled yesterday's customer deposits.
       description: Routine financial operations with no BSB, account number, or authorisation content
+    - value: "Policy: payments above $50,000 need dual authorisation by two financial delegates before the ABA file is released for processing via BECS direct entry."
+      description: Finance policy guidance naming the controls without any account details (must stay below 75)
+    - value: "Payment release form\nBSB: ______\nAccount number: ________\nPayment token: ________\nAuthorised signatory: ________"
+      description: Blank payment release form (must stay below 75)
 false_positives:
   - description: Routine bank detail collection forms for HR or accounts payable
     mitigation: Require authorisation/approval context (not just BSB + account) to distinguish from SENS_Fin patterns
@@ -101,15 +119,22 @@ purview:
       id_match: Pattern_bank_account_with_payment_authorisation_token_bsb_format_e_g_064_000_or_064000
       matches:
         - ref: Pattern_bank_account_with_payment_authorisation_token_bank_account_number_6_10_digits
+        - ref: Regex_bank_account_with_payment_authorisation_token_payment_authorisation_reference
         - type: any
-          min_matches: 1
-          children:
-            - ref: Pattern_bank_account_with_payment_authorisation_token_payment_authorisation_token_format
-            - type: any
-              min_matches: 2
-              refs:
-                - Evidence_bank_account_with_payment_authorisation_token_authorisation
-                - Evidence_bank_account_with_payment_authorisation_token_payment_methods
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_bank_account_with_payment_authorisation_token_exclusion
+    - confidence_level: 75
+      id_match: Pattern_bank_account_with_payment_authorisation_token_bsb_format_e_g_064_000_or_064000
+      matches:
+        - ref: Pattern_bank_account_with_payment_authorisation_token_bank_account_number_6_10_digits
+        - type: any
+          min_matches: 2
+          refs:
+            - Evidence_bank_account_with_payment_authorisation_token_authorisation
+            - Evidence_bank_account_with_payment_authorisation_token_payment_methods
         - type: any
           min_matches: 0
           max_matches: 0
@@ -131,19 +156,10 @@ purview:
       pattern: \b\d{3}-?\d{3}\b
     - id: Pattern_bank_account_with_payment_authorisation_token_bank_account_number_6_10_digits
       pattern: \b\d{6,10}\b
-    - id: Pattern_bank_account_with_payment_authorisation_token_payment_authorisation_token_format
-      pattern: AUTH-\d{4}-\d{4,6}
+    - id: Regex_bank_account_with_payment_authorisation_token_payment_authorisation_reference
+      pattern: >-
+        (?i)\b(?:payment\s+(?:token|authori[sz]ation\s+(?:code|no\.?|number|ref(?:erence)?))|(?:authori[sz]ation|approval|release)\s+(?:token|code|no\.?|number|ref(?:erence)?|ID))\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{3,20}\b
   keywords:
-    - id: Evidence_bank_account_with_payment_authorisation_token_primary
-      groups:
-        - match_style: word
-          terms:
-            - text: BSB
-              case_sensitive: true
-            - bank account
-            - account number
-            - payment
-      strength: domain
     - id: Evidence_bank_account_with_payment_authorisation_token_authorisation
       groups:
         - match_style: word
@@ -201,10 +217,15 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Financial
-references: []
+references:
+  - title: Financial Accountability Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-009
 created: '2026-02-20'
-updated: '2026-07-18'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): replaced the invented AUTH-YYYY-NNNNN token regex with the new payment-authorisation-reference labelled fallback (payment token / authorisation code / release code + digit-bearing value), declared as an identifier-format customisation slot on the 75 tier; tests converted to labelled tokens; added a finance-policy guidance decoy and a blank release-form decoy; references added. The 2026-07-06 tenant verdict (ERROR) predates the 2026-07-18 change and should be re-run.'
   - version: 1.4.1
     date: '2026-07-18'
     description: >-

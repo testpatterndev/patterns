@@ -1,22 +1,25 @@
 schema: testpattern/v1
 name: Witness Protection Program Record
 slug: witness-protection-program-record
-version: 1.5.0
+version: 1.6.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects documents containing witness protection program records including new identities, relocation details, and safe house locations for protected witnesses. Disclosure directly endangers the lives of witnesses and their families who have testified against violent criminals.
-operation: 'Keyword proximity: primary keywords (witness protection, protected witness, new identity, relocation plan, safe house) within 300 characters of corroborative keywords (PROTECTED, Witness Protection Act, QPS, relocation, identity documents). Document marker detection for WITNESS PROTECTION classification stamps. Negative keyword exclusion for media and fiction contexts.'
+operation: >-
+  Primary: witness protection phrases (witness protection, protected witness, relocation plan, safe house location, new identity documents, Witness Protection Act). 65 = phrase only (discovery). 75 = phrase plus a populated protected-person field (protected person, former/assumed name, new identity, relocation, case officer, name, date of birth, file number) or a labelled file reference. 85 = phrase plus two distinct populated fields plus independent evidence (assumed name, identity documents, drivers licence, Medicare card, threat assessment, interstate transfer ...). Media, fiction, policy and research framing excluded.
 pattern: (?i)\b(witness\s+protection|protected\s+witness|relocation\s+plan|safe\s+house\s+location|new\s+identity\s+(?:document|program|package)|Witness\s+Protection\s+Act)\b
 confidence: medium
-confidence_justification: 'Medium confidence: requires co-occurrence of witness protection terminology with personal identifiers and classification markers. The combination of protection program language with actual relocation or identity details distinguishes operational records from general policy discussions.'
+confidence_justification: >-
+  Medium confidence: enforcement requires populated protected-person fields; program file numbers are unpublished, so the reference is a documented label-anchored fallback.
 jurisdictions:
   - au
 regulations:
-- "PPRA 2000 (Qld)"
-- "Witness Protection Act 2000 (Qld)"
+  - Crime and Corruption Act 2001 (Qld)
+  - PPRA 2000 (Qld)
+  - Witness Protection Act 2000 (Qld)
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - law-enforcement
   - government
@@ -46,16 +49,25 @@ corroborative_evidence:
 
     - government-services
     - en-government-classification
+customisation:
+  - key: case-reference-number
+    kind: identifier-format
+    identifier: case-reference-number
+    target: purview.regexes/Regex_witness_protection_program_record_case_reference
+    mode: replace
+    affects_tiers: [75]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#case-reference-number). Earlier versions used the WP-YYYY-NNNN format, which does not appear in any published source.
 test_cases:
   should_match:
-    - value: 'PROTECTED — WITNESS PROTECTION. Record of protected witness relocation. Protected person: formerly known as Sandra Marie BLAKE. New identity documents issued under Witness Protection Act 2000 (Qld) s.10. Relocation plan: interstate transfer to safe house location designated WP-2024-0087.'
-      description: Witness protection relocation record with new identity details and legislative references
+    - value: 'PROTECTED — WITNESS PROTECTION. Record of protected witness relocation. Protected person: formerly known as Sandra Marie BLAKE. New identity documents issued under Witness Protection Act 2000 (Qld) s.10. Relocation plan: interstate transfer to safe house location on file number 2024/0087.'
+      description: Witness protection relocation record with new identity details and legislative references (reaches 75)
     - value: Witness Protection Program — Threat Assessment Update. Subject remains at HIGH risk from associates of convicted drug trafficker Raymond COSTELLO. Safe house location reviewed and deemed secure. New identity integration progressing; protected witness has commenced employment under assumed name.
-      description: Threat assessment update for an active witness protection case
+      description: Threat assessment update for an active witness protection case (65 discovery only - prose without populated record fields)
     - value: 'Memorandum to QPS Witness Protection Unit. Re: Application for inclusion in witness protection program. The witness provided evidence in Operation MERCURY resulting in the conviction of three members of the organised crime syndicate. Relocation plan prepared. New identity package includes Queensland drivers licence, Medicare card, and bank accounts.'
-      description: Application memorandum for witness protection program inclusion
-    - value: "WITNESS PROTECTION\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: WITNESS PROTECTION recorded against the subject; handling restricted."
-      description: Populated justice record reaching the 75/85 structure gate
+      description: Application memorandum for witness protection program inclusion (65 discovery only - prose without populated record fields)
+    - value: "PROTECTED — Witness Protection Unit\nProtected person: Avery Teston\nFormer name: Avery Marsh\nFile number: 2026/0417\nAssumed name documents issued (drivers licence, Medicare card); threat assessment reviewed before interstate transfer."
+      description: 'Populated protection record: protected person, former name and file number plus identity-document evidence (reaches 85)'
       synthetic: true
   should_not_match:
     - value: The Queensland Government administers the Witness Protection Act 2000 which provides a framework for protecting witnesses who assist law enforcement. The Act is publicly available on the Queensland legislation website.
@@ -66,6 +78,10 @@ test_cases:
       description: Academic research paper about witness protection using anonymised data
     - value: "Policy guidance: this procedure explains how records about WITNESS PROTECTION are handled, who may access them and how long they are kept. It contains no records about any person or system."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: "Witness protection — application for inclusion\nProtected person: __________\nFormer name: __________\nFile number: __________"
+      description: Blank form / template with unfilled fields (must stay below 75)
+    - value: "News: a film about witness protection follows a protected witness who is given a new identity after testifying."
+      description: News or training text naming the topic (must stay below 75)
 false_positives:
   - description: News reporting about witness protection programs in general terms
     mitigation: 'Negative keyword exclusion: ''media release'', ''news article'', ''reported'', ''published''. Require proximity to actual personal identifiers or case numbers.'
@@ -91,9 +107,7 @@ purview:
         - ref: Regex_witness_protection_program_record_record_structure
           min_count: 2
           unique_results: true
-        - ref: Evidence_witness_protection_program_record_classification_markers
         - ref: Evidence_witness_protection_program_record_corroborative_terms
-        - ref: Pattern_witness_protection_program_record_wp_case_reference
         - type: any
           min_matches: 0
           max_matches: 0
@@ -106,7 +120,7 @@ purview:
         - type: any
           refs:
             - Regex_witness_protection_program_record_record_structure
-            - Evidence_witness_protection_program_record_corroborative_terms
+            - Regex_witness_protection_program_record_case_reference
         - type: any
           min_matches: 0
           max_matches: 0
@@ -126,18 +140,13 @@ purview:
   regexes:
     - id: Pattern_witness_protection_program_record_witness_protection_terms
       pattern: (?i)\b(witness\s+protection|protected\s+witness|relocation\s+plan|safe\s+house|new\s+identity|Witness\s+Protection\s+Act)\b
-    - id: Pattern_witness_protection_program_record_wp_case_reference
-      pattern: \bWP-\d{4}-\d{3,5}\b
     - id: Regex_witness_protection_program_record_record_structure
       pattern: >-
-        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|protected\s+(?:person|witness)|former\s+name|assumed\s+name|new\s+identity|relocation\s+(?:date|area|address)|case\s+officer|witness|informant|(?:file|case|reference|ref)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_witness_protection_program_record_case_reference
+      pattern: >-
+        (?i)\b(?:case|file|matter|reference)\s+(?:no\.?|number|ID|#)\s*[:#]?\s*(?:[A-Z]{1,4}[/-]?)?\d[A-Z0-9/-]{3,20}\b
   keywords:
-    - id: Evidence_witness_protection_program_record_classification_markers
-      groups:
-        - match_style: word
-          terms:
-            - WITNESS PROTECTION
-      strength: specific
     - id: Evidence_witness_protection_program_record_corroborative_terms
       groups:
         - match_style: word
@@ -183,10 +192,17 @@ sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: PROTECTED Law-Enforcement
-references: []
+references:
+  - title: Witness Protection Act 2000 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2000-056
+  - title: Crime and Corruption Act 2001 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2001-069
 created: '2026-02-20'
 updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): rebuilt tiers - 75 needs a populated protected-person record field or a labelled file reference, 85 needs two distinct record fields plus independent identity/relocation evidence; removed the invented WP-YYYY-NNNN regex in favour of the case-reference-number labelled fallback (identifier-format slot); removed the WITNESS PROTECTION marker group, which repeated the primary phrase (same-span self-corroboration); tests converted with an 85 positive and blank-form/news decoys; added the Crime and Corruption Act 2001 (Qld) (the CCC runs the program) and references.'
   - version: 1.5.0
     date: '2026-09-24'
     description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."

@@ -1,8 +1,8 @@
 schema: testpattern/v1
 name: Reproductive & Sexual Health Data
 slug: global-reproductive-health-data
-version: 1.3.2
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
 engine: universal
 description: >-
@@ -11,15 +11,11 @@ description: >-
   (and a wave of post-Dobbs state consumer-health-data laws) treat this as protected consumer health
   data. Topic-grade vocabulary detector.
 operation: >-
-  Phrase regex matching indicative reproductive / sexual-health terminology. Detects the presence of
-  reproductive-health subject matter; pair with corroborative keywords (patient, clinic, diagnosis) to
-  raise precision. Not a structured-token detector.
-pattern: '(?i)\b(?:abortion|pregnan(?:cy|t)|miscarriage|contracepti(?:on|ve|ves)|fertility\s+treatments?|in\s+vitro\s+fertili[sz]ation|IVF|menstrual\s+cycle|mifepristone|misoprostol|Plan\s+B|emergency\s+contraception|gender[\s-]+affirming\s+care|gender\s+reassignment|hormone\s+(?:replacement\s+)?therapy|STI\s+status|STD\s+status|HIV\s+status|reproductive\s+health|sexual\s+health|prenatal\s+care|postpartum)\b'
+  The primary regex matches reproductive and sexual-health vocabulary (pregnancy, abortion, miscarriage, contraception, fertility treatment/IVF, mifepristone/misoprostol, emergency contraception, gender-affirming care, hormone therapy, STI/HIV status, prenatal care, postpartum). 65 (discovery only): term alone - policy, guidance, news and figurative uses stay here. 75: term plus a populated patient identifier field (name, DOB, URN/MRN, Medicare, patient number). 85: patient field plus a populated clinical field (gestation, EDD, LMP, gravida/parity, procedure, medication, diagnosis, test result, contraceptive method, cycle day, embryos transferred) plus independent clinical evidence (obstetrician, gynaecologist, midwife, ultrasound, beta hCG, antenatal, sexual health clinic, embryo transfer). Template and guidance/training framing excluded from 75/85. Converted from keyword_list to regex so the tier logic decides matches.
+pattern: (?i)\b(?:abortion|pregnan(?:cy|t)|miscarriage|contracepti(?:on|ve|ves)|fertility\s+treatments?|in\s+vitro\s+fertili[sz]ation|IVF|menstrual\s+cycle|mifepristone|misoprostol|Plan\s+B|emergency\s+contraception|gender[\s-]+affirming\s+care|gender\s+reassignment|hormone\s+(?:replacement\s+)?therapy|STI\s+status|STD\s+status|HIV\s+status|reproductive\s+health|sexual\s+health|prenatal\s+care|postpartum)\b
 confidence: low
 confidence_justification: >-
-  Low by design. Reproductive-health status is detected by topic vocabulary, not a fixed format. Terms
-  like "Plan B" or "fertility" appear in unrelated everyday prose; pair with corroborative keywords
-  (patient, clinic, diagnosis, record) within the proximity window to raise precision.
+  Low by design: the vocabulary is common in policy, news and figurative prose. Enforce tiers now require a populated patient identifier, and 85 also requires a clinical field and independent clinical evidence.
 jurisdictions:
   - global
   - us
@@ -46,27 +42,29 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: 'The policy covers reproductive health services.'
-      description: Exact 65 discovery probe with reproductive-health subject matter but no clinical or person context
-    - value: 'Patient record notes the prescription of mifepristone for the procedure.'
-      description: Exact 85 probe with clinical and person-record context
-    - value: 'The clinic confirmed the pregnancy and scheduled prenatal care follow-up.'
-      description: Exact 75 probe with clinical context but no person record
-    - value: 'Referral for gender-affirming care was added to the patient chart.'
-      description: Gender-affirming care term present
-    - value: 'Lab result shows HIV status pending confirmation from the provider.'
-      description: HIV status term present
+    - value: "Antenatal clinic note\nPatient name: Avery Teston\nMRN: 5540921\nDOB: 04/02/1991\nGestation: 12 weeks 3 days\nEDD: 18/03/2027\nDating scan confirms a singleton pregnancy; midwife follow-up booked."
+      description: Patient record with populated gestation/EDD fields and antenatal evidence (85)
+      synthetic: true
+    - value: "Clinic letter\nPatient: Casey Rourke\nURN: 118204\nReferred for contraception advice."
+      description: Patient letter naming contraception with labelled patient identifiers only (75)
+      synthetic: true
   should_not_match:
-    - value: 'The quarterly sales report shows revenue grew across all regions.'
+    - value: "The quarterly sales report shows revenue grew across all regions."
       description: Unrelated business prose, no health terms
-    - value: 'We need a backup plan before the launch deadline next week.'
+    - value: "We need a backup plan before the launch deadline next week."
       description: Near-miss prose ("plan" but not "Plan B"), no reproductive terms
-    - value: 'The engineering team merged the new feature branch this morning.'
+    - value: "The engineering team merged the new feature branch this morning."
       description: Unrelated prose with no reproductive-health vocabulary
-    - value: 'Plan B remains our fallback for the product launch.'
+    - value: "Plan B remains our fallback for the product launch."
       description: Colloquial Plan B reference may surface in discovery but must not enforce
-    - value: 'The theatre review described a pregnant pause before the final scene.'
+    - value: "The theatre review described a pregnant pause before the final scene."
       description: Figurative pregnant wording may surface in discovery but must not enforce
+    - value: "Policy guidance: this procedure explains how reproductive health records are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Antenatal booking form\nPatient name: ____________________\nMRN: ____________________\nGestation: ____________________\nEDD: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: the state will fund free contraception and prenatal care for low-income families, the health minister announced."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: >-
       Generic terms like "Plan B", "fertility" or "sexual health" appear in colloquial, agricultural,
@@ -81,7 +79,7 @@ exports:
 scope: broad
 risk_rating: 7
 risk_description: >-
-  The low-confidence list finds reproductive and sexual-health terms including pregnancy, contraception, abortion medicines, fertility treatment, gender-affirming care, and STI or HIV references; it signals subject matter rather than a structured patient record. When linked to a person, such material can expose intimate care choices and create stigma, discrimination, family conflict, or legal targeting. Isolated terms also appear in legislation, public-health guidance, agricultural fertility discussion, marketing, and colloquial uses, so identity and clinical context are material to the harm. Risk 7 and SENSITIVE preserve protection for real consumer-health data, while risk 8 or PROTECTED requires a named patient, diagnosis or treatment record, reproductive case file, bulk holding, or severe safety context.
+  The low-confidence detector finds reproductive and sexual-health terms (pregnancy, contraception, abortion medicines, fertility treatment, gender-affirming care, STI or HIV status) and enforces only when they sit with a populated patient identifier. When linked to a person, such material can expose intimate care choices and create stigma, discrimination, family conflict, or legal targeting. Isolated terms also appear in legislation, public-health guidance, agricultural fertility discussion, marketing, and colloquial uses, so identity and clinical context are material to the harm. Risk 7 and SENSITIVE preserve protection for real consumer-health data, while risk 8 or PROTECTED requires a named patient, diagnosis or treatment record, reproductive case file, bulk holding, or severe safety context.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -92,7 +90,7 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
@@ -101,22 +99,25 @@ purview:
     - confidence_level: 85
       id_match: Regex_reproductive_health_topic
       matches:
-        - ref: Keyword_clinical_context
-        - ref: Keyword_person_record_context
+        - ref: Regex_global_reproductive_health_data_patient_fields
+        - ref: Regex_global_reproductive_health_data_clinical_fields
+        - ref: Keyword_reproductive_clinical_evidence
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_reproductive_health_data_guidance_exclusion
     - confidence_level: 75
       id_match: Regex_reproductive_health_topic
       matches:
-        - ref: Keyword_clinical_context
+        - ref: Regex_global_reproductive_health_data_patient_fields
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_global_reproductive_health_data_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_reproductive_health_topic
@@ -128,35 +129,56 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_reproductive_health_topic
-      pattern: '(?i)\b(?:abortion|pregnan(?:cy|t)|miscarriage|contracepti(?:on|ve|ves)|fertility\s+treatments?|in\s+vitro\s+fertili[sz]ation|IVF|menstrual\s+cycle|mifepristone|misoprostol|Plan\s+B|emergency\s+contraception|gender[\s-]+affirming\s+care|gender\s+reassignment|hormone\s+(?:replacement\s+)?therapy|STI\s+status|STD\s+status|HIV\s+status|reproductive\s+health|sexual\s+health|prenatal\s+care|postpartum)\b'
+      pattern: (?i)\b(?:abortion|pregnan(?:cy|t)|miscarriage|contracepti(?:on|ve|ves)|fertility\s+treatments?|in\s+vitro\s+fertili[sz]ation|IVF|menstrual\s+cycle|mifepristone|misoprostol|Plan\s+B|emergency\s+contraception|gender[\s-]+affirming\s+care|gender\s+reassignment|hormone\s+(?:replacement\s+)?therapy|STI\s+status|STD\s+status|HIV\s+status|reproductive\s+health|sexual\s+health|prenatal\s+care|postpartum)\b
+    - id: Regex_global_reproductive_health_data_patient_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|patient(?:\s+name)?|URN|UR\s*(?:no\.?|number)|MRN|medical\s+record\s+(?:no\.?|number)|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|IHI|DVA\s+(?:no\.?|number)|(?:patient|client|hospital|case|file|episode)\s*(?:no\.?|number|ID)|(?:referring|treating|requesting)\s+(?:doctor|practitioner|clinician|psychiatrist)|clinician|consultant)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_global_reproductive_health_data_clinical_fields
+      pattern: (?i)\b(?:gestation(?:al\s+age)?|EDD|estimated\s+due\s+date|LMP|gravida|parity|procedure|medication|prescribed|diagnosis|test\s+result|result|contraceptive\s+method|cycle\s+day|embryo(?:s)?(?:\s+transferred)?)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Keyword_clinical_context
+    - id: Keyword_reproductive_clinical_evidence
       groups:
         - match_style: word
           terms:
-            - clinic
-            - diagnosis
-            - prescription
-            - provider
-            - appointment
-            - lab result
-            - treatment
-            - referral
-      strength: domain
-    - id: Keyword_person_record_context
-      groups:
-        - match_style: word
-          terms:
-            - patient
-            - patient record
-            - medical record
-            - patient chart
-            - case notes
-            - date of birth
+            - obstetrician
+            - gynaecologist
+            - gynecologist
+            - midwife
+            - ultrasound
+            - beta hCG
+            - antenatal
+            - sexual health clinic
+            - embryo transfer
+            - dating scan
       strength: specific
+    - id: Keyword_global_reproductive_health_data_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+            - public policy document
+            - public policy guidance
+            - public dataset
+            - aggregate statistics
+            - aggregate report
+            - academic paper
+            - blank questionnaire
+            - awareness campaign
+      strength: exclusion
 created: '2026-06-13'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex; 75 was gated only by generic clinical words (clinic, provider, treatment) that appear in policy and news. 75 now requires a populated patient identifier and 85 requires patient fields plus a clinical field (gestation, EDD, procedure, medication, result) plus independent clinical evidence. Bare-phrase tests replaced with populated patient records; added policy, blank-form and news decoys."
   - version: 1.3.2
     date: '2026-07-19'
     description: 'Targeted finance/health blocker remediation: add a topic-only 65 discovery tier, require independent clinical context at 75 and person-record linkage at 85, with exact-tier and colloquial/agricultural adversarial probes.'

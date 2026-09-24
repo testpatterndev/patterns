@@ -1,22 +1,24 @@
 schema: testpattern/v1
 name: Controlled Operation Authorisation
 slug: controlled-operation-authorisation
-version: 1.5.0
+version: 1.6.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects controlled operation authorisations under PPRA 2000 (Qld) Part 5. Controlled operations involve officers in criminal activity under legal authority. Disclosure reveals officers and operational scope.
-operation: 'Keyword proximity: primary keywords (controlled operation authority, assumed identity authority, authorised conduct) within 300 characters of authorisation references. Regex for COA numbers. Negative keyword exclusion for legislative commentary.'
+operation: >-
+  Primary: controlled operation / assumed identity authority phrases. 65 = phrase only (discovery). 75 = phrase plus a populated authority record field (participant, authorising officer, applicant, target, operation, period, authorised conduct, name, reference number). 85 = phrase plus two distinct populated fields plus a labelled authorisation/warrant number plus independent evidence (PPRA, Part 5, section 228, authorising officer, scope of authority ...). Legislative summaries, annual reports and academic framing excluded.
 pattern: (?i)\b(controlled\s+operation\s+(?:authoris(?:ation|ed)|authority)|assumed\s+identity\s+(?:authoris(?:ation|ed)|authority)|authorised\s+(?:civilian\s+)?conduct\s+(?:authority|authorisation)|PPRA\s+controlled\s+operation|undercover\s+operation\s+authorisation)\b
 confidence: medium
-confidence_justification: 'Medium confidence: controlled operation authorisation terminology is specialised legal language unique to operational documents. Co-occurrence with PPRA references and authorisation numbers is distinctive.'
+confidence_justification: >-
+  Medium confidence: enforcement requires a populated authority record; authority numbers are unpublished, so the reference is a documented label-anchored fallback and only counts at 85 together with other record fields.
 jurisdictions:
   - au
 regulations:
-- "Crime and Corruption Act 2001 (Qld)"
-- "PPRA 2000 (Qld)"
+  - "Crime and Corruption Act 2001 (Qld)"
+  - "PPRA 2000 (Qld)"
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - law-enforcement
   - government
@@ -42,16 +44,28 @@ corroborative_evidence:
 
     - government-services
     - en-government-classification
+customisation:
+  - key: surveillance-warrant-reference
+    kind: identifier-format
+    identifier: surveillance-warrant-reference
+    target: purview.regexes/Regex_controlled_operation_authorisation_authority_reference
+    mode: replace
+    affects_tiers: [85]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#surveillance-warrant-reference). Earlier versions used the COA-YYYY-AGENCY-NNNN authority format, which does not appear in any published source.
 test_cases:
   should_match:
-    - value: 'PROTECTED Law-Enforcement. Controlled Operation Authorisation. PPRA Part 5 — Authority No. COA-2025-QPS-0047. Authorising officer: A/C J. BURKE. Infiltrate drug distribution network. Authorised conduct: purchase controlled substances. Participant: Det. Const. S. TAYLOR (assumed identity). Period: 90 days.'
-      description: Formal controlled operation authorisation
+    - value: 'PROTECTED Law-Enforcement. Controlled Operation Authorisation. PPRA Part 5 — Authorisation number: 2025/0047. Authorising officer: A/C J. BURKE. Infiltrate drug distribution network. Authorised conduct: purchase controlled substances. Participant: Det. Const. S. TAYLOR (assumed identity). Period: 90 days.'
+      description: Formal controlled operation authorisation (reaches 85)
     - value: 'RESTRICTED. Application for Controlled Operation Authority under PPRA s.228. Operation VANGUARD. Authorised conduct: meetings with OC figures, handling proceeds. Assumed identity authority for two officers. Scope and risk assessment attached.'
-      description: Application for controlled operation authority
-    - value: Controlled operation authorisation renewal. COA-2024-QPS-0089. Extension of authorised conduct for 60 days. Undercover operation yielded significant intelligence. PPRA Part 5 compliance audit completed. Commissioner's approval recommended.
-      description: Controlled operation renewal
-    - value: "Controlled Operation Authorisation\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Controlled Operation Authorisation recorded against the subject; handling restricted."
-      description: Populated justice record reaching the 75/85 structure gate
+      description: Application for controlled operation authority (reaches 75)
+    - value: "Controlled operation authorisation renewal. Authorisation number: 2024/0089. Extension of authorised conduct for 60 days. Undercover operation yielded significant intelligence. PPRA Part 5 compliance audit completed. Commissioner's approval recommended."
+      description: Controlled operation renewal (reaches 75)
+    - value: "PROTECTED Law-Enforcement\nControlled operation authority — PPRA Part 5\nAuthorisation number: 2026/0417\nAuthorising officer: Assistant Commissioner Jordan Staffson\nParticipant: Detective Senior Constable Avery Teston\nPeriod: 90 days from 01/10/2026\nScope of authority: purchase of controlled substances from the target syndicate."
+      description: 'Populated authority: authorisation number, authorising officer, participant and period plus PPRA Part 5 evidence (reaches 85)'
+      synthetic: true
+    - value: "Controlled operation authority - variation\nParticipant: Detective Constable Morgan Teston\nThe authorised conduct is extended for a further 30 days."
+      description: One populated participant field with the controlled-operation primary (reaches 75)
       synthetic: true
   should_not_match:
     - value: PPRA Part 5 provides the framework for controlled operations. Section 228 sets out requirements. Legislation publicly available.
@@ -62,6 +76,10 @@ test_cases:
       description: Academic law review
     - value: "Policy guidance: this procedure explains how records about Controlled Operation Authorisation are handled, who may access them and how long they are kept. It contains no records about any person or system."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: "Application for controlled operation authority\nApplicant: __________\nParticipant: __________\nAuthorisation number: __________\nPeriod: __________"
+      description: Blank form / template with unfilled fields (must stay below 75)
+    - value: "Training: recruits studied how a controlled operation authority is applied for under the PPRA and why authorised conduct must be narrowly scoped."
+      description: News or training text naming the topic (must stay below 75)
 false_positives:
   - description: Legislative commentary
     mitigation: 'Negative keyword exclusion: ''legislative framework'', ''publicly available''. Require authorisation numbers.'
@@ -87,10 +105,8 @@ purview:
         - ref: Regex_controlled_operation_authorisation_record_structure
           min_count: 2
           unique_results: true
-        - ref: Evidence_controlled_operation_authorisation_classification_markers
         - ref: Evidence_controlled_operation_authorisation_corroborative_terms
-        - ref: Pattern_controlled_operation_authorisation_coa_reference_number
-        - ref: Pattern_controlled_operation_authorisation_ppra_section
+        - ref: Regex_controlled_operation_authorisation_authority_reference
         - type: any
           min_matches: 0
           max_matches: 0
@@ -100,10 +116,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_controlled_operation_authorisation_controlled_operation_terms
       matches:
-        - type: any
-          refs:
-            - Regex_controlled_operation_authorisation_record_structure
-            - Evidence_controlled_operation_authorisation_corroborative_terms
+        - ref: Regex_controlled_operation_authorisation_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -123,20 +136,13 @@ purview:
   regexes:
     - id: Pattern_controlled_operation_authorisation_controlled_operation_terms
       pattern: (?i)\b(controlled\s+operation\s+(?:authoris(?:ation|ed)|authority)|assumed\s+identity\s+(?:authoris(?:ation|ed)|authority)|authorised\s+conduct|PPRA\s+controlled\s+operation)\b
-    - id: Pattern_controlled_operation_authorisation_coa_reference_number
-      pattern: \bCOA-\d{4}-[A-Z]{2,5}-\d{3,5}\b
-    - id: Pattern_controlled_operation_authorisation_ppra_section
-      pattern: (?i)\b(?:PPRA|Police\s+Powers)\s+(?:Part\s+5|s\.?\s*228)\b
     - id: Regex_controlled_operation_authorisation_record_structure
       pattern: >-
-        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|participant|authorising\s+officer|applicant|covert\s+operative|target|suspect|operation(?:\s+name)?|period|authori[sz]ed\s+conduct|(?:file|case|reference|ref|authority|authorisation)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_controlled_operation_authorisation_authority_reference
+      pattern: >-
+        (?i)\b(?:surveillance\s+device\s+warrant|warrant|authorisation)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20}\b
   keywords:
-    - id: Evidence_controlled_operation_authorisation_classification_markers
-      groups:
-        - match_style: word
-          terms:
-            - COVERT
-      strength: domain
     - id: Evidence_controlled_operation_authorisation_corroborative_terms
       groups:
         - match_style: word
@@ -172,10 +178,17 @@ sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: PROTECTED Law-Enforcement
-references: []
+references:
+  - title: Police Powers and Responsibilities Act 2000 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2000-005
+  - title: Crime and Corruption Act 2001 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2001-069
 created: '2026-02-20'
 updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): rebuilt tiers - 75 needs a populated authority record field (participant, authorising officer, period, reference ...), 85 needs two distinct record fields plus a labelled authorisation number plus PPRA Part 5 / authorising-officer evidence; removed the invented COA-YYYY-AGENCY-NNNN regex in favour of the surveillance-warrant-reference labelled fallback (identifier-format slot, 85 only because that fallback is loose) and dropped the duplicate PPRA-section regex and generic COVERT marker; tests converted to labelled references with 85/75 positives and blank-form/training decoys; references added.'
   - version: 1.5.0
     date: '2026-09-24'
     description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."

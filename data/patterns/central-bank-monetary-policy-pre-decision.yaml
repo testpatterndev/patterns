@@ -1,101 +1,108 @@
 schema: testpattern/v1
 name: Central Bank Monetary Policy Pre-Decision
 slug: central-bank-monetary-policy-pre-decision
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
-description: Detects draft monetary policy decisions, interest rate recommendations, or central bank board deliberation papers before public announcement. Covers RBA board papers and Treasury analysis of expected RBA decisions.
-operation: 'Keyword proximity: monetary policy/interest rate terms within 300 characters of decision/recommendation terms and rate change indicators (basis points, tighten, ease, hold). Requires embargo or pre-decision markers.'
+description: >-
+  Detects draft monetary policy decisions and pre-announcement rate recommendations: a rate value (percentage, basis points or per cent) near a central bank / Reserve Bank reference and a recommendation line proposing a rate action. Published RBA statements, media commentary and forecasts are excluded.
+operation: >-
+  Pattern type: keyword proximity evaluated through purview tiers. Primary: a rate value (d.d%, N basis points/bps, d.dd per cent). Every enforce tier also requires a central bank reference (RBA, Reserve Bank, central bank, Monetary Policy Board). 65 (discovery only): rate value alone. 75: rate + institution + a recommendation/assessment/proposed-decision line that proposes a rate action (reduce, cut, raise, hold, tighten, ease...). 85: rate + institution + two distinct structures (recommendation line, pre-decision/embargo marker, or a labelled board meeting / decision date) + policy-content evidence (cash rate target, deliberation, policy options, inflation/CPI, trimmed mean, unemployment, tightening/easing). Media-release, forecast, published and guidance framing is excluded on every enforce tier.
 pattern: \b\d{1,2}\.\d{1,2}\s*%|\b\d{1,3}\s*(?:basis\s*points|bps)\b
 confidence: medium
-confidence_justification: 'Medium confidence: the co-occurrence of central bank/monetary policy terms with pre-decision markers and specific rate change indicators is uniquely identifiable. Published RBA statements and media commentary are excluded.'
+confidence_justification: >-
+  A labelled recommendation proposing a rate action beside an RBA reference and a rate value is characteristic of pre-decision papers; the previous 75 tier could fire on 'board paper' alone because a decision keyword group was also a primary. Published statements and economist forecasts are excluded by the filter group. Medium because internal economic commentary written as a recommendation can still match.
 jurisdictions:
   - global
 regulations:
-- "Reserve Bank Act 1959 (Cth)"
+  - Reserve Bank Act 1959 (Cth)
+  - Corporations Act 2001 (Cth) - market integrity
 frameworks:
-- QGISCF
+  - QGISCF
+  - PSPF
 data_categories:
   - financial
 corroborative_evidence:
   keywords:
-    - monetary policy
-    - interest rate
-    - cash rate
-    - RBA
-    - Reserve Bank
-    - central bank
-    - decision
-    - recommendation
-    - board paper
+    - cash rate target
+    - cash rate decision
     - deliberation
-    - pre-announcement
-    - embargoed
-    - basis points
-    - tighten
-    - ease
-    - hold
-    - rate change
-    - PROTECTED
-    - pre-decision
+    - policy options
+    - inflation
+    - CPI
+    - trimmed mean
+    - unemployment
+    - forward guidance
+    - tightening
   proximity: 300
   keyword_lists:
 
     - corporate-finance
 test_cases:
   should_match:
-    - value: 'PROTECTED — EMBARGOED. Treasury Analysis: Expected RBA Cash Rate Decision — March 2026 Board Meeting. Assessment: RBA board likely to ease by 25 basis points to 3.85%. Supporting factors: CPI at 2.4%, below target band midpoint. Employment softening. Pre-decision analysis — not for distribution.'
-      description: Treasury pre-decision analysis of expected RBA rate change
-    - value: 'CONFIDENTIAL — PRE-DECISION. Reserve Bank Board Paper. Recommendation: Reduce the cash rate target by 25 basis points to 3.85%. Deliberation: The Board notes that inflation has returned to the target band. Economic growth remains below trend. Hold option considered but rejected.'
-      description: Central bank board paper with rate recommendation
-    - value: 'PROTECTED — EMBARGOED. Monetary policy pre-decision briefing for the Reserve Bank board. Staff recommendation: tighten by 50 bps, moving the official cash rate target to 4.35 per cent. Deliberation notes restricted pending the board decision. Not for distribution.'
-      description: Pre-decision monetary policy briefing with bps and per-cent rate indicators
-    - value: 'Reserve Bank Board recommendation: ease 25 basis points to 3.60 per cent; PRE-DECISION; embargoed.'
-      description: Institution, recommendation, action, alternate rate formats, and pre-decision status enforce without a decimal-percent token
-    - value: CONFIDENTIAL Reserve Bank board deliberation recommends holding the cash rate.
-      description: A genuine pre-decision recommendation enforces via the deliberation primary with no numeric rate at all
+    - value: "PROTECTED — EMBARGOED. Treasury Analysis: Expected RBA Cash Rate Decision — March 2026 Board Meeting. Assessment: RBA board likely to ease by 25 basis points to 3.85%. Supporting factors: CPI at 2.4%, below target band midpoint. Employment softening. Pre-decision analysis — not for distribution."
+      description: Treasury pre-decision analysis with assessment line and embargo marker (85)
+    - value: "CONFIDENTIAL — PRE-DECISION. Reserve Bank Board Paper. Recommendation: Reduce the cash rate target by 25 basis points to 3.85%. Deliberation: The Board notes that inflation has returned to the target band. Economic growth remains below trend. Hold option considered but rejected."
+      description: Central bank board paper with recommendation, marker and deliberation (85)
+    - value: "PROTECTED — EMBARGOED. Monetary policy pre-decision briefing for the Reserve Bank board. Staff recommendation: tighten by 50 bps, moving the official cash rate target to 4.35 per cent. Deliberation notes restricted pending the board decision. Not for distribution."
+      description: Pre-decision briefing with bps and per-cent formats (85)
+    - value: "Reserve Bank Board recommendation: ease 25 basis points to 3.60 per cent."
+      description: Recommendation line with institution and rate but no marker or policy content (75)
+      synthetic: true
   should_not_match:
-    - value: 'RBA Media Release: At its meeting today, the Reserve Bank Board decided to leave the cash rate target unchanged. The decision was published immediately after the meeting.'
-      description: Published RBA decision — public announcement
-    - value: Market economists expect the RBA to cut rates at its next meeting. CBA, Westpac, and NAB have all forecast a rate reduction in their public research notes.
-      description: Market economist predictions based on public information
-    - value: The RBA cash rate is 3.85%.
-      description: A public numeric rate with no pre-decision, recommendation, or embargo evidence stays discovery only
-    - value: 'Economics exercise: RBA cuts 25 bps to 3.60%.'
-      description: Exercise context with public-style speculation carries no pre-decision evidence and must not enforce
-    - value: A museum exhibit described the history of Australian currency.
-      description: Historical currency material with no rate value, deliberation, recommendation, or embargo
+    - value: "RBA Media Release: At its meeting today, the Reserve Bank Board decided to leave the cash rate target unchanged. The decision was published immediately after the meeting."
+      description: Published RBA decision - public announcement
+    - value: "Market economists expect the RBA to cut rates at its next meeting. CBA, Westpac, and NAB have all forecast a rate reduction in their public research notes, with market pricing implying a 25 basis point cut to 3.60%."
+      description: Public market commentary
+    - value: "The RBA cash rate is 3.85%."
+      description: Public fact - rate and institution only
+      synthetic: true
+    - value: "Economics exercise: RBA cuts 25 bps to 3.60%."
+      description: Training exercise without a recommendation line
+      synthetic: true
+    - value: "RESERVE BANK BOARD PAPER - PRE-DECISION\nRecommendation: __________\nOptions: hold at 3.85% or ease 25 basis points\nMeeting date: __________"
+      description: Blank board paper - recommendation not populated
+      synthetic: true
+    - value: "Fact sheet: the Reserve Bank Board sets the cash rate target, currently 3.85%. Decisions are published at 2.30 pm on the day of each meeting."
+      description: Public fact sheet
+      synthetic: true
+    - value: "A museum exhibit described the history of Australian currency."
+      description: Unrelated
+      synthetic: true
 false_positives:
-  - description: Published RBA decisions and media releases
-    mitigation: Exclude documents containing 'media release', 'at its meeting today', 'decided to' indicating published decisions
-  - description: Market economist predictions and bank research notes
-    mitigation: Exclude documents containing 'economists expect', 'forecast', 'prediction', 'market pricing' indicating external analysis
+  - description: Economist research notes and market commentary predicting RBA moves.
+    mitigation: Forecast/market-pricing framing is excluded and commentary rarely carries a labelled recommendation line.
+  - description: Internal economic research written as a staff recommendation about another central bank.
+    mitigation: Still requires an RBA/Reserve Bank/central bank reference; reviewers should confirm the document is a pre-decision paper.
 exports:
   - purview_xml
   - yaml
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match:
+      id_match: &id001
         type: any
         ids:
           - Pattern_central_bank_monetary_policy_pre_decision_interest_rate_percentages
           - Pattern_central_bank_monetary_policy_pre_decision_basis_points_for_rate_changes
           - Pattern_central_bank_monetary_policy_pre_decision_per_cent_rate_format
-          - Evidence_central_bank_monetary_policy_pre_decision_decision
       matches:
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_central_bank_monetary_policy_pre_decision_recommendation
+            - Regex_central_bank_monetary_policy_pre_decision_marker
+            - Regex_central_bank_monetary_policy_pre_decision_meeting
         - ref: Evidence_central_bank_monetary_policy_pre_decision_institutions
-        - ref: Evidence_central_bank_monetary_policy_pre_decision_decision
-        - ref: Evidence_central_bank_monetary_policy_pre_decision_actions
-        - ref: Evidence_central_bank_monetary_policy_pre_decision_markers
+        - ref: Evidence_central_bank_monetary_policy_pre_decision_policy_content
         - type: any
           min_matches: 0
           max_matches: 0
@@ -103,20 +110,13 @@ purview:
             - Keyword_noise_exclusion
             - Filter_central_bank_monetary_policy_pre_decision_exclusion
     - confidence_level: 75
-      id_match:
-        type: any
-        ids:
-          - Pattern_central_bank_monetary_policy_pre_decision_interest_rate_percentages
-          - Pattern_central_bank_monetary_policy_pre_decision_basis_points_for_rate_changes
-          - Pattern_central_bank_monetary_policy_pre_decision_per_cent_rate_format
-          - Evidence_central_bank_monetary_policy_pre_decision_decision
+      id_match: *id001
       matches:
-        - ref: Evidence_central_bank_monetary_policy_pre_decision_institutions
         - type: any
           min_matches: 1
           refs:
-            - Evidence_central_bank_monetary_policy_pre_decision_decision
-            - Evidence_central_bank_monetary_policy_pre_decision_markers
+            - Regex_central_bank_monetary_policy_pre_decision_recommendation
+        - ref: Evidence_central_bank_monetary_policy_pre_decision_institutions
         - type: any
           min_matches: 0
           max_matches: 0
@@ -125,19 +125,13 @@ purview:
             - Filter_central_bank_monetary_policy_pre_decision_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match:
-        type: any
-        ids:
-          - Pattern_central_bank_monetary_policy_pre_decision_interest_rate_percentages
-          - Pattern_central_bank_monetary_policy_pre_decision_basis_points_for_rate_changes
-          - Pattern_central_bank_monetary_policy_pre_decision_per_cent_rate_format
+      id_match: *id001
       matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-            - Filter_central_bank_monetary_policy_pre_decision_exclusion
   regexes:
     - id: Pattern_central_bank_monetary_policy_pre_decision_interest_rate_percentages
       pattern: \b\d{1,2}\.\d{1,2}\s*%
@@ -145,17 +139,32 @@ purview:
       pattern: \b\d{1,3}\s*(?:basis\s*points|bps)\b
     - id: Pattern_central_bank_monetary_policy_pre_decision_per_cent_rate_format
       pattern: \b\d{1,2}\.\d{2}\s*per\s*cent\b
+    - id: Regex_central_bank_monetary_policy_pre_decision_recommendation
+      pattern: (?i)\b(?:staff\s+)?(?:recommendation|recommended\s+option|proposed\s+decision|preferred\s+option|assessment|staff\s+view)[ \t]{0,3}[:#-][^\n.]{0,60}?\b(?:reduce|lower|cut|raise|increase|lift|hold|maintain|leave|tighten|ease)\b
+    - id: Regex_central_bank_monetary_policy_pre_decision_marker
+      pattern: (?i)\b(?:pre-?decision|embargoed|not\s+for\s+(?:distribution|release)|board[\s-]+in[\s-]+confidence)\b
+    - id: Regex_central_bank_monetary_policy_pre_decision_meeting
+      pattern: (?i)\b(?:board\s+meeting|meeting\s+date|decision\s+date|announcement\s+date)[ \t]{0,3}[:#][ \t]{0,3}(?:(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}[ \t]{1,3}(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}[ \t]{1,3}\d{4})|(?:\d{1,2}[ \t]{1,3})?(?:January|February|March|April|May|June|July|August|September|October|November|December)(?:[ \t]{1,3}\d{4})?)
   keywords:
-    - id: Evidence_central_bank_monetary_policy_pre_decision_primary
+    - id: Evidence_central_bank_monetary_policy_pre_decision_policy_content
       groups:
         - match_style: word
           terms:
-            - monetary policy
-            - interest rate
-            - cash rate
             - cash rate target
-            - official rate
-      strength: specific
+            - cash rate decision
+            - deliberation
+            - policy options
+            - inflation
+            - text: CPI
+              case_sensitive: true
+            - trimmed mean
+            - unemployment
+            - forward guidance
+            - tightening
+            - easing
+            - rate cut
+            - rate rise
+      strength: domain
     - id: Evidence_central_bank_monetary_policy_pre_decision_institutions
       groups:
         - match_style: word
@@ -165,44 +174,8 @@ purview:
             - Reserve Bank
             - Reserve Bank of Australia
             - central bank
-            - board
+            - Monetary Policy Board
       strength: specific
-    - id: Evidence_central_bank_monetary_policy_pre_decision_decision
-      groups:
-        - match_style: word
-          terms:
-            - decision
-            - recommendation
-            - board paper
-            - deliberation
-            - pre-announcement
-            - pre-decision
-      strength: domain
-    - id: Evidence_central_bank_monetary_policy_pre_decision_actions
-      groups:
-        - match_style: word
-          terms:
-            - tighten
-            - tightening
-            - ease
-            - easing
-            - hold
-            - rate change
-            - rate cut
-            - rate hike
-            - reduce
-            - increase
-      strength: domain
-    - id: Evidence_central_bank_monetary_policy_pre_decision_markers
-      groups:
-        - match_style: word
-          terms:
-            - PROTECTED
-            - embargoed
-            - confidential
-            - pre-decision
-            - not for distribution
-      strength: domain
     - id: Filter_central_bank_monetary_policy_pre_decision_exclusion
       groups:
         - match_style: word
@@ -214,19 +187,32 @@ purview:
             - forecast by
             - market pricing
             - published
-
+            - policy guidance
+            - guidance note
+            - this guideline
+            - this procedure
+            - fact sheet
+            - training module
       strength: noise
 risk_rating: 9
 risk_description: >-
-  The detector identifies a pre-decision central-bank monetary policy paper by combining rate, tightening or easing, recommendation, basis-point, and embargo terms. Premature disclosure can enable market positioning across bonds, currencies, equities, and derivatives and can weaken the integrity of board or policy deliberations. A confirmed substantive record therefore has a credible significant-damage path and warrants risk 9 with PROTECTED Financial handling. Risk 9, rather than 10, recognises that the scale depends on the decision's imminence, policy materiality, and actual market exposure; forecasts, commentary, and public analysis remain outside that consequence assessment.
+  The detector identifies a pre-decision central-bank monetary policy paper by combining rate, tightening or easing, recommendation, basis-point, and embargo terms. Premature disclosure can enable market positioning across bonds, currencies, equities, and derivatives and can weaken the integrity of board or policy deliberations. A confirmed substantive record therefore has a credible significant-damage path and warrants risk 9 with PROTECTED Financial handling. Risk 9, rather than 10, recognises that the scale depends on the decision's imminence, policy materiality, and actual market exposure; forecasts, commentary, and public analysis remain outside that consequence assessment. Quality pass 2026-09-24: enforce tiers (75/85) now require populated record structure (labelled fields with real values, identifiers or data rows); phrase-only mentions in guidance, marketing, blank forms and news stay at 65 discovery.
 sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: PROTECTED Financial
-references: []
+references:
+  - title: Reserve Bank Act 1959 (Cth)
+    url: https://www.legislation.gov.au/C1959A00004/latest/text
+  - title: RBA - Monetary Policy Board
+    url: https://www.rba.gov.au/about-rba/boards/monetary-policy-board.html
 created: '2026-02-20'
-updated: '2026-07-16'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: >-
+      Quality pass (2026-09-24): removed the decision keyword group (containing 'board paper') from id_match, which let 75 fire on 'board paper' plus 'board' alone; primaries are now only the rate-value regexes; 75 = rate + institution + a populated recommendation line proposing a rate action; 85 = rate + institution + two distinct structures (recommendation, pre-decision marker, labelled meeting date) + policy-content evidence; dropped bare 'board' from the institution group; replaced the rate-less positive; added blank-paper and fact-sheet decoys; added Corporations Act (market integrity), PSPF and verified RBA / legislation references.
   - version: 1.4.0
     date: '2026-07-16'
     description: 'sit-alignment-validation-2026-07-16 wave1 (TP-00687): enforcing tiers now accept an any-of primary — decimal-percent, basis-point, or per-cent regex, or the board recommendation/deliberation keyword group (previously all tiers keyed solely on the decimal-percent regex, making the 50 bps / 4.35 per cent authored positive unreachable). Every enforcing path now requires the RBA/Reserve Bank institutions group plus pre-decision evidence (decision or embargo/markers group — 75 previously required neither); 85 additionally requires the actions group and protected markers, and no longer conjunctively requires all numeric formats. Discovery 65 keys on the numeric formats. Media-release/economists-expect/published exclusions retained. Adversarial test cases added.'

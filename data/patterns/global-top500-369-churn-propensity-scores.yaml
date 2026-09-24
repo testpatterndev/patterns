@@ -1,28 +1,25 @@
 schema: testpattern/v1
 name: Churn propensity scores
 slug: global-top500-369-churn-propensity-scores
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies documents containing references to churn propensity scores in Australian contexts. This information type is classified as personally identifiable information under applicable data
-  protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters.'
+  Detects churn propensity score outputs: a churn propensity / churn score / attrition risk phrase combined with populated scoring data - rows keyed by a customer identifier with a score, labelled churn scores or risk bands, or labelled customer/subscriber identifiers. Phrase-only mentions stay discovery-only.
+operation: >-
+  Pattern type: regex (boost_regex). Primary: churn propensity/prediction/risk/probability/likelihood (scores), churn score(s), propensity to churn, attrition risk/propensity/score, likelihood to churn/leave/cancel, retention model scores/outputs. 65 (discovery only): primary alone. 75: primary plus one populated structure - a delimited data row keyed by a customer identifier with a numeric value, a labelled churn score/probability/propensity/attrition risk/risk band/decile value, or a labelled customer/member/subscriber/account/service ID. 85: primary plus two distinct structures (the three above or a delimited column header pairing a customer ID column with churn score, probability, propensity, risk band or decile columns) plus retention-action evidence (retention offer, save desk, win-back, contract end, model version, top decile, feature importance, next best action, discount offer). Template/sample framing and guidance/help/news/training framing are excluded on every enforce tier.
 pattern: >-
-  (?is)\b(?:churn\s+propensity\s+scores|propensity\s+score|retention\s+model|predictive\s+analytics|customer\s+lifetime\s+value|churn\s+prediction|risk\s+score|machine\s+learning\s+model|churn\s+rate|customer\s+retention)\b
+  (?i)\b(?:churn\s+(?:propensity|prediction|risk|probability|likelihood)(?:\s+scores?)?|churn\s+scores?|propensity\s+to\s+churn|attrition\s+(?:risk|propensity|scores?)|likelihood\s+to\s+(?:churn|leave|cancel)|retention\s+model\s+(?:scores?|outputs?))\b
 confidence: medium
-confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection.
+confidence_justification: >-
+  Enforce tiers require populated dataset structure (a data row keyed by a customer/record identifier, a labelled value or a labelled identifier) beside the topic phrase; a column header on its own only counts toward 85, so blank extracts stay at 65. Help pages, policies, product copy and news that only name the topic stay at 65. Medium because internal analytics documentation with worked examples can still reach 75.
 jurisdictions:
   - global
 regulations:
-  - AML/CTF Act (Cth)
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
-  - TIA Act 1979 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
   - GDPR
 frameworks:
   - ISO 27001
@@ -31,38 +28,45 @@ data_categories:
   - pii
 corroborative_evidence:
   keywords:
-    - churn propensity scores
-    - churn
-    - propensity
-    - scores
-    - customer
-    - commercial
-    - data
+    - retention offer
+    - save desk
+    - win-back
+    - contract end
+    - model version
+    - top decile
+    - feature importance
+    - next best action
+    - discount offer
   proximity: 300
 test_cases:
   should_match:
-    - value: churn propensity scores
-      description: Primary topic phrase match
-    - value: propensity score
-      description: Case-insensitive topic phrase match
-    - value: retention model
-      description: Alternative topic phrase match
-    - value: predictive analytics
-      description: Additional topic phrase match
+    - value: "Churn propensity scores - model v4.2 scored 2026-09-01\ncustomer_id,plan,tenure_months,churn_score,risk_band\n50018821,Mobile 40GB,14,0.87,High\n50018840,NBN 100,48,0.12,Low\nTop decile routed to the save desk for a retention offer."
+      description: Scoring extract - header, customer rows and retention evidence (85)
+      synthetic: true
+    - value: "Churn risk review\nCustomer ID: 50018821\nAccount flagged by the retention team."
+      description: Single labelled customer identifier (75)
+      synthetic: true
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: customer invoice
-      description: Generic word pair from old broad template should not match
+    - value: "Fact sheet: a churn propensity score estimates how likely a customer is to leave. Scores range from 0 to 1 and are refreshed monthly; see the model card for features."
+      description: Model explainer
+      synthetic: true
+    - value: "Churn scores\ncustomer_id,plan,tenure_months,churn_score,risk_band\n"
+      description: Blank extract - column header only (65)
+      synthetic: true
+    - value: "Telcos are using churn prediction models to cut customer losses, with churn rates falling to 1.1% a month, a news report said."
+      description: News item
+      synthetic: true
+    - value: "unrelated generic text without domain phrases"
+      description: Unrelated
+    - value: "customer invoice"
+      description: Generic word pair
 false_positives:
-  - description: Common words and phrases related to churn propensity scores appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
-    mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
-  - description: In Australian English, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
-    mitigation: Layer with additional contextual signals such as structured identifiers, form fields, or database column headers to distinguish sensitive records from general references.
-  - description: High-frequency pattern matches in large document corpora due to broad regex anchors. Expected match rate is significantly higher than specific identifier patterns.
-    mitigation: Tune confidence thresholds for bulk scanning. Consider using this pattern primarily as a pre-filter with secondary validation.
+  - description: Privacy notices, help-centre articles, product pages and policies describing churn models and scores.
+    mitigation: They name the topic without populated rows, labelled values or identifiers, and guidance/help framing is excluded, so they stay at 65.
+  - description: Analytics training material and documentation with worked examples of churn models and scores.
+    mitigation: Training and template framing is excluded; unframed worked examples with realistic rows can still reach 75.
+  - description: News and industry commentary with aggregate statistics.
+    mitigation: Aggregate percentages are not keyed to a record identifier, so they do not satisfy the row or labelled-value structures.
 exports:
   - purview_xml
   - yaml
@@ -73,57 +77,104 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_churn_propensity_scores
       matches:
-        - ref: Evidence_churn_propensity_scores
-          min_count: 2
-          unique_results: true
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_global_top500_369_churn_propensity_scores_column_header
+            - Regex_global_top500_369_churn_propensity_scores_data_row
+            - Regex_global_top500_369_churn_propensity_scores_labelled_value
+            - Regex_global_top500_369_churn_propensity_scores_identifier
+        - ref: Keyword_global_top500_369_churn_propensity_scores_domain_evidence
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_369_churn_propensity_scores_guidance_exclusion
     - confidence_level: 75
       id_match: Pattern_churn_propensity_scores
       matches:
-        - ref: Evidence_churn_propensity_scores
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_global_top500_369_churn_propensity_scores_data_row
+            - Regex_global_top500_369_churn_propensity_scores_labelled_value
+            - Regex_global_top500_369_churn_propensity_scores_identifier
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_global_top500_369_churn_propensity_scores_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_churn_propensity_scores
       matches:
-        - ref: Evidence_churn_propensity_scores
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_churn_propensity_scores
-      pattern: >-
-        (?is)\b(?:churn\s+propensity\s+scores|propensity\s+score|retention\s+model|predictive\s+analytics|customer\s+lifetime\s+value|churn\s+prediction|risk\s+score|machine\s+learning\s+model|churn\s+rate|customer\s+retention)\b
+      pattern: (?i)\b(?:churn\s+(?:propensity|prediction|risk|probability|likelihood)(?:\s+scores?)?|churn\s+scores?|propensity\s+to\s+churn|attrition\s+(?:risk|propensity|scores?)|likelihood\s+to\s+(?:churn|leave|cancel)|retention\s+model\s+(?:scores?|outputs?))\b
+    - id: Regex_global_top500_369_churn_propensity_scores_column_header
+      pattern: (?i)\b(?:(?:customer|cust|client|member|account|acct|user|subscriber|visitor|device|contact|caller|txn|transaction|order|case|ticket|participant|subject|specimen|record|contract|profile)[ _]?(?:id|no|number|key|ref|hash)\b\"?(?:[,;\t]|[ \t]{0,2}\|[ \t]{0,2})(?:[^\n]{0,200}?(?:[,;\t]|\|[ \t]{0,2}))?\"?(?:churn[ _]?(?:score|prob(?:ability)?|risk|propensity|flag)|p[ _]?churn|attrition[ _]?(?:risk|score)|propensity(?:[ _]?score)?|risk[ _]?(?:band|decile|tier)|decile)|(?:churn[ _]?(?:score|prob(?:ability)?|risk|propensity|flag)|p[ _]?churn|attrition[ _]?(?:risk|score)|propensity(?:[ _]?score)?|risk[ _]?(?:band|decile|tier)|decile)\b\"?(?:[,;\t]|[ \t]{0,2}\|[ \t]{0,2})(?:[^\n]{0,200}?(?:[,;\t]|\|[ \t]{0,2}))?\"?(?:customer|cust|client|member|account|acct|user|subscriber|visitor|device|contact|caller|txn|transaction|order|case|ticket|participant|subject|specimen|record|contract|profile)[ _]?(?:id|no|number|key|ref|hash))\b
+    - id: Regex_global_top500_369_churn_propensity_scores_data_row
+      pattern: (?i)\b[A-Z]{0,5}[-_]?\d{4,12}\"?(?:[,;\t]|[ \t]{0,2}\|[ \t]{0,2})(?:[^\n]{0,160}?(?:[,;\t]|\|[ \t]{0,2}))?\"?-?\$?\d{1,12}(?:\.\d{1,6})?%?(?![\w.])
+    - id: Regex_global_top500_369_churn_propensity_scores_labelled_value
+      pattern: (?i)\b(?:churn\s+(?:score|probability|risk|propensity)|propensity(?:\s+score)?|attrition\s+risk|risk\s+(?:band|decile|tier)|decile)[ \t]{0,3}[:#=][ \t]{0,3}(?:0?\.\d{1,4}|\d{1,3}(?:\.\d{1,2})?[ \t]?%|very\s+high|high|medium|low|\d{1,2})\b
+    - id: Regex_global_top500_369_churn_propensity_scores_identifier
+      pattern: (?i)\b(?:customer\s*(?:no\.?|number|ID)|member\s*(?:no\.?|number|ID)|subscriber\s*(?:no\.?|number|ID)|account\s*(?:no\.?|number|ID)|service\s*(?:no\.?|number))(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?!(?:means|refers?|includes?|is|are|was|has|have|must|should|will|may|can|to|of|for|and|or|if|in|on|as|by|this|that|your|our|their|his|her|its)\b)(?=[A-Za-z-]{0,8}\d)[A-Za-z0-9][A-Za-z0-9._@-]{3,64}
   keywords:
-    - id: Evidence_churn_propensity_scores
+    - id: Keyword_global_top500_369_churn_propensity_scores_domain_evidence
       groups:
         - match_style: word
           terms:
-            - churn propensity scores
-            - churn
-            - propensity score
-            - attrition
-            - retention model
-            - predictive analytics
-            - customer lifetime value
-            - churn prediction
-            - risk score
-            - machine learning model
-            - churn rate
-            - customer retention
+            - retention offer
+            - save desk
+            - win-back
+            - contract end
+            - model version
+            - top decile
+            - feature importance
+            - next best action
+            - discount offer
+      strength: domain
+    - id: Keyword_global_top500_369_churn_propensity_scores_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - policy guidance
+            - guidance note
+            - this guideline
+            - this procedure
+            - fact sheet
+            - training module
+            - e-learning
+            - course notes
+            - media release
+            - press release
+            - news report
+            - frequently asked questions
+            - best practice guide
+            - white paper
+            - whitepaper
+            - webinar
+            - how-to guide
+            - user guide
+            - help centre article
+            - help center article
+            - model card
+      strength: noise
 risk_description: >-
-  This regex looks for churn propensity, retention models, predictive scores, and customer-risk language, with the intended unit being a person- or account-linked prediction rather than a generic model description. Disclosure can reveal which customers are considered likely to leave and the factors or interventions attached to them, enabling competitor targeting, manipulative retention, unfair treatment, or reputational harm across the scored population. The medium-confidence concept rule can also match methodology papers, aggregate dashboards, and vendor demonstrations without individual assignments. Risk 8 and SENSITIVE Personal-Privacy preserve the serious profiling outcome; PROTECTED would require protected attributes or large-scale consequential decisions capable of severe or significant damage.
+  This regex looks for churn propensity, retention models, predictive scores, and customer-risk language, with the intended unit being a person- or account-linked prediction rather than a generic model description. Disclosure can reveal which customers are considered likely to leave and the factors or interventions attached to them, enabling competitor targeting, manipulative retention, unfair treatment, or reputational harm across the scored population. The medium-confidence concept rule can also match methodology papers, aggregate dashboards, and vendor demonstrations without individual assignments. Risk 8 and SENSITIVE Personal-Privacy preserve the serious profiling outcome; PROTECTED would require protected attributes or large-scale consequential decisions capable of severe or significant damage. Quality pass 2026-09-24: enforce tiers (75/85) now require populated records - rows keyed by an identifier, labelled values or identifiers - so topic mentions in guidance, marketing and news stay at 65 discovery.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -133,8 +184,12 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: >-
+      Quality pass (2026-09-24): 75 and 85 were corroborated only by the primary's own phrase list (same-span self-corroboration) so they fired on the bare topic phrase; 75 now needs a populated customer score row, labelled churn score/risk band or labelled customer ID and 85 needs two distinct structures (header counts only toward 85) plus retention-action evidence. Removed the self-corroborating evidence group and generic primaries (predictive analytics, customer lifetime value, risk score, machine learning model, churn rate, customer retention). Replaced bare-phrase test values with populated synthetic records and added guidance, blank-extract and news decoys. Dropped AML/CTF Act, HRIPA, My Health Records Act and TIA Act.
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 956 without changing detector or package metadata.'

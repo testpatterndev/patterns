@@ -1,23 +1,26 @@
 schema: testpattern/v1
 name: Donor Conception Record
 slug: donor-conception-record
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects donor conception records including donor identity information, recipient details, offspring matching, and assisted reproductive technology treatment records under the Status of Children Act 1978 (Qld). These records contain the most sensitive reproductive information — donor identities, recipient medical details, and biological parentage links. Unauthorised disclosure can permanently alter family relationships and breach legal confidentiality protections.
-operation: 'Keyword proximity: primary keywords (donor conception, sperm donor, egg donor, donor identity, donor-conceived person, assisted reproductive technology) within 300 characters of corroborative keywords (PROTECTED, Privacy, Status of Children Act 1978, recipient, donor code, fertility clinic). Negative keyword exclusion for published research, IVF marketing, and public policy documents.'
+operation: >-
+  Primary: donor conception phrases (donor conception record/register, sperm/egg/embryo donor identity/profile/code, donor-conceived person, assisted reproductive technology record, donor identity release). 65 = phrase only (discovery). 75 = phrase plus a populated record field (recipient, donor, patient, clinician, name, date of birth, file number) or a labelled donor code. 85 = phrase plus two distinct populated fields plus independent treatment evidence (fertility clinic, gamete, treatment cycle, insemination, cryopreserved, counselling, Status of Children Act ...). Statistics, marketing, guidelines and research framing excluded.
 pattern: (?i)\b(donor\s+conception\s+(?:record|register|file)|(?:sperm|egg|embryo)\s+donor\s+(?:identity|profile|details|code)|donor-conceived\s+(?:person|individual|offspring)|assisted\s+reproductive\s+technology\s+(?:record|register)|donor\s+(?:identity|information)\s+(?:release|disclosure|register))\b
 confidence: medium
-confidence_justification: 'Medium confidence: requires co-occurrence of donor conception terminology with individual identifiers. General fertility treatment marketing, published research, and policy discussions do not trigger detection.'
+confidence_justification: >-
+  Medium confidence: enforcement requires populated donor conception record fields; donor codes are clinic-specific, so the donor code is a documented label-anchored fallback.
 jurisdictions:
   - au
 regulations:
-- "IPA 2009 (Qld)"
-- "Privacy Act 1988 (Cth)"
-- "Status of Children Act 1978 (Qld)"
+  - Assisted Reproductive Technology Act 2024 (Qld)
+  - IPA 2009 (Qld)
+  - Privacy Act 1988 (Cth)
+  - Status of Children Act 1978 (Qld)
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - health
   - government
@@ -50,16 +53,28 @@ corroborative_evidence:
 
     - government-services
     - en-government-classification
+customisation:
+  - key: fertility-donor-code
+    kind: identifier-format
+    identifier: fertility-donor-code
+    target: purview.regexes/Regex_donor_conception_record_donor_code
+    mode: replace
+    affects_tiers: [75]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#fertility-donor-code). Earlier versions used the SD-/ED-NNNN donor code and ART-YYYY-NNNNN register format, which does not appear in any published source.
 test_cases:
   should_match:
     - value: 'PROTECTED Privacy. Donor Conception Record — Queensland Fertility Clinic. Recipient: Catherine Mary BRADSHAW, DOB 19/07/1988, Patient ID: QFC-R-2025-04271. Sperm donor identity: Donor Code SD-4782. Assisted reproductive technology treatment cycle 3. Insemination date: 15/12/2025. Donor-conceived offspring: male infant, DOB 08/09/2026 (estimated). Donor profile: Caucasian, tertiary educated, no known hereditary conditions. This record is maintained in accordance with the Status of Children Act 1978 (Qld) and the donor identity disclosure provisions.'
-      description: Donor conception record with recipient and donor code details
-    - value: 'Queensland Assisted Reproductive Technology Register — Donor Identity Release Application. Application Reference: ART-2026-00156. Applicant: donor-conceived person, Emily Jane FOSTER, DOB 02/03/2000. Applicant seeks release of donor identity information under s.19C Status of Children Act 1978 (Qld). Donor Code: ED-2917 (egg donor). Donor identity: currently held under mandatory register. Counselling requirement: applicant must complete donor-linking counselling with an approved counsellor prior to release. Biological parent: donor information to be disclosed upon completion of counselling.'
-      description: Donor identity release application from donor-conceived person
+      description: Donor conception record with recipient and donor code details (reaches 85)
+    - value: 'Queensland Assisted Reproductive Technology Register — Donor Identity Release Application. File number: DCR-2026-00156. Applicant: donor-conceived person, Emily Jane FOSTER, DOB 02/03/2000. Applicant seeks release of donor identity information under s.19C Status of Children Act 1978 (Qld). Donor Code: ED-2917 (egg donor). Donor identity: currently held under mandatory register. Counselling requirement: applicant must complete donor-linking counselling with an approved counsellor prior to release. Biological parent: donor information to be disclosed upon completion of counselling.'
+      description: Donor identity release application from donor-conceived person (reaches 75)
     - value: 'Confidential — Donor Conception File. IVF Australia Queensland — Donor Matching Report. Recipient couple: James and Lisa PARK. Egg donor selected: Donor Code ED-5104. Embryo donor option declined. Assisted reproductive technology consent forms signed 20/01/2026. Donor profile reviewed: blood type compatible, CMV negative, genetic screening completed. Treatment plan: fresh egg collection and fertilisation with recipient partner sperm. Gamete storage consent: surplus embryos to be cryopreserved. Donor conception register entry to be created upon confirmed pregnancy. Fertility specialist: Dr Rachel Wong.'
-      description: Donor matching report with recipient couple and donor profile details
-    - value: "Donor Conception\nPatient name: Avery Teston\nURN: 004418273\nDate of birth: 04/02/1991\nClinician: Dr Jordan Staffson\nNotes: Donor Conception reviewed at appointment on 12/08/2026."
-      description: Populated health record reaching the 75/85 structure gate
+      description: Donor matching report with recipient couple and donor profile details (reaches 75)
+    - value: "Donor conception record — Brisbane fertility clinic\nRecipient: Avery Teston\nDate of birth: 04/02/1991\nDonor code: D4782\nSperm donor profile reviewed; treatment cycle 2 insemination on 12/08/2026; surplus embryos cryopreserved."
+      description: 'Populated donor conception record: recipient, DOB and donor code plus treatment-cycle evidence (reaches 85)'
+      synthetic: true
+    - value: "Donor identity release application received.\nDonor code: D5104\nApplicant to be offered counselling before any release."
+      description: Labelled donor code with the donor-identity primary (reaches 75)
       synthetic: true
   should_not_match:
     - value: The Victorian Assisted Reproductive Treatment Authority published its annual report on donor conception in Australia showing that 2,500 donor conception births were recorded across all states. The report presents aggregate de-identified data on trends and outcomes.
@@ -70,6 +85,10 @@ test_cases:
       description: Published ethical guidelines for assisted reproductive technology research
     - value: "Policy guidance: this procedure explains how records about Donor Conception are handled, who may access them and how long they are kept. It contains no records about any person or system."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: "Donor conception record\nRecipient: __________\nDate of birth: __________\nDonor code: __________"
+      description: Blank form / template with unfilled fields (must stay below 75)
+    - value: "News: Queensland's new donor conception information register opens in 2026, giving donor-conceived people access to donor identity information at 16."
+      description: News or training text naming the topic (must stay below 75)
 false_positives:
   - description: Published statistics and annual reports on donor conception and ART outcomes
     mitigation: 'Negative keyword exclusion: ''annual report'', ''published'', ''aggregate data'', ''de-identified'', ''statistics'', ''trends''. Require proximity to actual individual identifiers or donor codes.'
@@ -97,10 +116,7 @@ purview:
         - ref: Regex_donor_conception_record_record_structure
           min_count: 2
           unique_results: true
-        - ref: Evidence_donor_conception_record_classification_markers
         - ref: Evidence_donor_conception_record_corroborative_terms
-        - ref: Pattern_donor_conception_record_donor_code_reference
-        - ref: Pattern_donor_conception_record_art_register_reference
         - type: any
           min_matches: 0
           max_matches: 0
@@ -113,7 +129,7 @@ purview:
         - type: any
           refs:
             - Regex_donor_conception_record_record_structure
-            - Evidence_donor_conception_record_corroborative_terms
+            - Regex_donor_conception_record_donor_code
         - type: any
           min_matches: 0
           max_matches: 0
@@ -133,26 +149,17 @@ purview:
   regexes:
     - id: Pattern_donor_conception_record_donor_conception_terms
       pattern: (?i)\b(donor\s+conception|(?:sperm|egg|embryo)\s+donor|donor-conceived\s+(?:person|individual|offspring)|assisted\s+reproductive\s+technology|donor\s+(?:identity|information)\s+(?:release|disclosure|register)|donor\s+matching)\b
-    - id: Pattern_donor_conception_record_donor_code_reference
-      pattern: \b(?:SD|ED)-\d{4,5}\b
-    - id: Pattern_donor_conception_record_art_register_reference
-      pattern: \bART-\d{4}-\d{4,5}\b
     - id: Regex_donor_conception_record_record_structure
       pattern: >-
         (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|patient|client|participant|donor|recipient|clinician|URN|UR\s+number|MRN|medical\s+record\s+number|Medicare(?:\s+number)?|IHI|referring\s+(?:doctor|practitioner)|(?:specimen|accession|lab|laboratory|study|participant|patient|client|trial|case|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_donor_conception_record_donor_code
+      pattern: >-
+        (?i)\b(?:(?:sperm|egg|embryo|gamete)\s+)?donor\s+(?:code|ID|no\.?|number|ref(?:erence)?)\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{1,20}\b
   keywords:
-    - id: Evidence_donor_conception_record_classification_markers
-      groups:
-        - match_style: word
-          terms:
-            - Privacy
-      strength: domain
     - id: Evidence_donor_conception_record_corroborative_terms
       groups:
         - match_style: word
           terms:
-            - recipient
-            - donor code
             - fertility clinic
             - gamete
             - biological parent
@@ -162,7 +169,7 @@ purview:
             - counselling
             - fertility specialist
             - cryopreserved
-      strength: domain
+      strength: specific
     - id: Filter_donor_conception_record_exclusion
       groups:
         - match_style: word
@@ -195,10 +202,17 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Personal-Privacy
-references: []
+references:
+  - title: Assisted Reproductive Technology Act 2024 (Qld)
+    url: https://www.legislation.qld.gov.au/view/whole/html/asmade/act-2024-046
+  - title: Queensland Government — Donor conception information register
+    url: https://www.qld.gov.au/family/assisted-reproduction/donor-conception-information-register
 created: '2026-03-06'
 updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): rebuilt tiers - 75 needs a populated record field (recipient, donor, patient, name, DOB, file number ...) or a labelled donor code (the generic domain keyword path at 75 is removed), 85 needs two distinct record fields plus independent treatment evidence; replaced the invented SD-/ED-NNNN and ART-YYYY-NNNNN regexes with the new fertility-donor-code labelled fallback (identifier-format slot) and removed 'recipient'/'donor code' from the evidence group (same span as structure/reference); dropped the generic 'Privacy' marker; tests converted with 85/75 positives and blank-form/news decoys; added the Assisted Reproductive Technology Act 2024 (Qld) and references."
   - version: 1.4.0
     date: '2026-09-24'
     description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent health record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."

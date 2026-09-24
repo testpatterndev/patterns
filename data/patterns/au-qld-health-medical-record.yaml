@@ -1,21 +1,25 @@
 schema: testpattern/v1
 name: QLD Health Medical Record
 slug: au-qld-health-medical-record
-version: 1.3.2
-type: keyword_list
+version: 1.4.0
+type: regex
 pattern_class: concept
-description: Detects QLD Health medical record references including MRN/URN identifiers and clinical documentation.
-operation: 'Keyword-based detection. Corroborative evidence: 12 keywords within 300 characters.'
+description: >-
+  Detects Queensland public health medical records - patient files, clinical and health records, discharge summaries, progress notes and ieMR extracts - when the record phrase sits with populated patient identifiers (URN/MRN, name, DOB, Medicare) and clinical record fields.
+operation: >-
+  Primary: medical/patient/clinical/health/unit record, patient file, discharge summary, progress notes, ieMR. 65 (discovery only): phrase alone. 75: phrase plus a populated patient identifier field (name, DOB, URN/UR number, MRN, Medicare, IHI, patient/hospital number, treating clinician). 85: patient field plus a populated clinical record field (diagnosis, presenting complaint, admission/discharge date, ward, allergies, medications, procedure, facility) plus independent Queensland Health provenance (Queensland Health, a Hospital and Health Service, HHS name). Template and guidance/training framing excluded from 75/85. Converted from keyword_list to regex so the tier logic, not the phrase list, decides matches.
+pattern: (?i)\b(?:medical\s+record|patient\s+(?:file|record)|unit\s+record|clinical\s+record|health\s+record|discharge\s+summary|progress\s+notes|ieMR)\b
 confidence: medium
-confidence_justification: 'Medium confidence: keyword-based detection requires corroborative evidence for accurate identification.'
+confidence_justification: >-
+  Medium: enforce tiers need a populated patient identifier; 85 also needs a clinical field and Queensland Health provenance. Records-management procedures, software notes and training text carry the phrases without a patient and stay at 65.
 jurisdictions:
   - au
 regulations:
-  - HRIPA (Cth)
-  - IPA 2009 (Qld)
-  - My Health Records Act 2012 (Cth)
-  - NDB Scheme (Cth)
   - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+  - NDB Scheme (Cth)
+  - My Health Records Act 2012 (Cth)
+  - Hospital and Health Boards Act 2011 (Qld)
 frameworks:
   - ISO 27001
   - ISO 27701
@@ -26,25 +30,25 @@ data_categories:
   - government
 test_cases:
   should_match:
-    - value: Medical record archive index
-      description: Exact 65 discovery probe with a record phrase and no clinical contents
-    - value: Medical record with discharge summary
-      description: Exact 75 probe with clinical-record context
-    - value: Queensland Health medical record with discharge summary
-      description: Exact 85 probe with clinical-record and QLD Health context
-    - value: 'Medical record number (MRN): 12345678 clinical documentation'
-      description: Medical record number with clinical documentation
-    - value: QLD Health patient record with URN and discharge summary
-      description: Test match 2
-    - value: Health record patient chart and medical history review
-      description: Test match 3
+    - value: "DISCHARGE SUMMARY - Metro North Hospital and Health Service\nPatient: Morgan Ellisdale\nURN: 118204\nDOB: 17/03/1968\nAdmission date: 12/09/2026\nPrincipal diagnosis: Community-acquired pneumonia\nWard: 7B Respiratory\nFollow-up with GP in one week."
+      description: Populated discharge summary with patient, clinical fields and HHS provenance (85)
+      synthetic: true
+    - value: "Medical record request\nPatient name: Casey Rourke\nUR number: 0093317\nCopy released to the treating GP on 03/09/2026."
+      description: Medical record request with labelled patient identifiers only (75)
+      synthetic: true
   should_not_match:
-    - value: Record the meeting minutes
+    - value: "Record the meeting minutes"
       description: Non-match 1
-    - value: World record broken
+    - value: "World record broken"
       description: Non-match 2
-    - value: Unit record archive software release notes
+    - value: "Unit record archive software release notes"
       description: Product documentation phrase must remain discovery-only
+    - value: "Policy guidance: this procedure explains how medical record entries are collected, stored and shared, who may access them and how long they are kept. Staff should read the privacy section before completing any form. It contains no details about any individual."
+      description: Policy/guidance text naming the topic without any populated record (65 discovery at most)
+    - value: "Patient record - ieMR downtime form\nPatient name: ____________________\nURN: ____________________\nDate of birth: ____________________\nDiagnosis: ____________________\nWard: ____________________\nSignature: ____________  Date: __/__/____"
+      description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
+    - value: "News: Queensland Health says the ieMR now holds the clinical record for most hospital patients, and a new discharge summary format will reach GPs faster."
+      description: News/training prose about the topic without a populated record (65 discovery at most)
 false_positives:
   - description: Generic record references in non-medical contexts.
     mitigation: Require medical record identifiers like MRN, URN, or clinical documentation.
@@ -53,7 +57,7 @@ exports:
 scope: narrow
 risk_rating: 8
 risk_description: >-
-  This keyword detector recognizes Queensland Health medical records through patient-chart language, MRN or URN references, clinical documentation, discharge summaries, and medical history. A genuine match is a composite patient record that can expose identity, diagnoses, investigations, treatment, and care chronology, enabling discrimination, coercion, fraud, or unsafe alteration and misrouting. The normal record concerns one patient rather than a hospital database, so the consequence is serious but contained below broad institutional compromise. Risk 8 and SENSITIVE are justified; PROTECTED would require a large record repository, privileged clinical-system access, or significant patient-safety damage.
+  The detector recognises Queensland medical, patient and clinical record language and enforces only when populated patient identifier fields (URN/MRN, name, DOB, Medicare) sit nearby; phrase-only text stays at 65 discovery. A genuine match is a composite patient record that can expose identity, diagnoses, investigations, treatment, and care chronology, enabling discrimination, coercion, fraud, or unsafe alteration and misrouting. The normal record concerns one patient rather than a hospital database, so the consequence is serious but contained below broad institutional compromise. Risk 8 and SENSITIVE are justified; PROTECTED would require a large record repository, privileged clinical-system access, or significant patient-safety damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -64,89 +68,51 @@ sensitivity_labels:
   ca_gov: Protected B
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match:
-        type: any
-        ids:
-          - Pattern_medical_record
-          - Pattern_patient_record
+      id_match: Pattern_medical_record
       matches:
-        - ref: Evidence_clinical_record_context
+        - ref: Regex_au_qld_health_medical_record_patient_fields
+        - ref: Regex_au_qld_health_medical_record_clinical_fields
         - ref: Evidence_qld_health_forms
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_health_medical_record_guidance_exclusion
     - confidence_level: 75
-      id_match:
-        type: any
-        ids:
-          - Pattern_medical_record
-          - Pattern_patient_record
+      id_match: Pattern_medical_record
       matches:
-        - ref: Evidence_clinical_record_context
+        - ref: Regex_au_qld_health_medical_record_patient_fields
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_health_medical_record_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match:
-        type: any
-        ids:
-          - Pattern_medical_record
-          - Pattern_patient_record
+      id_match: Pattern_medical_record
       matches:
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
   regexes:
     - id: Pattern_medical_record
-      pattern: (?i)\b(?:medical\s+record|patient\s+(?:file|record)|unit\s+record|clinical\s+record|health\s+record)\b
-    - id: Pattern_patient_record
-      pattern: (?i)\b(?:mrn|urn|medical\s+record\s+number|unit\s+record\s+number)\b
+      pattern: (?i)\b(?:medical\s+record|patient\s+(?:file|record)|unit\s+record|clinical\s+record|health\s+record|discharge\s+summary|progress\s+notes|ieMR)\b
+    - id: Regex_au_qld_health_medical_record_patient_fields
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|patient(?:\s+name)?|URN|UR\s*(?:no\.?|number)|MRN|medical\s+record\s+(?:no\.?|number)|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|IHI|DVA\s+(?:no\.?|number)|(?:patient|client|hospital|case|file|episode)\s*(?:no\.?|number|ID)|(?:referring|treating|requesting)\s+(?:doctor|practitioner|clinician|psychiatrist)|clinician|consultant)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_au_qld_health_medical_record_clinical_fields
+      pattern: (?i)\b(?:diagnosis|principal\s+diagnosis|presenting\s+(?:complaint|problem)|admission\s+date|date\s+of\s+admission|discharge\s+date|ward|allergies|medications?|procedure|treating\s+team|facility|hospital|specialty)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
   keywords:
-    - id: Evidence_mrn_urn
-      groups:
-        - match_style: word
-          terms:
-            - text: MRN
-              case_sensitive: true
-            - text: URN
-              case_sensitive: true
-            - text: UR
-              case_sensitive: true
-            - medical record number
-            - unit record number
-            - unit record
-            - patient ID
-            - hospital ID
-      strength: specific
-    - id: Evidence_hhs
-      groups:
-        - match_style: word
-          terms:
-            - Metro North
-            - Metro South
-            - Gold Coast Health
-            - Sunshine Coast
-            - Cairns and Hinterland
-            - Townsville
-            - Central Queensland
-            - Wide Bay
-            - Darling Downs
-            - Children's Health Queensland
-      strength: specific
     - id: Evidence_qld_health_forms
       groups:
         - match_style: word
@@ -155,26 +121,38 @@ purview:
             - Hospital and Health Service
             - text: HHS
               case_sensitive: true
-            - health.qld.gov.au
-            - QH-IMP
+            - Metro North
+            - Metro South
+            - Gold Coast Health
+            - Sunshine Coast
+            - Cairns and Hinterland
+            - Townsville
+            - Darling Downs
+            - Wide Bay
+            - Children's Health Queensland
             - Pathology Queensland
-            - Clinical Excellence Queensland
       strength: specific
-    - id: Evidence_clinical_record_context
+    - id: Keyword_au_qld_health_medical_record_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - clinical documentation
-            - discharge summary
-            - medical history
-            - treatment notes
-            - diagnosis
-            - medications
-            - patient chart
-      strength: specific
+            - this policy
+            - this procedure
+            - this guideline
+            - these guidelines
+            - frequently asked questions
+            - media release
+            - news release
+            - training module
+            - e-learning module
+            - course outline
+      strength: exclusion
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): converted keyword_list to regex (the keyword_list harness treated any phrase as a match); 75 now needs a populated patient identifier and 85 needs patient fields plus a clinical record field plus Queensland Health provenance - previously both tiers fired on phrase lists. Bare-URN primary removed (it self-corroborated with identifier fields). Bare-phrase tests replaced with populated records plus policy, blank-form and news decoys. Removed HRIPA (Cth), added Hospital and Health Boards Act 2011 (Qld); references added."
   - version: 1.3.2
     date: '2026-07-19'
     description: 'Targeted finance/health blocker remediation: make medical-record phrases 65 discovery, require independent clinical-record contents at 75 and QLD Health provenance at 85, expand the primary to health-record wording, and add exact-tier plus software probes.'
@@ -208,3 +186,10 @@ remediation:
     changes:
       - 'Mapped non-canonical confidence 95 to 85.'
       - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
+references:
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2011-032
+    title: Hospital and Health Boards Act 2011 (Qld) - Part 7 confidentiality of patient information
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+    title: Information Privacy Act 2009 (Qld)
+  - url: https://www.legislation.gov.au/C2004A03712/latest/text
+    title: Privacy Act 1988 (Cth)

@@ -1,21 +1,23 @@
 schema: testpattern/v1
 name: Counter-Terrorism Assessment File
 slug: counter-terrorism-assessment-file
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects documents containing terrorism threat assessments, persons of interest profiles, and counter-terrorism operational capabilities. Disclosure enables counter-surveillance by terrorist subjects and compromises national security monitoring. Includes JCTT (Joint Counter Terrorism Team) and QPS Security and Counter-Terrorism Group documents.
-operation: 'Keyword proximity: primary keywords (counter-terrorism, CT assessment, terrorism threat assessment, national threat advisory, foreign fighter, radicalisation assessment, fixated threat) within 300 characters of subject identifiers and intelligence assessment language. Document markers from JCTT and QPS SCTG templates. Trainable classifier recommended for CT assessment document structure. Negative keyword exclusion for public threat advisories and media.'
+operation: >-
+  Primary: counter-terrorism assessment phrases (counter-terrorism assessment/intelligence/briefing, CT assessment, terrorism threat assessment, radicalisation assessment, fixated threat assessment, foreign fighter profile). 65 = phrase only (discovery). 75 = phrase plus a populated document header field (To, From, Date, Subject, Our ref, File no ...) or a labelled file reference. 85 = phrase plus three distinct populated header fields plus independent CT evidence (JCTT, SCTG, ASIO, AFP, person of interest, radicalisation indicators, hostile reconnaissance ...). Public advisories, media and academic framing excluded.
 pattern: (?i)\b(counter[\-\s]terrorism\s+(?:assessment|intelligence|briefing)|CT\s+assessment|terrorism\s+threat\s+assessment|national\s+threat\s+advisory|radicalisation\s+assessment|fixated\s+threat\s+(?:assessment|report)|foreign\s+fighter\s+(?:assessment|profile))\b
 confidence: medium
-confidence_justification: 'Medium confidence: requires co-occurrence of counter-terrorism assessment terminology with subject identifiers and intelligence classification markers. The combination of CT-specific language with operational detail distinguishes genuine assessments from publicly available threat level announcements and media reporting.'
+confidence_justification: >-
+  Medium confidence: enforcement requires a populated operational document; JCTT file references are unpublished, so the reference is a documented label-anchored fallback.
 jurisdictions:
   - global
 regulations:
-- "Criminal Code Act 1995 (Cth)"
+  - "Criminal Code Act 1995 (Cth)"
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - law-enforcement
 corroborative_evidence:
@@ -40,16 +42,28 @@ corroborative_evidence:
 
     - law-enforcement
     - en-government-classification
+customisation:
+  - key: case-reference-number
+    kind: identifier-format
+    identifier: case-reference-number
+    target: purview.regexes/Regex_counter_terrorism_assessment_file_case_reference
+    mode: replace
+    affects_tiers: [75]
+    required_for_enforcement: false
+    note: Replace the documented labelled-reference fallback with the customer's real format (see docs/identifiers.md#case-reference-number). Earlier versions used the CT-YYYY-AGENCY-NNNN JCTT reference format, which does not appear in any published source.
 test_cases:
   should_match:
-    - value: 'PROTECTED — NATIONAL SECURITY. Counter-Terrorism Assessment. JCTT Reference: CT-2025-QLD-0089. Subject: Ahmed Khalil FAROUK, DOB 14/07/1993. Radicalisation assessment: Subject has been consuming extremist material online and has expressed support for ISIL. National Terrorism Threat Level: PROBABLE. Recommendation: elevated monitoring and AFP referral.'
-      description: JCTT counter-terrorism assessment with subject identification and radicalisation indicators
+    - value: 'PROTECTED — NATIONAL SECURITY. Counter-Terrorism Assessment. File number: JCTT-2025-0089. Subject: Ahmed Khalil FAROUK, DOB 14/07/1993. Radicalisation assessment: Subject has been consuming extremist material online and has expressed support for ISIL. National Terrorism Threat Level: PROBABLE. Recommendation: elevated monitoring and AFP referral.'
+      description: JCTT counter-terrorism assessment with subject identification and radicalisation indicators (reaches 75)
     - value: 'QPS Security and Counter-Terrorism Group intelligence briefing. Fixated threat assessment for subject who has issued threats against Queensland Parliament House. CT assessment indicates subject has conducted hostile reconnaissance. Foreign fighter database check: negative. ASIO referral recommended under s.4 of ASIO Act.'
-      description: QPS SCTG fixated threat assessment with ASIO referral recommendation
+      description: QPS SCTG fixated threat assessment with ASIO referral recommendation (65 discovery only - prose without populated record fields)
     - value: Terrorism threat assessment update — Operation SENTINEL. Three persons of interest identified in South-East Queensland with links to foreign fighter networks. Counter-terrorism intelligence indicates planned travel to conflict zone. National threat advisory distributed to all JCTT partner agencies.
-      description: Multi-subject terrorism threat assessment with foreign fighter network links
-    - value: "To: Director-General\nFrom: Principal Legal Officer\nDate: 12/08/2026\nSubject: Counter-Terrorism Assessment\nOur ref: LS2026-0412\nThis briefing sets out the Counter-Terrorism Assessment for decision."
-      description: Populated doc record reaching the 75/85 structure gate
+      description: Multi-subject terrorism threat assessment with foreign fighter network links (65 discovery only - prose without populated record fields)
+    - value: "PROTECTED — NATIONAL SECURITY\nTo: Commander, Security and Counter-Terrorism Group\nFrom: JCTT Queensland\nDate: 12/09/2026\nSubject: Counter-terrorism assessment — person of interest Avery Teston\nFile number: JCTT-2026-0417\nRadicalisation indicators and hostile reconnaissance of a stadium noted; AFP and ASIO consulted."
+      description: 'Populated CT assessment minute: To/From/Date/Subject headers and file number plus JCTT/ASIO evidence (reaches 85)'
+      synthetic: true
+    - value: "Terrorism threat assessment\nFile number: JCTT-2026-0512\nAssessment attached for the duty officer."
+      description: Labelled file reference with the CT primary (reaches 75)
       synthetic: true
   should_not_match:
     - value: The Australian Government has set the National Terrorism Threat Level at PROBABLE, meaning a terrorist attack is likely. The public is advised to be vigilant and report suspicious behaviour to the National Security Hotline.
@@ -60,6 +74,10 @@ test_cases:
       description: Television journalism about counter-terrorism with former officials
     - value: "Policy guidance: this procedure explains how records about Counter-Terrorism Assessment are handled, who may access them and how long they are kept. It contains no records about any person or system."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: "Counter-terrorism assessment — minute\nTo: __________\nFrom: __________\nDate: __________\nSubject: __________\nFile number: __________"
+      description: Blank form / template with unfilled fields (must stay below 75)
+    - value: "News: a documentary on counter-terrorism intelligence featured former officers describing how a terrorism threat assessment is prepared."
+      description: News or training text naming the topic (must stay below 75)
 false_positives:
   - description: Public national terrorism threat level announcements and advisories
     mitigation: 'Negative keyword exclusion: ''public advisory'', ''public announcement'', ''media release'', ''public is advised''. Require proximity to specific subject identifiers.'
@@ -87,9 +105,7 @@ purview:
         - ref: Regex_counter_terrorism_assessment_file_record_structure
           min_count: 3
           unique_results: true
-        - ref: Evidence_counter_terrorism_assessment_file_classification_markers
         - ref: Evidence_counter_terrorism_assessment_file_corroborative_terms
-        - ref: Pattern_counter_terrorism_assessment_file_jctt_reference
         - type: any
           min_matches: 0
           max_matches: 0
@@ -102,7 +118,7 @@ purview:
         - type: any
           refs:
             - Regex_counter_terrorism_assessment_file_record_structure
-            - Evidence_counter_terrorism_assessment_file_corroborative_terms
+            - Regex_counter_terrorism_assessment_file_case_reference
         - type: any
           min_matches: 0
           max_matches: 0
@@ -122,18 +138,13 @@ purview:
   regexes:
     - id: Pattern_counter_terrorism_assessment_file_ct_assessment_terms
       pattern: (?i)\b(counter[\-\s]terrorism\s+assessment|CT\s+assessment|terrorism\s+threat\s+assessment|radicalisation\s+assessment|fixated\s+threat)\b
-    - id: Pattern_counter_terrorism_assessment_file_jctt_reference
-      pattern: \bCT-\d{4}-[A-Z]{2,5}-\d{3,5}\b
     - id: Regex_counter_terrorism_assessment_file_record_structure
       pattern: >-
         (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!_{2,}|\[|<)[A-Za-z0-9]
+    - id: Regex_counter_terrorism_assessment_file_case_reference
+      pattern: >-
+        (?i)\b(?:case|file|matter|reference)\s+(?:no\.?|number|ID|#)\s*[:#]?\s*(?:[A-Z]{1,4}[/-]?)?\d[A-Z0-9/-]{3,20}\b
   keywords:
-    - id: Evidence_counter_terrorism_assessment_file_classification_markers
-      groups:
-        - match_style: word
-          terms:
-            - NATIONAL SECURITY
-      strength: specific
     - id: Evidence_counter_terrorism_assessment_file_corroborative_terms
       groups:
         - match_style: word
@@ -179,10 +190,15 @@ sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: PROTECTED Law-Enforcement
-references: []
+references:
+  - title: Criminal Code Act 1995 (Cth)
+    url: https://www.legislation.gov.au/C2004A04868/latest/text
 created: '2026-02-20'
 updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): rebuilt tiers - 75 needs a populated document header field or a labelled file reference, 85 needs three distinct header fields plus independent CT evidence (JCTT, ASIO, AFP, radicalisation indicators ...); removed the invented CT-YYYY-AGENCY-NNNN regex in favour of the case-reference-number labelled fallback (identifier-format slot); dropped the single-term NATIONAL SECURITY marker group; tests converted with 85/75 positives and blank-form/news decoys; references added.'
   - version: 1.4.0
     date: '2026-09-24'
     description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent doc record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 3 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."

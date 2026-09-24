@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Marking - SENSITIVE
 slug: au-marking-sensitive
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -42,31 +42,43 @@ corroborative_evidence:
   proximity: 300
 test_cases:
   should_match:
-    - value: "Document footer candidate SENSITIVE"
-      description: Low-tier probe - uppercase candidate without a formal marking field
-    - value: "Classification: OFFICIAL: Sensitive"
+    - value: |-
+        Page 4 of 12
+        SENSITIVE
+      description: Discovery probe (65) - bare page-footer banner with no formal marking field or government context
+    - value: 'Classification: OFFICIAL: Sensitive'
       description: Medium-tier probe - formal classification field without a complete header
-    - value: "Subject [SEC=OFFICIAL:Sensitive]"
+    - value: Subject [SEC=OFFICIAL:Sensitive]
       description: Operational email subject marking reaches the balanced tier
-    - value: "Queensland Government QGISCF briefing\nSENSITIVE"
+    - value: |-
+        Queensland Government QGISCF briefing
+        SENSITIVE
       description: Medium-tier probe - standalone Queensland banner with explicit government marking context
-    - value: "X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=OFFICIAL:Sensitive"
+    - value: 'X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=OFFICIAL:Sensitive'
       description: High-tier probe - complete Australian protective-marking header
   should_not_match:
-    - value: "this is a sensitive topic for discussion"
+    - value: this is a sensitive topic for discussion
       description: lowercase English word (case-sensitive exclusion)
-    - value: "Memo [SEC=OFFICIAL]"
+    - value: Memo [SEC=OFFICIAL]
       description: plain OFFICIAL belongs to au-marking-official
-    - value: "Briefing [SEC=PROTECTED]"
+    - value: Briefing [SEC=PROTECTED]
       description: PROTECTED belongs to au-marking-protected
-    - value: "THIS DOCUMENT IS COMMERCIALLY SENSITIVE — DEPARTMENT OF TREASURY BRIEFING"
+    - value: THIS DOCUMENT IS COMMERCIALLY SENSITIVE — DEPARTMENT OF TREASURY BRIEFING
       description: commercial-sensitivity collocation excluded from the QLD tier by the commercial-sensitive NOT group
-    - value: "OFFICIAL: Sensitively drafted policy note avoids naming individuals"
-      description: "Sensitively (adverb) must not match the OFFICIAL: Sensitive stem after the trailing \\b fix"
-    - value: "Public marking guide: Classification: OFFICIAL: Sensitive"
+    - value: 'OFFICIAL: Sensitively drafted policy note avoids naming individuals'
+      description: 'Sensitively (adverb) must not match the OFFICIAL: Sensitive stem after the trailing \b fix'
+    - value: 'Public marking guide: Classification: OFFICIAL: Sensitive'
       description: Public guidance quotes a formal sensitive marking
-    - value: "Template example: X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=OFFICIAL:Sensitive"
+    - value: 'Template example: X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=OFFICIAL:Sensitive'
       description: Template contains a complete formal header
+    - value: |-
+        Blank cover sheet
+        Security classification: ________
+        Protective marking: [select from the approved list]
+        Dissemination limiting marker: ________
+      description: Blank template - empty classification fields must not enforce
+    - value: 'Protective security training material: an email subject line such as [SEC=OFFICIAL:Sensitive] shows the marking applied to a message.'
+      description: Training content quoting a SEC= subject marking is suppressed by the public-marking exclusion (never reaches 75)
 false_positives:
   - description: Uppercase SENSITIVE in non-marking headings (e.g. "COMMERCIALLY SENSITIVE").
     mitigation: QLD tier requires Australian-government corroborative evidence within 300 characters, and a dedicated NOT group excludes commercial-sensitivity collocations.
@@ -141,7 +153,7 @@ purview:
     - id: Regex_au_sensitive_complete_header
       pattern: '\bX-Protective-Marking:\s*VER=[0-9]{4}\.[0-9]+,\s*NS=gov\.au,\s*SEC=OFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive\b'
     - id: Regex_au_sensitive_formal_label
-      pattern: '\b(?:SEC(?:URITY CLASSIFICATION)?|Security Classification|CLASSIFICATION|Classification|PROTECTIVE MARKING|Protective Marking|MARKING|Marking)\s*[:=]\s*(?:OFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive|SENSITIVE)\b'
+      pattern: '\b(?:SEC(?:URITY\s+CLASSIFICATION)?|Security\s+Classification|CLASSIFICATION|Classification|PROTECTIVE\s+MARKING|Protective\s+Marking|MARKING|Marking)\s*[:=]\s*(?:OFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive|SENSITIVE)\b'
     - id: Regex_au_sensitive_candidate
       pattern: '\b(?:OFFICIAL(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive|SENSITIVE)\b'
   keywords:
@@ -194,9 +206,17 @@ purview:
             - style guide
             - training material
       strength: exclusion
+references:
+  - title: Protective Security Policy Framework (PSPF)
+    url: https://www.protectivesecurity.gov.au/
+  - title: Criminal Code Act 1995 (Cth)
+    url: https://www.legislation.gov.au/C2004A04868/latest/text
 created: '2026-06-29'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'Quality pass (2026-09-24): marking classifier retained by design (formal field / complete X-Protective-Marking header remain the enforcement signals; tiers unchanged). Fixed PDF-unsafe literal spaces in the formal-label regex (SECURITY CLASSIFICATION, Security Classification, PROTECTIVE MARKING, Protective Marking now use \s+). Replaced the bare "Document footer candidate" probe with a realistic page-footer banner; added blank cover-sheet and training-material decoys. Added PSPF and Criminal Code references.'
   - version: 1.3.0
     date: '2026-07-19'
     description: 'Profile quality: retain bare banners as 65 discovery, enforce formal labels or explicitly government-corroborated banners at the recommended 75 tier, reserve 85 for complete headers, retain commercial exclusions, and add public/template adversarial probes.'

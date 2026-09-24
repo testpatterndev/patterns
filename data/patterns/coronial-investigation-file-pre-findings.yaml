@@ -1,22 +1,24 @@
 schema: testpattern/v1
 name: Coronial Investigation File (Pre-Findings)
 slug: coronial-investigation-file-pre-findings
-version: 1.4.0
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
 description: Detects pre-publication coronial investigation files including evidence, witness statements, and draft findings. Published coronial findings are SENS_Law, not PROT_Law.
-operation: 'Keyword proximity: primary keywords (coronial investigation, coronial inquest, autopsy report, coronial findings draft) within 300 characters of pre-publication markers (DRAFT, NOT FOR RELEASE). Negative keyword exclusion for published findings.'
+operation: >-
+  Primary: coronial investigation / inquest brief / draft autopsy or findings phrases. 65 = phrase only (discovery). 75 = phrase plus a populated coronial record field (deceased, next of kin, date/place/cause of death, pathologist, investigating officer, witness, file number) or a labelled coronial file number (year/sequence, as printed on published findings). 85 = phrase plus two distinct populated fields plus independent coronial evidence (toxicology, pathologist, death in custody, Coroners Court ...) plus a pre-publication marker (DRAFT, NOT FOR RELEASE, RESTRICTED). Published findings, media and academic framing excluded.
 pattern: (?i)\b(coronial\s+investigation\s+(?:file|brief|report)|coronial\s+inquest\s+(?:brief|file)|autopsy\s+report\s+(?:draft|preliminary)|post[\-\s]mortem\s+(?:report|examination)\s+(?:draft|preliminary)|coronial\s+(?:findings?\s+draft|brief\s+draft|draft\s+findings?))\b
 confidence: medium
-confidence_justification: 'Medium confidence: requires coronial terminology with pre-publication markers (DRAFT, NOT FOR RELEASE). Published findings excluded.'
+confidence_justification: >-
+  Medium confidence: enforcement requires populated coronial record fields; the high tier also requires a pre-publication marker so published findings do not reach 85.
 jurisdictions:
   - au
 regulations:
-- "Coroners Act 2003 (Qld)"
-- "PPRA 2000 (Qld)"
+  - "Coroners Act 2003 (Qld)"
+  - "PPRA 2000 (Qld)"
 frameworks:
-- QGISCF
+  - QGISCF
 data_categories:
   - law-enforcement
   - government
@@ -43,16 +45,25 @@ corroborative_evidence:
     - law-enforcement
 
     - government-services
+customisation:
+  - key: qld-coroners-court-file-number
+    kind: identifier-format
+    identifier: qld-coroners-court-file-number
+    target: purview.regexes/Regex_coronial_investigation_file_pre_findings_coronial_file_number
+    mode: replace
+    affects_tiers: [75]
+    required_for_enforcement: false
+    note: Replace or extend the documented labelled file-number fallback with the court's internal format (see docs/identifiers.md#qld-coroners-court-file-number). Earlier versions used an invented COR-YYYY-NNN format; published findings print the file number as year/sequence under 'FILE NO(s):'.
 test_cases:
   should_match:
-    - value: 'PROTECTED — DRAFT — NOT FOR RELEASE. Coronial Investigation File. Coroners Court File COR-2025-0187. Deceased: Robert WHITFIELD. Cause of death pending — autopsy indicates blunt force trauma. Death in custody at Arthur Gorrie CC. Parallel criminal investigation active.'
-      description: Pre-findings coronial file for death in custody
+    - value: 'PROTECTED — DRAFT — NOT FOR RELEASE. Coronial Investigation File. File No(s): 2025/0187. Deceased: Robert WHITFIELD. Cause of death pending — autopsy indicates blunt force trauma. Death in custody at Arthur Gorrie CC. Parallel criminal investigation active.'
+      description: Pre-findings coronial file for death in custody (reaches 75)
     - value: 'RESTRICTED — NOT FOR RELEASE before inquest. Coronial inquest brief — workplace death, Toowoomba. Post-mortem (preliminary): fall from height. 7 witness statements attached. Draft findings not yet circulated.'
-      description: Pre-inquest coronial brief for workplace death
+      description: Pre-inquest coronial brief for workplace death (65 discovery only - prose without populated record fields)
     - value: 'Draft Coronial Findings. Coroners Act 2003 s.45. Death of Emily CHANG. Autopsy report draft. Toxicology: elevated BAC. Manner of death under investigation. RESTRICTED — not for release prior to publication.'
-      description: Draft coronial findings with toxicology
-    - value: "Coronial Investigation\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Coronial Investigation recorded against the subject; handling restricted."
-      description: Populated justice record reaching the 75/85 structure gate
+      description: Draft coronial findings with toxicology (65 discovery only - prose without populated record fields)
+    - value: "DRAFT — NOT FOR RELEASE\nCoronial investigation file\nFile No(s): 2026/0187\nDeceased: Avery Teston\nDate of death: 03/06/2026\nPlace of death: Brisbane Correctional Centre\nToxicology and pathologist report received; death in custody reportable to the Queensland Coroner."
+      description: 'Populated pre-findings file: file number, deceased, date and place of death plus toxicology / death-in-custody evidence and DRAFT marker (reaches 85)'
       synthetic: true
   should_not_match:
     - value: The Queensland Coroner published findings into the death of John Smith. Death due to natural causes. Available on the Coroners Court website.
@@ -63,6 +74,10 @@ test_cases:
       description: Academic thesis on published findings
     - value: "Policy guidance: this procedure explains how records about Coronial Investigation are handled, who may access them and how long they are kept. It contains no records about any person or system."
       description: Policy guidance naming the topic without any record (discovery only)
+    - value: "Coronial investigation file — cover sheet\nDeceased: __________\nDate of death: __________\nFile No(s): __________"
+      description: Blank form / template with unfilled fields (must stay below 75)
+    - value: "News: the coronial inquest into the workplace death heard evidence from three expert witnesses, the Courier-Mail reported."
+      description: News or training text naming the topic (must stay below 75)
 false_positives:
   - description: Published coronial findings
     mitigation: 'Negative keyword exclusion: ''published findings'', ''available on website''. Require DRAFT/NOT FOR RELEASE.'
@@ -88,10 +103,8 @@ purview:
         - ref: Regex_coronial_investigation_file_pre_findings_record_structure
           min_count: 2
           unique_results: true
-        - ref: Evidence_coronial_investigation_file_pre_findings_pre_publication_markers
         - ref: Evidence_coronial_investigation_file_pre_findings_corroborative_terms
-        - ref: Pattern_coronial_investigation_file_pre_findings_coroners_court_file
-        - ref: Pattern_coronial_investigation_file_pre_findings_pre_publication_markers
+        - ref: Evidence_coronial_investigation_file_pre_findings_pre_publication_markers
         - type: any
           min_matches: 0
           max_matches: 0
@@ -104,7 +117,7 @@ purview:
         - type: any
           refs:
             - Regex_coronial_investigation_file_pre_findings_record_structure
-            - Evidence_coronial_investigation_file_pre_findings_corroborative_terms
+            - Regex_coronial_investigation_file_pre_findings_coronial_file_number
         - type: any
           min_matches: 0
           max_matches: 0
@@ -124,13 +137,12 @@ purview:
   regexes:
     - id: Pattern_coronial_investigation_file_pre_findings_coronial_terms
       pattern: (?i)\b(coronial\s+investigation|coronial\s+inquest|autopsy\s+report|post[\-\s]mortem\s+report|coronial\s+findings\s+draft|coronial\s+brief)\b
-    - id: Pattern_coronial_investigation_file_pre_findings_coroners_court_file
-      pattern: \bCOR-\d{4}-\d{3,5}\b
-    - id: Pattern_coronial_investigation_file_pre_findings_pre_publication_markers
-      pattern: (?i)\b(DRAFT|NOT\s+FOR\s+RELEASE|PRE-PUBLICATION)\b
     - id: Regex_coronial_investigation_file_pre_findings_record_structure
       pattern: >-
-        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|deceased|next\s+of\s+kin|date\s+of\s+death|place\s+of\s+death|cause\s+of\s+death|pathologist|investigating\s+officer|witness|coroner|(?:file|case|reference|ref)\s*(?:no\.?(?:\(s\))?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_coronial_investigation_file_pre_findings_coronial_file_number
+      pattern: >-
+        (?i)\b(?:file\s+no\.?(?:\(s\))?|file\s+number|coronial\s+(?:file|reference|case)\s+(?:no\.?|number))\s*[:#]?\s*(?:19|20)\d{2}/\d{1,5}\b
   keywords:
     - id: Evidence_coronial_investigation_file_pre_findings_pre_publication_markers
       groups:
@@ -176,10 +188,17 @@ sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Law-Enforcement
-references: []
+references:
+  - title: Coroners Act 2003 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2003-013
+  - title: Coroners Court of Queensland — example published findings (file number format)
+    url: https://www.courts.qld.gov.au/__data/assets/pdf_file/0006/616758/cif-brown-hw-20190612.pdf
 created: '2026-02-20'
 updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "Quality pass (2026-09-24): rebuilt tiers - 75 needs a populated coronial record field (deceased, date/place/cause of death, file number ...) or a labelled coronial file number, 85 needs two distinct record fields plus independent coronial evidence plus a pre-publication marker; replaced the invented COR-YYYY-NNN regex with the new qld-coroners-court-file-number identifier (published year/sequence format under 'FILE NO(s):', label-anchored fallback, identifier-format slot); tests converted with an 85 positive and blank-form/news decoys; references added."
   - version: 1.4.0
     date: '2026-09-24'
     description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
