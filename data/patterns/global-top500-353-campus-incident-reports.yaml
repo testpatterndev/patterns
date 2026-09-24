@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Campus incident reports
 slug: global-top500-353-campus-incident-reports
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -51,6 +51,9 @@ test_cases:
       description: Alternative topic phrase match
     - value: student conduct
       description: Additional topic phrase match
+    - value: "campus incident reports\nStudent name: Avery Teston\nStudent ID: S4471820\nYear level: 9\nParent: Jordan Teston\nNotes: campus incident reports discussed with the family on 12/08/2026."
+      description: Populated student record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -58,6 +61,8 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: campus incident security incident
       description: Generic word pair from old broad template should not match
+    - value: "Policy guidance: this procedure explains how records about campus incident reports are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to campus incident reports appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -77,17 +82,13 @@ purview:
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
-    - dict: data-record-context
-      as: Evidence_data_record_context
-      match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_campus_incident_reports
       matches:
-        - ref: Evidence_campus_incident_reports
+        - ref: Regex_global_top500_353_campus_incident_reports_record_structure
           min_count: 2
           unique_results: true
-        - ref: Evidence_data_record_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -96,8 +97,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_campus_incident_reports
       matches:
-        - ref: Evidence_campus_incident_reports
-        - ref: Evidence_data_record_context
+        - ref: Regex_global_top500_353_campus_incident_reports_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -112,8 +112,9 @@ purview:
     - id: Pattern_campus_incident_reports
       pattern: >-
         (?is)\b(?:campus\s+incident\s+reports|campus\s+incident|security\s+incident|student\s+conduct|incident\s+report|campus\s+security|safety\s+officer|witness\s+statement|incident\s+number|police\s+report|emergency\s+response|workplace\s+health\s+and\s+safety)\b
-    - id: Pattern_au_top500_353_campus_incident_reports_label_context
-      pattern: (?i)\b(?:campus\s+incident\s+reports)\b
+    - id: Regex_global_top500_353_campus_incident_reports_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|student|child|young\s+person|pupil|candidate|EQ\s*ID|LUI|USI|year\s+level|parent|guardian|carer|(?:student|candidate|case|enrolment|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_campus_incident_reports
       groups:
@@ -131,14 +132,6 @@ purview:
             - police report
             - emergency response
             - workplace health and safety
-    - id: Keyword_au_top500_353_campus_incident_reports_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - campus incident reports
-            - campus
-            - incident
-            - reports
 risk_description: >-
   This concept detector recognises campus incident reports, campus incident, and security incident language with nearby report terms. A normal true positive may identify students, staff, witnesses, injuries, alleged offenders, locations, and response actions, creating privacy, reputation, and sometimes safety consequences. Public safety guidance, exercise scenarios, and empty reporting forms can also trigger the medium-confidence detector without describing an actual event. Risk 8 SENSITIVE fits a contained incident report, while PROTECTED requires active threat locations, protected witnesses, mass casualty details, or significant damage.
 sensitivity_labels:
@@ -150,8 +143,11 @@ sensitivity_labels:
   nz_gov: IN-CONFIDENCE
   ca_gov: Protected A
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent student record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 940 without changing detector or package metadata.'

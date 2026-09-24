@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Corrective Services Intelligence Report
 slug: corrective-services-intelligence-report
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -52,6 +52,9 @@ test_cases:
       description: Intelligence briefing about planned assault with informant source reference
     - value: 'QCS Intelligence Unit — Monthly Prison Intelligence Assessment. Prison gang activity across southern region facilities. OMCG intelligence update: Rebels and Mongols chapters competing for drug supply routes. High risk inmates identified for inter-facility transfer. Extreme risk rating assigned to three subjects due to escape planning intelligence.'
       description: Monthly prison intelligence assessment covering gang activity and risk ratings
+    - value: "Corrective Services Intelligence\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Corrective Services Intelligence recorded against the subject; handling restricted."
+      description: Populated justice record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: The Queensland Corrective Services annual report noted that 14,000 prisoners were managed across 11 correctional facilities during the year. The report discussed rehabilitation programs and recidivism rates.
       description: Published QCS annual report with aggregate statistics
@@ -59,6 +62,8 @@ test_cases:
       description: Academic research using anonymised correctional data
     - value: The ABC documentary series explored prison gang dynamics in Australian correctional facilities. Former inmates discussed the influence of outlaw motorcycle gangs within the prison system.
       description: Television documentary about prison gangs using former inmates
+    - value: "Policy guidance: this procedure explains how records about Corrective Services Intelligence are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Published QCS annual reports and public-facing statistics
     mitigation: 'Negative keyword exclusion: ''annual report'', ''published'', ''reporting period'', ''public release''. Require proximity to specific inmate identifiers or intelligence holdings.'
@@ -81,7 +86,9 @@ purview:
     - confidence_level: 85
       id_match: Pattern_corrective_services_intelligence_report_corrective_intelligence_terms
       matches:
-        - ref: Evidence_corrective_services_intelligence_report_primary_keywords
+        - ref: Regex_corrective_services_intelligence_report_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_corrective_services_intelligence_report_classification_markers
         - ref: Evidence_corrective_services_intelligence_report_corroborative_terms
         - ref: Pattern_corrective_services_intelligence_report_qcs_inmate_number
@@ -94,7 +101,10 @@ purview:
     - confidence_level: 75
       id_match: Pattern_corrective_services_intelligence_report_corrective_intelligence_terms
       matches:
-        - ref: Evidence_corrective_services_intelligence_report_primary_keywords
+        - type: any
+          refs:
+            - Regex_corrective_services_intelligence_report_record_structure
+            - Evidence_corrective_services_intelligence_report_corroborative_terms
         - type: any
           min_matches: 0
           max_matches: 0
@@ -116,22 +126,10 @@ purview:
       pattern: (?i)\b(corrective\s+services\s+intelligence|prison\s+intelligence|security\s+threat\s+group|STG\s+assessment|inmate\s+intelligence|custodial\s+intelligence)\b
     - id: Pattern_corrective_services_intelligence_report_qcs_inmate_number
       pattern: \bQCS\s*(?:No\.?|Number)\s*:?\s*\d{5,7}\b
+    - id: Regex_corrective_services_intelligence_report_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_corrective_services_intelligence_report_primary_keywords
-      groups:
-        - match_style: word
-          terms:
-            - corrective services intelligence
-            - prison intelligence
-            - security threat group
-            - STG assessment
-            - inmate intelligence
-            - custodial intelligence
-            - prison gang intelligence
-            - OMCG intelligence
-            - placement recommendation
-            - prison gang assessment
-      strength: specific
     - id: Evidence_corrective_services_intelligence_report_classification_markers
       groups:
         - match_style: word
@@ -184,8 +182,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Law-Enforcement
 references: []
 created: '2026-02-20'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1477 without changing detector or package metadata.'

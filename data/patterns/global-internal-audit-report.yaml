@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Internal Audit Report
 slug: global-internal-audit-report
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: concept
 description: Detects internal audit reports containing control assessments and organisational vulnerability findings.
@@ -34,6 +34,9 @@ test_cases:
       description: Medium-tier probe - substantive audit sections without a classified finding response
     - value: 'Internal audit report: high risk finding and audit exception; management response, corrective action, and target completion date.'
       description: High-tier probe - classified finding plus management response
+    - value: "To: Director-General\nFrom: Principal Legal Officer\nDate: 12/08/2026\nSubject: Internal audit report\nOur ref: LS2026-0412\nThis briefing sets out the Internal audit report for decision."
+      description: Populated doc record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: Tax audit by the ATO
       description: External tax-audit sibling
@@ -43,6 +46,8 @@ test_cases:
       description: Public link mentions only the report title
     - value: 'Template example: internal audit report with high risk finding, audit exception, management response, and target completion date.'
       description: Template contains otherwise high-tier evidence
+    - value: "Policy guidance: this procedure explains how records about Internal audit report are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: External audit or financial audit references.
     mitigation: Require internal audit specific terms like internal audit plan or management letter.
@@ -71,8 +76,9 @@ purview:
     - confidence_level: 85
       id_match: Regex_internal_audit_report
       matches:
-        - ref: Keyword_audit_finding_classification
-        - ref: Keyword_management_response
+        - ref: Regex_global_internal_audit_report_record_structure
+          min_count: 3
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -81,7 +87,9 @@ purview:
     - confidence_level: 75
       id_match: Regex_internal_audit_report
       matches:
-        - ref: Keyword_audit_general
+        - ref: Regex_global_internal_audit_report_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -94,54 +102,15 @@ purview:
     - id: Regex_internal_audit_report
       pattern: >-
         (?i)\b(?:internal\s+audit\s+(?:report|findings?|memorandum)|audit\s+report|audit\s+findings?\s+(?:report|summary)|management\s+letter|audit\s+conclusion)\b
-  keywords:
-    - id: Keyword_audit_finding_classification
-      groups:
-        - match_style: word
-          terms:
-            - critical finding
-            - high risk finding
-            - medium risk finding
-            - low risk finding
-            - priority one
-            - priority two
-            - priority three
-            - required action
-            - audit observation
-            - audit exception
-            - non-compliance
-            - deviation
-      strength: specific
-    - id: Keyword_management_response
-      groups:
-        - match_style: word
-          terms:
-            - management response
-            - management comment
-            - management action plan
-            - corrective action
-            - remediation plan
-            - action owner
-            - responsible party
-            - target completion date
-            - implementation date
-            - action items
-      strength: specific
-    - id: Keyword_audit_general
-      groups:
-        - match_style: word
-          terms:
-            - audit opinion
-            - audit scope
-            - audit objective
-            - audit conclusion
-            - audit recommendation
-            - IIA standards
-            - IPPF
-      strength: specific
+    - id: Regex_global_internal_audit_report_record_structure
+      pattern: >-
+        (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!_{2,}|\[|<)[A-Za-z0-9]
 created: '2026-02-09'
-updated: '2026-07-19'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent doc record structure (Regex ..._record_structure); 85 requires 3 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.4.0
     date: '2026-07-19'
     description: 'Profile quality: align the regex-backed detector type; add report-title discovery, substantive-audit medium, and finding-plus-response high tiers; add public/template adversarial probes.'

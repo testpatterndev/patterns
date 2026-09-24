@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Research participant consent files
 slug: global-top500-355-research-participant-consent-files
-version: 1.3.1
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -54,6 +54,9 @@ test_cases:
       description: Alternative topic phrase match
     - value: informed consent
       description: Additional topic phrase match
+    - value: "research participant consent files\nPatient name: Avery Teston\nURN: 004418273\nDate of birth: 04/02/1991\nClinician: Dr Jordan Staffson\nNotes: research participant consent files reviewed at appointment on 12/08/2026."
+      description: Populated health record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -61,6 +64,8 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: student grant
       description: Generic word pair from old broad template should not match
+    - value: "Policy guidance: this procedure explains how records about research participant consent files are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to research participant consent files appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -80,17 +85,13 @@ purview:
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
-    - dict: data-record-context
-      as: Evidence_data_record_context
-      match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_research_participant_consent
       matches:
-        - ref: Evidence_research_participant_consent
+        - ref: Regex_global_top500_355_research_participant_consent_files_record_structure
           min_count: 2
           unique_results: true
-        - ref: Evidence_data_record_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -99,8 +100,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_research_participant_consent
       matches:
-        - ref: Evidence_research_participant_consent
-        - ref: Evidence_data_record_context
+        - ref: Regex_global_top500_355_research_participant_consent_files_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -115,8 +115,9 @@ purview:
     - id: Pattern_research_participant_consent
       pattern: >-
         (?is)\b(?:research\s+participant\s+consent\s+files|research\s+participant|consent\s+form|informed\s+consent|participant\s+information\s+sheet|ethics\s+approval|voluntary\s+participation|withdrawal\s+of\s+consent|research\s+ethics|human\s+subjects|clinical\s+trial\s+consent)\b
-    - id: Pattern_au_top500_355_research_participant_consent_files_label_context
-      pattern: (?i)\b(?:research\s+participant\s+consent\s+files)\b
+    - id: Regex_global_top500_355_research_participant_consent_files_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|patient|client|participant|donor|recipient|clinician|URN|UR\s+number|MRN|medical\s+record\s+number|Medicare(?:\s+number)?|IHI|referring\s+(?:doctor|practitioner)|(?:specimen|accession|lab|laboratory|study|participant|patient|client|trial|case|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_research_participant_consent
       groups:
@@ -134,15 +135,6 @@ purview:
             - research ethics
             - human subjects
             - clinical trial consent
-    - id: Keyword_au_top500_355_research_participant_consent_files_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - research participant consent files
-            - research
-            - participant
-            - consent
-            - files
 risk_description: >-
   This detector finds research participant consent files, research participant, and consent form language with nearby study context. A normal true positive is a signed participant record linking identity and contact details to study participation, eligibility, procedures, and possibly health or vulnerability information. Blank consent templates, ethics guidance, and recruitment materials can also match because the concept pattern does not confirm a signature or populated subject data. Risk 8 SENSITIVE fits one participant file, while PROTECTED requires highly dangerous study details, re-identifiable bulk cohorts, or significant damage.
 sensitivity_labels:
@@ -154,8 +146,11 @@ sensitivity_labels:
   nz_gov: CONFIDENTIAL
   ca_gov: Protected B
 created: '2026-02-08'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent health record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 942 without changing detector or package metadata.'

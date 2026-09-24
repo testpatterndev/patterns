@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Bail Condition Document
 slug: bail-condition-document
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -51,6 +51,9 @@ test_cases:
       description: Bail order with exclusion zone and passport surrender conditions
     - value: 'Bail Variation Application — s.17 Bail Act 1980. Current bail conditions for [Name], proceeding MAG-2026-03892. Application to vary curfew hours from 9pm-6am to 11pm-5am to accommodate shift work at registered employer. Prosecution does not oppose variation. Surety of $3,000 to remain in place. Reporting conditions unchanged — twice weekly at Ipswich Police Station.'
       description: Bail variation application seeking amendment to curfew conditions
+    - value: "Bail Undertaking\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Bail Undertaking recorded against the subject; handling restricted."
+      description: Populated justice record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: The Queensland Sentencing Advisory Council published its annual bail statistics report showing that 78% of persons granted bail complied with all conditions during the reporting period.
       description: Published bail statistics from sentencing advisory body
@@ -58,6 +61,8 @@ test_cases:
       description: Law reform discussion recommending Bail Act amendments
     - value: A criminal law textbook chapter on bail explains the principles in s.16 of the Bail Act 1980 (Qld) and the types of conditions that may be imposed, including curfew, reporting, and exclusion zone conditions.
       description: Legal textbook explaining bail law principles
+    - value: "Policy guidance: this procedure explains how records about Bail Undertaking are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Published bail statistics and annual reports from courts and advisory bodies
     mitigation: 'Negative keyword exclusion: ''annual report'', ''statistics'', ''published'', ''reporting period'', ''compliance rate'''
@@ -82,7 +87,9 @@ purview:
     - confidence_level: 85
       id_match: Pattern_bail_condition_document_bail_condition_terms
       matches:
-        - ref: Evidence_bail_condition_document_primary_keywords
+        - ref: Regex_bail_condition_document_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_bail_condition_document_classification_markers
         - ref: Evidence_bail_condition_document_corroborative_terms
         - ref: Pattern_bail_condition_document_bail_act_reference
@@ -96,7 +103,10 @@ purview:
     - confidence_level: 75
       id_match: Pattern_bail_condition_document_bail_condition_terms
       matches:
-        - ref: Evidence_bail_condition_document_primary_keywords
+        - type: any
+          refs:
+            - Regex_bail_condition_document_record_structure
+            - Evidence_bail_condition_document_corroborative_terms
         - type: any
           min_matches: 0
           max_matches: 0
@@ -120,22 +130,10 @@ purview:
       pattern: (?i)\bBail\s+Act\s+1980\b
     - id: Pattern_bail_condition_document_bail_section_reference
       pattern: (?i)\bs\.\s?(?:11|16|17|29)\s+Bail\s+Act\b
+    - id: Regex_bail_condition_document_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_bail_condition_document_primary_keywords
-      groups:
-        - match_style: word
-          terms:
-            - bail conditions
-            - bail undertaking
-            - bail order
-            - bail variation
-            - surety agreement
-            - surety amount
-            - reporting conditions
-            - curfew condition
-            - exclusion zone
-            - no-contact condition
-      strength: specific
     - id: Evidence_bail_condition_document_classification_markers
       groups:
         - match_style: word
@@ -191,8 +189,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Legal
 references: []
 created: '2026-03-06'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1499 without changing detector or package metadata.'

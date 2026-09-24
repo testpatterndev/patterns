@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Police Body Worn Camera Metadata
 slug: police-body-worn-camera-metadata
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -51,6 +51,9 @@ test_cases:
       description: BWC weekly metadata summary with officer activation counts and categories
     - value: 'QPS Digital Evidence — BWC Record. Footage catalogue entry for Operation FALCON evidence bundle. BWC activation record: Officer ID 22104 (Const. Chen), activation timestamp 2026-01-28T19:23:41+10:00, location GPS coordinates -27.4698, 153.0251 (West End). Incident link: QP-2026-0034521. Evidence category: Drug search — PPRA s.30. Chain of custody log: downloaded by Det. Sgt K. O''Brien, CIB South Brisbane, 29 January 2026.'
       description: BWC evidence catalogue entry with GPS coordinates and operation cross-reference
+    - value: "Body Worn Camera Activation\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Body Worn Camera Activation recorded against the subject; handling restricted."
+      description: Populated justice record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: 'QPS Policy: Body Worn Camera Guidelines (Version 3.1, July 2025). This policy outlines the requirements for activation, use, and management of body worn cameras by QPS officers. Officers must activate their BWC when attending any incident involving potential use of force.'
       description: Published QPS BWC policy document
@@ -58,6 +61,8 @@ test_cases:
       description: BWC procurement tender document
     - value: A policing journal article examined the impact of body worn cameras on use-of-force complaints, finding a 32% reduction in complaints after BWC deployment across three Queensland police districts.
       description: Academic journal article on BWC effectiveness study
+    - value: "Policy guidance: this procedure explains how records about Body Worn Camera Activation are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Published QPS BWC policy and operational guidelines
     mitigation: 'Negative keyword exclusion: ''policy'', ''guidelines'', ''version'', ''outlines requirements'', ''must activate'''
@@ -82,7 +87,9 @@ purview:
     - confidence_level: 85
       id_match: Pattern_police_body_worn_camera_metadata_bwc_metadata_terms
       matches:
-        - ref: Evidence_police_body_worn_camera_metadata_primary_keywords
+        - ref: Regex_police_body_worn_camera_metadata_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_police_body_worn_camera_metadata_classification_markers
         - ref: Evidence_police_body_worn_camera_metadata_corroborative_terms
         - ref: Pattern_police_body_worn_camera_metadata_bwc_unit_reference
@@ -96,7 +103,10 @@ purview:
     - confidence_level: 75
       id_match: Pattern_police_body_worn_camera_metadata_bwc_metadata_terms
       matches:
-        - ref: Evidence_police_body_worn_camera_metadata_primary_keywords
+        - type: any
+          refs:
+            - Regex_police_body_worn_camera_metadata_record_structure
+            - Evidence_police_body_worn_camera_metadata_corroborative_terms
         - type: any
           min_matches: 0
           max_matches: 0
@@ -120,22 +130,10 @@ purview:
       pattern: \bBWC-[A-Z]{2,4}-\d{3,5}\b
     - id: Pattern_police_body_worn_camera_metadata_activation_timestamp
       pattern: (?i)\b(?:activation|deactivation)\s+timestamp\b
+    - id: Regex_police_body_worn_camera_metadata_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_police_body_worn_camera_metadata_primary_keywords
-      groups:
-        - match_style: word
-          terms:
-            - body worn camera metadata
-            - body worn camera log
-            - body worn camera activation
-            - BWC activation log
-            - BWC footage reference
-            - BWC record
-            - activation timestamp
-            - deactivation timestamp
-            - footage catalogue
-            - footage reference index
-      strength: specific
     - id: Evidence_police_body_worn_camera_metadata_classification_markers
       groups:
         - match_style: word
@@ -195,8 +193,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Legal
 references: []
 created: '2026-03-06'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1502 without changing detector or package metadata.'

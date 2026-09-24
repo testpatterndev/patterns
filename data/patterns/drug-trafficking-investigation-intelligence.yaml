@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Drug Trafficking Investigation Intelligence
 slug: drug-trafficking-investigation-intelligence
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -49,6 +49,9 @@ test_cases:
       description: Drug investigation update with controlled delivery and buy-bust operation details
     - value: 'Drug importation investigation intelligence. Precursor chemical tracking: 500 litres pseudoephedrine-based product tracked from import to storage facility. Drug supply chain analysis indicates distribution network spanning Brisbane, Townsville, and Cairns. Clandestine laboratory investigation — suspect premises identified at rural property.'
       description: Multi-location drug importation investigation with precursor tracking
+    - value: "Drug Trafficking Investigation\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: Drug Trafficking Investigation recorded against the subject; handling restricted."
+      description: Populated justice record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: Queensland Health published its annual report on drug-related harm in the community. The report noted an increase in methylamphetamine-related hospital presentations and called for expanded treatment services.
       description: Public health report about drug-related harm statistics
@@ -56,6 +59,8 @@ test_cases:
       description: Television journalism about drug trafficking impact
     - value: A Griffith University research paper examined controlled delivery operations as a law enforcement strategy for combating drug importation. The study reviewed published case law and international best practice.
       description: Academic paper reviewing controlled delivery as a strategy
+    - value: "Policy guidance: this procedure explains how records about Drug Trafficking Investigation are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Public health reports and drug harm statistics
     mitigation: 'Negative keyword exclusion: ''public health'', ''hospital presentations'', ''treatment services'', ''harm reduction'', ''Queensland Health report'''
@@ -78,7 +83,9 @@ purview:
     - confidence_level: 85
       id_match: Pattern_drug_trafficking_investigation_intelligence_drug_investigation_terms
       matches:
-        - ref: Evidence_drug_trafficking_investigation_intelligence_primary_keywords
+        - ref: Regex_drug_trafficking_investigation_intelligence_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_drug_trafficking_investigation_intelligence_classification_markers
         - ref: Evidence_drug_trafficking_investigation_intelligence_corroborative_terms
         - ref: Pattern_drug_trafficking_investigation_intelligence_operation_name
@@ -91,7 +98,10 @@ purview:
     - confidence_level: 75
       id_match: Pattern_drug_trafficking_investigation_intelligence_drug_investigation_terms
       matches:
-        - ref: Evidence_drug_trafficking_investigation_intelligence_primary_keywords
+        - type: any
+          refs:
+            - Regex_drug_trafficking_investigation_intelligence_record_structure
+            - Evidence_drug_trafficking_investigation_intelligence_corroborative_terms
         - type: any
           min_matches: 0
           max_matches: 0
@@ -113,22 +123,10 @@ purview:
       pattern: (?i)\b(drug\s+trafficking\s+investigation|controlled\s+delivery|precursor\s+tracking|drug\s+supply\s+chain|clandestine\s+laboratory|drug\s+importation|border\s+interdiction)\b
     - id: Pattern_drug_trafficking_investigation_intelligence_operation_name
       pattern: (?i)\bOperation\s+[A-Z]{3,15}\b
+    - id: Regex_drug_trafficking_investigation_intelligence_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_drug_trafficking_investigation_intelligence_primary_keywords
-      groups:
-        - match_style: word
-          terms:
-            - drug trafficking investigation
-            - controlled delivery
-            - precursor tracking
-            - drug supply chain
-            - clandestine laboratory
-            - drug importation
-            - border interdiction
-            - controlled substance seizure
-            - buy-bust operation
-            - test purchase
-      strength: specific
     - id: Evidence_drug_trafficking_investigation_intelligence_classification_markers
       groups:
         - match_style: word
@@ -183,8 +181,11 @@ sensitivity_labels:
   qgiscf_dlm: SENSITIVE Legal
 references: []
 created: '2026-02-20'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1484 without changing detector or package metadata.'

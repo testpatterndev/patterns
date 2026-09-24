@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Witness Protection Program Record
 slug: witness-protection-program-record
-version: 1.4.1
+version: 1.5.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
@@ -54,6 +54,9 @@ test_cases:
       description: Threat assessment update for an active witness protection case
     - value: 'Memorandum to QPS Witness Protection Unit. Re: Application for inclusion in witness protection program. The witness provided evidence in Operation MERCURY resulting in the conviction of three members of the organised crime syndicate. Relocation plan prepared. New identity package includes Queensland drivers licence, Medicare card, and bank accounts.'
       description: Application memorandum for witness protection program inclusion
+    - value: "WITNESS PROTECTION\nName: Avery Teston\nDate of birth: 04/02/1991\nReference number: RX22914471\nNotes: WITNESS PROTECTION recorded against the subject; handling restricted."
+      description: Populated justice record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: The Queensland Government administers the Witness Protection Act 2000 which provides a framework for protecting witnesses who assist law enforcement. The Act is publicly available on the Queensland legislation website.
       description: General public description of the Witness Protection Act
@@ -61,6 +64,8 @@ test_cases:
       description: Movie description involving witness protection as a plot device
     - value: The Australian Institute of Criminology published a research paper examining the effectiveness of witness protection programs across Australian jurisdictions. The study used anonymised aggregate data.
       description: Academic research paper about witness protection using anonymised data
+    - value: "Policy guidance: this procedure explains how records about WITNESS PROTECTION are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: News reporting about witness protection programs in general terms
     mitigation: 'Negative keyword exclusion: ''media release'', ''news article'', ''reported'', ''published''. Require proximity to actual personal identifiers or case numbers.'
@@ -83,7 +88,9 @@ purview:
     - confidence_level: 85
       id_match: Pattern_witness_protection_program_record_witness_protection_terms
       matches:
-        - ref: Evidence_witness_protection_program_record_primary_keywords
+        - ref: Regex_witness_protection_program_record_record_structure
+          min_count: 2
+          unique_results: true
         - ref: Evidence_witness_protection_program_record_classification_markers
         - ref: Evidence_witness_protection_program_record_corroborative_terms
         - ref: Pattern_witness_protection_program_record_wp_case_reference
@@ -96,7 +103,10 @@ purview:
     - confidence_level: 75
       id_match: Pattern_witness_protection_program_record_witness_protection_terms
       matches:
-        - ref: Evidence_witness_protection_program_record_primary_keywords
+        - type: any
+          refs:
+            - Regex_witness_protection_program_record_record_structure
+            - Evidence_witness_protection_program_record_corroborative_terms
         - type: any
           min_matches: 0
           max_matches: 0
@@ -118,22 +128,10 @@ purview:
       pattern: (?i)\b(witness\s+protection|protected\s+witness|relocation\s+plan|safe\s+house|new\s+identity|Witness\s+Protection\s+Act)\b
     - id: Pattern_witness_protection_program_record_wp_case_reference
       pattern: \bWP-\d{4}-\d{3,5}\b
+    - id: Regex_witness_protection_program_record_record_structure
+      pattern: >-
+        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_witness_protection_program_record_primary_keywords
-      groups:
-        - match_style: word
-          terms:
-            - witness protection
-            - protected witness
-            - relocation plan
-            - safe house
-            - new identity
-            - Witness Protection Act
-            - protection order
-            - protected person
-            - witness relocation
-            - identity package
-      strength: specific
     - id: Evidence_witness_protection_program_record_classification_markers
       groups:
         - match_style: word
@@ -154,7 +152,6 @@ purview:
             - birth certificate
             - threat assessment
             - interstate transfer
-            - safe house location
       strength: specific
     - id: Filter_witness_protection_program_record_exclusion
       groups:
@@ -188,8 +185,11 @@ sensitivity_labels:
   qgiscf_dlm: PROTECTED Law-Enforcement
 references: []
 created: '2026-02-20'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires either independent justice record structure (Regex ..._record_structure) or one of the hand-authored corroborative terms (none of which the primary matches); 85 requires 2 distinct structure hits plus the existing hand-authored evidence. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
   - version: 1.4.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1474 without changing detector or package metadata.'
