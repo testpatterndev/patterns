@@ -1,26 +1,32 @@
 schema: testpattern/v1
-name: SCADA/ICS System Documentation
+name: SCADA/ICS System Documentation and Network Diagrams
 slug: global-scada-ics-documentation
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies substantive SCADA and industrial-control-system documentation. Topic phrases are retained
-  for discovery; enforcement requires point, tag, I/O, alarm, HMI, RTU, protocol-map, polling, or
-  control-logic configuration content, and high confidence also requires a populated asset, node,
-  address, register, outstation, or site detail.
+  Identifies substantive SCADA and industrial-control-system documentation, including SCADA/ICS/OT
+  network diagrams and topologies. Topic phrases are retained for discovery; enforcement requires
+  point, tag, I/O, alarm, HMI, RTU, protocol-map, polling, or control-logic configuration content, or
+  OT network-diagram structure (IP schema / addressing tables, PLC/RTU lists, Purdue levels, zones and
+  conduits, control zones, trust boundaries, field networks), and high confidence also requires a
+  populated asset, node, address, subnet, VLAN, register, or outstation detail.
 operation: >-
   Regex_scada_ics_documentation recognises SCADA/ICS system, configuration, network, and architecture
-  documentation topics. The topic alone is discovery-only at 65. Concrete point/tag/I/O/alarm/HMI/RTU
-  or protocol configuration content raises it to 75; populated asset, address, register, outstation, or
-  node details reach 85. Enforcing tiers reject explicit templates and training examples.
+  documentation topics and SCADA/ICS/OT/control-system network diagram and topology topics. The topic
+  alone is discovery-only at 65. Concrete configuration content (Evidence_scada_configuration_content)
+  or OT network-diagram structure (Evidence_ot_network_structure) raises it to 75; either of those plus
+  a populated PLC/RTU/HMI/DCS node, IPv4 address or subnet, VLAN number, Modbus register, or DNP3
+  outstation (Evidence_scada_live_detail) reaches 85. Enforcing tiers reject explicit templates and
+  training examples.
 pattern: >-
-  (?is)\b(?:SCADA\s+(?:system|configuration|network|architecture)\s+documentation|ICS\s+(?:system|configuration|network|architecture)\s+documentation|industrial\s+control\s+system\s+(?:documentation|configuration\s+manual)|SCADA/ICS\s+(?:documentation|architecture))\b
+  (?is)\b(?:SCADA\s+(?:system|configuration|network|architecture)\s+documentation|ICS\s+(?:system|configuration|network|architecture)\s+documentation|industrial\s+control\s+system\s+(?:documentation|configuration\s+manual)|SCADA/ICS\s+(?:documentation|architecture)|(?:SCADA|ICS|OT)\s+network\s+(?:diagram|topology)|(?:industrial\s+control|control\s+system)\s+network\s+diagram)\b
 confidence: medium
 confidence_justification: >-
-  Medium confidence requires substantive control-system configuration content. High confidence adds a
-  deployable asset, node, address, protocol register, outstation, or site value.
+  Medium confidence requires substantive control-system configuration content or OT network-diagram
+  structure. High confidence adds a deployable asset, node, address, subnet, VLAN, protocol register,
+  or outstation value.
 jurisdictions:
   - global
 regulations:
@@ -41,6 +47,20 @@ test_cases:
       description: Medium-tier probe - substantive configuration content without populated live values
     - value: 'SCADA system documentation for production RTU node RTU-07 at 10.24.8.15: protocol register map contains Modbus register 40017, and the tag database maps PUMP_RUN to HMI node HMI-02'
       description: High-tier probe - configuration content with populated asset, address, register, tag, and node details
+    - value: OT network topology
+      description: Low-tier probe - network-diagram topic without diagram structure (merged from global-top500-441-scada-network-diagrams)
+    - value: 'ICS network diagram (rev C): zones and conduits between the Purdue level 3 operations zone and the level 1 field network; DMZ trust boundary at the historian'
+      description: Medium-tier probe - OT diagram structure (zones and conduits, Purdue levels, trust boundary) without populated addresses
+    - value: |-
+        SCADA network diagram - North Plant water treatment, rev 7
+        Purdue level 2 supervisory zone / level 1 control zone, zones and conduits per site standard
+        IP addressing table:
+        VLAN 120  OT-CONTROL   10.24.8.0/24
+        VLAN 130  OT-FIELD     10.24.9.0/24
+        PLC list: PLC-11 10.24.9.21 (filter gallery), PLC-12 10.24.9.22 (clear water pumps)
+        RTU list: RTU-07 10.24.9.40 (reservoir outstation, DNP3 outstation 7)
+        Conduit C-04: HMI-02 10.24.8.10 to PLC-11 via firewall FW-OT-01
+      description: High-tier probe - populated OT network diagram (Purdue zones, IP addressing table, VLANs, PLC/RTU lists, conduit) (merged from global-top500-441-scada-network-diagrams)
   should_not_match:
     - value: Remote control for the television
       description: Non-match 1
@@ -50,11 +70,19 @@ test_cases:
       description: Product overview without a configuration record
     - value: 'Training example: SCADA system documentation for RTU-07 at 10.24.8.15, Modbus register 40017'
       description: Explicit training content must not enforce
+    - value: 'Training example: SCADA network diagram with Purdue level 2 zone, VLAN 120, HMI-02 at 10.24.8.10, and RTU-07'
+      description: Explicit training diagram with otherwise high-tier structure must not enforce (carried from global-top500-441-scada-network-diagrams)
+    - value: 'Records policy: SCADA network diagrams and the OT network topology register are retained for seven years and reviewed by the asset owner annually.'
+      description: Policy text naming the diagram topic without diagram structure stays discovery-only
+    - value: 'News: the utility said its OT network topology was not affected by the ransomware incident at its corporate office.'
+      description: News report mentioning the topic without structure stays discovery-only
 false_positives:
   - description: Vendor manuals, standards, and engineering courses discuss SCADA, PLCs, HMIs, RTUs, and OT protocols without exposing a live system configuration.
     mitigation: Keep document topics discovery-only and require point, tag, I/O, alarm, HMI, RTU, polling, protocol-map, or control-logic content for enforcement.
   - description: Training labs can include realistic asset IDs, IP addresses, register numbers, tags, and node names.
     mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
+  - description: Vendor reference architectures, IEC 62443 and Purdue-model courseware, and OT security standards describe zones and conduits, Purdue levels, DMZs, and remote sites without exposing a live topology.
+    mitigation: Diagram structure alone reaches 75 only alongside a SCADA/ICS/OT network-diagram topic; 85 additionally requires a populated node, address, subnet, VLAN, register, or outstation value, and template/training framing is excluded.
 exports:
   - yaml
 scope: narrow
@@ -80,7 +108,11 @@ purview:
     - confidence_level: 85
       id_match: Regex_scada_ics_documentation
       matches:
-        - ref: Evidence_scada_configuration_content
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_scada_configuration_content
+            - Evidence_ot_network_structure
         - ref: Evidence_scada_live_detail
         - type: any
           min_matches: 0
@@ -90,7 +122,11 @@ purview:
     - confidence_level: 75
       id_match: Regex_scada_ics_documentation
       matches:
-        - ref: Evidence_scada_configuration_content
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_scada_configuration_content
+            - Evidence_ot_network_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -102,10 +138,10 @@ purview:
   regexes:
     - id: Regex_scada_ics_documentation
       pattern: >-
-        (?is)\b(?:SCADA\s+(?:system|configuration|network|architecture)\s+documentation|ICS\s+(?:system|configuration|network|architecture)\s+documentation|industrial\s+control\s+system\s+(?:documentation|configuration\s+manual)|SCADA/ICS\s+(?:documentation|architecture))\b
+        (?is)\b(?:SCADA\s+(?:system|configuration|network|architecture)\s+documentation|ICS\s+(?:system|configuration|network|architecture)\s+documentation|industrial\s+control\s+system\s+(?:documentation|configuration\s+manual)|SCADA/ICS\s+(?:documentation|architecture)|(?:SCADA|ICS|OT)\s+network\s+(?:diagram|topology)|(?:industrial\s+control|control\s+system)\s+network\s+diagram)\b
     - id: Evidence_scada_live_detail
       pattern: >-
-        (?i)\b(?:(?:PLC|RTU|HMI|DCS)\s*(?:ID|node|station)?\s*[:#-]\s*[A-Z0-9][A-Z0-9._-]{2,}|(?:Modbus\s+register|DNP3\s+outstation)\s*[:#]?\s*\d+|(?:\d{1,3}\.){3}\d{1,3})\b
+        (?i)\b(?:(?:PLC|RTU|HMI|DCS)\s{0,3}(?:ID|node|station)?\s{0,3}[:#-]\s{0,3}[A-Z0-9][A-Z0-9._-]{1,30}|(?:PLC|RTU|HMI|DCS)\s{1,3}(?:node|ID|station)\s{1,3}[A-Z0-9][A-Z0-9._-]{1,30}|(?:Modbus\s{1,3}register|DNP3\s{1,3}outstation)\s{0,3}[:#]?\s{0,3}\d{1,6}|VLAN\s{0,3}(?:ID\s{0,3})?[:#]?\s{0,3}\d{1,4}|(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?)\b
   keywords:
     - id: Evidence_scada_configuration_content
       groups:
@@ -123,9 +159,41 @@ purview:
             - interlock
             - historian mapping
       strength: domain
+    - id: Evidence_ot_network_structure
+      groups:
+        - match_style: word
+          terms:
+            - IP schema
+            - IP addressing table
+            - IP address table
+            - IP address schedule
+            - addressing table
+            - subnet table
+            - PLC list
+            - RTU list
+            - field device list
+            - Purdue level
+            - Purdue model
+            - zones and conduits
+            - security zone
+            - control zone
+            - firewall zone
+            - trust boundary
+            - text: DMZ
+              case_sensitive: true
+            - remote site
+            - communications path
+            - field network
+            - process data flow
+            - control centre
+            - control center
+      strength: domain
 created: '2026-02-09'
-updated: '2026-07-04'
+updated: '2026-09-24'
 changelog:
+  - version: 1.5.0
+    date: '2026-09-24'
+    description: 'Merge global-top500-441-scada-network-diagrams into this classifier (Qld government classifier review 2026-09-24): SCADA/ICS/OT/industrial-control/control-system network diagram and topology phrases added to the primary (discovery at 65); new Evidence_ot_network_structure group (IP schema / addressing tables, PLC/RTU lists, Purdue levels, zones and conduits, control/firewall/security zones, trust boundaries, DMZ, remote sites, communications paths, field networks, process data flow, control centres) accepted alongside configuration content at 75 and 85; Evidence_scada_live_detail extended with VLAN numbers, CIDR subnets and space-separated HMI/RTU/PLC/DCS node IDs, and its inner repeats bounded. Populated OT network-diagram positive and training/policy/news diagram decoys added. Risk 10 / PROTECTED unchanged (absorbed pattern was risk 9 PROTECTED).'
   - version: 1.4.0
     date: '2026-07-04'
     description: 'CI profile hardening: convert the broad keyword-list detector to a regex-backed concept; require point, tag, I/O, alarm, HMI, RTU, protocol-map, polling, or logic configuration at 75 and populated asset, address, register, outstation, or node detail at 85.'
@@ -164,6 +232,13 @@ keywords:
   - DNP3
   - OPC UA
   - IEC 61850
+  - SCADA network diagram
+  - OT network topology
+  - Purdue model
+  - zones and conduits
+references:
+  - https://www.legislation.gov.au/C2018A00029/latest/text
+  - https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/ism
 remediation:
   catalog_quality_2026_06_02:
     status: applied

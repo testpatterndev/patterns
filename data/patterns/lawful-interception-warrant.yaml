@@ -1,13 +1,13 @@
 schema: testpattern/v1
-name: Lawful Interception Warrant
+name: Lawful Interception Warrant and Intercept Product
 slug: lawful-interception-warrant
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
-description: Detects documents containing telecommunications interception warrants and stored communications warrants issued under the Telecommunications (Interception and Access) Act 1979 (Cth). Disclosure of the existence of an interception warrant is a criminal offence under s.63 of the TIA Act and alerts targets to switch to unmonitored channels.
-operation: 'Regex for TIA Act warrant reference numbers combined with keyword proximity: primary keywords (telecommunications interception, TI warrant, TIA Act, interception warrant, stored communications warrant, B-party warrant) within 300 characters of target identifiers (phone numbers, IMEI, email). Document markers referencing s.6 secrecy provisions.'
-pattern: (?i)\b(telecommunications\s+interception|TI\s+warrant|TIA\s+Act|interception\s+warrant|stored\s+communications\s+warrant|preservation\s+notice|B-party\s+warrant|lawful\s+interception)\b
+description: Detects telecommunications interception warrants, stored communications warrants and the intercept product they produce (call transcripts, line / session logs, intercepted communications) under the Telecommunications (Interception and Access) Act 1979 (Cth). Disclosure of the existence of an interception warrant or of interception product is a criminal offence under the TIA Act and alerts targets to switch to unmonitored channels. Absorbs the former lawful-intercept-transcripts classifier.
+operation: 'Two detector families within 300 characters. (1) TIA warrant reference primary: 65 alone (discovery); 75 with an interception keyword; 85 with an interception keyword plus target / intercept record fields, IMEI, warrant-process terms or secrecy markers. (2) Interception phrase primary (telecommunications / lawful interception, TIA Act, interception / stored communications / B-party warrant, interception product, intercept(ed) call transcript, intercepted communications, telephone / line intercept): 65 phrase only (discovery); 75 plus one populated intercept record field (warrant number, target service / line / number, intercepted line, line / session / call / product number, A- or B-party, IMSI, MSISDN), a TIA / SCW warrant reference or an IMEI; 85 plus two distinct record fields, or two different independent evidence types (record fields, warrant references, IMEI, warrant-process terms such as eligible judge / issuing authority / carrier). Negative keyword exclusion for parliamentary, academic and media contexts.'
+pattern: (?i)\b(?:telecommunications\s+interception|TI\s+warrant|TIA\s+Act|interception\s+warrant|stored\s+communications\s+warrant|preservation\s+notice|B-party\s+warrant|lawful\s+interception|interception\s+product|intercept(?:ed)?\s+(?:call\s+)?transcripts?|intercepted\s+(?:communications?|calls?)|(?:telephone|line)\s+intercepts?)\b
 confidence: medium
 confidence_justification: 'Medium confidence: the combination of TIA Act-specific terminology with warrant reference numbers and target identifiers is highly distinctive. These terms rarely appear together outside genuine interception warrant documents. The s.63 secrecy provisions referenced in these documents are unique identifiers.'
 jurisdictions:
@@ -53,6 +53,15 @@ test_cases:
       description: Stored communications warrant application with legislative references
     - value: B-party warrant application. The subject of the interception warrant TIA/2025/QPS/00298 has been communicating with an unidentified B-party using prepaid SIM. Application for B-party warrant to identify the associate. TIA Act secrecy provisions noted — disclosure of this warrant is a criminal offence.
       description: B-party warrant application referencing existing interception warrant
+    - value: "PROTECTED Law-Enforcement\nTelecommunications interception product - call transcript\nWarrant number: 2026/0417\nTarget service: +61 412 555 019\nSession number: 88213\nB-party number: 07 3555 0192\nDate/time: 12/03/2026 21:14\nMALE 1: The car's at the usual spot, bring the rest Thursday.\nMALE 2: Yeah, same as last time."
+      description: Intercept call transcript with warrant number, target service, session and B-party fields (85, absorbed intercept-transcript scope)
+      synthetic: true
+    - value: "Lawful interception - line activity summary for week 11.\nLine ID: L4471\nIMSI: 505013456789012\nIntercepted communications: 14 SMS, 3 voice calls, 1 data session."
+      description: Lawful interception line log with line ID and IMSI (85)
+      synthetic: true
+    - value: "Intercepted call transcript attached for the brief. Warrant number: 2026/0417. Handle in accordance with the secure product register."
+      description: Intercept transcript cover note with one labelled warrant number (75)
+      synthetic: true
   should_not_match:
     - value: The Parliamentary Joint Committee on Intelligence and Security tabled its annual review of the Telecommunications (Interception and Access) Act 1979. The report noted that 3,247 interception warrants were issued nationally during the reporting period.
       description: Parliamentary committee report with aggregate warrant statistics
@@ -60,6 +69,10 @@ test_cases:
       description: Legal textbook explaining TIA Act framework
     - value: ABC News reported that federal police obtained telecommunications interception warrants as part of a drug trafficking investigation. Three men were arrested following the 18-month investigation.
       description: News article about a concluded investigation mentioning warrants
+    - value: Our 5G core supports lawful interception interfaces, so carriers can deliver interception product to agencies in real time with full audit logging.
+      description: Telecommunications vendor product copy about lawful interception capability (discovery only)
+    - value: "Procedure: interception product must be stored in the secure repository and every access logged. Transcripts of intercepted communications may only be communicated as permitted by the TIA Act."
+      description: Agency procedure about handling intercept product without any warrant or target record (discovery only)
 false_positives:
   - description: Parliamentary reports and reviews discussing TIA Act warrant statistics in aggregate
     mitigation: 'Negative keyword exclusion: ''parliamentary'', ''annual review'', ''reporting period'', ''tabled'', ''committee''. Require proximity to specific target identifiers.'
@@ -67,6 +80,8 @@ false_positives:
     mitigation: 'Negative keyword exclusion: ''textbook'', ''academic'', ''university'', ''chapter'', ''legal framework'', ''explains'''
   - description: News articles reporting on completed investigations that involved warrants
     mitigation: 'Negative keyword exclusion: ''media release'', ''news'', ''reported'', ''arrested'', ''convicted'', ''sentenced'', ''court heard'''
+  - description: Carrier / vendor material describing lawful interception capability, and agency procedures for handling interception product
+    mitigation: Phrase-only matches stay at the 65 discovery tier; enforce tiers need a populated intercept record field, warrant reference or IMEI.
 exports:
   - purview_xml
   - yaml
@@ -83,11 +98,66 @@ purview:
       id_match: Pattern_lawful_interception_warrant_tia_warrant_reference
       matches:
         - ref: Evidence_lawful_interception_warrant_primary_keywords
-        - ref: Evidence_lawful_interception_warrant_classification_markers
-        - ref: Evidence_lawful_interception_warrant_corroborative_terms
-        - ref: Pattern_lawful_interception_warrant_scw_reference
-        - ref: Pattern_lawful_interception_warrant_interception_terms
-        - ref: Pattern_lawful_interception_warrant_imei_pattern
+        - type: any
+          refs:
+            - Regex_lawful_interception_warrant_intercept_record_fields
+            - Evidence_lawful_interception_warrant_corroborative_terms
+            - Evidence_lawful_interception_warrant_classification_markers
+            - Pattern_lawful_interception_warrant_imei_pattern
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_lawful_interception_warrant_exclusion
+    - confidence_level: 85
+      id_match: Pattern_lawful_interception_warrant_interception_terms
+      matches:
+        - ref: Regex_lawful_interception_warrant_intercept_record_fields
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_lawful_interception_warrant_exclusion
+    - confidence_level: 85
+      id_match: Pattern_lawful_interception_warrant_interception_terms
+      matches:
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_lawful_interception_warrant_intercept_record_fields
+            - Pattern_lawful_interception_warrant_tia_warrant_reference
+            - Pattern_lawful_interception_warrant_scw_reference
+            - Pattern_lawful_interception_warrant_imei_pattern
+            - Evidence_lawful_interception_warrant_corroborative_terms
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_lawful_interception_warrant_exclusion
+    - confidence_level: 75
+      id_match: Pattern_lawful_interception_warrant_interception_terms
+      matches:
+        - type: any
+          refs:
+            - Regex_lawful_interception_warrant_intercept_record_fields
+            - Pattern_lawful_interception_warrant_tia_warrant_reference
+            - Pattern_lawful_interception_warrant_scw_reference
+            - Pattern_lawful_interception_warrant_imei_pattern
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_lawful_interception_warrant_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_lawful_interception_warrant_interception_terms
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -120,9 +190,12 @@ purview:
     - id: Pattern_lawful_interception_warrant_scw_reference
       pattern: \bSCW-\d{4}-\d{3,5}\b
     - id: Pattern_lawful_interception_warrant_interception_terms
-      pattern: (?i)\b(telecommunications\s+interception|TI\s+warrant|TIA\s+Act|interception\s+warrant|stored\s+communications\s+warrant|preservation\s+notice|B-party\s+warrant)\b
+      pattern: (?i)\b(?:telecommunications\s+interception|TI\s+warrant|TIA\s+Act|interception\s+warrant|stored\s+communications\s+warrant|preservation\s+notice|B-party\s+warrant|lawful\s+interception|interception\s+product|intercept(?:ed)?\s+(?:call\s+)?transcripts?|intercepted\s+(?:communications?|calls?)|(?:telephone|line)\s+intercepts?)\b
     - id: Pattern_lawful_interception_warrant_imei_pattern
       pattern: \bIMEI\s*:?\s*\d{14,15}\b
+    - id: Regex_lawful_interception_warrant_intercept_record_fields
+      pattern: >-
+        (?i)\b(?:warrant\s*(?:no\.?|number|ref(?:erence)?|ID)|target\s+(?:service|line|number|phone|handset|identifier|ID)|(?:intercepted|monitored)\s+(?:service|line|number)|(?:line|session|call|product)\s*(?:no\.?|number|ID|ref(?:erence)?)|[AB]-party(?:\s+(?:no\.?|number))?|IMSI|MSISDN)\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9+][A-Za-z0-9/.+-]{1,30}
   keywords:
     - id: Evidence_lawful_interception_warrant_primary_keywords
       groups:
@@ -156,11 +229,7 @@ purview:
             - interception agency
             - secrecy provision
             - section 63
-            - IMEI
-            - target service
-            - mobile number
             - carrier
-            - interception product
             - warrant period
       strength: specific
     - id: Filter_lawful_interception_warrant_exclusion
@@ -193,8 +262,11 @@ sensitivity_labels:
   qgiscf_dlm: PROTECTED Law-Enforcement
 references: []
 created: '2026-02-20'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'Merge global-top500-407-lawful-intercept-transcripts into this classifier (Qld government classifier review 2026-09-24): renamed to "Lawful Interception Warrant and Intercept Product". Interception-phrase regex gains lawful interception, interception product, intercept(ed) (call) transcript, intercepted communications / calls and telephone / line intercept, and becomes a second primary family (65 phrase / 75 plus one populated intercept record field, TIA / SCW reference or IMEI / 85 plus two record fields or two independent evidence types). New Regex_..._intercept_record_fields recognises populated warrant number, target service / line / number, intercepted line, line / session / call / product number, A- / B-party, IMSI and MSISDN fields. TIA-reference 85 tier simplified (it required every evidence type at once, including both TIA and SCW references, and no test reached it) to interception keyword plus one of record fields, warrant-process terms, secrecy markers or IMEI. Corroborative terms that duplicate record fields or primary phrases (IMEI, target service, mobile number, interception product) removed from that list to avoid same-span double counting. Not imported: phone tap, wiretap, wire intercept, electronic surveillance, surveillance transcript and intercept order (US / news vocabulary, and surveillance-device material is a different regime) and the absorbed self-corroborating label/domain tiers. Added intercept transcript and line-log positives (85), a 75 cover note, and vendor-copy and procedure decoys. Risk unchanged at 10.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1476 without changing detector or package metadata.'

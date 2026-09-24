@@ -1,21 +1,24 @@
 schema: testpattern/v1
-name: Cabinet Submission
+name: Cabinet Submission and Cabinet Briefing
 slug: global-cabinet-submission
-version: 1.5.1
+version: 1.6.0
 type: regex
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies substantive Australian federal and state Cabinet submissions, memoranda, and approval
-  papers. Topic phrases are retained for discovery; enforcement requires purpose, recommendation,
-  financial, consultation, implementation, risk, regulatory, or decision-sought sections, and high
-  confidence also requires a formal Cabinet marking, minute, decision, or submission identifier.
+  Identifies substantive Australian federal and state Cabinet submissions, memoranda, approval
+  papers, and Cabinet briefs, briefing notes and briefing books. Topic phrases are retained for
+  discovery; enforcement requires purpose, recommendation, financial, consultation, implementation,
+  risk, regulatory, key-issues, talking-points or decision-sought sections, and high confidence also
+  requires a formal Cabinet marking, minute, decision, or submission identifier. Absorbed
+  global-top500-492-cabinet-briefing-books (2026-09-24).
 operation: >-
-  Regex_cabinet recognises Cabinet submission, memorandum, decision, and approval topics. The topic
-  alone is discovery-only at 65. Substantive submission sections raise it to 75; those sections plus a
-  Cabinet-in-Confidence marking or formal submission/minute/decision identifier reach 85. Enforcing
-  tiers reject explicit templates and training examples.
-pattern: (?is)\b(?:cabinet\s+(?:submission|memorandum|decision|approval)|for\s+cabinet\s+(?:consideration|approval))\b
+  Regex_cabinet recognises Cabinet submission, memorandum, decision, approval, brief and briefing
+  (note/paper/book) topics. The topic alone is discovery-only at 65. Substantive submission or brief
+  sections raise it to 75; those sections plus a Cabinet-in-Confidence marking or formal
+  submission/minute/decision identifier reach 85. Enforcing tiers reject explicit templates and
+  training examples.
+pattern: (?is)\b(?:cabinet\s+(?:submission|memorandum|decision|approval|brief|briefing(?:\s+(?:book|note|paper))?)|for\s+cabinet\s+(?:consideration|approval))\b
 confidence: medium
 confidence_justification: >-
   Medium confidence requires substantive submission content rather than a title. High confidence adds
@@ -33,12 +36,40 @@ data_categories:
   - cabinet
 test_cases:
   should_match:
-    - value: Cabinet submission
-      description: Low-tier probe - Cabinet topic without submission content
-    - value: 'Cabinet submission: purpose, recommendations, financial implications, consultation, implementation plan, risks, and decision sought'
-      description: Medium-tier probe - substantive submission sections without formal marking or identifier
-    - value: 'Cabinet-in-Confidence Cabinet submission number: CAB-2026-104: purpose, recommendations, financial implications, consultation, risks, implementation plan, and decision sought'
-      description: High-tier probe - substantive submission with Cabinet marking and formal identifier
+    - value: |-
+        CABINET-IN-CONFIDENCE
+        Cabinet Submission CAB-2026-0417
+        Title: Regional water security investment program
+        Portfolio: Regional Development and Water
+        Purpose: To seek Cabinet approval for a $1.2 billion, ten-year regional water security program.
+        Recommendations: That Cabinet approve stage 1 funding of $310 million and note the proposed pipeline route.
+        Financial implications: Stage 1 is unfunded and requires a Treasury provision in the 2027-28 Budget.
+        Consultation: Queensland Treasury and the Department of Environment have been consulted.
+      description: Populated Cabinet submission with marking and submission identifier (85)
+      synthetic: true
+    - value: |-
+        CABINET-IN-CONFIDENCE
+        Cabinet briefing book - Cabinet meeting 14 September 2026
+        Item 3: Cabinet submission CAB-2026-0452, youth justice reforms
+        Key issues: Police support the bail amendments; the Human Rights Commission has raised compatibility concerns.
+        Recommendations: The Minister supports the submission subject to a 12-month review clause.
+        Talking points: The package delivers on the election commitment and is fully funded from existing resources.
+      description: Populated Cabinet briefing book carried over from the absorbed briefing-books scope (85)
+      synthetic: true
+    - value: |-
+        Cabinet briefing note for the Minister
+        Purpose: To brief the Minister ahead of Monday's Cabinet meeting on the hospital car parking concession.
+        Key issues: The operator seeks a five-year extension in return for capital works.
+        Financial implications: Forgone concession revenue of about $14M over four years.
+      description: Populated Cabinet briefing note without a formal marking or identifier (75)
+      synthetic: true
+    - value: |-
+        For Cabinet consideration
+        Purpose: To seek agreement to release the draft Housing Strategy for public consultation.
+        Decision sought: Cabinet agree to release the draft strategy on 1 October 2026.
+        Risk assessment: Delay beyond October would compress the statutory consultation period.
+      description: Populated Cabinet paper with decision-sought section but no marking (75)
+      synthetic: true
   should_not_match:
     - value: Kitchen cabinet installation guide
       description: Non-match 1
@@ -48,11 +79,17 @@ test_cases:
       description: Public process guidance without a submission record
     - value: 'Training example: Cabinet-in-Confidence Cabinet submission CAB-2026-104 with recommendations and decision sought'
       description: Explicit training content must not enforce
+    - value: The Premier confirmed Cabinet approval of the Olympic venues plan at a press conference on Tuesday, saying construction would begin next year.
+      description: News report of a Cabinet decision without submission content (discovery only)
+    - value: Under the Cabinet Handbook, departments prepare a Cabinet briefing note for their Minister before each meeting and lodge it through the Cabinet Services portal.
+      description: Public handbook-style description of Cabinet briefing notes (discovery only)
 false_positives:
   - description: Public process guidance, historical commentary, and generic policy material discuss Cabinet submissions, recommendations, and decisions without containing a live submission.
     mitigation: Keep Cabinet topics discovery-only and require substantive purpose, recommendation, financial, consultation, implementation, risk, regulatory, or decision-sought content.
   - description: Training submissions can contain realistic Cabinet markings, numbers, sections, recommendations, and decisions sought.
     mitigation: Reject explicit template, demo, tutorial, sample-data, and training-example framing from enforcing tiers.
+  - description: Cabinet Handbook text, agency process pages and news reports mention Cabinet briefs, briefing notes and briefing books without containing one.
+    mitigation: Briefing topics are discovery-only; enforcement needs populated purpose, key-issues, recommendation, talking-points, financial or decision-sought sections. Generic ministerial briefs, Prime Minister, Executive Council and Cabinet committee references are deliberately not primaries.
 exports:
   - yaml
 scope: narrow
@@ -99,7 +136,7 @@ purview:
       id_match: Regex_cabinet
   regexes:
     - id: Regex_cabinet
-      pattern: (?i)\b(?:cabinet\s+(?:submission|memorandum|decision|approval)|for\s+cabinet\s+(?:consideration|approval))\b
+      pattern: (?i)\b(?:cabinet\s+(?:submission|memorandum|decision|approval|brief|briefing(?:\s+(?:book|note|paper))?)|for\s+cabinet\s+(?:consideration|approval))\b
     - id: Evidence_cabinet_formal_record
       pattern: >-
         (?i)\b(?:Cabinet-in-Confidence|Cabinet\s+(?:submission|minute|decision)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#-]\s*[A-Z0-9][A-Z0-9/-]{3,}|CAB(?:INET)?[-/][A-Z0-9][A-Z0-9/-]{3,}|Cabinet\s+minute\s+(?:no\.?\s*)?\d+)\b
@@ -118,10 +155,15 @@ purview:
             - regulatory impact
             - human rights implications
             - stakeholder impacts
+            - key issues
+            - talking points
       strength: domain
 created: '2026-02-09'
-updated: '2026-09-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.6.0
+    date: '2026-09-24'
+    description: 'Merge global-top500-492-cabinet-briefing-books into this classifier (Qld government classifier review 2026-09-24): Regex_cabinet (and the top-level pattern) now also recognise Cabinet brief and Cabinet briefing / briefing note / briefing paper / briefing book; key issues and talking points added to the substantive-content evidence group so populated Cabinet briefs reach 75, and 85 with the existing Cabinet-in-Confidence / formal identifier evidence. Not imported: ministerial brief (not a Cabinet record), Prime Minister, executive council, cabinet committee, cabinet handbook and PMC (public or generic references), cabinet minute as a primary (it already anchors Evidence_cabinet_formal_record and would self-corroborate), and the absorbed self-corroborating keyword tiers. Replaced the bare-phrase probe positives with populated submission, briefing book, briefing note and Cabinet paper records, and added news and handbook-style decoys. Name/description/operation updated for the merged scope; risk 10 PROTECTED Cabinet-in-Confidence unchanged (absorbed pattern was risk 9 PROTECTED).'
   - version: 1.5.1
     date: '2026-09-14'
     description: 'Assign QGISCF category to PROTECTED Cabinet-in-Confidence; preserve classification tier and detection logic.'
@@ -154,6 +196,9 @@ keywords:
   - for Cabinet consideration
   - for Cabinet approval
   - National Cabinet
+  - Cabinet brief
+  - Cabinet briefing note
+  - Cabinet briefing book
 remediation:
   catalog_quality_2026_06_02:
     status: applied

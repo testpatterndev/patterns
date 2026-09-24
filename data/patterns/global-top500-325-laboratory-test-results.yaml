@@ -1,19 +1,27 @@
 schema: testpattern/v1
-name: Laboratory test results
+name: Pathology and laboratory results
 slug: global-top500-325-laboratory-test-results
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Identifies laboratory test results references in healthcare and patient records. Protected health information
-  under applicable data protection regulations.
-operation: 'Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific
-  content. Corroborative evidence: 7 keywords within 300 characters. Keyword lists: au-healthcare-records. Uses additional
-  domain-context evidence and explicit exclusion logic for template/sample/test text.'
-pattern: (?is)\b(?:laboratory\s+test|lab\s+results|test\s+results|blood\s+test|pathology\s+results|reference\s+range|laboratory\s+report|clinical\s+chemistry)\b
+description: Identifies patient pathology and laboratory result records - blood test and clinical chemistry results, laboratory
+  reports, and histopathology, cytology or biopsy reports - by combining a pathology/laboratory report phrase with populated
+  record structure (labelled patient identifiers, specimen fields, result lines with units and a reference range or H/L flag,
+  and a reporting pathologist). Protected health information under applicable data protection regulations. The slug predates
+  the merge of the former pathology reports classifier and is kept for stability.
+operation: 'Pattern type: regex (boost_regex engine). Primary: laboratory/pathology report phrases (laboratory test, lab results,
+  blood test, pathology report/results, histopathology, cytology report, biopsy report, surgical pathology, microscopic or
+  gross description, reference range, clinical chemistry). 65 (discovery only): phrase alone. 75: phrase plus one independent
+  labelled field - patient identifier (name, DOB, URN / UR number / MRN, Medicare, IHI, referring doctor), specimen field
+  (specimen type, collected / received date, lab / accession / specimen number) or reporting pathologist. 85: phrase plus two
+  distinct structure types from patient identifiers, specimen fields, result lines (test value with units followed by a reference
+  range or H/L flag) and reporting pathologist. Template/sample framing excluded on every tier.'
+pattern: (?is)\b(?:laboratory\s+(?:tests?|reports?|results?)|lab\s+results|test\s+results|blood\s+tests?|pathology\s+(?:results?|reports?)|reference\s+range|clinical\s+chemistry|histopathology(?:\s+reports?)?|cytology\s+reports?|biopsy\s+reports?|surgical\s+pathology|microscopic\s+(?:examination|description)|gross\s+description|tissue\s+sample)\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection.
-  Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: Enforce tiers require populated record structure (labelled patient, specimen, result or pathologist
+  fields) independent of the report phrase; phrase-only hits stay discovery-only at 65. Health education, service brochures,
+  price lists and research methods text can still carry the phrases, so confidence stays medium.
 jurisdictions:
 - global
 regulations:
@@ -29,12 +37,13 @@ data_categories:
 corroborative_evidence:
   keywords:
   - laboratory test results
-  - laboratory
-  - test
-  - results
-  - health
-  - biomedical
-  - information
+  - pathology report
+  - histopathology
+  - cytology
+  - biopsy report
+  - pathologist
+  - specimen
+  - reference range
   proximity: 300
   keyword_lists:
   - au-healthcare-records
@@ -42,47 +51,63 @@ corroborative_evidence:
   - generic-data-labels
 test_cases:
   should_match:
-  - value: laboratory test
-    description: Primary topic phrase match
-  - value: lab results
-    description: Case-insensitive topic phrase match
-  - value: test results
-    description: Alternative topic phrase match
-  - value: blood test
-    description: Additional topic phrase match
+  - value: "CUMULATIVE PATHOLOGY REPORT\nPatient: Morgan Ellisdale\nURN: 118204\nDOB: 17/03/1968\nSpecimen type: Serum\nCollected: 21/09/2026 08:15\nLab number: 26-771904\nSodium 138 mmol/L (135-145)\nPotassium 5.8 mmol/L H (3.5-5.2)\nCreatinine 142 umol/L H (45-90)\nReporting pathologist: Dr Priya Ramanathan"
+    description: Populated chemistry report with patient identifiers, specimen fields, flagged result lines and pathologist (85)
+    synthetic: true
+  - value: "HISTOPATHOLOGY REPORT\nName: Jordan Whitlock\nMRN: 5540921\nSpecimen type: Skin excision, left forearm\nReceived: 19/09/2026\nAccession number: HS26-04417\nMicroscopic description: Sections show an ulcerated nodular basal cell carcinoma. Margins clear, closest 2 mm peripheral.\nReported by: Dr Alex Moreau"
+    description: Histopathology report carried over from the absorbed pathology reports classifier, populated with patient,
+      specimen and pathologist fields (85)
+    synthetic: true
+  - value: "Blood test results for Casey Rourke\nUR number: 0093317\nFull blood count\nHaemoglobin 102 g/L L (115-165)\nWCC 7.2 x10^9/L (4.0-11.0)\nPlatelets 388 x10^9/L (150-400)"
+    description: Full blood count with labelled UR number and result lines with units and reference ranges (85)
+    synthetic: true
   - value: "laboratory test\nPatient name: Avery Teston\nURN: 004418273\nDate of birth: 04/02/1991\nClinician: Dr Jordan Staffson\nNotes: laboratory test reviewed at appointment on 12/08/2026."
-    description: Populated health record reaching the 75/85 structure gate
+    description: Laboratory test note with labelled patient identifiers only (75)
+    synthetic: true
+  - value: "Cytology report - specimen type: cervical screening, liquid-based. Collected: 03/09/2026. No epithelial cell abnormality detected."
+    description: Cytology report with specimen fields but no patient identifiers (75)
     synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
-  - value: placeholder value 12345
-    description: Random text should not match topic-specific regex
   - value: patient biometric
     description: Generic word pair from old broad template should not match
   - value: "Policy guidance: this procedure explains how records about laboratory test are handled, who may access them and how long they are kept. It contains no records about any person or system."
     description: Policy guidance naming the topic without any record (discovery only)
+  - value: "Pathology services at the hospital: our laboratory runs more than 2,000 blood tests a day and reports histopathology for the region. Collection centres are open 7am to 4pm on weekdays and no appointment is needed. Your doctor receives pathology results electronically, usually within 24 hours, and will discuss them with you. Please bring your request form and Medicare card."
+    description: Hospital pathology services brochure - report phrases without any patient record (discovery only)
+  - value: "Laboratory test price list 2026-27 (private patients)\nFull blood count (FBC) - EDTA whole blood - $32.50\nUrea, electrolytes and creatinine (UEC) - serum - $28.90\nHbA1c - EDTA whole blood - $41.00\nHistopathology, single specimen - $96.00\nPrices include GST where applicable."
+    description: Laboratory price list naming tests and specimen types without results or patients (discovery only)
+  - value: "Methods: venous blood samples were drawn after an overnight fast and analysed in an accredited clinical chemistry laboratory. Serum sodium, potassium and creatinine were measured on an automated analyser. Mean eGFR was 88 mL/min/1.73m2 (SD 14). Participants whose results fell outside the laboratory reference range were referred to their general practitioner."
+    description: Research methods paragraph with aggregate values and no patient record (discovery only)
 false_positives:
 - description: Medical terminology in health education materials, research publications, clinical guidelines, or public health
     documents without patient-specific data.
-  mitigation: Require corroborative evidence keywords confirming patient context. Look for co-occurrence with patient identifiers
-    such as medical record numbers or dates of birth.
-- description: General wellness and fitness content using medical vocabulary without constituting protected health information.
-  mitigation: Layer with patient identifier patterns or healthcare-specific document structure detection to distinguish clinical
-    records from general health content.
+  mitigation: Enforce tiers require labelled patient, specimen, result-line or pathologist fields beside the report phrase;
+    phrase-only hits are discovery-only at 65.
+- description: Pathology service brochures, test catalogues and laboratory price lists that name tests, specimen types and
+    report types without any patient result.
+  mitigation: Price and catalogue lines carry no labelled field values or unit-plus-range result lines, so they stay at 65.
+- description: Research methods and results sections quoting aggregate laboratory values with units.
+  mitigation: A result line alone never enforces; 85 needs a second distinct structure type such as a labelled patient or
+    specimen field.
+- description: Teaching cases and pathology training material with fully populated mock reports.
+  mitigation: Template/sample framing (e.g. "sample data", "training example", "example only") suppresses every tier; unframed
+    mock reports can still reach enforce tiers.
 exports:
 - purview_xml
 - yaml
 - regex_copy
 scope: wide
-risk_description: The medium-confidence concept regex recognises laboratory test, lab results, blood test, pathology results,
-  reference range, laboratory report, and clinical chemistry, using seven healthcare-record corroborators within 300 characters
-  plus template exclusions. Research tables, clinical guidance, public-health material, and general wellness content can match
-  without identifying a patient, whereas a true clinical result links a person to a measured value, interpretation, specimen,
-  date, or provider. That patient-linked record can reveal infection, organ function, pregnancy, toxicology, diagnosis indicators,
-  or treatment response, with serious but normally individual-scale privacy and discrimination harm. Risk 8 and SENSITIVE
-  Personal-Privacy are warranted for the corroborated result; PROTECTED requires bulk patient exposure, severe safety consequences,
-  a protected person, or significant health-service damage.
+risk_description: The medium-confidence concept regex recognises laboratory and pathology report language - blood test and
+  clinical chemistry results, reference ranges, laboratory reports, and histopathology, cytology and biopsy reports - and
+  enforces only when independent populated structure is present (labelled patient identifiers, specimen fields, result lines
+  with units and a reference range or H/L flag, or a reporting pathologist), with template exclusions on every tier. A patient-linked
+  result or specimen report can reveal infection, organ function, pregnancy, toxicology, malignancy, genetic findings, margins
+  or treatment response, sometimes before the result has been communicated clinically, with serious but normally individual-scale
+  privacy, distress and discrimination harm. Brochures, price lists, research text and teaching cases can still hit the phrase
+  tier. Risk 8 and SENSITIVE Personal-Privacy are warranted for the corroborated record; PROTECTED requires bulk patient exposure,
+  severe safety consequences, a protected person, or significant health-service damage.
 sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
@@ -102,9 +127,13 @@ purview:
     - confidence_level: 85
       id_match: Regex_laboratory_test_results
       matches:
-        - ref: Regex_global_top500_325_laboratory_test_results_record_structure
-          min_count: 2
-          unique_results: true
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_global_top500_325_laboratory_test_results_patient_identifiers
+            - Regex_global_top500_325_laboratory_test_results_specimen_fields
+            - Regex_global_top500_325_laboratory_test_results_result_line
+            - Regex_global_top500_325_laboratory_test_results_reporting_pathologist
         - type: any
           min_matches: 0
           max_matches: 0
@@ -113,7 +142,12 @@ purview:
     - confidence_level: 75
       id_match: Regex_laboratory_test_results
       matches:
-        - ref: Regex_global_top500_325_laboratory_test_results_record_structure
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_global_top500_325_laboratory_test_results_patient_identifiers
+            - Regex_global_top500_325_laboratory_test_results_specimen_fields
+            - Regex_global_top500_325_laboratory_test_results_reporting_pathologist
         - type: any
           min_matches: 0
           max_matches: 0
@@ -130,13 +164,33 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_laboratory_test_results
-      pattern: (?is)\b(?:laboratory\s+test|lab\s+results|test\s+results|blood\s+test|pathology\s+results|reference\s+range|laboratory\s+report|clinical\s+chemistry)\b
-    - id: Regex_global_top500_325_laboratory_test_results_record_structure
+      pattern: (?is)\b(?:laboratory\s+(?:tests?|reports?|results?)|lab\s+results|test\s+results|blood\s+tests?|pathology\s+(?:results?|reports?)|reference\s+range|clinical\s+chemistry|histopathology(?:\s+reports?)?|cytology\s+reports?|biopsy\s+reports?|surgical\s+pathology|microscopic\s+(?:examination|description)|gross\s+description|tissue\s+sample)\b
+    - id: Regex_global_top500_325_laboratory_test_results_patient_identifiers
       pattern: >-
-        (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|patient|client|participant|donor|recipient|clinician|URN|UR\s+number|MRN|medical\s+record\s+number|Medicare(?:\s+number)?|IHI|referring\s+(?:doctor|practitioner)|(?:specimen|accession|lab|laboratory|study|participant|patient|client|trial|case|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+        (?i)\b(?:name|full\s+name|patient(?:\s+name)?|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|URN|UR\s*(?:no\.?|number)|MRN|medical\s+record\s+(?:no\.?|number)|Medicare(?:\s+(?:no\.?|number))?|IHI|(?:patient|client|hospital|case|file)\s*(?:no\.?|number|ID|#)|(?:referring|requesting)\s+(?:doctor|practitioner)|clinician)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_global_top500_325_laboratory_test_results_specimen_fields
+      pattern: >-
+        (?i)\b(?:specimen(?:\s+(?:type|site|source|no\.?|number|ID))?|sample\s+type|accession\s*(?:no\.?|number|ID)|lab(?:oratory)?\s*(?:no\.?|number|ID)|(?:date\s+(?:and\s+time\s+)?|time\s+)?(?:collected|received)|collection\s+(?:date|time)|date\s+of\s+collection)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/:.,'-]{0,40}
+    - id: Regex_global_top500_325_laboratory_test_results_result_line
+      pattern: >-
+        (?i)\b[A-Z][A-Za-z0-9()/-]{1,30}(?:[ \t][A-Za-z0-9()/-]{1,20}){0,3}[ \t]{0,3}[:=]?[ \t]{1,12}[<>]?\d{1,5}(?:\.\d{1,3})?[ \t]{0,3}(?:mmol/L|mmol/mol|umol/L|nmol/L|pmol/L|mIU/L|IU/L|U/L|g/L|mg/L|mg/dL|g/dL|ng/mL|ug/L|x[ \t]?10\^?9/L|x[ \t]?10\^?12/L|fL|pg|%|mL/min(?:/1\.73[ \t]?m2)?|mm/hr?)(?![A-Za-z])[ \t]{0,12}(?:[HL]\*?[ \t]{1,12})?(?:\(?[ \t]?(?:ref(?:erence)?(?:[ \t]range)?[ \t]?:?[ \t]?)?[<>]?\d{1,5}(?:\.\d{1,3})?[ \t]?(?:-|to)[ \t]?\d{1,5}(?:\.\d{1,3})?[ \t]?\)?|[HL]\b)
+    - id: Regex_global_top500_325_laboratory_test_results_reporting_pathologist
+      pattern: >-
+        (?i)\b(?:reporting\s+pathologist|pathologist|reported\s+by)\s*:\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?:(?:Dr|Prof|A/Prof|Professor)\.?\s+)?[A-Z][A-Za-z'-]{1,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+- version: 1.4.0
+  date: '2026-09-24'
+  description: 'Merge global-top500-327-pathology-reports into this classifier (Qld government classifier review 2026-09-24):
+    renamed to "Pathology and laboratory results" (slug and classifier_id kept); primary now also covers pathology report,
+    histopathology, cytology report, biopsy report, surgical pathology, microscopic/gross description and tissue sample (plus
+    plural forms of laboratory/blood tests); record structure split into patient identifiers (specimen/accession/lab numbers
+    moved out), specimen fields (specimen type, collected/received date, lab/accession/specimen number), result lines (value
+    with units followed by a reference range or H/L flag) and reporting pathologist. 75 = phrase plus one labelled patient,
+    specimen or pathologist field; 85 = phrase plus two distinct structure types (result lines count only toward 85). The absorbed
+    pattern''s self-corroborating phrase tiers were not imported. Replaced bare-phrase tests with populated chemistry, FBC, histopathology and cytology records and added brochure,
+    price list and research methods decoys. Risk 8 and labels unchanged.'
 - version: 1.3.0
   date: '2026-09-24'
   description: "75-tier gating fix: the 75 tier was corroborated only by the primary's own phrase list, so it enforced on topic mentions in policy, news and training text. 75 now requires independent health record structure (Regex ..._record_structure); 85 requires 2 distinct structure hits. Phrase-only matches stay at 65 discovery. Removed evidence no longer referenced by any tier. Added a populated positive and a guidance decoy."
