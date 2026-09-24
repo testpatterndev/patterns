@@ -1,22 +1,29 @@
 schema: testpattern/v1
 name: Australian Person-Linked Residential Address
 slug: au-person-linked-residential-address
-version: 1.1.0
+version: 1.2.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
 description: >-
   Detects a populated Australian residential street address linked to a labelled person. Bare address
   structure is available for discovery, the balanced tier requires person and residential context plus
-  Australian geography, and the strict tier requires state and postcode corroboration.
+  Australian geography, and the strict tier requires state and postcode corroboration. A parallel
+  household-utility path treats a utility supply/service address linked to a labelled account holder as
+  a person-linked residence. Absorbs the former au-top500-041-home-address and
+  au-top500-054-home-utility-account-addresses classifiers.
 operation: >-
   Pattern_au_person_linked_street_address matches a populated street number, street name, and Australian
   road type. The 65 tier is discovery-only. The 75 tier requires a labelled person, an explicit
   residence relationship, and at least one state, locality, or postcode signal, where locality evidence
   draws on the consolidated 15,829-entry Australian suburbs and localities registry. The 85 tier requires
   the same person and residence relationship plus an explicit residential-address label, an Australian
-  state or territory, a postcode, and registry or major-locality evidence.
-  Template and example content is excluded from the enforcing tiers.
+  state or territory, a postcode, and registry or major-locality evidence. The utility path mirrors this:
+  75 requires a labelled account holder, utility-service context (electricity/gas/water account, supply
+  or service address), independent account/metering context (account number, NMI, MIRN, meter number),
+  and one geographic signal; 85 adds a supply/service/connection-address field label, state, locality,
+  and postcode. Company account-holder suffixes veto the utility path. Unattributed home addresses stay
+  discovery-only. Template and example content is excluded from the enforcing tiers.
 pattern: >-
   (?i)\b\d{1,5}[A-Z]?(?:\s*[-/]\s*\d{1,5}[A-Z]?)?\s+[A-Z][A-Z'-]{1,30}(?:\s+[A-Z][A-Z'-]{0,30}){0,5}\s+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Place|Pl|Court|Ct|Crescent|Cres|Close|Cl|Lane|La|Way|Parade|Pde|Boulevard|Blvd|Terrace|Tce|Circuit|Cct|Highway|Hwy|Grove|Gv|Square|Sq|Esplanade|Esp|Rise|View|Gardens|Loop|Trail|Track|Pass|Heights)\b
 confidence: medium
@@ -50,6 +57,12 @@ corroborative_evidence:
     - residential address
     - principal place of residence
     - postcode
+    - account holder
+    - supply address
+    - service address
+    - utility account
+    - NMI
+    - MIRN
   proximity: 300
   keyword_lists:
     - au-road-classification-extended
@@ -70,6 +83,16 @@ test_cases:
       description: Unit-prefixed person-linked Australian residence
     - value: 'Resident: Priya Sharma; residential address: 18 Boronia Street, Abbeywood QLD 4613'
       description: Registry-locality high probe - non-major suburb corroborated by the consolidated suburbs and localities registry
+    - value: 'Resident: Mia Chen; home address: Unit 4, 12 Ocean Rise, Redcliffe QLD 4020'
+      description: 85 probe carried from au-top500-041-home-address - home-address label with person, state, and postcode
+    - value: 'Home address: 18 Banksia Road, Brisbane QLD 4000'
+      description: Unattributed home address (from au-top500-041-home-address) stays discovery-only at 65 without a labelled person
+    - value: 'Account holder: Noah Williams; NMI 41020012345; electricity supply address: 12 Ocean Rise, Redcliffe QLD 4020'
+      description: Exact 85 utility probe carried from au-top500-054 - account holder, metering identifier, supply-address label, state, locality, and postcode
+    - value: 'Account holder: Noah Williams; gas account number 552190; service address: 7 Wattle Street, Toowoomba'
+      description: Exact 75 utility probe - labelled account holder with utility account evidence and locality but no state or postcode
+    - value: 'Account holder: Priya Sharma; NMI 41020012345; electricity supply address: 18 Boronia Street, Abbeywood QLD 4613'
+      description: Utility registry-locality 85 probe - non-major suburb corroborated by the suburbs and localities registry
   should_not_match:
     - value: 'Resident: Alex Nguyen; residential address:'
       description: Person and residential labels without a populated address
@@ -83,11 +106,28 @@ test_cases:
       description: Complete but explicitly documented example is excluded from enforcing tiers
     - value: The tenant rights guide explains how to update an address.
       description: Residential topic without a populated address value
+    - value: The home address field is mandatory on the application form.
+      description: Policy or form prose without an address value (from au-top500-041-home-address)
+    - value: 'Account holder: Full Name; electricity account number 884201; service address: 18 Banksia Road, Brisbane QLD 4000'
+      description: Blank-form account-holder placeholder must not establish person linkage on the utility path
+    - value: 'Account holder: Northwind Traders Pty Ltd; electricity account number 884201; supply address: 18 Banksia Road, Brisbane QLD 4000'
+      description: Commercial account holder is vetoed from the household utility path by the company-suffix exclusion
+    - value: 'News: crews restored electricity supply to homes near 18 Banksia Road, Brisbane QLD 4000 after the storm; account number enquiries go to the energy retailer.'
+      description: News decoy with utility, account, and address wording but no labelled person must not enforce
+    - value: 'Documentation example: Account holder: Noah Williams; NMI 41020012345; supply address: 12 Ocean Rise, Redcliffe QLD 4020'
+      description: Complete but explicitly documented utility example is excluded from enforcing tiers
+    - value: Meter number 123456 was retired after the network upgrade.
+      description: Meter context without a populated service address
 false_positives:
   - description: A person name and valid address can refer to a business contact, venue, or correspondence destination rather than a residence.
     mitigation: Require an explicit resident, tenant, occupant, home-address, or place-of-residence relationship for enforcement.
   - description: Completed example records in forms, documentation, or training material can look genuine.
     mitigation: Apply the shared template-exclusion NOT-group to the 75 and 85 tiers.
+  - description: Utility-industry documents and commercial accounts mention electricity, gas, water, or meters near business premises.
+    mitigation: >-
+      The utility path requires a labelled account holder plus both utility-service and independent
+      account/metering evidence, and company suffixes (Pty Ltd, Ltd, Limited, Inc, Corporation, body
+      corporate) veto it.
 exports:
   - purview_xml
   - yaml
@@ -154,6 +194,47 @@ purview:
           max_matches: 0
           refs:
             - Evidence_template_exclusion
+    - confidence_level: 85
+      id_match: Pattern_au_person_linked_street_address
+      matches:
+        - ref: Pattern_au_person_linked_labelled_person
+        - ref: Evidence_au_person_linked_utility_service_context
+        - ref: Evidence_au_person_linked_utility_account_context
+        - ref: Evidence_au_person_linked_state_territory
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_au_person_linked_major_locality
+            - Evidence_au_locality_registry
+        - ref: Pattern_au_person_linked_postcode
+        - ref: Pattern_au_person_linked_service_address_label
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Pattern_au_person_linked_business_holder
+      description: Household utility service address - labelled account holder, utility service and account/metering evidence, service-address label, state, locality, and postcode
+    - confidence_level: 75
+      id_match: Pattern_au_person_linked_street_address
+      matches:
+        - ref: Pattern_au_person_linked_labelled_person
+        - ref: Evidence_au_person_linked_utility_service_context
+        - ref: Evidence_au_person_linked_utility_account_context
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_au_person_linked_state_territory
+            - Evidence_au_person_linked_major_locality
+            - Evidence_au_locality_registry
+            - Pattern_au_person_linked_postcode
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Pattern_au_person_linked_business_holder
+      description: Household utility service address - labelled account holder with utility service and account/metering evidence plus Australian geography
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_au_person_linked_street_address
@@ -169,6 +250,14 @@ purview:
     - id: Pattern_au_person_linked_labelled_person
       pattern: >-
         (?i)\b(?:resident|tenant|occupant|applicant|customer|account\s+holder|name)\s*(?:is\s*)?[:#-]\s*(?!(?:full|given|first|last|customer|resident|tenant|occupant|account\s+holder)\s+name\b)(?!firstname\s+lastname\b)(?!(?:john|jane)\s+doe\b)[A-Z][A-Za-z'-]{1,30}(?:\s+[A-Z][A-Za-z'-]{1,30}){1,3}\b
+    - id: Pattern_au_person_linked_service_address_label
+      pattern: >-
+        (?i)\b(?:(?:electricity|gas|water|energy)\s+)?(?:supply|service|connection)\s+(?:address|premises)\s*[:#-]
+      description: Utility supply/service/connection address field label (from au-top500-054-home-utility-account-addresses)
+    - id: Pattern_au_person_linked_business_holder
+      pattern: >-
+        (?i)\b(?:pty\.?\s+ltd|ltd|limited|incorporated|inc|corporation|body\s+corporate)\b
+      description: Company account-holder suffix - vetoes the utility path so commercial supply addresses do not read as household residences
   keywords:
     - id: Evidence_au_person_linked_residential_context
       groups:
@@ -185,6 +274,41 @@ purview:
             - resident
             - tenant
             - occupant
+      strength: specific
+    - id: Evidence_au_person_linked_utility_service_context
+      groups:
+        - match_style: word
+          terms:
+            - electricity account
+            - gas account
+            - water account
+            - energy account
+            - utility account
+            - utility bill
+            - electricity supply
+            - gas supply
+            - water service
+            - supply address
+            - service address
+            - service premises
+            - connection address
+            - energy retailer
+      strength: specific
+    - id: Evidence_au_person_linked_utility_account_context
+      groups:
+        - match_style: word
+          terms:
+            - account number
+            - customer number
+            - billing account
+            - meter number
+            - text: NMI
+              case_sensitive: true
+            - text: MIRN
+              case_sensitive: true
+            - national metering identifier
+            - meter reading
+            - connection point
       strength: specific
     - id: Evidence_au_person_linked_state_territory
       groups:
@@ -245,8 +369,11 @@ purview:
             - Parramatta
       strength: domain
 created: '2026-07-19'
-updated: '2026-07-20'
+updated: '2026-09-24'
 changelog:
+  - version: 1.2.0
+    date: '2026-09-24'
+    description: 'Merge au-top500-041-home-address and au-top500-054-home-utility-account-addresses into this classifier (Qld government classifier review 2026-09-24): add a household-utility 75/85 path (labelled account holder + utility-service context + independent account/metering context such as NMI/MIRN/meter number + geography; 85 adds a supply/service/connection-address label, state, locality, and postcode) with a company-suffix veto, NMI/MIRN utility corroborative vocabulary, the AER NMI reference, and carried-over home-address and utility-account tests plus blank-holder, commercial-holder, news, and documented-example decoys. 041 contributed no phrases beyond this pattern''s residential context; its unattributed 75 path was not imported, so a home address without a labelled person remains discovery-only.'
   - version: 1.1.0
     date: '2026-07-20'
     description: 'Wire the consolidated au-suburbs-localities registry (15,829 suburb/locality names, all states and territories) as Evidence_au_locality_registry: accepted as the geographic signal in the 75 tier and as locality corroboration in the 85 tier alongside the major-locality list, so complete addresses in non-major suburbs reach the intended tiers; add a registry-locality high probe.'
@@ -263,3 +390,5 @@ references:
     title: What is personal information? | OAIC
   - url: https://auspost.com.au/business/shipping/check-sending-guidelines/addressing-guidelines
     title: Addressing guidelines | Australia Post
+  - url: https://www.aer.gov.au/industry/registers/resources/reviews/national-metering-identifier
+    title: National Metering Identifier | Australian Energy Regulator

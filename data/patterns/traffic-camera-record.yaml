@@ -1,13 +1,13 @@
 schema: testpattern/v1
 name: Traffic Camera Record
 slug: traffic-camera-record
-version: 1.3.1
+version: 1.4.0
 type: keyword_proximity
 pattern_class: concept
 engine: universal
-description: Detects traffic camera and speed camera infringement records containing driver identification details, vehicle registration, and photographic evidence references. These records link specific individuals to traffic offences via camera evidence under the Transport Operations (Road Use Management) Act 1995 (Qld).
-operation: 'Keyword proximity: primary keywords (traffic camera, speed camera, red light camera, infringement notice, registered operator, vehicle registration, penalty infringement) within 300 characters of infringement reference numbers and driver identification. Negative keyword exclusion for road safety campaigns and published camera location lists.'
-pattern: (?i)\b(traffic\s+camera\s+(?:record|image|evidence)|speed\s+camera\s+(?:detection|infringement)|red\s+light\s+camera\s+(?:detection|infringement)|infringement\s+notice|registered\s+operator|penalty\s+infringement\s+notice)\b
+description: Detects traffic camera and speed camera infringement records containing driver identification details, vehicle registration, and photographic evidence references, and automatic number plate recognition (ANPR / ALPR) read records that place a plate at a camera site, lane, direction and time. These records link specific vehicles and individuals to locations and traffic offences via camera evidence under the Transport Operations (Road Use Management) Act 1995 (Qld). Absorbs the former automated-plate-reader-data classifier.
+operation: 'Two detector families within 300 characters. (1) Infringement notice reference primary: 65 alone (discovery); 75 with a camera / infringement keyword; 85 with that keyword plus camera read fields, penalty-process terms or a PIN reference. (2) Camera phrase primary (traffic / speed / red light camera record or detection, penalty infringement notice, automatic number plate recognition, ANPR, ALPR, plate reader / plate read): 65 phrase only (discovery); 75 plus one populated camera read field (plate / registration / rego / VRM, camera / site / reader ID, lane, direction of travel, read / capture time, timestamp), an infringement / PIN reference or a camera site ID; 85 plus two distinct read fields, or two different independent evidence types (read fields, notice references, penalty-process terms). Negative keyword exclusion for road safety campaigns, published camera location lists, reviews and statistics.'
+pattern: (?i)\b(?:traffic\s+camera\s+(?:record|image|evidence)|speed\s+camera\s+(?:detection|infringement)|red\s+light\s+camera\s+(?:detection|infringement)|infringement\s+notice|registered\s+operator|penalty\s+infringement\s+notice|automatic\s+(?:number|licen[cs]e)\s+plate\s+recognition|ANPR|ALPR|(?:number|licen[cs]e)\s+plate\s+(?:recognition|readers?)|plate\s+(?:reads?|readers?))\b
 confidence: medium
 confidence_justification: 'Medium confidence: requires co-occurrence of camera infringement terminology with specific driver identification details and infringement reference numbers. Published camera location lists and road safety campaigns do not contain individual driver data.'
 jurisdictions:
@@ -51,6 +51,12 @@ test_cases:
       description: Red light camera infringement with driver identification and statutory reference
     - value: 'SPER Enforcement — Outstanding Traffic Camera Infringement. Original Notice: TIN-2025-TSV-041872. Registered operator [Name] of [Address], Aitkenvale QLD 4814. Speed camera detection: 134 km/h in 110 km/h zone, Bruce Highway northbound at Bowen (Site ID: SC-7341). Original fine: $287 plus 1 demerit point. SPER enforcement order issued: additional $113.15 enforcement fee. Total amount due: $400.15. Payment required within 28 days or enforcement warrant may issue.'
       description: SPER enforcement of outstanding camera infringement with escalated penalties
+    - value: "ANPR read record\nPlate: 123ABC (QLD)\nRead time: 14/02/2026 08:42:17\nCamera ID: ANPR0412\nSite: Gateway Motorway, Nudgee\nLane: 2\nDirection: Southbound\nHotlist: unregistered vehicle"
+      description: ANPR read record with plate, read time, camera ID, lane and direction (85, absorbed plate-reader scope)
+      synthetic: true
+    - value: "Automatic number plate recognition search - registration 987XYZ (QLD). 3 reads returned. First read 03/03/2026 07:12, Gateway Motorway northbound, site ID: GM0217."
+      description: ANPR search result placing a registration at a camera site with one labelled site ID (75)
+      synthetic: true
   should_not_match:
     - value: The Queensland Government published its updated list of fixed speed camera and red light camera locations across the state. The 2026 list includes 142 fixed camera sites and 87 mobile camera deployment zones.
       description: Published camera location list from government
@@ -58,6 +64,10 @@ test_cases:
       description: Road safety campaign with aggregate infringement statistics
     - value: A motoring magazine reviewed the latest speed camera detection technology, noting that Queensland has deployed point-to-point cameras on sections of the Bruce Highway.
       description: Motoring magazine article about camera technology
+    - value: The Queensland Police Service uses automatic number plate recognition (ANPR) cameras to detect unregistered and stolen vehicles. ANPR read data is retained for a limited period under the ANPR procedures.
+      description: Public explanation of ANPR use without any read record (discovery only)
+    - value: Our ANPR camera reads plates at up to 250 km/h across three lanes and reports direction of travel for every capture.
+      description: Vendor product copy about an ANPR camera - speed and lane vocabulary without populated read fields (discovery only)
 false_positives:
   - description: Published speed camera and red light camera location lists
     mitigation: 'Negative keyword exclusion: ''camera locations'', ''location list'', ''site list'', ''published list'''
@@ -67,6 +77,8 @@ false_positives:
     mitigation: 'Negative keyword exclusion: ''magazine'', ''review'', ''technology'', ''deployed'''
   - description: TMR annual reports with traffic enforcement statistics
     mitigation: 'Negative keyword exclusion: ''annual report'', ''statistics'', ''published'', ''reporting period'''
+  - description: ANPR / plate-reader explainers, procedures and vendor product copy
+    mitigation: Phrase-only matches stay at the 65 discovery tier; enforce tiers need a populated read field (plate, camera / site ID, lane, direction, read time) or a notice reference.
 exports:
   - purview_xml
   - yaml
@@ -83,11 +95,64 @@ purview:
       id_match: Pattern_traffic_camera_record_infringement_notice_ref
       matches:
         - ref: Evidence_traffic_camera_record_primary_keywords
-        - ref: Evidence_traffic_camera_record_classification_markers
-        - ref: Evidence_traffic_camera_record_corroborative_terms
-        - ref: Pattern_traffic_camera_record_penalty_infringement_ref
-        - ref: Pattern_traffic_camera_record_camera_site_id
-        - ref: Pattern_traffic_camera_record_camera_infringement_terms
+        - type: any
+          refs:
+            - Regex_traffic_camera_record_read_fields
+            - Evidence_traffic_camera_record_corroborative_terms
+            - Pattern_traffic_camera_record_penalty_infringement_ref
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_traffic_camera_record_exclusion
+    - confidence_level: 85
+      id_match: Pattern_traffic_camera_record_camera_infringement_terms
+      matches:
+        - ref: Regex_traffic_camera_record_read_fields
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_traffic_camera_record_exclusion
+    - confidence_level: 85
+      id_match: Pattern_traffic_camera_record_camera_infringement_terms
+      matches:
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_traffic_camera_record_read_fields
+            - Pattern_traffic_camera_record_infringement_notice_ref
+            - Pattern_traffic_camera_record_penalty_infringement_ref
+            - Evidence_traffic_camera_record_corroborative_terms
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_traffic_camera_record_exclusion
+    - confidence_level: 75
+      id_match: Pattern_traffic_camera_record_camera_infringement_terms
+      matches:
+        - type: any
+          refs:
+            - Regex_traffic_camera_record_read_fields
+            - Pattern_traffic_camera_record_infringement_notice_ref
+            - Pattern_traffic_camera_record_penalty_infringement_ref
+            - Pattern_traffic_camera_record_camera_site_id
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Filter_traffic_camera_record_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_traffic_camera_record_camera_infringement_terms
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -122,7 +187,10 @@ purview:
     - id: Pattern_traffic_camera_record_camera_site_id
       pattern: \b(?:SC|RLC)-\d{3,5}\b
     - id: Pattern_traffic_camera_record_camera_infringement_terms
-      pattern: (?i)\b(traffic\s+camera\s+(?:record|image|infringement)|speed\s+camera\s+(?:detection|infringement)|red\s+light\s+camera\s+(?:detection|infringement)|penalty\s+infringement\s+notice)\b
+      pattern: (?i)\b(?:traffic\s+camera\s+(?:record|image|infringement)|speed\s+camera\s+(?:detection|infringement)|red\s+light\s+camera\s+(?:detection|infringement)|penalty\s+infringement\s+notice|automatic\s+(?:number|licen[cs]e)\s+plate\s+recognition|ANPR|ALPR|(?:number|licen[cs]e)\s+plate\s+(?:recognition|readers?)|plate\s+(?:reads?|readers?))\b
+    - id: Regex_traffic_camera_record_read_fields
+      pattern: >-
+        (?i)\b(?:(?:(?:(?:number|licen[cs]e|registration)\s+)?plate(?:\s+(?:no\.?|number|read))?|registration(?:\s+(?:no\.?|number))?|rego|VRM)\s*[:#]\s*(?!(?:n/?a|none|unknown|tbc|tba|withheld|the|a|an|any|all|see|refer)\b|_{2,}|\[|<)[A-Z0-9]{1,4}[ -]?[A-Z0-9]{1,5}\b|(?:camera|site|reader|detector|device)\s*(?:ID|no\.?|number|code)\s*[:#]\s*(?!(?:n/?a|none|unknown|tbc|tba|the|a|an|any|all|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/-]{1,20}|lane(?:\s*(?:no\.?|number))?\s*[:#]\s*\d{1,2}\b|direction(?:\s+of\s+travel)?\s*[:#]\s*(?:(?:north|south|east|west)(?:bound)?|inbound|outbound|[NSEW]B)\b|(?:read|capture|detection|passage)\s+(?:time|date(?:\s*/\s*time)?|timestamp)\s*[:#]\s*\d{1,4}[/.-]\d{1,2}|timestamp\s*[:#]\s*\d{1,4}[/.-]\d{1,2})
   keywords:
     - id: Evidence_traffic_camera_record_primary_keywords
       groups:
@@ -161,7 +229,6 @@ purview:
             - enforcement order
             - enforcement fee
             - enforcement warrant
-            - registered operator
             - km/h
             - fine
             - penalty
@@ -189,15 +256,18 @@ purview:
       strength: noise
 risk_rating: 7
 risk_description: >-
-  This detector finds a traffic or speed-camera infringement record linking a registered operator or identified driver to a vehicle, location, timestamp, measured conduct, image reference, notice, and penalty. Disclosure can reveal a person's movements and alleged offence, expose an address or registration, and support harassment or fraudulent social engineering around a genuine infringement. Published camera locations, road-safety campaigns, motoring articles, and aggregate enforcement statistics are excluded, so the normal match is an attributed administrative enforcement record. Risk 7 supports SENSITIVE Legal; PROTECTED would require protected-location tracking, systematic movement surveillance, or compromise of a large enforcement repository.
+  This detector finds a traffic or speed-camera infringement record linking a registered operator or identified driver to a vehicle, location, timestamp, measured conduct, image reference, notice, and penalty, or an ANPR read record placing a plate at a camera site, lane and direction at a given time. Disclosure can reveal a person's movements and alleged offence, expose an address or registration, and support harassment or fraudulent social engineering around a genuine infringement. Published camera locations, road-safety campaigns, motoring articles, and aggregate enforcement statistics are excluded, so the normal match is an attributed administrative enforcement record. Risk 7 supports SENSITIVE Legal; PROTECTED would require protected-location tracking, systematic movement surveillance, or compromise of a large enforcement repository.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Legal
 references: []
 created: '2026-03-06'
-updated: '2026-07-14'
+updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'Merge global-top500-409-automated-plate-reader-data into this classifier (Qld government classifier review 2026-09-24): camera-phrase regex gains automatic number / licence plate recognition, ANPR, ALPR, number / licence plate recognition / reader and plate read(er), and becomes a second primary family (65 phrase / 75 plus one populated read field, TIN / PIN reference or camera site ID / 85 plus two read fields or two independent evidence types). New Regex_..._read_fields recognises populated ANPR read-record fields: plate / registration / rego / VRM, camera / site / reader ID, lane, direction of travel, read / capture time and timestamp. TIN-reference 85 tier simplified (it required TIN and PIN references, site ID and every keyword group at once, and no test reached it) to camera keyword plus one of read fields, penalty-process terms or a PIN reference; "registered operator" removed from the corroborative list because it is already a primary keyword. Not imported: bare licence plate, number plate, registration plate, plate number, vehicle tracking and vehicle identification (everyday vehicle-sale / insurance vocabulary) and the absorbed self-corroborating label/domain tiers. Added an 85 ANPR read record, a 75 ANPR search result, and ANPR explainer and vendor-copy decoys. Risk unchanged at 7 (ANPR read records of a single vehicle are an administrative movement record; the absorbed classifier rated 8 for bulk tracking data, noted but not adopted).'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1504 without changing detector or package metadata.'
