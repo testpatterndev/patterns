@@ -1,0 +1,224 @@
+schema: testpattern/v1
+name: Completed TFN Declaration or Superannuation Standard Choice Form
+slug: au-tfn-declaration-super-choice-form
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Completed ATO Tax file number declaration (NAT 3092) and Superannuation standard choice form
+  (NAT 13080) held by an employer: the form title or number together with populated fields such as a
+  checksum-valid TFN, the payee's name or date of birth, the employee identification number, ticked
+  residency or tax-free threshold answers, and the chosen fund's ABN, unique superannuation identifier
+  (USI) or member number.
+operation: >-
+  Primary: the form title or number (tax file number declaration, TFN declaration, NAT 3092,
+  superannuation standard choice form, standard choice form, NAT 13080). 65 is discovery-only (title
+  alone) and surfaces ATO guidance, onboarding checklists and blank forms. 75 requires the title plus
+  one populated field: a 9-digit TFN that passes the ATO mod-11 checksum, a populated person field
+  (surname / given name / payee or employee name, employee identification number, date of birth with a
+  date), a ticked residency or tax-free-threshold answer ([X], ☒, ☑, ✓), or a populated fund field
+  (fund ABN, USI, member number, value containing a digit). 85 has two routes. For a TFN declaration it
+  needs the title, the TFN, a person field, and a ticked answer or a fund field. For a choice form it
+  needs the title, a person field, and two distinct fund fields. All tiers exclude template/fixture
+  text.
+pattern: (?i)\b(?:tax\s+file\s+number\s+declarations?|TFN\s+declarations?|NAT\s*3092|superannuation\s+(?:standard\s+)?choice\s+forms?|standard\s+choice\s+forms?|NAT\s*13080)\b
+confidence: medium
+confidence_justification: >-
+  Medium-high in practice: the titles and NAT numbers are specific, and the TFN evidence carries the
+  ATO mod-11 checksum validator in the exported SIT (the local test harness does not evaluate
+  checksums, so tests use checksum-valid values). The 75 route with only a person or fund field can
+  fire on onboarding trackers that list a new starter's forms with dates of birth. 85/75 are heuristic
+  evidence tiers, not measured accuracy; tests are synthetic.
+jurisdictions:
+  - au
+regulations:
+  - Taxation Administration Act 1953 (Cth)
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - QGISCF
+data_categories:
+  - pii
+  - government-id
+  - financial
+corroborative_evidence:
+  keywords:
+    - tax file number
+    - TFN
+    - payee
+    - tax-free threshold
+    - Australian resident for tax purposes
+    - unique superannuation identifier
+    - member number
+    - employee identification number
+  proximity: 300
+customisation:
+  - key: super-member-number
+    kind: identifier-format
+    identifier: super-member-number
+    target: purview.regexes/Regex_tfn_super_form_fund_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's superannuation member number format (see docs/identifiers.md#super-member-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Tax file number declaration (NAT 3092)\nSection A: To be completed by the payee\n1 What is your tax file number (TFN)? 255 446 951\n2 Title: Ms  Surname or family name: Testerly  First given name: Avery\n4 Date of birth: 14/02/1994\n8 Are you an Australian resident for tax purposes or a working holiday maker? [X] Australian resident for tax purposes\n9 Do you want to claim the tax-free threshold from this payer? [X] Yes"
+      description: 85 - completed TFN declaration with checksum-valid TFN, payee name, date of birth and ticked answers
+      synthetic: true
+    - value: "Superannuation standard choice form (NAT 13080)\nSection A: Employee to complete\nEmployee name: Rowan Sampleton  Employee identification number: 55021\nTax file number: 194 353 277\nFund ABN: 60 905 115 063  Unique superannuation identifier (USI): 60905115063003\nMember number: 7741093\nSignature: R Sampleton  Date: 03/10/2026"
+      description: 85 - completed super choice form with employee name, TFN, fund ABN, USI and member number
+      synthetic: true
+    - value: "TFN declaration received from new starter - Date of birth: 22/07/1988; payer to lodge the declaration with the ATO within 14 days."
+      description: 75 - TFN declaration reference with a populated date of birth only
+      synthetic: true
+    - value: "Standard choice form returned by employee. Member number: 88120045 at the nominated fund; payroll to action from the next pay run."
+      description: 75 - choice form with one populated fund field
+      synthetic: true
+  should_not_match:
+    - value: "Tax file number declaration\nThis declaration is not an application for a tax file number.\nWhat is your tax file number (TFN)? ___ ___ ___\nSurname or family name: ____________\nDate of birth: __/__/____\nAre you an Australian resident for tax purposes? ☐ Yes ☐ No\nDo you want to claim the tax-free threshold from this payer? ☐ Yes ☐ No"
+      description: Blank TFN declaration form (65 discovery at most)
+    - value: "You need to complete a Tax file number declaration (NAT 3092) when you start a new job. Your employer must also offer you a Superannuation standard choice form (NAT 13080) so you can nominate a fund."
+      description: ATO guidance text
+    - value: "New starter checklist: bank details form, TFN declaration, super standard choice form, emergency contact form, code of conduct acknowledgement."
+      description: HR onboarding checklist
+    - value: "Our onboarding app lets new starters complete their TFN declaration and superannuation standard choice form online in minutes."
+      description: HR software marketing
+    - value: "The ATO said employers lodged more than a million TFN declarations online last financial year, up 12 per cent."
+      description: News report
+false_positives:
+  - description: ATO instructions, employer guidance and onboarding checklists that name the forms.
+    mitigation: Enforce tiers need a populated TFN, person, answer or fund field; guidance and checklists have none.
+  - description: Blank forms, including the printed ATO form with empty boxes and unticked options.
+    mitigation: Placeholders (underscores, square brackets, n/a, tbc) are rejected, answer boxes must be ticked, and fund values must contain a digit.
+  - description: Onboarding trackers listing a new starter's forms alongside a date of birth or member number.
+    mitigation: These are still personal records but reach only 75; 85 needs a TFN or two fund fields plus a person field.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_tfn_super_form_primary
+      matches:
+        - ref: Regex_tfn_super_form_tfn_value
+        - ref: Regex_tfn_super_form_person_field
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_tfn_super_form_answer
+            - Regex_tfn_super_form_fund_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_tfn_super_form_primary
+      matches:
+        - ref: Regex_tfn_super_form_person_field
+        - ref: Regex_tfn_super_form_fund_field
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_tfn_super_form_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_tfn_super_form_tfn_value
+            - Regex_tfn_super_form_person_field
+            - Regex_tfn_super_form_answer
+            - Regex_tfn_super_form_fund_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_tfn_super_form_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_tfn_super_form_primary
+      pattern: >-
+        (?i)\b(?:tax\s+file\s+number\s+declarations?|TFN\s+declarations?|NAT\s*3092|superannuation\s+(?:standard\s+)?choice\s+forms?|standard\s+choice\s+forms?|NAT\s*13080)\b
+    - id: Regex_tfn_super_form_tfn_value
+      pattern: \b(?!0{3}[ \-]?0{3}[ \-]?0{3}\b)(?!1{3}[ \-]?1{3}[ \-]?1{3}\b)\d{3}[ \-]?\d{3}[ \-]?\d{3}\b
+      validators:
+        - ref: Validator_australian_tfn
+    - id: Regex_tfn_super_form_person_field
+      pattern: >-
+        (?i)\b(?:surname(?:\s+or\s+family\s+name)?|family\s+name|(?:first\s+|other\s+)?given\s+names?|full\s+name|payee(?:'s)?\s+name|employee(?:'s)?\s+(?:name|identification\s+number|number|ID))\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}|\bdate\s+of\s+birth\s*[:\-]?\s*\d{1,2}[/.-]\d{1,2}[/.-]\d{4}
+    - id: Regex_tfn_super_form_answer
+      pattern: >-
+        (?i)\b(?:resident\s+for\s+tax\s+purposes|working\s+holiday\s+maker|tax[\s-]+free\s+threshold(?:\s+from\s+this\s+payer)?)\??[ \t]{0,3}(?:\[[ \t]?[X✓✔][ \t]?\]|☒|☑|✓|✔)|(?:\[[ \t]?[X✓✔][ \t]?\]|☒|☑|✓|✔)[ \t]{0,2}(?:Yes|No|Australian\s+resident|foreign\s+resident|working\s+holiday\s+maker)\b
+    - id: Regex_tfn_super_form_fund_field
+      pattern: >-
+        (?i)\b(?:unique\s+superannuation\s+identifier(?:\s*\(USI\))?|USI|fund\s+ABN|member(?:ship)?\s+(?:no\.?|number)|SMSF\s+(?:ABN|ESA|BSB|account\s+(?:no\.?|number)))[ \t]{0,3}[:#]?[ \t]{0,3}(?!_{2,}|\[|<)(?=[A-Z0-9-]{0,19}\d)(?:\d{2}[ ]?\d{3}[ ]?\d{3}[ ]?\d{3}\b|[A-Z0-9][A-Z0-9-]{3,19}\b)
+  keywords: []
+  validators:
+    - id: Validator_australian_tfn
+      type: Checksum
+      params:
+        - name: Weights
+          value: 1, 4, 3, 7, 5, 8, 6, 9, 0
+        - name: Modulo
+          value: '11'
+        - name: CheckDigit
+          value: '9'
+risk_rating: 7
+risk_description: >-
+  A completed TFN declaration or super choice form combines a tax file number with the person's name,
+  date of birth, address, residency status and, on the choice form, their super fund and member number.
+  That set is enough to impersonate the person to the ATO or a super fund, lodge false returns or
+  redirect super, and TFN handling is specifically regulated. Each form is one person's record; bulk
+  payroll files with many TFNs are covered at higher risk by payroll-master-file-with-tax-file-numbers.
+  Risk 7 supports OFFICIAL: Sensitive / SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: ATO - Tax file number declaration (NAT 3092)
+    url: https://www.ato.gov.au/forms-and-instructions/tfn-declaration
+  - title: ATO - Superannuation standard choice form (NAT 13080)
+    url: https://www.ato.gov.au/forms-and-instructions/superannuation-standard-choice-form
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: >-
+      Initial release - NAT 3092 / NAT 13080 form titles gated on populated fields (checksum-valid TFN,
+      person, ticked answer, fund ABN / USI / member number); replaces the phrase-only intent of
+      au/global-top500-084 for completed forms.
+author: testpattern-community
+license: MIT

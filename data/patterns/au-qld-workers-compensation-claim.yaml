@@ -1,0 +1,201 @@
+schema: testpattern/v1
+name: Queensland Workers' Compensation Claim or Work Capacity Record
+slug: au-qld-workers-compensation-claim
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Workers' compensation claim records for an identified worker under the Workers' Compensation and Rehabilitation Act 2003 (Qld): the application for compensation, work capacity certificates (WorkCover / WorkSafe Form 132M, and the Comcare certificate of capacity equivalent), rehabilitation and return to work plans and suitable duties plans (WCRA ss 220, 226, 228), and claim decisions. Claim records combine health information (injury, diagnosis, capacity, restrictions, treating practitioner) with a claim, and WCRA s 572A prohibits obtaining or using such documents for employment purposes such as pre-employment checks. The WorkCover claim number format is not public, so it is matched only by its label.
+operation: >-
+  Primary: workers' compensation claim / application / claim form, "application for compensation", "work capacity certificate", "Form 132M", "certificate of capacity", "(rehabilitation and) return to work plan / coordinator", "suitable duties plan / program", "WorkCover (Queensland) claim", "Comcare claim" or RRTWC. 65 is discovery-only (primary alone) and will surface WorkSafe / WorkCover guidance, blank certificates, policies and news. 75 requires one populated field within 300 characters: either a worker / claim field (worker or claimant name, employee, claim number by label, date of injury or birth, employer, insurer, case manager, policy number) or an injury / medical field (injury description, nature of injury, diagnosis, mechanism of injury, body part, capacity, restrictions, suitable duties, treating practitioner, review date) with a non-placeholder value, or a capacity statement ("fit for suitable duties", "no capacity for any work"). 85 requires a populated worker / claim field AND a populated injury / medical field plus an independent claim / insurer context term (insurer, self-insurer, weekly compensation, claim accepted / rejected, statutory claim, WCRA 2003, AHPRA). Every tier excludes template/fixture text; enforce tiers also exclude legislation text, fact sheets / guides, "how to make a claim" explainers and job ads.
+pattern: (?i)\b(?:workers?['’]?\s+compensation\s+(?:claim(?:\s+form)?|application)|application\s+for\s+compensation|work\s+capacity\s+certificate|Form\s+132M|certificate\s+of\s+capacity|(?:rehabilitation\s+and\s+)?return\s+to\s+work\s+(?:plan|coordinator)|suitable\s+duties\s+(?:plan|program(?:me)?)|WorkCover\s+(?:Queensland\s+)?claim|Comcare\s+claim|RRTWC)\b
+confidence: medium
+confidence_justification: >-
+  Medium: the form titles and statutory phrases are specific, but they also appear throughout WorkSafe / WorkCover guidance, HR policies and blank certificates, and the claim number has no public format. Enforce tiers therefore require populated worker, claim or medical fields. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic records laid out like Form 132M and a typical RRTW plan.
+jurisdictions:
+  - au
+  - au-qld
+regulations:
+  - Workers' Compensation and Rehabilitation Act 2003 (Qld) ss 220, 226, 228, 572A
+  - Information Privacy Act 2009 (Qld)
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - QGISCF
+data_categories:
+  - health
+  - pii
+  - employment
+corroborative_evidence:
+  keywords:
+    - insurer
+    - self-insurer
+    - weekly compensation
+    - claim accepted
+    - claim rejected
+    - statutory claim
+    - Workers' Compensation and Rehabilitation Act 2003
+    - AHPRA
+    - lost time
+    - medical excess
+  proximity: 300
+customisation:
+  - key: workcover-claim-number
+    kind: identifier-format
+    identifier: workcover-claim-number
+    target: purview.regexes/Regex_au_qld_workers_compensation_claim_worker_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's workers compensation claim number format (see docs/identifiers.md#workcover-claim-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Work capacity certificate - workers' compensation (Form 132M)\nWorker name: Jordan Teston\nDate of birth: 14/02/1986\nClaim number: 25Q/448193\nEmployer: Carrow Valley Power Pty Ltd\nDiagnosis: Right shoulder rotator cuff strain\nCapacity for work: fit for suitable duties from 02/09/2026 to 30/09/2026\nRestrictions: no lifting above shoulder height, max 5 kg\nTreating practitioner: Dr Priya Teston\nThe insurer has been sent a copy of this certificate."
+      description: 85 tier - Form 132M with worker, claim number and employer plus diagnosis, capacity, restrictions and treating practitioner, insurer context
+      synthetic: true
+    - value: "Rehabilitation and return to work plan\nInjured worker: Casey Teston\nClaim no: WC-2026-07731\nSuitable duties: office-based permit administration, 4 hours per day, 3 days per week\nReview date: 21/10/2026\nThe self-insurer approved the plan on 12/09/2026 and weekly compensation continues for hours not worked."
+      description: 85 tier - RRTW plan with worker and claim fields plus suitable duties and self-insurer / weekly compensation context
+      synthetic: true
+    - value: "Application for compensation\nWorker: Alex Teston\nDate of injury: 03/08/2026"
+      description: 75 tier - application for compensation with populated worker and date of injury only
+      synthetic: true
+    - value: "Certificate of capacity (Comcare)\nDiagnosis: lumbar disc protrusion L4/5\nNo capacity for any work until review."
+      description: 75 tier - Comcare certificate of capacity with a populated diagnosis field
+      synthetic: true
+    - value: "Workers' compensation claim decision\nClaimant: Sam Teston\nEmployee number: 700418\nNature of injury: psychological injury - adjustment disorder\nThe insurer advises the statutory claim has been rejected under the Workers' Compensation and Rehabilitation Act 2003."
+      description: 85 tier - claim decision with claimant and employee fields, nature of injury, rejection by insurer
+      synthetic: true
+  should_not_match:
+    - value: "A work capacity certificate (Form 132M) must be completed by a doctor, nurse practitioner or dentist registered with AHPRA. This fact sheet explains how to make a claim and what the return to work coordinator does."
+      description: WorkSafe / WorkCover guidance text
+    - value: "Work capacity certificate - workers' compensation\nWorker name: ______________\nClaim number: ______________\nDiagnosis: ______________\nCapacity for work: [ ] fit for pre-injury duties [ ] fit for suitable duties"
+      description: Blank certificate form
+    - value: "(1) A person must not obtain or use a document relating to a worker's application for compensation for an employment purpose. Maximum penalty - 40 penalty units. See legislation.qld.gov.au."
+      description: Legislation text (s 572A style)
+    - value: "WorkCover Queensland received 95,000 claims last year; the scheme's return to work rate rose to 94 per cent, the annual report says."
+      description: News / statistics
+    - value: "Return to work coordinator - part-time role. Apply now: you will manage suitable duties programs and liaise with the insurer on workers' compensation claims."
+      description: Job advertisement
+false_positives:
+  - description: WorkSafe Queensland, WorkCover Queensland and Comcare guidance, fact sheets and HR policies naming the certificate and plan.
+    mitigation: Guidance uses the labels without values and stays at 65 discovery; fact sheets, "how to make a claim" explainers and legislation text are excluded from enforce tiers.
+  - description: Blank certificates and plan templates.
+    mitigation: Blank lines, square-bracket and angle-bracket placeholders and n/a/tbc values are rejected; template wording is excluded by the shared template-exclusion dictionary.
+  - description: Scheme statistics, annual reports and job ads for return to work coordinators.
+    mitigation: No populated worker or medical fields; job ads ("apply now", "part-time role", "position description") are excluded.
+  - description: Claim numbers have no public format.
+    mitigation: Matched only by label (claim no. / number / reference); no standalone claim-number regex is shipped.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_qld_workers_compensation_claim_primary
+      matches:
+        - ref: Regex_au_qld_workers_compensation_claim_worker_field
+        - ref: Regex_au_qld_workers_compensation_claim_medical_field
+        - ref: Keyword_au_qld_workers_compensation_claim_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_qld_workers_compensation_claim_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_qld_workers_compensation_claim_primary
+      matches:
+        - type: any
+          refs:
+            - Regex_au_qld_workers_compensation_claim_worker_field
+            - Regex_au_qld_workers_compensation_claim_medical_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_au_qld_workers_compensation_claim_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_qld_workers_compensation_claim_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_qld_workers_compensation_claim_primary
+      pattern: >-
+        (?i)\b(?:workers?['’]?\s+compensation\s+(?:claim(?:\s+form)?|application)|application\s+for\s+compensation|work\s+capacity\s+certificate|Form\s+132M|certificate\s+of\s+capacity|(?:rehabilitation\s+and\s+)?return\s+to\s+work\s+(?:plan|coordinator)|suitable\s+duties\s+(?:plan|program(?:me)?)|WorkCover\s+(?:Queensland\s+)?claim|Comcare\s+claim|RRTWC)\b
+    - id: Regex_au_qld_workers_compensation_claim_worker_field
+      pattern: >-
+        (?i)\b(?:(?:injured\s+)?worker(?:['’]s)?(?:\s+name)?|claimant(?:\s+name)?|employee(?:\s+(?:name|no\.?|number|ID))?|claim\s+(?:no\.?|number|ref(?:erence)?)|WorkCover\s+(?:claim\s+)?(?:no\.?|number)|date\s+of\s+(?:injury|birth)|DOB|employer(?:\s+name)?|insurer|case\s+manager|policy\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Za-z0-9][A-Za-z0-9/'.-]{0,30}){0,4}
+    - id: Regex_au_qld_workers_compensation_claim_medical_field
+      pattern: >-
+        (?i)(?:\b(?:injury\s+description|description\s+of\s+(?:the\s+)?injury|nature\s+of\s+(?:the\s+)?injury|mechanism\s+of\s+injury|diagnosis|body\s+part(?:\s+injured)?|(?:work\s+)?capacity(?:\s+for\s+work)?|restrictions|suitable\s+duties|treating\s+(?:doctor|practitioner|medical\s+practitioner|GP|specialist)|next\s+review|review\s+date)\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9/'.,-]{1,40}(?:[ \t]+[A-Za-z0-9/'.,-]{1,30}){0,6}|\b(?:fit|unfit)\s+for\s+(?:suitable|pre-injury|normal|full|modified|alternative)\s+duties\s+from\s+\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\bno\s+capacity\s+for\s+(?:any\s+)?work\s+(?:from|until)\b)
+    - id: Regex_au_qld_workers_compensation_claim_exclusion
+      pattern: >-
+        (?i)(?:\blegislation\.qld\.gov\.au|\blegislation\.gov\.au|\bMaximum\s+penalty\b|\bthis\s+(?:fact\s?sheet|guide|article|page|webinar|course|module|brochure)\b|\bhow\s+to\s+(?:make|lodge|submit)\s+a\s+claim\b|\bgeneral\s+information\s+only\b|\bapply\s+now\b|\b(?:part|full)-time\s+role\b|\bposition\s+description\b|\bsubscribe\s+to\s+our\b)
+  keywords:
+    - id: Keyword_au_qld_workers_compensation_claim_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - insurer
+            - self-insurer
+            - weekly compensation
+            - claim accepted
+            - claim rejected
+            - accepted the claim
+            - has been accepted
+            - has been rejected
+            - statutory claim
+            - Workers' Compensation and Rehabilitation Act 2003
+            - text: WCRA
+              case_sensitive: true
+            - text: AHPRA
+              case_sensitive: true
+            - lost time
+            - medical excess
+            - notice of assessment
+            - review decision
+      strength: specific
+risk_rating: 9
+risk_description: >-
+  The classifier identifies workers' compensation claim, work capacity certificate and return to work records about an identified worker, gated on populated worker, claim and medical fields. These records carry health information (injury, diagnosis, capacity and restrictions, treating practitioner) tied to employment, and WCRA 2003 (Qld) s 572A prohibits obtaining or using them for employment purposes; leakage exposes the worker to discrimination in hiring and management decisions. Guidance, blank certificates, statistics and job ads are excluded from enforce tiers. Risk 9 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Workers' Compensation and Rehabilitation Act 2003 (Qld) s 572A (AustLII)
+    url: https://classic.austlii.edu.au/au/legis/qld/consol_act/wcara2003400/s572a.html
+  - title: Workers' Compensation and Rehabilitation Act 2003 (Qld) s 228 (AustLII)
+    url: https://www5.austlii.edu.au/au/legis/qld/consol_act/wcara2003400/s228.html
+  - title: WorkSafe Queensland - Form 132M Work capacity certificate - workers' compensation
+    url: https://www.worksafe.qld.gov.au/__data/assets/pdf_file/0014/25214/form-132m-work-capacity-certificate-workers-compensation.pdf
+  - title: WorkCover Queensland - Work capacity certificate
+    url: https://www.workcoverqld.com.au/claims-and-payments/claims/how-to-make-a-claim/work-capacity-certificate
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - anchored on WCRA 2003 (Qld) claim, Form 132M work capacity certificate, certificate of capacity and RRTW plan terms; 75 gated on one populated worker / claim or medical field, 85 on both plus insurer / claim-decision evidence. Claim number matched by label only because the format is not public (proposed identifier slot workcover-claim-number).
+author: testpattern-community
+license: MIT

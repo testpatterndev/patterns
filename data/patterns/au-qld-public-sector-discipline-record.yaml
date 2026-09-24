@@ -1,0 +1,214 @@
+schema: testpattern/v1
+name: Queensland Public Sector Discipline Record (Show Cause Notice, Allegations, Disciplinary Finding)
+slug: au-qld-public-sector-discipline-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Discipline records about an identified public sector employee under the Public Sector Act 2022 (Qld) and the Discipline Directive 05/23 (made under ss 100 and 222): show cause notices on disciplinary finding (allegation, particulars, the disciplinary ground under section 91 and the evidence, 14 days to respond), show cause notices on proposed disciplinary action (7 days), suspension notices, disciplinary findings and decision letters. Council and university discipline letters that use the same wording (show cause, allegation, particulars, disciplinary finding) are also caught. Overlaps global-top500-063-disciplinary-records (generic, being rebuilt separately); this classifier is the Qld-anchored, populated-record version.
+operation: >-
+  Primary: a discipline phrase (show cause notice/letter/process, show cause notice on disciplinary finding or on proposed disciplinary action, notice to show cause, Discipline Directive, Directive 05/23, disciplinary ground/finding/decision, proposed or serious disciplinary action, grounds for discipline, section 91(1)). 75 tier requires, within 300 characters, a populated employee field (employee/subject employee/staff member/officer name, employee or payroll number, position number or title, work unit, classification with a non-placeholder value) OR a populated allegation field (Allegation N: / Particulars: followed by at least three words, or "it is alleged that ..."). 85 tier requires the employee field AND the allegation field AND a decision/response structure (response due or respond-by date, notice/decision/suspension date, suspended with effect from a date, a finding of substantiated / not substantiated, proposed disciplinary action or penalty with an action word, or "within 14/7 days of receiving this notice") AND an independent corroborative term (natural justice, procedural fairness, Public Sector Act 2022, section 91, misconduct, delegate, Code of Conduct, respond in writing). All enforce tiers AND NOT the shared template-exclusion dictionary and a directive/guidance/decision exclusion (this directive, fact sheet, frequently asked questions, catchwords, case study, hypothetical, training module). 65 is discovery-only (primary alone) and will surface the directive, guidance and blank notices.
+pattern: >-
+  (?i)\b(?:show[\s-]+cause\s+(?:notice|letter|process|response)(?:\s+on\s+(?:(?:a\s+)?disciplinary\s+finding|proposed\s+disciplinary\s+action))?|notice\s+to\s+show\s+cause|Discipline\s+Directive|Directive\s+0?5/23|disciplinary\s+(?:ground|finding|decision)s?|proposed\s+disciplinary\s+action|serious\s+disciplinary\s+action|grounds?\s+for\s+discipline|(?:section|s\.?)\s*91\s*\(1\)(?:\s*\([a-h]\))?)
+confidence: medium
+confidence_justification: >-
+  Medium: the notice names and the section 91 ground come straight from Directive 05/23 and the Act, but the same words fill the directive, agency guidance, training and published appeal decisions, so enforce tiers need populated employee and allegation fields and 85 also needs a response-date or finding structure. Employee and position numbers are agency-defined, so values are label-anchored and placeholder-guarded rather than shape-checked. 85/75 are heuristic evidence tiers, not measured accuracy; test values are synthetic notices laid out like the directive's required content.
+jurisdictions:
+  - au
+regulations:
+  - Public Sector Act 2022 (Qld) s 91
+  - Discipline Directive 05/23 (Qld)
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - employment
+corroborative_evidence:
+  keywords:
+    - show cause notice on disciplinary finding
+    - show cause notice on proposed disciplinary action
+    - disciplinary ground
+    - allegation
+    - particulars
+    - natural justice
+    - Public Sector Act 2022
+    - suspension
+  proximity: 300
+customisation:
+  - key: employee-id
+    kind: identifier-format
+    identifier: employee-id
+    target: purview.regexes/Regex_au_qld_ps_discipline_employee_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's employee / staff id format (see docs/identifiers.md#employee-id). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+  - key: position-number
+    kind: identifier-format
+    identifier: position-number
+    target: purview.regexes/Regex_au_qld_ps_discipline_employee_field
+    mode: extend
+    affects_tiers:
+      - 75
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's position number format (see docs/identifiers.md#position-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "SHOW CAUSE NOTICE ON DISCIPLINARY FINDING\nEmployee: Jordan Testwell\nPosition number: 30012345\nAllegation 1: On 14 July 2026 you accessed the client records of a family member without a work reason.\nDisciplinary ground: section 91(1)(b) of the Public Sector Act 2022\nResponse due: 18/09/2026"
+      description: Show cause notice with employee, allegation, disciplinary ground and response date (85 tier)
+      synthetic: true
+    - value: "Disciplinary finding and decision\nEmployee number: 1042877\nParticulars of allegation 2: you failed to declare secondary employment with a council contractor.\nFinding on allegation 2: substantiated\nProposed disciplinary action: reprimand\nNatural justice was afforded under the Public Sector Act 2022."
+      description: Finding letter with employee number, particulars, finding and proposed action (85 tier)
+      synthetic: true
+    - value: "Show cause notice on proposed disciplinary action\nSubject employee: Casey Teston\nThe delegate proposes a reduction in classification level. Please provide any response within seven days."
+      description: Proposed-action notice with a populated employee field only (75 tier)
+      synthetic: true
+    - value: "Notice to show cause - School of Engineering\nStaff member: Riley Testwell\nThe University is considering whether disciplinary action is warranted and invites your written response."
+      description: University show cause letter with a populated staff member field (75 tier)
+      synthetic: true
+    - value: "Discipline Directive 05/23 process - suspension\nEmployee: Morgan Teston\nSuspended with effect from 02/09/2026 on normal remuneration pending the show cause process."
+      description: Suspension notice with employee and suspension date, no allegation (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: "A show cause notice on disciplinary finding must set out the allegation, the particulars of the allegation, the applicable disciplinary ground under section 91 and the evidence relied on. The employee must be given 14 days to respond."
+      description: Directive 05/23 guidance text (65 only)
+    - value: "SHOW CAUSE NOTICE ON DISCIPLINARY FINDING\nEmployee: [employee name]\nPosition number: __________\nAllegation 1: [insert allegation]\nResponse due: [date]"
+      description: Blank notice with placeholders (65 only)
+    - value: "CATCHWORDS: PUBLIC SERVICE - APPEAL AGAINST DISCIPLINARY DECISION - show cause notice - whether finding fair and reasonable. Employee: Jordan Testwell. Allegation 1: that the appellant used a work vehicle for private travel on 3 occasions."
+      description: Published appeal decision header quoting the notice (excluded by catchwords)
+    - value: "Training module 4 case study: the delegate issues a show cause notice to Employee: Pat Testcase, setting out Allegation 1: that the officer disclosed confidential information to a friend."
+      description: Training case study (excluded)
+    - value: "The department issued 212 show cause notices and made 97 disciplinary findings in 2025-26, the annual report shows."
+      description: Aggregate statistics / news (65 only)
+false_positives:
+  - description: Directive 05/23, agency discipline guidance and forgov pages describe show cause notices, allegations and particulars.
+    mitigation: Enforce tiers need a populated employee or allegation field; guidance uses the labels without values, and a directive/guidance exclusion suppresses text that names this directive, fact sheets or FAQs.
+  - description: Published QIRC and court decisions quote show cause notices and allegations in full.
+    mitigation: Decisions carry a CATCHWORDS header, which is in the exclusion group. Decisions are public, so they are not the target record; decision extracts without catchwords can still reach 75.
+  - description: Blank notice templates and form kits.
+    mitigation: Blank lines, square-bracket and angle-bracket placeholders and n/a/tbc values are rejected; template wording is excluded by the shared template-exclusion dictionary.
+  - description: Student discipline records (school suspension, academic show cause) use similar words.
+    mitigation: Those are covered by au-qld-school-suspension-exclusion-decision and au-tertiary-academic-progression-show-cause; this classifier needs employee-type labels (employee, staff member, officer, position number) or allegation particulars.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_qld_ps_discipline_primary
+      matches:
+        - ref: Regex_au_qld_ps_discipline_employee_field
+        - ref: Regex_au_qld_ps_discipline_allegation_field
+        - ref: Regex_au_qld_ps_discipline_decision_field
+        - ref: Keyword_au_qld_ps_discipline_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_ps_discipline_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_qld_ps_discipline_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_qld_ps_discipline_employee_field
+            - Regex_au_qld_ps_discipline_allegation_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_ps_discipline_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_qld_ps_discipline_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_qld_ps_discipline_primary
+      pattern: >-
+        (?i)\b(?:show[\s-]+cause\s+(?:notice|letter|process|response)(?:\s+on\s+(?:(?:a\s+)?disciplinary\s+finding|proposed\s+disciplinary\s+action))?|notice\s+to\s+show\s+cause|Discipline\s+Directive|Directive\s+0?5/23|disciplinary\s+(?:ground|finding|decision)s?|proposed\s+disciplinary\s+action|serious\s+disciplinary\s+action|grounds?\s+for\s+discipline|(?:section|s\.?)\s*91\s*\(1\)(?:\s*\([a-h]\))?)
+    - id: Regex_au_qld_ps_discipline_employee_field
+      pattern: >-
+        (?i)\b(?:(?:subject\s+)?employee(?:'s)?(?:\s+(?:name|no\.?|number|ID))?|staff\s+member(?:\s+(?:name|no\.?|number|ID))?|officer(?:'s)?\s+name|name\s+of\s+(?:employee|officer|staff\s+member)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number|title)|work\s+unit|classification(?:\s+level)?)\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_au_qld_ps_discipline_allegation_field
+      pattern: >-
+        (?i)\b(?:(?:allegation\s*(?:no\.?\s*)?(?:\d{1,2}|[A-H])?|particulars?(?:\s+of\s+(?:the\s+)?allegation(?:\s*\d{1,2})?)?)\s*[:\-]|it\s+is\s+alleged\s+that)\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z][A-Za-z'-]{1,30}(?:[ \t,;]+[A-Za-z0-9'/().-]{1,30}){2,12}
+    - id: Regex_au_qld_ps_discipline_decision_field
+      pattern: >-
+        (?i)\b(?:(?:response\s+(?:due|date|deadline|required\s+by)|respond\s+(?:by|no\s+later\s+than)|due\s+date|(?:notice|decision|suspension)\s+date|date\s+of\s+(?:notice|decision|suspension|finding)|suspended\s+(?:from\s+duty\s+)?(?:from|with\s+effect\s+from|effective))\s*[:\-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-](?:\d{4}|\d{2})|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})|(?:finding|decision|outcome)(?:\s+(?:on|for)\s+allegation\s*\d{0,2})?\s*[:\-]\s*(?:substantiated|not\s+substantiated|partially\s+substantiated|unsubstantiated)|(?:proposed\s+)?(?:disciplinary\s+action|penalty)\s*[:\-]\s*(?:termination|reprimand|reduction|demotion|transfer|redeployment|fine|forfeiture|deferral)|within\s+(?:14|7|fourteen|seven)\s+days\s+(?:of|from|after)\s+(?:receiving|receipt|the\s+date\s+of)\b)
+  keywords:
+    - id: Keyword_au_qld_ps_discipline_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - natural justice
+            - procedural fairness
+            - Public Sector Act 2022
+            - section 91
+            - misconduct
+            - delegate
+            - Code of Conduct
+            - respond in writing
+            - written response
+            - suspension
+            - support person
+      strength: specific
+    - id: Keyword_au_qld_ps_discipline_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - this directive
+            - purpose of this directive
+            - fact sheet
+            - factsheet
+            - frequently asked questions
+            - catchwords
+            - case study
+            - hypothetical
+            - training module
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  The classifier identifies a discipline record about an identified public sector (or council or university) employee: a show cause notice, allegation particulars, suspension, disciplinary finding or proposed disciplinary action. The record discloses conduct allegations and findings that affect employment rights, can cause reputational and legal harm if released, and is screened in later recruitment ("serious disciplinary action" under Directive 07/23). The directive, guidance, blank notices and published decision headers are excluded from enforce tiers. Risk 8 supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Queensland Government (forgov) - Discipline Directive 05/23
+    url: https://www.forgov.qld.gov.au/pay-benefits-and-policy/directives-policies-circulars-and-guidelines/discipline-directive-0523
+  - title: Public Sector Act 2022 (Qld) s 91 Grounds for discipline (AustLII)
+    url: https://classic.austlii.edu.au/au/legis/qld/consol_act/psa2022152/s91.html
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - Directive 05/23 show cause notices, allegations, suspension and disciplinary findings; 75 gated on a populated employee or allegation field, 85 on employee + allegation + response-date/finding structure + corroborative term; directive text, guidance, blank notices and decision headers excluded.
+author: testpattern-community
+license: MIT
