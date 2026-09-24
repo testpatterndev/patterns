@@ -1,0 +1,162 @@
+schema: testpattern/v1
+name: Family Law Notice of Child Abuse, Family Violence or Risk
+slug: au-family-law-notice-of-child-abuse-family-violence-risk
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Detects completed Notices of Child Abuse, Family Violence or Risk filed in parenting proceedings
+  in the Federal Circuit and Family Court of Australia (Family Law Act 1975 ss67Z, 67ZBA,
+  69ZQ(1)(aa)), including the earlier "Notice of Child Abuse, Family Violence or Risk of Family
+  Violence" and the Family Court of Western Australia Form 4 "Notice of Child Abuse and Family
+  Violence (or Risk)". The notice records allegations of child abuse or neglect, family violence,
+  substance misuse, mental health issues and abduction threats against named parties and children,
+  and child abuse allegations are reported to the prescribed child welfare authority.
+operation: >-
+  Primary: the notice title (current, earlier or WA Form 4 wording). 75 tier requires a populated
+  court-box field (File number, Client ID or Date filed with a non-placeholder value) or a populated
+  person field (family/given/full name, child name, applicant/respondent name) within 1000
+  characters. 85 tier requires both, plus a structural anchor from the form (Part C/Part D headings,
+  the abuse-type tick grid terms, ss67Z/67ZBA/69ZQ, Rule 15.21 approval text or the 0524V1 form
+  code). All tiers exclude template/fixture text. 65 is discovery-only (title alone) and will surface
+  blank forms and court guidance.
+pattern: >-
+  (?i)\bNotice\s+of\s+Child\s+Abuse,?\s+(?:and\s+)?Family\s+Violence(?:\s+or\s+Risk(?:\s+of\s+Family\s+Violence)?|\s+\(or\s+Risk\))?
+confidence: medium
+confidence_justification: >-
+  Medium-high structure: the title is a distinctive form name, but it is also published on court,
+  legal aid and law firm pages and in blank form kits, so enforce tiers require populated court-box
+  or person fields. 85/75 are heuristic evidence tiers, not measured accuracy; synthetic examples
+  follow the published FCFCOA form layout (form code 0524V1).
+jurisdictions:
+  - au
+regulations:
+  - Family Law Act 1975 (Cth)
+  - Federal Circuit and Family Court of Australia (Family Law) Rules 2021
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - QGISCF
+data_categories:
+  - legal
+  - pii
+corroborative_evidence:
+  keywords:
+    - Federal Circuit and Family Court of Australia
+    - child welfare authority
+    - Exposure to family violence
+    - Part D Family violence or risk of family violence
+    - File number
+    - Client ID
+    - Date filed
+  proximity: 1000
+  keyword_lists:
+    - au-dfv-terminology
+test_cases:
+  should_match:
+    - value: "Federal Circuit and Family Court of Australia (Division 2)\nNotice of Child Abuse, Family Violence or Risk\nFile number: BRC4417/2026\nDate filed: 03/09/2026\nPart A About you\nFamily name: Teston\nGiven names: Avery\nAre you the applicant or respondent? Applicant\nPart D Family violence or risk of family violence\nPhysical [X]  Emotional/Psychological [X]  Exposure to family violence [X]"
+      description: Completed notice with court box, party name and Part D ticks
+      synthetic: true
+    - value: "Notice of Child Abuse, Family Violence or Risk (Family Law Act 1975 - sections 67Z, 67ZBA, 69ZQ(1)(aa))\nClient ID: 20411873\nChild 1 name: Riley Teston  Date of birth: 14/05/2019\nPart C Child abuse or neglect or risk of child abuse or neglect: the respondent Jordan Teston has hit the child."
+      description: Completed notice identifying a child and allegation
+      synthetic: true
+    - value: "Family Court of Western Australia - Form 4\nNotice of Child Abuse and Family Violence (or Risk)\nFile number: PTW 2291 of 2026\nFull name: Morgan Teston\nThe father threatened to take the children overseas."
+      description: WA Form 4 notice
+      synthetic: true
+  should_not_match:
+    - value: If you allege that a child has been abused or is at risk of family violence, you must file a Notice of Child Abuse, Family Violence or Risk with your application for parenting orders. The court may refer the matter to the child welfare authority.
+      description: Court guidance explaining when to file the notice
+    - value: "Notice of Child Abuse, Family Violence or Risk\nTo be completed by the court\nFile number: __________\nClient ID: __________\nDate filed: __________\nPart A About you\nFamily name: __________"
+      description: Blank form kit
+    - value: Our family lawyers can help you prepare a Notice of Child Abuse, Family Violence or Risk. Call 1300 000 000 to book a consultation.
+      description: Law firm marketing page
+false_positives:
+  - description: Court, legal aid and law firm pages describing the notice.
+    mitigation: Enforce tiers require populated court-box or person fields.
+  - description: Blank form kits and precedent libraries.
+    mitigation: Blank lines, square-bracket and angle-bracket placeholders, and n/a/tbc values are rejected; template text is excluded.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 1000
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_notice_child_abuse_fv_risk_title
+      matches:
+        - ref: Regex_family_court_box_field
+        - ref: Regex_family_law_person_field
+        - ref: Regex_notice_form_anchor
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_notice_child_abuse_fv_risk_title
+      matches:
+        - type: any
+          refs:
+            - Regex_family_court_box_field
+            - Regex_family_law_person_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_notice_child_abuse_fv_risk_title
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_notice_child_abuse_fv_risk_title
+      pattern: >-
+        (?i)\bNotice\s+of\s+Child\s+Abuse,?\s+(?:and\s+)?Family\s+Violence(?:\s+or\s+Risk(?:\s+of\s+Family\s+Violence)?|\s+\(or\s+Risk\))?
+    - id: Regex_family_court_box_field
+      pattern: >-
+        (?i)\b(?:file\s+(?:number|no\.?)|client\s+ID|date\s+filed)\s*:\s*(?!(?:n/?a|tbc|tba|to\s+be)\b|_{2,}|\[|<)(?=[A-Z0-9/ -]{0,20}\d)[A-Z0-9][A-Z0-9/ -]{3,20}
+    - id: Regex_family_law_person_field
+      pattern: >-
+        (?i)\b(?:family\s+name|surname|given\s+names?|full\s+name|child\s+\d\s+name|child(?:'s)?\s+name|name\s+of\s+(?:the\s+)?child|applicant(?:'s)?\s+name|respondent(?:'s)?\s+name)\s*:\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]{1,30}
+    - id: Regex_notice_form_anchor
+      pattern: >-
+        (?i)\bPart\s+[CD]\s+(?:Child\s+abuse\s+or\s+neglect|Family\s+violence\s+or\s+risk\s+of\s+family\s+violence)|\bExposure\s+to\s+family\s+violence\b|\bEmotional/Psychological\b|\b(?:sections?\s+)?67Z(?:BA)?\b|\b69ZQ\b|\bRule\s+15\.21\b|\b0524V1\b|\bchild\s+welfare\s+authority\b
+risk_rating: 9
+risk_description: >-
+  The detector identifies a completed family law notice alleging child abuse, family violence or
+  risk against named parties and children. The notice combines allegations of physical, sexual and
+  emotional abuse, neglect, substance misuse, mental illness and abduction threats with child names,
+  dates of birth and court identifiers; child abuse allegations are also reported to the state child
+  welfare authority. Family law proceedings carry statutory restrictions on publishing identifying
+  accounts, and disclosure can endanger children and the reporting parent. Court guidance, blank kits
+  and marketing are excluded from enforce tiers. Risk 9 supports SENSITIVE Legal.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Legal
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - title: FCFCOA — Notice of Child Abuse, Family Violence or Risk
+    url: https://www.fcfcoa.gov.au/fl/forms/notice-cafvor
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release — completed family law notices of child abuse, family violence or risk, gated on populated court-box and person fields with FCFCOA form-structure anchors at 85.
+author: testpattern-community
+license: MIT

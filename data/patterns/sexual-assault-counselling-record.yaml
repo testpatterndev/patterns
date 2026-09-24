@@ -1,21 +1,59 @@
 schema: testpattern/v1
 name: Sexual Assault Counselling Record
 slug: sexual-assault-counselling-record
-version: 1.4.2
-type: keyword_proximity
+version: 2.0.0
+type: regex
 pattern_class: concept
-engine: universal
-description: Detects sexual assault counselling session records containing victim identifiers, forensic medical examination details, and trauma counselling notes. These records are subject to absolute privilege in Queensland and carry the highest privacy protections — disclosure can re-traumatise survivors, compromise criminal proceedings, and endanger safety.
-operation: 'Keyword proximity: primary keywords (sexual assault counselling, victim support, trauma counselling, forensic medical examination, SARAS) within 300 characters of corroborative keywords (PROTECTED, Privacy, survivor, counsellor, incident date). Negative keyword exclusion for awareness campaigns, training, published statistics, and policy documents.'
-pattern: (?i)\b(sexual\s+assault\s+counselling|forensic\s+medical\s+examination|trauma\s+counselling\s+(?:session|record|notes)|victim[\s/]survivor\s+support|SARAS\s+(?:referral|service|case)|sexual\s+violence\s+counselling)\b
+engine: boost_regex
+description: >-
+  Detects sexual assault counselling records and the legal material that seeks or protects them, for an
+  identified person: counselling session notes, trauma counselling and victim/survivor support records,
+  forensic medical examination referrals, specialist sexual assault service records (Queensland SARAS,
+  Centres Against Sexual Assault, Yarrow Place, Sexual Assault Resource Centre, sexual assault response
+  teams), and subpoena or privilege material about protected counselling communications — Qld sexual
+  assault counselling privilege (Evidence Act 1977 Pt 2 Div 2A), NSW sexual assault communications
+  privilege (Criminal Procedure Act 1986 ss295-306), Vic confidential communications (Evidence
+  (Miscellaneous Provisions) Act 1958 Div 2A), and WA, SA, Tas, ACT and NT equivalents. These records are
+  subject to strong statutory privilege and carry the highest privacy protections — disclosure can
+  re-traumatise survivors, compromise criminal proceedings, and endanger safety.
+operation: >-
+  Primary: any of two regexes — a sexual violence disclosure statement (disclosed / reported /
+  experienced / victim or survivor of / history of, followed within three words by sexual assault,
+  sexual abuse, sexual violence, rape, child sexual abuse or indecent assault/treatment), or a
+  counselling, privilege or specialist-service phrase (sexual assault or sexual violence counselling,
+  trauma counselling session/record/notes, forensic medical examination, victim/survivor support,
+  SARAS, protected counselling communication, sexual assault communications/counselling privilege,
+  protected confider, Counselling Notes Protect, Centre(s) Against Sexual Assault, Yarrow Place, Sexual
+  Assault Resource Centre, sexual assault support service, sexual assault response team). Bare CASA/SARC
+  acronyms, 1800RESPECT and "confidential communication" are never primaries. 75 tier requires a
+  populated record field (client, patient, participant or protected confider name or ID; case, file,
+  matter or case reference number; date of birth; incident date; police report number; counsellor;
+  SARAS case reference) within 300 characters. 85 tier additionally requires two distinct counselling or
+  legal-process terms. All tiers exclude template/fixture text and awareness, statistics, training and
+  media phrases. 65 is discovery-only.
+pattern: >-
+  (?i)\b(?:disclos(?:ed|es|ing|ure\s+of)|report(?:ed|s|ing)|experienc(?:ed|es|ing)|victim\s+of|survivor\s+of|history\s+of|subjected\s+to)\s+(?:[a-z]{1,20}\s{1,5}){0,3}?(?:sexual\s+(?:assault|abuse|violence)|rape|child\s+sexual\s+abuse|indecent\s+(?:assault|treatment))\b|\b(?:sexual\s+(?:assault|violence)\s+counselling|trauma\s+counselling\s+(?:session|record|notes)|forensic\s+medical\s+examination|victim[\s/]survivor\s+support|SARAS|protected\s+counselling\s+communications?|sexual\s+assault\s+communications?\s+privilege|sexual\s+assault\s+counselling\s+privilege|protected\s+confider|Counselling\s+Notes\s+Protect|Centres?\s+Against\s+Sexual\s+Assault|Yarrow\s+Place|Sexual\s+Assault\s+Resource\s+Centre|sexual\s+assault\s+(?:support\s+)?services?|sexual\s+assault\s+response\s+team)\b
 confidence: medium
-confidence_justification: 'Medium confidence: requires co-occurrence of sexual assault service terminology with victim/survivor identifiers. Generic awareness or policy content about sexual assault services does not trigger detection.'
+confidence_justification: >-
+  Medium: sexual violence disclosure language and service names are common in news, research, awareness
+  material and referral directories. Enforce tiers require a populated record field; 85 adds counselling
+  or legal-process terms independent of the primary phrase. Earlier versions corroborated the 75 tier
+  with the primary's own phrase list and required a SARAS-YYYY-NNNNN reference at 85, a format not found
+  in any published source. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
   - au
 regulations:
 - "Criminal Code 1899 (Qld)"
 - "Evidence Act 1977 (Qld)"
 - "IPA 2009 (Qld)"
+- "Criminal Procedure Act 1986 (NSW)"
+- "Evidence (Miscellaneous Provisions) Act 1958 (Vic)"
+- "Evidence Act 1906 (WA)"
+- "Evidence Act 1929 (SA)"
+- "Evidence Act 2001 (Tas)"
+- "Evidence (Miscellaneous Provisions) Act 1991 (ACT)"
+- "Evidence Act 1939 (NT)"
+- "Privacy Act 1988 (Cth)"
 frameworks:
 - QGISCF
 data_categories:
@@ -24,31 +62,20 @@ data_categories:
   - government
 corroborative_evidence:
   keywords:
-    - PROTECTED
-    - Privacy
-    - sexual assault counselling
-    - SARAS
-    - forensic medical examination
-    - trauma counselling
-    - victim
-    - survivor
+    - counselling session
     - counsellor
+    - session notes
+    - forensic medical examination
+    - subpoena
+    - privilege
+    - protected counselling communication
     - incident date
     - police report number
-    - crisis support
     - safety plan
-    - court proceeding
-    - confidential communication
-    - Queensland Health
-    - sexual assault service
-    - referral
   proximity: 300
   keyword_lists:
-
     - healthcare-clinical
-
     - law-enforcement
-    - en-government-classification
 test_cases:
   should_match:
     - value: 'PROTECTED Privacy. Sexual Assault Counselling Record — Queensland Health SARAS Service. Client: Rebecca Louise MARTIN, DOB 23/05/1994. Case Reference: SARAS-2026-04518. Session 4 of trauma counselling conducted 01/03/2026 by accredited counsellor Sarah Thompson. Client reports continued hypervigilance and sleep disturbance following the sexual assault of 12/01/2026. Forensic medical examination was completed at Royal Brisbane Women''s Hospital on 13/01/2026. Safety plan reviewed and updated. QPS report number: QP-2026-187423.'
@@ -57,6 +84,15 @@ test_cases:
       description: SARAS referral document with forensic examination and court proceeding details
     - value: 'Confidential — Sexual Assault Service. Trauma counselling notes for ongoing client. Client presented in acute distress following contact from offender''s legal representative. Crisis support provided. Safety plan activated — emergency accommodation arranged through DV Connect. Counsellor assessment: client requires increased session frequency. Incident date: 14/11/2025. Police report number: QP-2025-342891. Next session: 10/03/2026.'
       description: Trauma counselling notes with crisis intervention and safety planning details
+    - value: "Centre Against Sexual Assault - counselling case note\nClient name: Avery Teston\nClient ID: CASA-20417\nSession 4, 11/09/2026. Client disclosed childhood sexual abuse by a family member. Counsellor discussed trauma responses and updated the safety plan."
+      description: Victorian CASA counselling case note
+      synthetic: true
+    - value: 'Patient ID: MRN0071932. Date of birth: 12/08/2002. Patient reported sexual assault on 06/09/2026; forensic examination offered through the sexual assault response team. Counselling session booked; counsellor contact provided.'
+      description: Hospital intake recording a sexual assault disclosure
+      synthetic: true
+    - value: "Objection to subpoena - protected counselling communications (Evidence Act 1977 s14F)\nProtected confider: Morgan Teston\nMatter number: 2026/0041187\nThe counselling notes are privileged; the confider does not consent to produce and opposes leave to issue the subpoena."
+      description: Privilege objection over counselling notes
+      synthetic: true
   should_not_match:
     - value: The Queensland Government funds Sexual Assault Response and Support (SARAS) services across the state. SARAS provides free and confidential counselling for anyone who has experienced sexual assault. Services are available 24 hours a day.
       description: Public information about SARAS services with no client details
@@ -64,19 +100,25 @@ test_cases:
       description: Published statistical report with aggregate de-identified data
     - value: The university sexual assault prevention training module explains consent, bystander intervention, and support services available to students. Case studies in the training are entirely fictional.
       description: University training module on sexual assault prevention with fictional scenarios
+    - value: Around one in five women in Australia has experienced sexual violence since the age of 15. If you need support, call 1800RESPECT or contact a sexual assault support service.
+      description: Awareness statistics with a support-service footer
+    - value: The sexual assault communications privilege in the Criminal Procedure Act 1986 protects counselling notes from being produced in criminal proceedings unless the court grants leave.
+      description: Legal information explainer
+    - value: "Sexual assault counselling intake\nClient name: __________\nClient ID: __________\nHas the client disclosed sexual assault?  [ ] Yes  [ ] No"
+      description: Blank intake form
 false_positives:
-  - description: Public awareness campaigns about sexual assault support services
-    mitigation: 'Negative keyword exclusion: ''awareness campaign'', ''support line'', ''public information'', ''community education'', ''help is available''. Require proximity to actual client identifiers or case numbers.'
+  - description: Public awareness campaigns, service directories and support-line footers
+    mitigation: 'Enforce tiers require a populated record field; phrase exclusion: ''awareness campaign'', ''support line'', ''public information'', ''community education'', ''government funds'''
   - description: Published annual reports and statistics on sexual assault service utilisation
-    mitigation: 'Negative keyword exclusion: ''annual report'', ''statistical report'', ''de-identified'', ''aggregate data'', ''service utilisation''. Require co-occurrence with client-specific terms.'
+    mitigation: 'Enforce tiers require a populated record field; phrase exclusion: ''annual report'', ''statistical report'', ''de-identified'', ''aggregate data'''
   - description: Training materials for sexual assault counsellors using fictional scenarios
-    mitigation: 'Negative keyword exclusion: ''training module'', ''fictional'', ''case study'', ''role play'', ''learning exercise'', ''scenario'''
-  - description: News reporting on sexual assault policy and legislative reform
-    mitigation: 'Negative keyword exclusion: ''media release'', ''news article'', ''legislative reform'', ''parliamentary inquiry'', ''policy submission'''
+    mitigation: 'Phrase exclusion: ''training module'', ''fictional'', ''case study'', ''role play'''
+  - description: News reporting and legal commentary on sexual assault policy and counselling privilege
+    mitigation: 'Enforce tiers require a populated record field; phrase exclusion: ''media release'', ''news article'', ''legislative reform'''
 exports:
   - purview_xml
   - yaml
-scope: wide
+scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
@@ -86,12 +128,16 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_sexual_assault_counselling_record_sexual_assault_service_terms
+      id_match:
+        type: any
+        ids:
+          - Pattern_sexual_assault_counselling_record_sexual_violence_disclosure
+          - Pattern_sexual_assault_counselling_record_sexual_assault_service_terms
       matches:
-        - ref: Evidence_sexual_assault_counselling_record_primary_keywords
-        - ref: Evidence_sexual_assault_counselling_record_classification_markers
-        - ref: Evidence_sexual_assault_counselling_record_corroborative_terms
-        - ref: Pattern_sexual_assault_counselling_record_saras_case_reference
+        - ref: Pattern_sexual_assault_counselling_record_record_field
+        - ref: Evidence_sexual_assault_counselling_record_counselling_process
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -99,9 +145,13 @@ purview:
             - Keyword_noise_exclusion
             - Filter_sexual_assault_counselling_record_exclusion
     - confidence_level: 75
-      id_match: Pattern_sexual_assault_counselling_record_sexual_assault_service_terms
+      id_match:
+        type: any
+        ids:
+          - Pattern_sexual_assault_counselling_record_sexual_violence_disclosure
+          - Pattern_sexual_assault_counselling_record_sexual_assault_service_terms
       matches:
-        - ref: Evidence_sexual_assault_counselling_record_primary_keywords
+        - ref: Pattern_sexual_assault_counselling_record_record_field
         - type: any
           min_matches: 0
           max_matches: 0
@@ -110,7 +160,11 @@ purview:
             - Filter_sexual_assault_counselling_record_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_sexual_assault_counselling_record_sexual_assault_service_terms
+      id_match:
+        type: any
+        ids:
+          - Pattern_sexual_assault_counselling_record_sexual_violence_disclosure
+          - Pattern_sexual_assault_counselling_record_sexual_assault_service_terms
       matches:
         - type: any
           min_matches: 0
@@ -119,49 +173,39 @@ purview:
             - Keyword_noise_exclusion
             - Filter_sexual_assault_counselling_record_exclusion
   regexes:
+    - id: Pattern_sexual_assault_counselling_record_sexual_violence_disclosure
+      pattern: >-
+        (?i)\b(?:disclos(?:ed|es|ing|ure\s+of)|report(?:ed|s|ing)|experienc(?:ed|es|ing)|victim\s+of|survivor\s+of|history\s+of|subjected\s+to)\s+(?:[a-z]{1,20}\s{1,5}){0,3}?(?:sexual\s+(?:assault|abuse|violence)|rape|child\s+sexual\s+abuse|indecent\s+(?:assault|treatment))\b
     - id: Pattern_sexual_assault_counselling_record_sexual_assault_service_terms
-      pattern: (?i)\b(sexual\s+assault\s+counselling|forensic\s+medical\s+examination|trauma\s+counselling|victim[\s/]survivor\s+support|SARAS|sexual\s+violence\s+counselling|confidential\s+communication)\b
-    - id: Pattern_sexual_assault_counselling_record_saras_case_reference
-      pattern: \bSARAS-\d{4}-\d{4,5}\b
+      pattern: >-
+        (?i)\b(?:sexual\s+(?:assault|violence)\s+counselling|trauma\s+counselling\s+(?:session|record|notes)|forensic\s+medical\s+examination|victim[\s/]survivor\s+support|SARAS|protected\s+counselling\s+communications?|sexual\s+assault\s+communications?\s+privilege|sexual\s+assault\s+counselling\s+privilege|protected\s+confider|Counselling\s+Notes\s+Protect|Centres?\s+Against\s+Sexual\s+Assault|Yarrow\s+Place|Sexual\s+Assault\s+Resource\s+Centre|sexual\s+assault\s+(?:support\s+)?services?|sexual\s+assault\s+response\s+team)\b
+    - id: Pattern_sexual_assault_counselling_record_record_field
+      pattern: >-
+        (?i)\bSARAS-\d{4}-\d{4,5}\b|\b(?:(?:client|patient|participant|resident)(?:\s+(?:name|ID|no\.?|number|reference))?|protected\s+confider|(?:case|file|client|matter)\s*(?:no\.?|number|ID|#|reference)|MRN|date\s+of\s+birth|DOB|incident\s+date|police\s+report\s+number|(?:QPS\s+)?report\s+number|counsellor)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_sexual_assault_counselling_record_primary_keywords
+    - id: Evidence_sexual_assault_counselling_record_counselling_process
       groups:
         - match_style: word
           terms:
-            - sexual assault counselling
-            - forensic medical examination
-            - trauma counselling
-            - victim/survivor support
-            - SARAS
-            - sexual violence counselling
+            - counselling session
+            - counsellor
+            - accredited counsellor
+            - session notes
+            - case notes
+            - counselling notes
             - crisis support
             - safety plan
-            - confidential communication
-            - sexual assault service
-      strength: specific
-    - id: Evidence_sexual_assault_counselling_record_classification_markers
-      groups:
-        - match_style: word
-          terms:
-            - Privacy
-      strength: domain
-    - id: Evidence_sexual_assault_counselling_record_corroborative_terms
-      groups:
-        - match_style: word
-          terms:
-            - counsellor
-            - incident date
-            - police report number
-            - text: QPS
-              case_sensitive: true
-            - court proceeding
             - forensic kit
             - chain of custody
-            - DV Connect
-            - referral
-            - Queensland Health
-            - accredited counsellor
-            - session
+            - forensic examination
+            - trauma
+            - subpoena
+            - privilege
+            - privileged
+            - leave to issue
+            - consent to produce
+            - court proceeding
+            - next session
       strength: specific
     - id: Filter_sexual_assault_counselling_record_exclusion
       groups:
@@ -183,19 +227,27 @@ purview:
             - news article
             - legislative reform
             - government funds
-
       strength: noise
 risk_rating: 9
 risk_description: >-
-  This proximity classifier identifies a sexual-assault counselling or victim-support record by combining counselling, trauma, or forensic-examination terms with survivor, counsellor, incident-date, privacy, or case context. Disclosure could reveal a survivor's identity, assault account, injuries, forensic examination, and therapeutic communications, causing retraumatisation, stigma, retaliation, or prejudice to criminal proceedings. The record exposes a survivor's identity, trauma narrative, health effects, alleged offender and safety arrangements. Disclosure can cause severe retraumatisation, stigma, coercion or retaliation. These consequences place a confirmed Sexual Assault Counselling Record record at risk 9 and PROTECTED Legal without assuming that every low-confidence phrase hit contains the record.
+  This classifier identifies a sexual-assault counselling, forensic or victim-support record, or legal material over protected counselling communications, tied to an identified person by a populated client, case, matter, incident or police-report field. Disclosure could reveal a survivor's identity, assault account, injuries, forensic examination, and therapeutic communications, causing retraumatisation, stigma, retaliation, or prejudice to criminal proceedings. The record exposes a survivor's identity, trauma narrative, health effects, alleged offender and safety arrangements. These consequences place a confirmed Sexual Assault Counselling Record at risk 9 and PROTECTED Legal without assuming that every discovery-tier phrase hit contains the record.
 sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: PROTECTED Legal
-references: []
+references:
+  - title: Legal Aid Queensland — Sexual Assault Counselling Privilege (Counselling Notes Protect)
+    url: https://www.legalaid.qld.gov.au/About-us/Policies-and-procedures/Grants-Handbook/What-do-we-fund/Civil-law/Sexual-Assault-Counselling-Privilege-Counselling-Notes-Protect
+  - title: NSW Criminal Trial Courts Bench Book — Sexual assault communications privilege
+    url: https://judcom.nsw.gov.au/publications/benchbks/criminal/sexual_assault_communications_privilege.html
+  - title: Judicial College of Victoria — Confidential communications
+    url: https://judicialcollege.vic.edu.au/resources/confidential-communications
 created: '2026-03-06'
-updated: '2026-07-15'
+updated: '2026-09-24'
 changelog:
+  - version: 2.0.0
+    date: '2026-09-24'
+    description: 'Rebuild detector to the concept tier shape without changing risk, labels or package metadata. 75 previously required only the primary phrase list again (same-span self-corroboration) and 85 required a SARAS-YYYY-NNNNN reference not found in any published source. Now: primaries are a sexual violence disclosure statement or a counselling/privilege/specialist-service phrase (adds NSW, Vic and other-jurisdiction privilege terms and CASA, Yarrow Place, SARC and SART service names; drops bare "confidential communication", which collides with ordinary business text); 75 requires a populated record field (client, case, matter, incident date, police report number, counsellor, protected confider, SARAS reference); 85 adds two distinct counselling or legal-process terms. Exclusion filter kept. Absorbs the separately drafted au-sexual-assault-counselling-record so the catalog keeps one classifier for this record type.'
   - version: 1.4.2
     date: '2026-07-15'
     description: 'v25 authoritative risk alignment from Compl8DLPDeploy workbook row 1498; detector and package metadata unchanged.'

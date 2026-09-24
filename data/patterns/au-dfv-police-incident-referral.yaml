@@ -1,0 +1,179 @@
+schema: testpattern/v1
+name: Domestic and Family Violence Police Incident or Referral
+slug: au-dfv-police-incident-referral
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Detects police domestic and family violence (DFV) incident records and the referrals police
+  send to specialist and government services: Queensland QPRIME DV occurrences, Victoria Police L17
+  Family Violence Reports, NSW DV events, and DFV incident, call-out and attendance records in
+  other jurisdictions. These records travel beyond police to housing, child safety, health,
+  education and specialist DFV services, so they turn up in general agency mailboxes and file shares.
+operation: >-
+  Primary: any of two regexes — a case-insensitive DFV incident/occurrence/event/call-out/
+  attendance/referral or family violence report phrase, or the case-sensitive L17 form code.
+  75 tier requires either a police reference (QPRIME QP + 10 digits, or a labelled occurrence/
+  event/incident/job/report number containing a digit) or a populated party field (victim,
+  aggrieved, affected family member, person in need of protection, respondent, offender, person
+  of interest, involved person) within 300 characters. 85 tier requires both. All tiers exclude
+  template/fixture text. 65 is discovery-only.
+pattern: >-
+  (?i)\b(?:(?:domestic|family)(?:\s+and\s+(?:family|domestic))?\s+violence\s+(?:incidents?|occurrences?|events?|call-?outs?|attendances?|referrals?|reports?)|(?:DV|DFV|FDV)\s+(?:incidents?|occurrences?|events?|jobs?|referrals?)|police\s+referral\s+(?:to|for)\s+(?:a\s+)?(?:specialist\s+)?(?:DFV|domestic|family\s+violence)|domestic\s+violence:\s+support\s+for\s+(?:aggrieved|respondent)|referred\s+with\s+QPS\s+authority|central\s+referral\s+point|family\s+violence\s+risk\s+assessment\s+and\s+management\s+report)\b|\bL17\b
+confidence: medium
+confidence_justification: >-
+  Medium: DFV incident language is common in police annual reports, media and procedures, so
+  enforce tiers depend on a police reference or a populated party field. The L17 form code alone
+  is ambiguous and is only a primary, never evidence. 85/75 are heuristic evidence tiers, not
+  measured accuracy.
+jurisdictions:
+  - au
+regulations:
+  - DFV Protection Act 2012 (Qld)
+  - PPRA 2000 (Qld)
+  - Family Violence Protection Act 2008 (Vic)
+  - Crimes (Domestic and Personal Violence) Act 2007 (NSW)
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - QGISCF
+data_categories:
+  - law-enforcement
+  - pii
+corroborative_evidence:
+  keywords:
+    - occurrence
+    - QPRIME
+    - aggrieved
+    - respondent
+    - person of interest
+    - police protection notice
+    - referral
+    - DVConnect
+  proximity: 300
+  keyword_lists:
+    - au-dfv-terminology
+test_cases:
+  should_match:
+    - value: "QPRIME occurrence QP2600123456. Domestic violence incident at residence, Logan.\nAggrieved: Avery Teston. Respondent: Casey Teston. PPN issued. Referral to DVConnect with consent."
+      description: Queensland DV occurrence with QPRIME number and parties
+      synthetic: true
+    - value: "L17 Family Violence Report\nReport number: 260914-0043\nAffected family member: Morgan Teston\nRespondent: Riley Teston\nReferral sent to The Orange Door."
+      description: Victoria Police L17 referral
+      synthetic: true
+    - value: 'DV event. Event number: E86655708. Person in need of protection: Jamie Teston. Person of interest: Alex Teston. DVSAT completed: serious threat; referred to Safety Action Meeting.'
+      description: NSW DV event with DVSAT outcome
+      synthetic: true
+  should_not_match:
+    - value: Police attended more than 300,000 family violence incidents nationally in 2025, and referrals to specialist services increased by 11 per cent.
+      description: Aggregate statistics
+    - value: Officers must complete an L17 for every family violence incident attended and record the event number and the details of the affected family member.
+      description: Police procedure text
+    - value: 'Incident number: INC0048213. Priority 2. Server outage in the Brisbane data centre; the respondent group was the network team.'
+      description: IT incident ticket with no DFV context
+false_positives:
+  - description: Police annual reports, procedures and training that describe DFV incident handling.
+    mitigation: Enforce tiers require a police reference number or a populated party field.
+  - description: L17 used as an unrelated code (lot, grid reference, part number).
+    mitigation: L17 is only a primary; enforce tiers still require police reference or party evidence.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match:
+        type: any
+        ids:
+          - Regex_dfv_police_incident
+          - Regex_vic_l17
+      matches:
+        - type: any
+          refs:
+            - Regex_qprime_occurrence
+            - Regex_police_reference_field
+        - ref: Regex_dfv_incident_party_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match:
+        type: any
+        ids:
+          - Regex_dfv_police_incident
+          - Regex_vic_l17
+      matches:
+        - type: any
+          refs:
+            - Regex_qprime_occurrence
+            - Regex_police_reference_field
+            - Regex_dfv_incident_party_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_dfv_police_incident
+          - Regex_vic_l17
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_dfv_police_incident
+      pattern: >-
+        (?i)\b(?:(?:domestic|family)(?:\s+and\s+(?:family|domestic))?\s+violence\s+(?:incidents?|occurrences?|events?|call-?outs?|attendances?|referrals?|reports?)|(?:DV|DFV|FDV)\s+(?:incidents?|occurrences?|events?|jobs?|referrals?)|police\s+referral\s+(?:to|for)\s+(?:a\s+)?(?:specialist\s+)?(?:DFV|domestic|family\s+violence)|domestic\s+violence:\s+support\s+for\s+(?:aggrieved|respondent)|referred\s+with\s+QPS\s+authority|central\s+referral\s+point|family\s+violence\s+risk\s+assessment\s+and\s+management\s+report)\b
+    - id: Regex_vic_l17
+      pattern: \bL17\b
+    - id: Regex_qprime_occurrence
+      pattern: \bQP\d{10}\b
+    - id: Regex_police_reference_field
+      pattern: >-
+        (?i)\b(?:occurrence|event|incident|job|CAD|QPRIME|COPS|LEAP|police\s+reference|report)\s*(?:no\.?|number|ref(?:erence)?|#|ID)?\s*[:#]\s*(?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{5,}\b
+    - id: Regex_dfv_incident_party_field
+      pattern: >-
+        (?i)\b(?:victim(?:-survivor)?|aggrieved(?:\s+(?:person|party))?|affected\s+family\s+member|affected\s+person|person\s+in\s+need\s+of\s+protection|PINOP|protected\s+person|respondent|offender|person\s+of\s+interest|POI|involved\s+person|person\s+using\s+violence|defendant)(?:\s+(?:name|details))?\s*:\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z][A-Za-z'-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){1,3}
+risk_rating: 8
+risk_description: >-
+  The detector identifies a police DFV incident record or police referral that identifies the
+  people involved or carries a police occurrence reference. These records describe alleged
+  violence, injuries, children present, weapons, and police action taken, and are routinely
+  shared with housing, child safety, health and specialist services. Unauthorised disclosure can
+  alert the person using violence, prejudice investigations and expose the victim-survivor.
+  Annual-report statistics and procedures are excluded from enforce tiers. Risk 8 supports
+  SENSITIVE Law-Enforcement.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Law-Enforcement
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Victoria Police Manual — L17 Family Violence Portal
+    url: https://www.cpmanual.vic.gov.au/policies-and-procedures/children-specific-circumstances/l17-family-violence-portal-historical
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release — police DFV incidents and referrals (QPRIME, L17, DV events), gated on police reference or party fields.
+author: testpattern-community
+license: MIT
