@@ -1,0 +1,257 @@
+schema: testpattern/v1
+name: Staff Work Roster or Shift Schedule
+slug: global-work-roster-schedule
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Populated staff work rosters and shift schedules (duty rosters, on-call rosters, nursing and
+  custodial post rosters, control room shift patterns), detected from the roster's own structure:
+  repeated shift time ranges, a day or date column header over rows of shift codes (D, N, E, L, AM,
+  PM, RDO, OFF, OT, OC, AL, on call, leave), and site or role context. Staff names are NOT required,
+  because a roster with names removed still shows when a site is staffed or thinly staffed and where
+  a particular line or post will be.
+operation: >-
+  Primary: a roster phrase (roster, rostering, rota, shift schedule / pattern / plan / allocation,
+  duty list / schedule). 65 is discovery-only (phrase alone) and will surface policies, enterprise
+  agreement clauses and templates. There are two 75 tiers. 75a: the phrase plus at least 8 shift time
+  ranges within 300 characters (06:00-14:30, 0600-1400, 22:00–06:00, 7am-3pm). Repeats count, because
+  real rosters reuse the same few shifts. 75b: the phrase plus a day or date column header (5 or more
+  consecutive day names or dd/mm dates) plus a row of 6 or more consecutive shift codes. 85 requires the
+  phrase, at least 2 distinct shift time ranges, the day/date header, a shift-code row, and a site or
+  role term (station, depot, control room, ward, unit, correctional centre, substation, plant, shift
+  supervisor, officer in charge, on-call contact). Every enforce tier excludes template/fixture text and
+  timetable, TV guide, opening-hours and shift-penalty wording.
+pattern: (?i)\b(?:rosters?|rostering|rota|shift\s+(?:schedules?|patterns?|plans?|allocations?)|duty\s+(?:lists?|schedules?))\b
+confidence: medium
+confidence_justification: >-
+  Medium: the roster structures (runs of shift codes under a day/date header, repeated time ranges) are
+  distinctive, and timetable, TV guide and opening-hours text is excluded. Some operational schedules
+  that are not rosters, such as maintenance windows, clinic session lists or rail crew documents that
+  mention a timetable, will be misclassified in both directions. Time-range matching is limited to
+  quarter-hour values in the colon-free form so that year ranges such as 2023-2024 do not count. The
+  85/75 tiers are heuristic evidence tiers, not measured accuracy; tests are synthetic rosters.
+jurisdictions:
+  - global
+regulations:
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+  - SOCI Act 2018 (Cth)
+  - Fair Work Regulations 2009 (Cth)
+frameworks:
+  - ISO 27001
+  - QGISCF
+data_categories:
+  - security
+  - infrastructure
+  - pii
+corroborative_evidence:
+  keywords:
+    - control room
+    - substation
+    - depot
+    - ward
+    - correctional centre
+    - shift supervisor
+    - officer in charge
+    - on-call contact
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Brisbane North Substation - Control Room Duty Roster\nWeek commencing 12/10/2026\n        Mon Tue Wed Thu Fri Sat Sun\nLine 1: D D N N OFF OFF RDO\nLine 2: N OFF OFF D D N N\nLine 3: OFF D D N N OFF OFF\nShift times: D = 06:00-18:00, N = 18:00-06:00\nShift supervisor on call: 0412 555 019 (after hours)"
+      description: 85 - control room roster with no names; day header, shift-code rows, two shift time ranges, substation / control room / shift supervisor context
+      synthetic: true
+    - value: "Correctional centre - Unit 3 officer roster (fortnight 13/10 to 26/10)\n13/10 14/10 15/10 16/10 17/10 18/10 19/10\nPost A: E E L L N N OFF\nPost B: L L N N OFF OFF E\nE 7am-3pm | L 3pm-11pm | N 11pm-7am\nOfficer in charge: relief via Master Control, ext 4471"
+      description: 85 - custodial post roster with a date header, shift-code rows, am/pm ranges and correctional centre / officer in charge context
+      synthetic: true
+    - value: "Ward 4B nursing roster, fortnight beginning 05/10/2026\nRN1 0700-1530, 0700-1530, 1300-2130, 1300-2130, 2100-0730, 2100-0730\nRN2 1300-2130, 1300-2130, 0700-1530, 0700-1530, 2100-0730\nEN1 0700-1530, 1300-2130, 2100-0730"
+      description: 75 - nursing roster given as rows of shift time ranges (14 ranges, no day header)
+      synthetic: true
+    - value: "On-call roster - ICT infrastructure, October 2026\nMon Tue Wed Thu Fri Sat Sun\nWeek 1: OC OC OFF OFF OC AL AL\nWeek 2: OFF OC OC OC OFF OFF OC\nEscalate after 15 minutes to the next rostered officer."
+      description: 75 - on-call roster as a day header over rows of shift codes, no times
+      synthetic: true
+  should_not_match:
+    - value: "Clause 24 Shift penalties. An employee rostered to work an afternoon shift (commencing at or after 11.00 am and finishing after 6.30 pm) is paid a 15% loading; a night shift (commencing at or after 6.30 pm and finishing before 7.30 am) attracts 30%. The roster must be displayed at least 7 days in advance."
+      description: Enterprise agreement shift-penalty clause (65 discovery at most)
+    - value: "Shift work and rostering policy: rosters are published fortnightly, managers must allow 10 hours between shifts and consult staff before changing a shift pattern. Night shift workers are offered annual health checks."
+      description: Shift-work policy text
+    - value: "Duty roster - week commencing ____\nMon Tue Wed Thu Fri Sat Sun\nPosition 1: ____ ____ ____ ____ ____ ____ ____\nPosition 2: ____ ____ ____ ____ ____ ____ ____\nShift codes: D day, N night, OFF rostered off, RDO rostered day off"
+      description: Blank roster form - header and legend but no populated shift rows
+    - value: "Route 412 timetable - weekday services (updated for the new driver roster)\nCity departs: 05:30-06:00 every 15 min, 06:00-07:00 every 10 min, 07:00-09:00 every 5 min, 09:00-15:00 every 15 min, 15:00-18:30 every 5 min, 18:30-20:00 every 15 min, 20:00-22:00 every 30 min, 22:00-23:30 hourly"
+      description: Bus timetable - many time ranges but timetable wording is excluded
+    - value: "TV guide - Saturday. Weekend roster of shows: 06:00-07:00 News; 07:00-09:00 Weekend Breakfast; 09:00-10:00 Cooking; 10:00-11:00 Gardening; 11:00-12:00 Movie; 12:00-13:00 News; 13:00-15:00 Football; 15:00-16:00 Travel episode"
+      description: TV guide with a roster phrase and repeated time ranges
+    - value: "Library opening hours and volunteer roster information: Mon 9:00-17:00, Tue 9:00-17:00, Wed 9:00-20:00, Thu 9:00-20:00, Fri 9:00-17:00, Sat 10:00-16:00, Sun 10:00-14:00, public holidays 10:00-14:00"
+      description: Opening hours list
+    - value: "Nurses say short-staffed rosters left one registered nurse per ward on night shift at the regional hospital, the union said on Tuesday."
+      description: News report about rostering
+false_positives:
+  - description: Enterprise agreement and award clauses, shift-work policies and fatigue guidance that discuss rosters and shift times.
+    mitigation: Enforce tiers need 8 time ranges or a day/date header over a run of shift codes; clause text has neither. Shift-penalty wording is excluded.
+  - description: Public transport timetables, TV and radio guides, and opening or trading hours with many time ranges.
+    mitigation: Timetable, departs/arrives, TV/program guide, episode and opening/trading/business hours wording is excluded from every enforce tier. Rail crew rosters that mention a timetable are therefore missed; accept or tune locally.
+  - description: Blank roster templates and roster software screenshots.
+    mitigation: Blank grids have no shift-code run; template/fixture words are excluded through the shared template-exclusion dictionary.
+  - description: Grade tables or checklists with long runs of single letters (A A A A A A) under a day or date header.
+    mitigation: Still requires the roster phrase within 300 characters; 85 additionally needs time ranges and site/role context.
+exports:
+  - purview_xml
+  - yaml
+scope: wide
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_work_roster_primary
+      matches:
+        - ref: Regex_work_roster_time_range
+          min_count: 2
+          unique_results: true
+        - ref: Regex_work_roster_day_header
+        - ref: Regex_work_roster_shift_code_run
+        - ref: Keyword_work_roster_site_role
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_work_roster_exclusion
+    - confidence_level: 75
+      id_match: Regex_work_roster_primary
+      matches:
+        - ref: Regex_work_roster_time_range
+          min_count: 8
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_work_roster_exclusion
+    - confidence_level: 75
+      id_match: Regex_work_roster_primary
+      matches:
+        - ref: Regex_work_roster_day_header
+        - ref: Regex_work_roster_shift_code_run
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_work_roster_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_work_roster_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_work_roster_primary
+      pattern: >-
+        (?i)\b(?:rosters?|rostering|rota|shift\s+(?:schedules?|patterns?|plans?|allocations?)|duty\s+(?:lists?|schedules?))\b
+    - id: Regex_work_roster_time_range
+      pattern: >-
+        (?i)\b(?:(?:[01]?\d|2[0-3])[:.][0-5]\d|(?:[01]\d|2[0-3])(?:00|15|30|45))[ \t]{0,2}(?:-|–|to)[ \t]{0,2}(?:(?:[01]?\d|2[0-3])[:.][0-5]\d|(?:[01]\d|2[0-3])(?:00|15|30|45))\b|\b(?:1[0-2]|0?[1-9])(?:[:.][0-5]\d)?[ \t]?(?:am|pm)[ \t]{0,2}(?:-|–|to)[ \t]{0,2}(?:1[0-2]|0?[1-9])(?:[:.][0-5]\d)?[ \t]?(?:am|pm)\b
+    - id: Regex_work_roster_day_header
+      pattern: >-
+        (?i)\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day|sday|nesday|rsday|urday|s)?\b\.?(?:[ \t|,;]{1,6}(?:\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?[ \t|,;]{1,6})?(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day|sday|nesday|rsday|urday|s)?\b\.?){4,13}|\b\d{1,2}/\d{1,2}(?:/\d{2,4})?(?:[ \t|,;]{1,6}\d{1,2}/\d{1,2}(?:/\d{2,4})?){4,13}\b
+    - id: Regex_work_roster_shift_code_run
+      pattern: >-
+        (?i)\b(?:RDO|ADO|OFF|TOIL|AM|PM|NT|OT|OC|AL|SL|LV|on[ \t]call|leave|D|N|A|E|L)\b(?:[ \t|,;]{1,6}(?:RDO|ADO|OFF|TOIL|AM|PM|NT|OT|OC|AL|SL|LV|on[ \t]call|leave|D|N|A|E|L)\b){5,13}
+  keywords:
+    - id: Keyword_work_roster_site_role
+      groups:
+        - match_style: word
+          terms:
+            - station
+            - depot
+            - control room
+            - ward
+            - unit
+            - correctional centre
+            - correctional center
+            - prison
+            - watch house
+            - substation
+            - plant
+            - treatment plant
+            - pump station
+            - communications centre
+            - dispatch
+            - emergency department
+            - school
+            - campus
+            - shift supervisor
+            - shift manager
+            - duty manager
+            - officer in charge
+            - team leader
+            - on-call contact
+            - on call contact
+      strength: specific
+    - id: Keyword_work_roster_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - timetable
+            - timetables
+            - departs
+            - arrives
+            - departure times
+            - bus stop
+            - opening hours
+            - trading hours
+            - business hours
+            - TV guide
+            - program guide
+            - programme guide
+            - episode
+            - now showing
+            - session times
+            - shift penalty
+            - shift penalties
+      strength: specific
+risk_rating: 7
+risk_description: >-
+  A populated roster shows when a site is staffed, how many people are on each shift, and when
+  coverage is thin: overnight single-officer control rooms, relief gaps in a correctional unit, a ward
+  running on agency staff, or an on-call engineer rota for a substation. For critical infrastructure,
+  prisons, police and hospitals that is operational security information that helps someone time an
+  intrusion, sabotage or escape. It also tells anyone holding it where a particular worker will be and
+  when, which matters for an employee affected by domestic and family violence or stalking, even when
+  names are replaced by line numbers. The classifier does not need names, so these records are caught
+  before they are joined to staff lists. Risk 7 rather than 8 because many rosters (retail, hospitality,
+  back-office) carry low operational risk. OFFICIAL: Sensitive / SENSITIVE fits the combined
+  personal-safety and site-security harm.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - title: Fair Work Regulations 2009 (Cth) - regs 3.31-3.44 employee records (hours worked, overtime)
+    url: https://www.legislation.gov.au/F2009L02356/latest/text
+  - title: AusCheck - Critical infrastructure risk management programs (personnel hazards)
+    url: https://www.auscheck.gov.au/about/programs/critical-infrastructure-risk-management-programs
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: >-
+      Initial release - roster detected from its own structure (shift time ranges, day/date header over
+      shift-code rows, site/role context) without requiring staff names; timetable, TV guide,
+      opening-hours and shift-penalty wording excluded.
+author: testpattern-community
+license: MIT

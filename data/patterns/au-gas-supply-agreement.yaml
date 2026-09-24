@@ -1,0 +1,201 @@
+schema: testpattern/v1
+name: Australian Gas Supply or Transportation Agreement (Executed / Populated)
+slug: au-gas-supply-agreement
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Executed or negotiated gas supply, gas sale and purchase, gas transportation and gas storage agreements between
+  named parties, carrying the commercial terms that the Competition and Consumer (Gas Market Code) Regulations 2023
+  s 25(2) requires a covered supplier's agreement to specify - quantity and annual quantity, flexibility and load
+  factor, supply period, delivery points, price or price structure including take-or-pay conditions - together with
+  the industry terms that express them (Annual Contract Quantity / ACQ, Maximum Daily Quantity / MDQ, take-or-pay,
+  swing). Published Gas Market Code text, model or template agreements, ACCC gas inquiry reports and law-firm
+  commentary are decoys.
+operation: >-
+  Primary: agreement titles (gas supply / sale / sales / transportation / storage agreement, gas sale and purchase
+  agreement, agreement for the supply of (regulated) gas). 75 requires, within 300 characters, either a populated
+  quantity term (ACQ, MDQ, DCQ, MHQ, annual quantity, annual / daily contract quantity, take-or-pay quantity or
+  percentage, swing, with a GJ / TJ / PJ value or percentage) or a populated party / delivery / price field (seller,
+  buyer, supplier, shipper, delivery or receipt point, contract / base / commodity price, commencement or expiry date,
+  or a $/GJ price). 85 requires both a quantity term and a party / delivery / price field plus an independent
+  contract term (take or pay, load factor, major interruption, price review, nomination, shortfall, curtailment,
+  force majeure, Gas Market Code). Every tier excludes template/fixture text, model and pro forma agreements, ACCC
+  gas inquiry material, explanatory statements and media releases. 65 is discovery-only.
+pattern: (?i)\b(?:gas\s+(?:supply|sale|sales|transportation|transport|storage)(?:\s+and\s+purchase)?\s+agreements?|gas\s+sale\s+and\s+purchase\s+agreements?|agreement\s+for\s+(?:the\s+)?supply\s+of\s+(?:regulated\s+)?gas)\b
+confidence: medium
+confidence_justification: >-
+  Medium: agreement titles appear in the Gas Market Code, ACCC reports and law-firm articles, so enforcement requires
+  populated terms (quantities with GJ/TJ/PJ units, named parties, delivery points, $/GJ prices). ACQ, MDQ and
+  take-or-pay are industry practice rather than statutory terms (s 25 uses "quantity", "annual quantity", "delivery
+  points" and "take or pay conditions"), which is why they are evidence rather than primary anchors. 85/75 are
+  heuristic evidence tiers, not measured accuracy.
+jurisdictions:
+  - au
+regulations:
+  - Competition and Consumer (Gas Market Code) Regulations 2023 (Cth) s 25 (mandatory agreement terms), s 33 (record keeping), s 38 (reporting of agreements)
+  - Competition and Consumer Act 2010 (Cth)
+frameworks:
+  - ISO 27001
+data_categories:
+  - energy-market
+  - business
+  - legal
+corroborative_evidence:
+  keywords:
+    - take or pay
+    - load factor
+    - delivery point
+    - major interruption
+    - price review
+    - nomination
+    - shortfall
+    - curtailment
+    - Gas Market Code
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "GAS SUPPLY AGREEMENT\nSeller: Eastbrook Gas Pty Ltd\nBuyer: Coralvale Alumina Pty Ltd\nAnnual Contract Quantity (ACQ): 4,500 TJ\nMaximum Daily Quantity (MDQ): 14,200 GJ/day\nDelivery Point: Wallumbilla hub outlet flange\nContract Price: $11.85/GJ, escalated annually by CPI\nTake or pay: Buyer must pay for 90% of ACQ whether or not taken; load factor 85%."
+      description: Executed gas supply agreement schedule with parties, ACQ/MDQ, delivery point, price and take-or-pay - intended 85
+      synthetic: true
+    - value: "Gas Sale and Purchase Agreement - Schedule 1 Commercial Terms\nSupplier: Harlow Basin Energy\nMDQ: 9,000 GJ/day\nSwing: 115% of DCQ\nPrice: $12.40 per GJ\nMajor interruption notification within 2 hours."
+      description: GSPA commercial terms schedule with MDQ, swing and price - intended 85
+      synthetic: true
+    - value: "Gas transportation agreement\nShipper: Coralvale Alumina Pty Ltd\nReceipt point and firm capacity are set out in the service schedule."
+      description: Transportation agreement with a populated shipper field - intended 75
+      synthetic: true
+    - value: "Draft gas supply agreement - revised annual quantity 2.5 PJ for 2028 as agreed at the commercial meeting."
+      description: Draft agreement with a populated annual quantity - intended 75
+      synthetic: true
+  should_not_match:
+    - value: "25 Agreement for supply of regulated gas must comply with certain requirements. The matters are: the quantity of regulated gas to be supplied; the annual quantity; the degree of flexibility (including conditions relating to load factor); the delivery points; the price or price structure (including any take or pay conditions)."
+      description: Published Gas Market Code s 25 text
+    - value: "Gas Supply Agreement template\nSeller: [insert name]\nBuyer: [insert name]\nACQ: ____ TJ\nMDQ: ____ GJ/day\nDelivery Point: [insert]"
+      description: Blank template agreement
+    - value: "Model agreement for the supply of gas: the parties should specify the Annual Contract Quantity and Maximum Daily Quantity in Schedule 1 and consider whether take or pay applies."
+      description: Model / pro forma agreement guidance
+    - value: "ACCC gas inquiry interim report: offers for gas supply agreements in 2027 averaged $13.10/GJ, with a typical ACQ of 5 PJ, the media release said."
+      description: ACCC gas inquiry report / news
+false_positives:
+  - description: The Gas Market Code and its explanatory statement list the s 25 matters in the abstract.
+    mitigation: Enforce tiers need quantities with GJ/TJ/PJ units, named parties, delivery points or $/GJ prices; explanatory statements are excluded.
+  - description: Template, model and pro forma agreements.
+    mitigation: Bracket, underscore and n/a placeholders fail the populated-field guard; template, model agreement and pro forma terms are excluded.
+  - description: ACCC gas inquiry reports, law-firm articles and news quoting average prices and ACQs.
+    mitigation: Gas inquiry and media release terms are excluded within the proximity window; aggregate commentary rarely carries named seller / buyer fields.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_gas_supply_agreement_primary
+      matches:
+        - ref: Regex_au_gas_supply_agreement_quantity
+        - ref: Regex_au_gas_supply_agreement_party_field
+        - ref: Keyword_au_gas_supply_agreement_terms
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_gas_supply_agreement_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_gas_supply_agreement_primary
+      matches:
+        - type: any
+          refs:
+            - Regex_au_gas_supply_agreement_quantity
+            - Regex_au_gas_supply_agreement_party_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_gas_supply_agreement_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_gas_supply_agreement_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_gas_supply_agreement_exclusion
+  regexes:
+    - id: Regex_au_gas_supply_agreement_primary
+      pattern: >-
+        (?i)\b(?:gas\s+(?:supply|sale|sales|transportation|transport|storage)(?:\s+and\s+purchase)?\s+agreements?|gas\s+sale\s+and\s+purchase\s+agreements?|agreement\s+for\s+(?:the\s+)?supply\s+of\s+(?:regulated\s+)?gas)\b
+    - id: Regex_au_gas_supply_agreement_quantity
+      pattern: >-
+        (?i)\b(?:annual\s+contract\s+quantity|maximum\s+daily\s+quantity|daily\s+contract\s+quantity|maximum\s+hourly\s+quantity|annual\s+quantity|take[\s-]or[\s-]pay(?:\s+(?:quantity|percentage|threshold|level))?|swing|ACQ|MDQ|DCQ|MHQ)(?:\s*\([^)]{1,10}\))?\s{0,3}(?:[:=]|of|is|to)?\s{0,3}\d{1,3}(?:,\d{3}){0,3}(?:\.\d{1,3})?\s?(?:(?:GJ|TJ|PJ)(?:\s?/\s?(?:day|d|annum|year|hour|h))?\b|%)
+    - id: Regex_au_gas_supply_agreement_party_field
+      pattern: >-
+        (?i)(?:\b(?:seller|buyer|supplier|shipper|transporter|delivery\s+point|receipt\s+point|contract\s+price|base\s+price|commodity\s+price|price|commencement\s+date|expiry\s+date|end\s+date)(?:\s*\([^)]{1,20}\))?\s*[:=]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer|insert)\b|_{2,}|\[|<)[A-Z0-9$][A-Za-z0-9/'.,$&-]{1,40}|(?:\$|AUD\s?)\s?\d{1,3}(?:\.\d{1,4})?\s?(?:/|per\s)\s?GJ\b)
+  keywords:
+    - id: Keyword_au_gas_supply_agreement_terms
+      groups:
+        - match_style: word
+          terms:
+            - take or pay
+            - take-or-pay
+            - load factor
+            - major interruption
+            - price review
+            - nomination
+            - nominations
+            - shortfall
+            - curtailment
+            - force majeure
+            - Gas Market Code
+            - escalated
+      strength: specific
+    - id: Keyword_au_gas_supply_agreement_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - model agreement
+            - pro forma
+            - gas inquiry
+            - explanatory statement
+            - media release
+            - consultation paper
+      strength: specific
+risk_rating: 7
+risk_description: >-
+  A populated gas supply or transportation agreement discloses who is buying gas from whom, the contracted volumes
+  (ACQ, MDQ, swing), delivery points, price and price-review mechanics and take-or-pay exposure. These terms are
+  commercially confidential between the parties; the Gas Market Code requires covered suppliers to keep and report
+  agreements to the ACCC (ss 33, 38) precisely because the terms are not public. Disclosure lets competitors and
+  counterparties price against the parties' positions in a concentrated east-coast market. Risk 7 supports SENSITIVE
+  Commercial-in-Confidence (negotiated contract terms rather than a trading book).
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Commercial-in-Confidence
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Competition and Consumer (Gas Market Code) Regulations 2023 (F2023L00994) - s 25 agreement requirements, s 33, s 38
+    url: https://www.legislation.gov.au/F2023L00994/asmade
+  - title: Law Insider - Maximum Daily Quantity or MDQ definition (secondary source for industry terminology)
+    url: https://www.lawinsider.com/dictionary/maximum-daily-quantity-or-mdq
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - anchored on gas agreement titles and Gas Market Code s 25 terms; 75 gated on a populated quantity (GJ/TJ/PJ or %) or party / delivery / price field; 85 on both plus an independent contract term; template, model agreement, gas inquiry and explanatory statement text excluded.
+author: testpattern-community
+license: MIT

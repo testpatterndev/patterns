@@ -1,0 +1,201 @@
+schema: testpattern/v1
+name: Australian Wholesale Electricity Hedge Book / Contract Position Report
+slug: au-energy-hedge-position-report
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Portfolio-level wholesale electricity hedge book and contract position reports held by a NEM generator, retailer or
+  gentailer: contracted volumes aggregated by NEM region (QLD1, NSW1, VIC1, SA1, TAS1), product (swap, cap, floor,
+  PPA, futures) and period, in MW or MWh, with strikes in $/MWh, counterparties, mark-to-market and the open or net
+  position against forecast generation or load. Complements au-electricity-derivative-confirmation (single executed
+  trade confirmations) and au-forward-curve-artefact (price curves); this classifier covers the aggregated position
+  report.
+operation: >-
+  Primary: hedge book vocabulary (hedge book / position / cover / ratio / report / portfolio, contracted position,
+  net open or net contracted position, open position, cap cover, swap volume, contract cover, position report). 75
+  requires, within 300 characters, a populated position row: a NEM region ID followed on the same line by a MW or MWh
+  volume. 85 requires two distinct position rows (min_count 2, unique) plus a $/MWh strike or price and an
+  independent term (counterparty, mark-to-market / MtM, VaR, forecast generation, strike, hedge ratio). Every tier
+  excludes template/fixture text and public reporting (AER State of the Market, ASX daily settlement prices, annual
+  report / financial statement notes, media releases). 65 is discovery-only and will surface FX and securities
+  position language.
+pattern: (?i)\b(?:hedge\s+(?:book|position|cover|ratio|report|portfolio)|contracted\s+position|net\s+(?:open|contracted)\s+position|open\s+position|cap\s+cover|swap\s+volume|contract\s+cover|position\s+report)\b
+confidence: medium
+confidence_justification: >-
+  Medium: the primary phrases are shared with financial-markets position reporting, so enforcement requires NEM
+  region IDs with MW/MWh volumes on the same line; forward curves (region plus $/MWh without volume) do not satisfy
+  the row regex. Public ASX Energy and AER material with the same numbers is excluded by source terms within the
+  window only. 85/75 are heuristic evidence tiers, not measured accuracy.
+jurisdictions:
+  - au
+regulations:
+  - Corporations Act 2001 (Cth) - derivatives
+  - Competition and Consumer Act 2010 (Cth)
+frameworks:
+  - ISO 27001
+data_categories:
+  - energy-market
+  - trading
+  - financial
+corroborative_evidence:
+  keywords:
+    - counterparty
+    - mark-to-market
+    - MtM
+    - VaR
+    - forecast generation
+    - strike
+    - hedge ratio
+    - cap
+    - swap
+    - PPA
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Hedge book summary - Q1 2027 (internal)\nRegion | Product | Period | Volume | Strike | Counterparty | MtM\nQLD1 | Base swap | Q1-27 | 219,600 MWh | $92.40/MWh | Harbourline Energy | -$1.24m\nQLD1 | $300 cap | Q1-27 | 150 MW | $14.80/MWh premium | Southgate Retail | +$0.31m\nNSW1 | Peak swap | Q1-27 | 64,800 MWh | $118.00/MWh | Westfield Power | -$0.52m\nNet open position vs forecast generation: 71% hedge ratio"
+      description: Multi-row position report with regions, volumes, strikes, counterparties and MtM - intended 85
+      synthetic: true
+    - value: "Contracted position by quarter\nQLD1 Q3-27 swaps 180 MW flat, caps 120 MW, strike $88.50/MWh\nQLD1 Q4-27 swaps 160 MW flat, caps 140 MW\nForecast generation 410 MW average; counterparty concentration within limit."
+      description: Quarterly contracted-position rows with strike and forecast generation - intended 85
+      synthetic: true
+    - value: "Cap cover update for the trading committee\nQLD1 summer 26-27 cap cover 350 MW against forecast peak demand."
+      description: Cap cover note with a single region-volume row - intended 75
+      synthetic: true
+    - value: "Net open position report\nVIC1 PPA offtake 52,000 MWh unhedged for FY28 after the solar farm delay."
+      description: Net open position with one populated row - intended 75
+      synthetic: true
+  should_not_match:
+    - value: "Forward curve snapshot: QLD1 Cal-27 base $96.25/MWh, QLD1 Cal-27 peak $128.40/MWh, NSW1 Cal-27 base $101.10/MWh. Hedge book valuation uses these marks."
+      description: Forward curve prices with region and $/MWh but no volumes (au-forward-curve-artefact territory)
+    - value: "State of the Market 2026: contract cover in Queensland rose as generators sold more cap contracts; QLD1 traded volumes on ASX Energy reached 45,000 MW of open interest."
+      description: AER State of the Market commentary
+    - value: "Hedge position report template\nRegion | Product | Period | Volume (MWh) | Strike ($/MWh) | Counterparty\n[region] | [product] | [period] | [volume] | [strike] | [name]"
+      description: Blank position report template
+    - value: "Notes to the financial statements - derivative financial instruments. The Group manages its open position using electricity swaps and caps. At 30 June the hedge portfolio covered QLD1 volumes of 8,200 GWh."
+      description: Annual report hedging note (public)
+    - value: "The generator said its hedge book was well positioned for the summer, according to a media release on Monday."
+      description: News / media release
+false_positives:
+  - description: Forward curve extracts and price snapshots quote regions and $/MWh.
+    mitigation: The position-row regex needs a MW or MWh volume after the region ID; prices in $/MWh alone do not qualify.
+  - description: AER State of the Market, ASX Energy settlement data, annual-report hedging notes and news.
+    mitigation: Source terms (State of the Market, ASX Energy, daily settlement, notes to the financial statements, annual report, media release) are excluded within the proximity window.
+  - description: Financial-markets (FX, equities) open-position reports.
+    mitigation: NEM region IDs with MW/MWh volumes are required at enforce tiers.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_energy_hedge_primary
+      matches:
+        - ref: Regex_au_energy_hedge_position_row
+          min_count: 2
+          unique_results: true
+        - ref: Regex_au_energy_hedge_price
+        - ref: Keyword_au_energy_hedge_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_energy_hedge_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_energy_hedge_primary
+      matches:
+        - ref: Regex_au_energy_hedge_position_row
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_energy_hedge_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_energy_hedge_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_energy_hedge_exclusion
+  regexes:
+    - id: Regex_au_energy_hedge_primary
+      pattern: >-
+        (?i)\b(?:hedge\s+(?:book|position|cover|ratio|report|portfolio)|contracted\s+position|net\s+(?:open|contracted)\s+position|open\s+position|cap\s+cover|swap\s+volume|contract\s+cover|position\s+report)\b
+    - id: Regex_au_energy_hedge_position_row
+      pattern: >-
+        \b(?:QLD1|NSW1|VIC1|SA1|TAS1)\b[^\r\n]{0,150}(?<![\d.,/])\d{1,3}(?:,\d{3}){0,3}(?:\.\d{1,2})?\s?MWh?\b
+    - id: Regex_au_energy_hedge_price
+      pattern: >-
+        (?:\$|AUD\s?)\s?\d{1,5}(?:\.\d{1,2})?\s?(?:/|per\s)\s?MWh\b
+  keywords:
+    - id: Keyword_au_energy_hedge_evidence
+      groups:
+        - match_style: word
+          terms:
+            - counterparty
+            - mark-to-market
+            - mark to market
+            - text: MtM
+              case_sensitive: true
+            - text: VaR
+              case_sensitive: true
+            - forecast generation
+            - forecast load
+            - strike
+            - hedge ratio
+            - premium
+      strength: specific
+    - id: Keyword_au_energy_hedge_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - State of the Market
+            - ASX Energy
+            - daily settlement
+            - settlement prices
+            - notes to the financial statements
+            - annual report
+            - media release
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  A hedge book or contract position report shows a market participant's whole contracted position: volumes by region
+  and period, strikes, counterparties, mark-to-market and how much generation or load is left open. Competitors or
+  counterparties holding it can infer bidding incentives and price the participant's remaining exposure against it;
+  counterparty terms are usually confidential under the contracts themselves. Disclosure causes direct financial
+  loss and can distort NEM trading. Risk 8 supports SENSITIVE Financial, matching au-electricity-derivative-confirmation
+  and au-forward-curve-artefact.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Financial
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - title: ASX Energy - Australian electricity futures and options products (public product and settlement data, decoy source)
+    url: https://www.asxenergy.com.au/products/au_electricity
+  - title: AEMO NEMweb current reports (NEM regional reference price regions QLD1, NSW1, VIC1, SA1, TAS1)
+    url: https://nemweb.com.au/Reports/Current/
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release - anchored on hedge book / contract position vocabulary (commercial practice); 75 gated on a NEM region ID with a MW/MWh volume on the same line; 85 on two distinct rows plus a $/MWh strike and counterparty / MtM / forecast-generation evidence; public AER, ASX and annual-report sources excluded.
+author: testpattern-community
+license: MIT
