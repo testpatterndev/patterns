@@ -1,0 +1,155 @@
+schema: testpattern/v1
+name: Family and Domestic Violence Leave Record
+slug: au-family-domestic-violence-leave-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Detects HR, payroll and timesheet records showing that a named or numbered employee has taken
+  or requested family and domestic violence (FDV) leave. Under Fair Work Act 2009 ss106A-106E
+  every national-system employee is entitled to 10 days of paid FDV leave, and Fair Work
+  Regulations 2009 reg 3.48 prevents FDV leave from being shown on pay slips because the record
+  itself discloses that the employee is experiencing violence. Public sector DFV leave under state
+  directives and enterprise agreements is covered by the same terms.
+operation: >-
+  Primary: a family and domestic violence / domestic and family violence / domestic violence /
+  family violence leave phrase, or the FDV leave / DFV leave / FDVL abbreviations. 75 tier requires
+  a populated employee field (employee/staff/worker name, number or ID with a non-placeholder
+  value) within 300 characters. 85 tier additionally requires a populated leave detail (leave
+  dates, start/end date, days or hours taken). All tiers exclude template/fixture text. 65 is
+  discovery-only and will surface policy, enterprise agreement and payroll configuration text.
+pattern: >-
+  (?i)\b(?:paid\s+)?(?:family\s+and\s+domestic\s+violence|domestic\s+and\s+family\s+violence|domestic\s+violence|family\s+violence)\s+leave\b|\b(?:FDV|DFV)\s+leave\b|\bFDVL\b
+confidence: medium
+confidence_justification: >-
+  Medium: FDV leave terms are common in enterprise agreements, HR policy and payroll setup, so
+  enforce tiers require a populated employee field. Records that identify the employee only by
+  name in free text, without a field label, fall to discovery. 85/75 are heuristic evidence tiers,
+  not measured accuracy.
+jurisdictions:
+  - au
+regulations:
+  - Fair Work Act 2009 (Cth)
+  - Fair Work Regulations 2009 (Cth)
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - employment
+corroborative_evidence:
+  keywords:
+    - family and domestic violence leave
+    - leave request
+    - leave balance
+    - payroll
+    - timesheet
+    - employee
+  proximity: 300
+  keyword_lists:
+    - au-dfv-terminology
+test_cases:
+  should_match:
+    - value: "Leave request\nEmployee name: Avery Teston\nEmployee ID: 4471820\nLeave type: Family and domestic violence leave (paid)\nStart date: 15/09/2026\nEnd date: 17/09/2026\nApproved by: Jordan Staffson"
+      description: Approved FDV leave request
+      synthetic: true
+    - value: 'Timesheet adjustment. Staff number: P0048213. FDV leave taken 7.6 hours on 03/09/2026. Record against confidential leave code only; do not show on payslip.'
+      description: Timesheet entry for FDV leave
+      synthetic: true
+    - value: "HR case note - Employee ID: 5520117. Manager advised employee has requested domestic and family violence leave\nand a change of work location. Leave dates: 22/09/2026 to 26/09/2026."
+      description: HR case note recording DFV leave and dates across a line break
+      synthetic: true
+  should_not_match:
+    - value: Under the Fair Work Act 2009, all employees, including casuals, are entitled to 10 days of paid family and domestic violence leave in each 12-month period.
+      description: Entitlement description from guidance
+    - value: 'Clause 34.5 Domestic and family violence leave. An employee experiencing domestic and family violence is entitled to paid leave in accordance with the Directive.'
+      description: Enterprise agreement clause
+    - value: "Pay code: 0735\nDescription: FDV leave\nPayslip display: Ordinary hours\nEmployee: __________"
+      description: Payroll configuration row with a blank employee field
+false_positives:
+  - description: Enterprise agreements, HR policies and Fair Work guidance describing the entitlement.
+    mitigation: Enforce tiers require a populated employee field; policy text has none.
+  - description: Payroll system configuration (leave type and pay code tables).
+    mitigation: Configuration tables have no employee value; blank and placeholder values are rejected.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_fdv_leave
+      matches:
+        - ref: Regex_employee_field
+        - ref: Regex_leave_detail
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_fdv_leave
+      matches:
+        - ref: Regex_employee_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_fdv_leave
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_fdv_leave
+      pattern: >-
+        (?i)\b(?:paid\s+)?(?:family\s+and\s+domestic\s+violence|domestic\s+and\s+family\s+violence|domestic\s+violence|family\s+violence)\s+leave\b|\b(?:FDV|DFV)\s+leave\b|\bFDVL\b
+    - id: Regex_employee_field
+      pattern: >-
+        (?i)\b(?:employee|staff|worker|personnel|payroll)(?:\s+(?:name|no\.?|number|ID|#))?\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_leave_detail
+      pattern: >-
+        (?i)\b(?:(?:leave|absence)\s+(?:dates?|period|from|start|taken)|(?:start|end|commencement|return)\s+date|date\s+(?:from|to)|(?:days|hours)\s+taken|taken)\s*[:\-]?\s*(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,3}(?:\.\d{1,2})?\s*(?:days?|hours?|hrs?)\b)
+risk_rating: 8
+risk_description: >-
+  The detector identifies an HR, payroll or timesheet record showing that an identified employee
+  has requested or taken family and domestic violence leave. The record discloses that the
+  employee is experiencing violence and, often, when they are absent or relocating. If it reaches
+  a person using violence who works in the same organisation, a shared payroll mailbox or a joint
+  bank statement, it can escalate risk; this is why reg 3.48 keeps FDV leave off pay slips.
+  Enterprise agreements, policies and payroll configuration are excluded from enforce tiers. Risk 8
+  supports SENSITIVE Personal-Privacy.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Fair Work Ombudsman — Pay slips (reporting paid family and domestic violence leave)
+    url: https://www.fairwork.gov.au/pay-and-wages/paying-wages/pay-slips
+  - title: Fair Work Ombudsman — Family and domestic violence leave
+    url: https://www.fairwork.gov.au/leave/family-and-domestic-violence-leave
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release — FDV leave in HR, payroll and timesheet records, gated on populated employee fields.
+author: testpattern-community
+license: MIT

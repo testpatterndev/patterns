@@ -1,0 +1,170 @@
+schema: testpattern/v1
+name: Domestic and Family Violence Refuge or Confidential Address
+slug: au-dfv-confidential-address
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Detects records that disclose where a person at risk of domestic and family violence (DFV) is
+  living or sheltering: refuge, shelter, safe house and crisis accommodation addresses, addresses
+  flagged as confidential, suppressed or not to be disclosed, and silent elector entries. This is
+  the highest-harm DFV disclosure, because it tells a person using violence where to find the
+  victim-survivor. Sector-neutral: it applies to housing, human services, health, education,
+  court, police, electoral and payroll records.
+operation: >-
+  Primary: a DFV refuge/shelter/safe house/crisis accommodation phrase, a refuge or safe house
+  address/location label, a confidential/suppressed/withheld/not-to-be-disclosed address statement,
+  a "do not disclose address/location/whereabouts" instruction, or "silent elector". 75 tier
+  requires an Australian street address or suburb+state+postcode within 300 characters. 85 tier
+  additionally requires a populated person or case field (name, client/tenant/elector, case or
+  file number, or date of birth with a non-placeholder value). All tiers exclude template/fixture
+  text. 65 is discovery-only (primary phrase alone).
+pattern: >-
+  (?i)\b(?:(?:women'?s|DFV|domestic\s+(?:and\s+family\s+)?violence|family\s+violence|crisis)\s+(?:refuges?|shelters?|safe\s+houses?|crisis\s+accommodation)|(?:refuge|shelter|safe\s+house)\s+(?:address|location|placement)|confidential\s+(?:residential\s+|home\s+|postal\s+)?address|(?:address|location|whereabouts)\s+(?:is\s+)?(?:suppressed|withheld|confidential|protected|not\s+to\s+be\s+(?:disclosed|released|shared))|do\s+not\s+(?:disclose|release|share)\s+(?:the\s+)?(?:(?:client|tenant|aggrieved|applicant|customer|patient)'?s?\s+)?(?:address|location|whereabouts)|silent\s+elector|confidential\s+contact\s+details|does\s+the\s+respondent\s+know\s+this\s+address|is\s+the\s+respondent\s+aware\s+of\s+your\s+(?:home\s+)?address|personal\s+safety\s+of\s+myself\s+or\s+members\s+of\s+my\s+family\s+at\s+risk|deny\s+access\s+facility)\b
+confidence: medium
+confidence_justification: >-
+  Medium: the primary phrases are strongly associated with concealed locations, but policy text
+  that mentions a refuge address alongside an office address can reach the 75 tier. The 85 tier
+  requires a person or case field, which policy text rarely carries. 85/75 are heuristic
+  evidence tiers, not measured accuracy.
+jurisdictions:
+  - au
+regulations:
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+  - DFV Protection Act 2012 (Qld)
+  - Commonwealth Electoral Act 1918 (Cth)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - government
+corroborative_evidence:
+  keywords:
+    - refuge
+    - safe house
+    - crisis accommodation
+    - confidential address
+    - silent elector
+    - protection order
+    - victim-survivor
+    - aggrieved
+  proximity: 300
+  keyword_lists:
+    - au-dfv-terminology
+test_cases:
+  should_match:
+    - value: "Client name: Avery Teston\nCurrent address (CONFIDENTIAL - DFV refuge): 14 Wattlebird Street, Stafford QLD 4053\nDo not disclose client's address to any party, including the respondent."
+      description: Client record with refuge address and a non-disclosure instruction
+      synthetic: true
+    - value: 'Address not to be disclosed. Aggrieved: Jordan Teston resides at Unit 3/27 Carrington Avenue, Toowong QLD 4066 under protection order conditions.'
+      description: Protected address of an aggrieved person
+      synthetic: true
+    - value: "Silent elector\nElector: Morgan Teston\nEnrolled address: 8 Sandpiper Court, Mackay QLD 4740"
+      description: Silent elector enrolment detail
+      synthetic: true
+    - value: "Registration as a silent elector\nI declare that having my residential address shown on any electoral roll places the personal safety of myself or members of my family at risk.\nFamily name: Teston\nResidential address: 22 Kookaburra Close, Emerald QLD 4720"
+      description: Completed AEC silent elector registration (declaration wording from ER022)
+      synthetic: true
+    - value: "File number: HF-2026-00817. Household moved to a women's shelter on 02/09/2026.\nSafe house address: 51 Harlow Road, Logan Central QLD 4114"
+      description: Safe house address in a case file
+      synthetic: true
+  should_not_match:
+    - value: The department allocated $12 million to DFV refuges and crisis accommodation across Queensland in 2025-26, including 40 new beds in regional areas.
+      description: Funding announcement naming refuges generally, no address
+    - value: Staff must never record a refuge address on a shared file. If a client's address is confidential, record it only in the restricted-access field.
+      description: Practice guidance about confidential addresses, no address present
+    - value: Refuge Cove on Wilsons Promontory, 12 Telegraph Track, Wilsons Promontory VIC 3960, is a wildlife refuge and campsite.
+      description: Non-DFV use of the word refuge with an address
+    - value: "Client name: __________\nConfidential address: __________\nSilent elector?  [ ] Yes  [ ] No"
+      description: Blank form with confidential address field
+false_positives:
+  - description: Policy or procedure text that mentions a refuge or confidential address alongside an office or postal address (for example a return-mail address).
+    mitigation: Such text can reach the 75 tier. The 85 tier requires a populated person or case field. Where policy libraries are noisy, deploy at 85 and keep 75 for audit-only rules.
+  - description: Directories of DFV services that publish a service's public office address.
+    mitigation: Refuge locations are not published, so public directories normally list office or outreach addresses only; consider an exception for the specific service directory site.
+  - description: Business uses of "confidential address" (for example a restricted return address for tenders).
+    mitigation: Rare; 85 tier requires a person or case field.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_dfv_confidential_location
+      matches:
+        - ref: Regex_au_street_or_locality_address
+        - ref: Regex_dfv_person_or_case_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_dfv_confidential_location
+      matches:
+        - ref: Regex_au_street_or_locality_address
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_dfv_confidential_location
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_dfv_confidential_location
+      pattern: >-
+        (?i)\b(?:(?:women'?s|DFV|domestic\s+(?:and\s+family\s+)?violence|family\s+violence|crisis)\s+(?:refuges?|shelters?|safe\s+houses?|crisis\s+accommodation)|(?:refuge|shelter|safe\s+house)\s+(?:address|location|placement)|confidential\s+(?:residential\s+|home\s+|postal\s+)?address|(?:address|location|whereabouts)\s+(?:is\s+)?(?:suppressed|withheld|confidential|protected|not\s+to\s+be\s+(?:disclosed|released|shared))|do\s+not\s+(?:disclose|release|share)\s+(?:the\s+)?(?:(?:client|tenant|aggrieved|applicant|customer|patient)'?s?\s+)?(?:address|location|whereabouts)|silent\s+elector|confidential\s+contact\s+details|does\s+the\s+respondent\s+know\s+this\s+address|is\s+the\s+respondent\s+aware\s+of\s+your\s+(?:home\s+)?address|personal\s+safety\s+of\s+myself\s+or\s+members\s+of\s+my\s+family\s+at\s+risk|deny\s+access\s+facility)\b
+    - id: Regex_au_street_or_locality_address
+      pattern: >-
+        \b(?:(?:Unit|Apt|Flat|Lot)\s+)?\d{1,5}[A-Za-z]?(?:/\d{1,5}[A-Za-z]?)?\s+(?:[A-Z][a-z]{1,20}\s{1,5}){1,3}(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Court|Ct|Crescent|Cres|Place|Pl|Parade|Pde|Terrace|Tce|Lane|Ln|Way|Close|Cl|Highway|Hwy|Boulevard|Bvd|Circuit|Cct|Grove|Gr|Track|Esplanade)\b|\b[A-Z][A-Za-z]+(?:\s{1,5}[A-Z][A-Za-z]{1,30}){0,2},?\s+(?:QLD|NSW|VIC|TAS|SA|WA|NT|ACT)\s+\d{4}\b
+    - id: Regex_dfv_person_or_case_field
+      pattern: >-
+        (?i)\b(?:(?:client|tenant|applicant|customer|participant|patient|resident|elector|aggrieved|protected\s+person|affected\s+family\s+member|person\s+in\s+need\s+of\s+protection)(?:\s+(?:name|ID|no\.?|number|reference))?|(?:case|file|client|matter|customer|reference|ref)\s*(?:no\.?|number|ID|#)|name|CRN|date\s+of\s+birth|DOB)\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+risk_rating: 10
+risk_description: >-
+  The detector identifies a record that places a person at risk of domestic and family violence at
+  a refuge, shelter, safe house, crisis accommodation, or an address that has been deliberately
+  kept confidential, suppressed or silently enrolled. Disclosure can let a person using violence
+  locate the victim-survivor and children, with a credible risk of serious injury or death, and
+  can compromise the refuge for every other resident. This is the circumstance the DFV order
+  classifiers reserve PROTECTED for. Risk 10 supports PROTECTED Personal-Privacy; review the
+  classification against the agency's own harm assessment before enforcement.
+sensitivity_labels:
+  pspf: PROTECTED
+  qgiscf: PROTECTED
+  qgiscf_dlm: PROTECTED Personal-Privacy
+  us_gov: CUI Specified
+  uk_gov: SECRET
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+references:
+  - title: AEC — ER022 Registration as a silent elector (declaration wording)
+    url: https://www.aec.gov.au/Enrolling_to_vote/pdf/forms/silent/er022sw-act.pdf
+  - title: AEC — Silent electors
+    url: https://www.aec.gov.au/Enrolling_to_vote/Special_Category/silent-electors.htm
+  - title: Domestic and Family Violence Protection Act 2012 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2012-005
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release — refuge, safe house, confidential/suppressed address and silent elector records, gated on an Australian address.
+author: testpattern-community
+license: MIT
