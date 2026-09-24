@@ -1,0 +1,202 @@
+schema: testpattern/v1
+name: Queensland Regulated Dog Declaration or Dog Attack Record
+slug: au-qld-regulated-dog-declaration-attack-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Queensland council animal management enforcement records under the Animal Management (Cats and Dogs) Act 2008. Covers proposed declaration notices (s 90: breed, colour, sex, distinguishing marks, reasons, written representations within at least 14 days), regulated dog declarations (s 89 and s 94: declared dangerous or declared menacing dog), information notices (s 95), destruction orders (s 127A) and dog attack investigation or complaint records (attack offences ss 194-195). These records name the owner, the dog, the address and, for attacks, the victim and their injuries. The state regulated dog register may be inspected only by officers, owners and similar persons (s 173). The council dog registry is open to inspection, but owner information is excluded (s 179(2)), so a registry extract without owner details is not matched at enforce tiers. Restricted dog provisions survive only as transitional permits after the 2024 amendments (Act No. 17 of 2024), which introduced prohibited dogs (s 127).
+operation: >-
+  Primary: proposed declaration notice, notice of proposed declaration, regulated dog declaration, dangerous or menacing dog declaration, declared dangerous or menacing dog, dog attack [investigation / report / complaint / incident / record], destruction order, prohibited dog, restricted dog. Field values must be on the same line as their label and are placeholder-guarded (withheld, not, none, nil, excluded, redacted, suppressed, blank lines, brackets). 75 requires, within 300 characters, either an owner field (owner, dog owner, registered owner, owner's name, responsible person, relevant person, owner's address, followed by a name of two or more capitalised words or a street address) or an incident / victim field (date or location of attack or incident, victim or victim's name, person or animal attacked, injuries sustained, nature of injuries, complainant, witness, veterinary report or treatment, followed by a value). Dog-description fields alone (breed, colour, sex, microchip or PPID number, registration or tag number) never reach 75, which keeps registry extracts without owner details at 65. 85 requires an owner field, a dog-description or incident / victim field, and an independent corroborative term (written representations, information notice, authorised person, impounded, seized, bitten, bodily harm, veterinary surgeon, compliance notice, Animal Management (Cats and Dogs) Act). All enforce tiers AND NOT the shared template-exclusion dictionary and a guidance exclusion (fact sheet, frequently asked questions, open to inspection, how to report). 65 is discovery-only.
+pattern: >-
+  (?i)\b(?:proposed\s+declaration\s+notice|notice\s+of\s+proposed\s+declaration|regulated\s+dog\s+declaration|(?:dangerous|menacing)\s+dog\s+declaration|declared\s+(?:dangerous|menacing)\s+dog|dog\s+attack(?:\s+(?:investigation|report|complaint|incident|record))?|destruction\s+order|(?:prohibited|restricted)\s+dog)\b
+confidence: medium
+confidence_justification: >-
+  Medium. The primary phrases are the Act's own terms (ss 89-95, 127, 127A), but they also appear in the Act, council fact sheets, QCAT decisions and news. Enforce tiers therefore need a populated owner or victim / incident field. PPID microchip numbers are matched only as a labelled loose value (9-15 characters after a microchip / PPID label). The ISO 11784 15-digit structure was not verified from a primary source for this build and is not relied on. Registration and tag numbers are council-defined. 85/75 are heuristic evidence tiers, not measured accuracy. Test values are synthetic.
+jurisdictions:
+  - au
+  - au-qld
+regulations:
+  - Animal Management (Cats and Dogs) Act 2008 (Qld) ss 89-95
+  - Animal Management (Cats and Dogs) Act 2008 (Qld) ss 127, 127A
+  - Animal Management (Cats and Dogs) Act 2008 (Qld) ss 172-173, 179
+  - Animal Management (Cats and Dogs) Act 2008 (Qld) ss 194-195
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - law-enforcement
+  - pii
+  - health
+  - government
+corroborative_evidence:
+  keywords:
+    - written representations
+    - information notice
+    - authorised person
+    - impounded
+    - seized
+    - bitten
+    - bodily harm
+    - veterinary surgeon
+    - Animal Management (Cats and Dogs) Act
+  proximity: 300
+customisation:
+  - key: animal-registration-number
+    kind: identifier-format
+    identifier: animal-registration-number
+    target: purview.regexes/Regex_au_qld_regulated_dog_description_field
+    mode: extend
+    affects_tiers:
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's council animal registration number / tag format (see docs/identifiers.md#animal-registration-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Proposed declaration notice - Animal Management (Cats and Dogs) Act 2008 s 90\nOwner: Jordan Teston\nOwner's address: 22 Banksia Drive, Rockhampton QLD 4700\nBreed: Staffordshire bull terrier cross\nColour: brindle\nSex: male\nDeclaration proposed: dangerous dog\nReasons: on 02/09/2026 the dog attacked a person, causing bodily harm.\nYou may make written representations to council within 14 days."
+      description: Completed s 90 proposed declaration notice with owner, dog details and reasons (85 tier)
+      synthetic: true
+    - value: "Dog attack investigation report\nVictim: Priya Testwell\nInjuries sustained: puncture wounds to left forearm, treated at hospital\nDog owner: Casey Teston\nBreed: kelpie cross\nWitness: Alex Staffson\nThe dog was seized and impounded by an authorised person on 15/09/2026."
+      description: Dog attack investigation with victim, injuries, owner, breed and seizure (85 tier)
+      synthetic: true
+    - value: "Dog attack complaint 2026-004471\nVictim's name: Morgan Teston\nDate of attack: 14/09/2026\nLocation of attack: footpath outside 9 Quandong Street\nOwner unknown - dog wandering at large."
+      description: Attack complaint with victim and incident fields, owner not identified (75 tier)
+      synthetic: true
+    - value: "Regulated dog declaration - information notice\nRegistered owner: Riley Teston\nThe declared menacing dog must be kept only at the place stated in the registration notice."
+      description: Declaration information notice with the owner field only (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: "90 Notice of proposed declaration (1) If a local government proposes to make a regulated dog declaration it must give any owner of the dog a notice (a proposed declaration notice) stating the following details for the dog: breed; colour; sex; any other noticeable distinguishing features or marks."
+      description: Animal Management (Cats and Dogs) Act 2008 s 90 text (legislation, 65 only)
+    - value: "Proposed declaration notice\nOwner name: ____________\nOwner's address: ____________\nBreed: ________ Colour: ________ Sex: ________\nReasons for proposed declaration: ____________"
+      description: Blank council notice form (65 only)
+    - value: "Dog registry - general register extract (open to inspection at the public office, s 179)\nOwner details: not available for inspection\nRegistration number: 2026-1187\nBreed: Rottweiler\nColour: black and tan\nSex: female\nRegulated dog: declared dangerous dog"
+      description: Public council dog registry extract without owner details (s 179(2)); dog-description fields only (65 at most)
+    - value: "Council declared 14 dogs dangerous after a run of dog attack reports last year, and QCAT upheld one destruction order on review."
+      description: News with aggregate numbers (65 only)
+    - value: "Dangerous and menacing dogs fact sheet: if your dog is a declared dangerous dog you must keep it in a proper enclosure, display warning signs and ensure it wears a distinctive collar."
+      description: Council fact sheet (guidance exclusion)
+false_positives:
+  - description: The Act, council fact sheets, QCAT decisions and news use the declaration and attack vocabulary.
+    mitigation: Enforce tiers need a populated owner or victim / incident field on the same line as its label, and a guidance exclusion suppresses fact sheets and FAQ pages.
+  - description: Public council dog registry extracts (s 179) list regulated dogs with breed, colour and sex but not the owner.
+    mitigation: Dog-description fields never reach 75 on their own, owner fields reject withheld / not / excluded values, and "open to inspection" is excluded.
+  - description: Routine dog registration records name the owner and dog without any declaration or attack.
+    mitigation: They lack this classifier's primary phrases. They are covered by au-qld-animal-registration-record at lower risk.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_qld_regulated_dog_primary
+      matches:
+        - ref: Regex_au_qld_regulated_dog_owner_field
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_qld_regulated_dog_description_field
+            - Regex_au_qld_regulated_dog_incident_field
+        - ref: Keyword_au_qld_regulated_dog_corroborative
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_regulated_dog_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_qld_regulated_dog_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_qld_regulated_dog_owner_field
+            - Regex_au_qld_regulated_dog_incident_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_regulated_dog_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_qld_regulated_dog_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_qld_regulated_dog_primary
+      pattern: >-
+        (?i)\b(?:proposed\s+declaration\s+notice|notice\s+of\s+proposed\s+declaration|regulated\s+dog\s+declaration|(?:dangerous|menacing)\s+dog\s+declaration|declared\s+(?:dangerous|menacing)\s+dog|dog\s+attack(?:\s+(?:investigation|report|complaint|incident|record))?|destruction\s+order|(?:prohibited|restricted)\s+dog)\b
+    - id: Regex_au_qld_regulated_dog_owner_field
+      pattern: >-
+        (?i)\b(?:(?:dog\s+)?owner|registered\s+owner|owner'?s\s+name|name\s+of\s+(?:the\s+)?owner|responsible\s+person|relevant\s+person|owner'?s\s+(?:residential\s+)?address|owner\s+address)(?:\s+(?:name|details))?[ \t]*[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not|none|nil|excluded|redacted|suppressed|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?:(?:(?:Mr|Mrs|Ms|Miss|Dr)\.?[ \t]+)?[A-Z][A-Za-z'-]{1,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){1,3}|(?:(?:Unit|Lot|Apt|Flat)[ \t]+)?\d{1,5}[A-Za-z]?(?:/\d{1,5}[A-Za-z]?)?[ \t]+[A-Z][A-Za-z'-]{1,30})
+    - id: Regex_au_qld_regulated_dog_description_field
+      pattern: >-
+        (?i)\b(?:breed|colour|color|sex|distinguishing\s+(?:features|marks)|(?:dog'?s|animal)\s+name|microchip(?:\s+(?:no\.?|number))?|PPID(?:\s+(?:no\.?|number))?|registration\s+(?:tag\s+)?(?:no\.?|number)|tag\s+(?:no\.?|number))[ \t]*[:#][ \t]{0,5}(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9'/-]{1,30}
+    - id: Regex_au_qld_regulated_dog_incident_field
+      pattern: >-
+        (?i)\b(?:date\s+(?:and\s+time\s+)?of\s+(?:the\s+)?(?:attack|incident)|incident\s+(?:date|location|address)|location\s+of\s+(?:the\s+)?(?:attack|incident)|victim(?:'?s)?(?:\s+(?:name|details))?|(?:person|animal)\s+attacked|injur(?:y|ies)(?:\s+sustained)?|nature\s+of\s+(?:the\s+)?injur(?:y|ies)|complainant|witness(?:\s+name)?|veterinary\s+(?:report|treatment))[ \t]*[:#][ \t]{0,5}(?!(?:n/?a|none|nil|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9'/.-]{1,30}
+  keywords:
+    - id: Keyword_au_qld_regulated_dog_corroborative
+      groups:
+        - match_style: word
+          terms:
+            - written representations
+            - information notice
+            - authorised person
+            - authorised officer
+            - impounded
+            - seized
+            - seizure
+            - bitten
+            - bodily harm
+            - grievous bodily harm
+            - veterinary surgeon
+            - compliance notice
+            - Animal Management (Cats and Dogs) Act
+      strength: specific
+    - id: Keyword_au_qld_regulated_dog_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - fact sheet
+            - factsheet
+            - frequently asked questions
+            - open to inspection
+            - how to report
+      strength: specific
+risk_rating: 7
+risk_description: >-
+  The classifier identifies a council regulated dog declaration, proposed declaration notice, destruction order or dog attack investigation that names the owner and, for attacks, the victim, their injuries and witnesses. These are enforcement and possible prosecution records. They carry health information about attack victims, and neighbour-dispute and complainant details that are often contested. The state regulated dog register is not public (s 173), and owner details are withheld from the public council registry (s 179(2)). Legislation, fact sheets, news and owner-less registry extracts are excluded from enforce tiers. Risk 7 supports SENSITIVE Legal.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Legal
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected B
+references:
+  - title: Animal Management (Cats and Dogs) Act 2008 (Qld) - ss 60, 89-95, 127, 127A, 172-179, 194-195
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2008-074
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release. AM(CD) Act regulated dog declarations, proposed declaration notices, destruction orders and dog attack records. 75 requires a populated owner or victim / incident field. 85 requires owner + dog-description or incident + an Act-process term. Owner-less public registry extracts, legislation, fact sheets and blank notices are excluded.
+author: testpattern-community
+license: MIT

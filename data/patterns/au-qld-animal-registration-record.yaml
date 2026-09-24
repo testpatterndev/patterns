@@ -1,0 +1,168 @@
+schema: testpattern/v1
+name: Queensland Council Cat and Dog Registration Record
+slug: au-qld-animal-registration-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Council dog and cat registration forms, registration notices, renewals and registry records that identify the owner. Dog registration is statutory under the Animal Management (Cats and Dogs) Act 2008. Under s 47 the registration form must state the owner's name, residential address, contact telephone number and email address, and the dog's age, breed, colour, sex, distinguishing marks, address, PPID number, desexing and regulated status. The council gives the owner a registration notice (s 49) and keeps it in the dog registry (ss 177-178). Cat registration, where required, is imposed by local law, which s 6 permits. The dog registry is open to public inspection, but owner information in the registration notice is excluded (s 179(2)), and s 39 restricts the release of identifying information. The owner block is therefore the sensitive part of the record. Declarations, attacks and destruction orders are covered by au-qld-regulated-dog-declaration-attack-record.
+operation: >-
+  Primary: dog / cat / animal / pet registration [form / notice / record / renewal / application / details / certificate], dog / cat / animal registry, registration notice for the / your dog or cat, lifetime dog or cat registration. Owner field values must be on the same line as the label and are placeholder-guarded (withheld, not, none, nil, excluded, redacted, suppressed, blank lines, brackets). 75 requires, within 300 characters, one populated owner field: owner, owner's [full] name, registered owner, owner's address, residential or postal address, contact / owner telephone or phone, mobile or email, followed by a name of two or more capitalised words, a street address, an Australian phone number or an email address. 85 requires two distinct owner field values (min_count 2, unique) plus a populated animal field (breed, colour, sex, desexed, age, animal / dog's / cat's name, microchip or PPID number, registration or tag number). Animal fields alone never reach 75, which keeps public registry extracts at 65. All enforce tiers AND NOT the shared template-exclusion dictionary and a guidance exclusion (open to inspection, fact sheet, frequently asked questions, how to register). 65 is discovery-only.
+pattern: >-
+  (?i)\b(?:(?:dog|cat|animal|pet)\s+registration(?:\s+(?:form|notice|record|renewal|application|details|certificate))?|(?:dog|cat|animal)\s+registry|registration\s+notice\s+for\s+(?:the|your)\s+(?:dog|cat)|lifetime\s+(?:dog|cat)\s+registration)\b
+confidence: medium
+confidence_justification: >-
+  Medium. The registration phrases are common on council web pages and renewal reminders, so enforce tiers need populated owner fields. Registration and tag numbers are council-defined and are matched only as labelled loose values. Microchip (PPID) numbers are matched only as a labelled loose value. The ISO 11784 15-digit structure was not verified from a primary source for this build and is not relied on. 85/75 are heuristic evidence tiers, not measured accuracy. Test values are synthetic.
+jurisdictions:
+  - au
+  - au-qld
+regulations:
+  - Animal Management (Cats and Dogs) Act 2008 (Qld) ss 44-49
+  - Animal Management (Cats and Dogs) Act 2008 (Qld) ss 39, 177-179
+  - IPA 2009 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - government
+corroborative_evidence:
+  keywords:
+    - registration notice
+    - registration tag
+    - microchip
+    - PPID
+    - desexed
+    - breed
+    - registered owner
+  proximity: 300
+customisation:
+  - key: animal-registration-number
+    kind: identifier-format
+    identifier: animal-registration-number
+    target: purview.regexes/Regex_au_qld_animal_registration_animal_field
+    mode: extend
+    affects_tiers:
+      - 85
+    required_for_enforcement: false
+    note: >-
+      Extend the labelled-field evidence with the customer's council animal registration number / tag format (see docs/identifiers.md#animal-registration-number). The public fallback is the documented label-anchored regex, so the classifier works without customisation at lower precision.
+test_cases:
+  should_match:
+    - value: "Dog registration form\nOwner's full name: Avery Teston\nResidential address: 41 Poinciana Street, Mackay QLD 4740\nContact phone: 0491 570 156\nDog's name: Biscuit\nBreed: Border collie\nSex: female\nDesexed: yes\nMicrochip number: 999000000012345"
+      description: Completed s 47 registration form with owner name, address, phone and dog details (85 tier)
+      synthetic: true
+    - value: "Cat registration renewal\nRegistered owner: Morgan Teston, 7 Jacaranda Court, Toowoomba QLD 4350\nEmail: morgan.teston@mailtest.au\nCat's name: Pepper\nRegistration number: C2026-0471"
+      description: Cat registration renewal with owner name, email and animal fields (85 tier)
+      synthetic: true
+    - value: "Animal registration record updated. Owner: Jordan Teston. New owner phone: 07 5550 1234"
+      description: Registry update with owner name and phone, no animal field (75 tier)
+      synthetic: true
+    - value: "Pet registration details\nOwner name: Casey Teston\nPlease renew before 30 September."
+      description: Renewal reminder with owner name only (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: "47 What registration form must state (1) A registration form for the registration of a dog in the relevant local government's area, must state all of the following information about its owner: name; residential address; contact telephone number; email address, if any."
+      description: Animal Management (Cats and Dogs) Act 2008 s 47 text (legislation, 65 only)
+    - value: "Dog registration form\nOwner's full name: ______________\nResidential address: ______________\nContact phone: ______________\nBreed: ________ Sex: ________ Desexed: Y / N"
+      description: Blank registration form (65 only)
+    - value: "Dog registry - general register extract (open to inspection at the public office under s 179). Owner information not shown.\nRegistration number: 2026-3317\nBreed: Labrador\nColour: yellow\nSex: male\nDesexed: yes"
+      description: Public dog registry extract without owner details (s 179(2)); animal fields only (65 at most)
+    - value: "Dog registration is compulsory for all dogs over 12 weeks. Register your dog online; lifetime dog registration is available for desexed dogs."
+      description: Council web page (65 only)
+    - value: "Council registered 18,420 dogs this year and says pet registration fees will rise by 3% from July."
+      description: News with aggregate numbers (65 only)
+false_positives:
+  - description: Council registration web pages, renewal campaigns, fee schedules and news.
+    mitigation: Enforce tiers need a populated owner field on the same line as its label.
+  - description: Public council dog registry extracts (s 179), which show the dog but not the owner.
+    mitigation: Animal fields never reach 75 on their own, owner fields reject not / withheld / excluded values, and "open to inspection" is excluded.
+  - description: Regulated dog declarations and attack records also carry owner and dog details.
+    mitigation: A registration notice for a regulated dog can match both classifiers. The declaration / attack classifier is the higher-risk one and should drive labelling.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_qld_animal_registration_primary
+      matches:
+        - ref: Regex_au_qld_animal_registration_owner_field
+          min_count: 2
+          unique_results: true
+        - ref: Regex_au_qld_animal_registration_animal_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_animal_registration_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_qld_animal_registration_primary
+      matches:
+        - ref: Regex_au_qld_animal_registration_owner_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_qld_animal_registration_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_qld_animal_registration_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_qld_animal_registration_primary
+      pattern: >-
+        (?i)\b(?:(?:dog|cat|animal|pet)\s+registration(?:\s+(?:form|notice|record|renewal|application|details|certificate))?|(?:dog|cat|animal)\s+registry|registration\s+notice\s+for\s+(?:the|your)\s+(?:dog|cat)|lifetime\s+(?:dog|cat)\s+registration)\b
+    - id: Regex_au_qld_animal_registration_owner_field
+      pattern: >-
+        (?i)\b(?:owner(?:'?s)?(?:\s+(?:full\s+)?name)?|registered\s+owner|name\s+of\s+(?:the\s+)?owner|owner(?:'?s)?\s+(?:residential\s+)?address|residential\s+address|postal\s+address|(?:contact\s+|owner\s+)?(?:tele)?phone(?:\s+(?:no\.?|number))?|mobile(?:\s+(?:no\.?|number))?|email(?:\s+address)?)[ \t]*[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not|none|nil|excluded|redacted|suppressed|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?:(?:(?:Mr|Mrs|Ms|Miss|Dr)\.?[ \t]+)?[A-Z][A-Za-z'-]{1,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){1,3}|(?:(?:Unit|Lot|Apt|Flat)[ \t]+)?\d{1,5}[A-Za-z]?(?:/\d{1,5}[A-Za-z]?)?[ \t]+[A-Z][A-Za-z'-]{1,30}|(?:\+?61[ \t]?|0)[2-478](?:\d{2}[ \t]?\d{3}[ \t]?\d{3}|[ \t]?\d{4}[ \t]?\d{4})|[A-Z0-9._%+-]{1,40}@[A-Z0-9-]{1,40}\.[A-Z.]{2,20})
+    - id: Regex_au_qld_animal_registration_animal_field
+      pattern: >-
+        (?i)\b(?:breed|colour|color|sex|desexed|age|(?:dog'?s|cat'?s|animal'?s?|pet'?s?)\s+name|microchip(?:\s+(?:no\.?|number))?|PPID(?:\s+(?:no\.?|number))?|(?:animal\s+)?registration\s+(?:tag\s+)?(?:no\.?|number)|tag\s+(?:no\.?|number))[ \t]*[:#][ \t]{0,5}(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Za-z0-9][A-Za-z0-9'/-]{0,30}
+  keywords:
+    - id: Keyword_au_qld_animal_registration_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - open to inspection
+            - fact sheet
+            - factsheet
+            - frequently asked questions
+            - how to register
+      strength: specific
+risk_rating: 5
+risk_description: >-
+  The classifier identifies a council dog or cat registration record that names the owner with a residential address, phone or email alongside the animal. The Act withholds owner details from the public dog registry (s 179(2)) and restricts the release of identifying information (s 39). Pet registers have been misused to locate people, including people with DFV confidential addresses, and bulk extracts expose many households' contact details. Legislation, council web pages, blank forms and owner-less registry extracts are excluded from enforce tiers. Risk 5 supports OFFICIAL: Sensitive / SENSITIVE Personal-Privacy for owner-identified records.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  us_gov: CUI Basic
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+references:
+  - title: Animal Management (Cats and Dogs) Act 2008 (Qld) - ss 6, 12, 39, 44-49, 177-179
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2008-074
+created: '2026-09-24'
+updated: '2026-09-24'
+changelog:
+  - version: 1.0.0
+    date: '2026-09-24'
+    description: Initial release. Council cat and dog registration records anchored on registration phrases and AM(CD) Act s 47 owner fields. 75 requires a populated owner field. 85 requires two distinct owner values + an animal field. Owner-less public registry extracts, legislation and blank forms are excluded.
+author: testpattern-community
+license: MIT
