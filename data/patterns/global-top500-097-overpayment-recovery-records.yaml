@@ -1,68 +1,78 @@
 schema: testpattern/v1
 name: Overpayment recovery records
 slug: global-top500-097-overpayment-recovery-records
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to overpayment recovery records in financial and compliance documents. Commonly found in Australian regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects salary and wage overpayment recovery records for an identified employee: overpayment notifications, recovery letters and repayment agreements, with the overpaid amount, repayment instalments or overpayment period.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 7 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?i)\b(?:overpayment\s+recovery\s+records?)\b
+  Primary: an overpayment recovery phrase (overpayment recovery/repayment/notification/letter/arrangement/agreement/debt, salary/wage/payroll overpayment, recovery of an overpayment, overpaid salary/wages). 75 tier requires a populated person field (employee/staff name or number, payroll number, position number, payee) with a non-placeholder value within 300 characters. 85 tier additionally requires a populated overpayment detail (gross/net overpayment, amount overpaid/owing/to be repaid, repayment or instalment amount, or an overpayment period date) and an independent corroborative term (written agreement, agreed in writing, repayment arrangement, instalments, signed, payroll error, per pay, payroll deduction). Enforce tiers exclude template/fixture text (template-exclusion) and policy, guidance, training and media-release framing; 65 is discovery-only (primary alone, template-excluded) and will surface policies, guidance, blank forms and statistics.
+pattern: >-
+  (?i)\b(?:overpayment\s+(?:recovery(?:\s+records?)?|repayment|notifications?|notices?|letters?|arrangements?|agreements?|debts?)|(?:salary|wages?|pay(?:roll)?)\s+overpayments?|recovery\s+of\s+(?:an?\s+)?overpayment|overpaid\s+(?:salary|wages|pay))\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated field with a non-placeholder value and 85 adds a record-specific populated detail plus independent corroboration. Person and record values are customer-defined, so the field regexes use labelled loose values with a placeholder guard. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
+  - au
   - global
 regulations:
-  - AML/CTF Act (Cth)
-  - IPA 2009 (Qld)
-  - NDB Scheme (Cth)
+  - Fair Work Act 2009 (Cth)
+  - Industrial Relations Act 2016 (Qld)
   - Privacy Act 1988 (Cth)
-  - GDPR
+  - IPA 2009 (Qld)
 frameworks:
   - ISO 27001
   - ISO 27701
-  - PCI-DSS
-  - SOC 2
 data_categories:
   - financial
+  - employment
+  - pii
 corroborative_evidence:
   keywords:
-    - overpayment recovery records
-    - overpayment
-    - recovery
-    - records
-    - payroll
-    - tax
-    - operations
+    - written agreement
+    - agreed in writing
+    - repayment arrangement
+    - instalments
+    - signed
+    - payroll error
+    - per fortnight
+    - per pay
+    - payroll deduction
   proximity: 300
-  keyword_lists:
-    - corporate-finance
-    - generic-data-labels
-    - data-record-context
 test_cases:
   should_match:
-    - value: 'Overpayment recovery records'
-      description: Topic phrase present
-    - value: 'overpayment recovery records'
-      description: Topic phrase, lowercase
-    - value: 'this record references the overpayment recovery records held on file'
-      description: Topic phrase within surrounding text
+    - value: "Salary overpayment notification\nEmployee name: Avery Teston\nPayroll number: 88213\nOverpayment period: 01/07/2026 to 12/09/2026\nGross overpayment: $2,145.80\nRepayment arrangement: $50.00 per fortnight by payroll deduction\nWritten agreement signed by the employee."
+      description: "85: overpayment notification with employee, period, gross overpayment, repayment and signed agreement"
+      synthetic: true
+    - value: "Overpayment recovery - repayment plan\nStaff member: Morgan Teston\nAmount to be repaid: $780.00\nInstalments of $65.00 per pay, agreed in writing on 20/09/2026."
+      description: "85: repayment plan with staff member, amount to be repaid and instalments agreed in writing"
+      synthetic: true
+    - value: "Overpayment recovery letter to employee: Jordan Staffson - draft for HR review."
+      description: "75: recovery letter naming the employee, no amounts"
+      synthetic: true
+    - value: "overpayment recovery"
+      description: "65: bare phrase only - discovery tier"
+      synthetic: true
   should_not_match:
-    - value: unrelated generic text
-      description: No relevant phrase context
-    - value: placeholder value 12345
-      description: Random text should not match phrase marker
-    - value: generic narrative without identifier/document anchors
-      description: Should not match plain mention
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: "If a salary overpayment happens, the employer and employee should discuss and agree on a repayment arrangement in writing. This fact sheet explains the rules."
+      description: "FWO-style guidance - must stay at or below 65"
+    - value: "Overpayment recovery agreement\nEmployee name: __________\nGross overpayment: $______\nRepayment amount: $______"
+      description: "Blank agreement template - must stay at or below 65"
+    - value: "The council recovered wage overpayments from hundreds of staff after a system fault, according to a media release."
+      description: "News - must stay at or below 65"
+    - value: "unrelated generic text without domain phrases"
+      description: "No relevant topic phrases present"
 false_positives:
-  - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
-    mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
-  - description: In Australian English, standard business terminology overlapping with financial detection keywords in routine correspondence and documentation.
-    mitigation: Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for higher precision.
+  - description: "Policies, procedures, regulator guidance, fact sheets and training material that name the record type."
+    mitigation: "Enforce tiers require populated fields; guidance has labels without values, and policy/guidance/training/media-release framing is excluded by the NOT-group."
+  - description: "Blank forms, templates and system configuration screens."
+    mitigation: "Blank lines, bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded by template-exclusion."
+  - description: "News, statistics and vendor marketing."
+    mitigation: "No populated person or record fields, so these stay at 65 discovery."
+  - description: "Centrelink / benefit overpayment debt letters (not payroll)."
+    mitigation: "They are equally personal debt records; person field still required for 75."
 exports:
   - purview_xml
   - yaml
@@ -70,73 +80,92 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
-      match_style: word
-    - dict: generic-data-labels
-      as: Evidence_generic_data_labels
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_overpayment_recovery_records
+      id_match: Regex_top500_097_overpayment_recovery_records_primary
       matches:
-        - ref: Evidence_overpayment_recovery_records
-          min_count: 2
-          unique_results: true
-        - ref: Evidence_generic_data_labels
+        - ref: Regex_top500_097_overpayment_recovery_records_person_field
+        - ref: Regex_top500_097_overpayment_recovery_records_overpayment_detail
+        - ref: Keyword_top500_097_overpayment_recovery_records_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_097_overpayment_recovery_records_guidance_exclusion
     - confidence_level: 75
-      id_match: Pattern_overpayment_recovery_records
+      id_match: Regex_top500_097_overpayment_recovery_records_primary
       matches:
-        - ref: Evidence_overpayment_recovery_records
-        - ref: Evidence_generic_data_labels
+        - ref: Regex_top500_097_overpayment_recovery_records_person_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_097_overpayment_recovery_records_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_overpayment_recovery_records
+      id_match: Regex_top500_097_overpayment_recovery_records_primary
       matches:
-        - ref: Evidence_overpayment_recovery_records
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-    - id: Pattern_overpayment_recovery_records
-      pattern: (?i)\b(?:overpayment\s+recovery\s+records?)\b
-    - id: Pattern_au_top500_097_overpayment_recovery_records_label_context
-      pattern: (?i)\b(?:overpayment\s+recovery\s+records)\b
+    - id: Regex_top500_097_overpayment_recovery_records_primary
+      pattern: >-
+        (?i)\b(?:overpayment\s+(?:recovery(?:\s+records?)?|repayment|notifications?|notices?|letters?|arrangements?|agreements?|debts?)|(?:salary|wages?|pay(?:roll)?)\s+overpayments?|recovery\s+of\s+(?:an?\s+)?overpayment|overpaid\s+(?:salary|wages|pay))\b
+    - id: Regex_top500_097_overpayment_recovery_records_person_field
+      pattern: >-
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number)|payee(?:\s+name)?)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_top500_097_overpayment_recovery_records_overpayment_detail
+      pattern: >-
+        (?i)\b(?:(?:gross\s+|net\s+)?overpayment(?:\s+amount)?|amount\s+(?:overpaid|owing|outstanding|to\s+be\s+(?:repaid|recovered))|repayment(?:\s+amount)?|instal(?:l)?ments?(?:\s+of)?|balance\s+outstanding)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:=\-]?[ \t]{0,3}-?(?:AUD|A\$|US\$|NZ\$|\$|£|€)[ \t]?\d{1,3}(?:,?\d{3}){0,3}(?:\.\d{2})?|\b(?:overpayment\s+period|period\s+of\s+overpayment|overpaid\s+from)[ \t]{0,3}[:\-]?[ \t]{0,3}(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})
   keywords:
-    - id: Evidence_overpayment_recovery_records
+    - id: Keyword_top500_097_overpayment_recovery_records_corroborative
       groups:
         - match_style: word
           terms:
-            - overpayment recovery
-            - overpayment
-            - recovery plan
-            - repayment schedule
-            - salary overpayment
-            - payroll adjustment
-            - debt recovery
-            - recovery notice
-            - overpaid wages
-            - recoupment
-            - payroll correction
-            - repayment agreement
-    - id: Keyword_au_top500_097_overpayment_recovery_records_domain_context
+            - written agreement
+            - agreed in writing
+            - repayment arrangement
+            - instalments
+            - signed
+            - payroll error
+            - per fortnight
+            - per pay
+            - payroll deduction
+      strength: specific
+    - id: Keyword_top500_097_overpayment_recovery_records_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - overpayment recovery records
-            - overpayment
-            - recovery
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
+            - should discuss
+            - should talk
+            - when an overpayment
+            - if an overpayment
+            - get legal advice
+      strength: domain
 risk_description: >-
-  The detector matches the phrase overpayment recovery record or records with finance, record-structure, and template-exclusion context. A real recovery file can expose an employee's debt, repayment plan, or payroll dispute, but the regex does not require a person, amount, schedule, or case reference. The affected individual faces financial and reputational harm only when those details are present, while policy, retention, and sample-record discussions can produce the same phrase. Risk 4 OFFICIAL is retained for the topic marker; SENSITIVE would require a populated and attributable recovery case.
+  The classifier identifies overpayment recovery records for an identified employee (75) with overpaid amounts, instalments or periods (85). These reveal a personal debt to the employer and pay details. Guidance, blank templates and news stay at 65. Risk 4 supports OFFICIAL.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -146,18 +175,25 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 references:
-  - title: "Anti-Money Laundering and Counter-Terrorism Financing Act 2006 (Cth)"
-    url: https://www.legislation.gov.au/C2006A00169/latest/text
-  - title: "Information Privacy Act 2009 (Qld)"
-    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+  - title: "Fair Work Ombudsman - Overpayments"
+    url: https://www.fairwork.gov.au/pay-and-wages/deductions-and-related-issues/overpayments
+  - title: "Fair Work Ombudsman - Deducting pay"
+    url: https://www.fairwork.gov.au/pay-and-wages/deductions-and-related-issues/deducting-pay
+  - title: "Fair Work Act 2009 (Cth)"
+    url: https://www.legislation.gov.au/C2009A00028/latest/text
+  - title: "Industrial Relations Act 2016 (Qld) - ss 339-340 time and wages records"
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2016-063
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'HR quality pass (2026-09-24): rebuilt tiers - 65 overpayment phrase (discovery), 75 primary + populated person field, 85 adds a populated overpayment amount/instalment/period regex plus independent corroboration; removed the label-context regex, generic-data-labels and domain keyword lists that repeated the primary phrase; widened the primary from the single phrase "overpayment recovery records" to real overpayment record phrases; added template-exclusion and guidance NOT-groups; replaced bare-phrase tests with populated records and guidance/blank/news decoys; regulations now cite the Fair Work Act 2009 (Cth) (s 324 deductions, FWO overpayment guidance) and Industrial Relations Act 2016 (Qld) with the privacy statutes.'
   - version: 1.3.2
     date: '2026-09-24'
-    description: "Metadata quality pass (2026-09-24): removed regulation tags that do not apply (SOCI Act 2018 (Cth)); added 3 verified legislation/regulator references."
+    description: 'Metadata quality pass (2026-09-24): removed regulation tags that do not apply (SOCI Act 2018 (Cth)); added 3 verified legislation/regulator references.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 700 without changing detector or package metadata.'
@@ -178,5 +214,4 @@ changelog:
     description: Initial release
 author: testpattern-community
 license: MIT
-
 risk_rating: 4

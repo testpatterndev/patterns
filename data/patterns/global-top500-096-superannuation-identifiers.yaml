@@ -1,59 +1,76 @@
 schema: testpattern/v1
 name: Superannuation identifiers
 slug: global-top500-096-superannuation-identifiers
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to superannuation identifiers in financial and compliance documents. Commonly found in international regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects Australian superannuation identifiers with populated values: USI (unique superannuation identifier), fund member/account numbers, fund or SMSF ABN and SMSF electronic service address (ESA), optionally with the member or employee name.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Keyword
-  lists: financial-deposit-terms, industry-hr. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?i)\b(?:superannuation\s+identifiers?)\b
+  Primary: a superannuation identifier phrase (superannuation identifier, unique superannuation identifier / USI, super member/account number, fund member number, SMSF ABN/ESA, electronic service address, fund ABN). 75 tier requires a populated identifier value field (USI, member number, super account number, fund/SMSF ABN, ESA) whose value contains a digit or is a spaced ABN, placeholder-guarded, within 300 characters. 85 tier additionally requires a populated member/employee name field and an independent corroborative term (SuperStream, rollover, contributions, fund name, standard choice, self-managed super fund, clearing house, stapled fund). Enforce tiers exclude template/fixture text and guidance framing; 65 is discovery-only.
+pattern: >-
+  (?i)\b(?:superannuation\s+identifiers?|unique\s+superannuation\s+identifier|USI|super(?:annuation)?\s+(?:fund\s+)?(?:member|membership|account)\s+(?:number|no\.?|ID)|fund\s+member\s+(?:number|ID)|SMSF\s+(?:ABN|electronic\s+service\s+address|ESA)|electronic\s+service\s+address|fund\s+ABN)\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: USIs, member numbers and SMSF ESAs have no single verified public format, so the classifier anchors on a labelled identifier with a populated value that contains a digit (placeholder-guarded) near a superannuation identifier phrase for 75, and adds a populated member/employee name plus independent corroboration for 85. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
-  - global
+  - au
 regulations:
-  - GDPR
+  - Superannuation Guarantee (Administration) Act 1992 (Cth)
+  - Superannuation Industry (Supervision) Act 1993 (Cth)
+  - Taxation Administration Act 1953 (Cth)
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - financial
+  - pii
 corroborative_evidence:
   keywords:
-    - superannuation identifiers
-    - superannuation
-    - identifiers
-    - payroll
-    - tax
-    - operations
+    - SuperStream
+    - rollover
+    - contributions
+    - fund name
+    - standard choice
+    - self-managed super fund
+    - clearing house
+    - stapled fund
   proximity: 300
-  keyword_lists:
-    - financial-deposit-terms
-    - industry-hr
-    - generic-data-labels
-    - data-record-context
 test_cases:
   should_match:
-    - value: 'Superannuation identifiers'
-      description: Topic phrase present
-    - value: 'superannuation identifiers'
-      description: Topic phrase, lowercase
-    - value: 'this record references the superannuation identifiers held on file'
-      description: Topic phrase within surrounding text
+    - value: "Superannuation details\nEmployee name: Avery Teston\nFund name: Coastline Super\nFund ABN: 12 345 678 901\nUSI: 12345678901001\nMember number: 70442198\nContributions to be paid via SuperStream."
+      description: "85: super details with employee, fund ABN, USI, member number and SuperStream"
+      synthetic: true
+    - value: "SMSF ABN: 98 765 432 109\nElectronic service address (ESA): ESAPROV1\nMember name: Morgan Teston\nRollover to the self-managed super fund to be processed this week."
+      description: "85: SMSF details with SMSF ABN, ESA, member name and rollover"
+      synthetic: true
+    - value: "Superannuation member number: 88120455\nPlease update your records."
+      description: "75: super member number with value, no member name"
+      synthetic: true
+    - value: "superannuation identifiers"
+      description: "65: bare phrase only - discovery tier"
+      synthetic: true
   should_not_match:
-    - value: unrelated generic text
-      description: No relevant phrase context
-    - value: placeholder value 12345
-      description: Random text should not match phrase marker
-    - value: generic narrative without identifier/document anchors
-      description: Should not match plain mention
-    - value: template example placeholder record identifier
-      description: Template/sample context should be excluded even when anchor words are present
+    - value: "A unique superannuation identifier (USI) identifies a super fund product. This fact sheet explains where to find your fund's USI."
+      description: "ATO-style guidance - must stay at or below 65"
+    - value: "Superannuation standard choice form\nFund ABN: __________\nUSI: __________\nMember number: __________"
+      description: "Blank choice form - must stay at or below 65"
+    - value: "USI: N/A\nMember number: TBC\nFund ABN: [fund ABN]"
+      description: "Placeholder values - must stay at or below 65"
+    - value: "unrelated generic text without domain phrases"
+      description: "No relevant topic phrases present"
 false_positives:
-  - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
-    mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
-  - description: In English (as the primary international business language), standard business terminology overlapping with financial detection keywords in routine correspondence and documentation.
-    mitigation: Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for higher precision.
+  - description: "Policies, procedures, regulator guidance, fact sheets and training material that name the record type."
+    mitigation: "Enforce tiers require populated fields; guidance has labels without values, and policy/guidance/training/media-release framing is excluded by the NOT-group."
+  - description: "Blank forms, templates and system configuration screens."
+    mitigation: "Blank lines, bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded by template-exclusion."
+  - description: "Public fund product listings that publish fund ABNs and USIs."
+    mitigation: "Fund ABN/USI alone is public data and stays at 75; 85 needs a populated member name plus corroboration."
+  - description: "Overlap with au-tfn-declaration-super-choice-form, au-superannuation-fund-number and superannuation-fund-member-statement-bulk."
+    mitigation: "This pattern detects identifiers in any record; the choice-form and bulk-statement classifiers carry the form/bulk context."
 exports:
   - purview_xml
   - yaml
@@ -61,68 +78,91 @@ exports:
 scope: wide
 purview:
   patterns_proximity: 300
-  recommended_confidence: 85
+  recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
       as: Keyword_noise_exclusion
       match_style: word
-    - dict: generic-data-labels
-      as: Evidence_generic_data_labels
-      match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_super_id
+      id_match: Regex_top500_096_superannuation_identifiers_primary
       matches:
-        - ref: Keyword_super_id
-        - ref: Evidence_generic_data_labels
+        - ref: Regex_top500_096_superannuation_identifiers_identifier_value
+        - ref: Regex_top500_096_superannuation_identifiers_person_field
+        - ref: Keyword_top500_096_superannuation_identifiers_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_top500_096_superannuation_identifiers_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_top500_096_superannuation_identifiers_primary
+      matches:
+        - ref: Regex_top500_096_superannuation_identifiers_identifier_value
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_top500_096_superannuation_identifiers_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_super_id
+      id_match: Regex_top500_096_superannuation_identifiers_primary
       matches:
-        - ref: Evidence_generic_data_labels
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
   regexes:
-    - id: Regex_super_id
-      pattern: (?i)\b(?:superannuation\s+identifiers?)\b
-    - id: Pattern_global_top500_096_superannuation_identifiers_label_context
-      pattern: (?i)\b(?:superannuation\s+identifiers)\b
+    - id: Regex_top500_096_superannuation_identifiers_primary
+      pattern: >-
+        (?i)\b(?:superannuation\s+identifiers?|unique\s+superannuation\s+identifier|USI|super(?:annuation)?\s+(?:fund\s+)?(?:member|membership|account)\s+(?:number|no\.?|ID)|fund\s+member\s+(?:number|ID)|SMSF\s+(?:ABN|electronic\s+service\s+address|ESA)|electronic\s+service\s+address|fund\s+ABN)\b
+    - id: Regex_top500_096_superannuation_identifiers_identifier_value
+      pattern: >-
+        (?i)\b(?:USI|unique\s+superannuation\s+identifier|(?:fund\s+)?member(?:ship)?\s+(?:number|no\.?|ID)|(?:super(?:annuation)?\s+)?account\s+number|(?:fund|SMSF)\s+ABN|ESA|electronic\s+service\s+address)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})(?:\d{2}(?:[ ]?\d{3}){3}(?:[ ]?\d{3})?|(?=[A-Za-z0-9-]{0,20}\d)[A-Za-z0-9][A-Za-z0-9-]{3,20})\b
+    - id: Regex_top500_096_superannuation_identifiers_person_field
+      pattern: >-
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number)|payee(?:\s+name)?|member(?:\s+(?:full\s+)?name)|fund\s+member\s+name|account\s+holder)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Keyword_super_id
+    - id: Keyword_top500_096_superannuation_identifiers_corroborative
       groups:
         - match_style: word
           terms:
-            - superannuation identifiers
-            - superannuation
-            - super fund
-            - text: USI
-              case_sensitive: true
-            - member number
-            - SPIN
-            - fund identifier
-            - super account
-            - superannuation guarantee
-            - employer super
-            - fund ABN
+            - SuperStream
+            - rollover
+            - contributions
+            - fund name
+            - standard choice
+            - self-managed super fund
+            - clearing house
+            - stapled fund
       strength: specific
-    - id: Keyword_global_top500_096_superannuation_identifiers_domain_context
+    - id: Keyword_top500_096_superannuation_identifiers_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - superannuation identifiers
-            - superannuation
-            - identifiers
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
+            - how to find
+            - where to find
+            - you can find
+            - identifies a super fund
+            - what is a usi
       strength: domain
 risk_description: >-
-  This medium-confidence regex detects superannuation-identifier terminology in financial and human-resources text, such as references to member, fund, or super account identifiers. It does not validate the format or presence of an issued identifier value, so a normal match may be a field label, policy instruction, form template, or routine benefits discussion. A real identifier linked to an employee could facilitate account targeting or expose benefit participation, particularly alongside personal and balance data. Risk 4 OFFICIAL fits the phrase-level unit; SENSITIVE requires an attributable issued member or account identifier embedded in a substantive personal financial record.
+  The classifier identifies populated superannuation identifiers (75) and, with a member or employee name, a person-linked super record (85). Member numbers plus names enable account enquiries, rollover fraud and social engineering; fund ABNs/USIs alone are public product data. Guidance and blank forms stay at 65. Risk 4 supports OFFICIAL.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -131,15 +171,26 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
-frameworks:
-  - ISO 27001
-  - ISO 27701
+references:
+  - title: "Superannuation Guarantee (Administration) Act 1992 (Cth)"
+    url: https://www.legislation.gov.au/C2004A04402/latest/text
+  - title: "ATO - Paying electronically through SuperStream"
+    url: https://www.ato.gov.au/businesses-and-organisations/super-for-employers/paying-electronically-through-superstream
+  - title: "ATO - Superannuation standard choice form (NAT 13080)"
+    url: https://www.ato.gov.au/forms-and-instructions/superannuation-standard-choice-form
+  - title: "ATO - Super for employers"
+    url: https://www.ato.gov.au/businesses-and-organisations/super-for-employers
+  - title: "Privacy Act 1988 (Cth)"
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'HR quality pass (2026-09-24): rebuilt tiers - 65 identifier phrase (discovery), 75 adds a populated identifier value field (USI, member/account number, fund/SMSF ABN, ESA; placeholder-guarded, must contain a digit), 85 adds a populated member/employee name plus independent corroboration; removed the label-context regex and domain keyword list that repeated the primary phrase; widened the primary from the single phrase "superannuation identifiers" to real identifier labels; replaced bare-phrase tests with populated records and guidance/blank/placeholder decoys; jurisdiction set to au; regulations now cite the Superannuation Guarantee (Administration) Act 1992 (Cth), Superannuation Industry (Supervision) Act 1993 (Cth) and Taxation Administration Act 1953 (Cth) with the privacy statutes.'
   - version: 1.3.2
     date: '2026-09-24'
-    description: "Metadata quality pass (2026-09-24): added 1 verified legislation/regulator references; filled empty frameworks (ISO 27001, ISO 27701)."
+    description: 'Metadata quality pass (2026-09-24): added 1 verified legislation/regulator references; filled empty frameworks (ISO 27001, ISO 27701).'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1657 without changing detector or package metadata.'
@@ -160,15 +211,11 @@ changelog:
     description: Initial release
 author: testpattern-community
 license: MIT
-references:
-  - title: "Regulation (EU) 2016/679 (General Data Protection Regulation)"
-    url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
 remediation:
   catalog_quality_2026_06_02:
     status: applied
     changes:
-      - 'Mapped non-canonical confidence 90 to 85.'
-      - 'Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.'
-      - 'Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.'
-
+      - Mapped non-canonical confidence 90 to 85.
+      - Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
+      - Collapsed 2 duplicate 85-confidence tier(s) into the strictest canonical tier.
 risk_rating: 4

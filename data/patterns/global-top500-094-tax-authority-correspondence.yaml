@@ -1,59 +1,77 @@
 schema: testpattern/v1
 name: Tax authority correspondence
 slug: global-top500-094-tax-authority-correspondence
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to tax authority correspondence in financial and compliance documents. Commonly found in international regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects correspondence from a tax authority to an identified taxpayer: ATO notices of (amended) assessment, audit and review letters, QRO notices, IRS CP notices and HMRC letters, with taxpayer identifiers and amounts payable, penalties or response dates.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Primary: a tax authority correspondence phrase (notice of (amended) assessment, ATO/QRO/IRS/HMRC letter, correspondence, notice, audit or review, tax/revenue audit letter, notice of audit/review, IRS notice CPnnnn). Generic "tax notice", "compliance notice", "tax ruling" and "revenue authority" were removed. 75 tier requires a populated taxpayer field (taxpayer/client/entity name, client number, our/your reference, case number, employee name) with a non-placeholder value within 300 characters. 85 tier additionally requires a populated notice detail (amount payable/due/refundable, tax shortfall, penalty, general interest charge, or a due/respond-by/issue date) and an independent corroborative term (Commissioner of Taxation, Taxation Administration Act, income year, tax return, objection, amended, shortfall). Enforce tiers exclude template/fixture text (template-exclusion) and policy, guidance, training and media-release framing; 65 is discovery-only (primary alone, template-excluded) and will surface policies, guidance, blank forms and statistics.
 pattern: >-
-  (?is)\b(?:tax\s+authority\s+correspondence|tax\s+office\s+letter|revenue\s+authority|tax\s+notice|assessment\s+notice|tax\s+audit|compliance\s+notice|penalty\s+notice|tax\s+ruling|ATO\s+correspondence|IRS\s+notice)\b
+  (?i)\b(?:tax\s+authority\s+correspondence|notice\s+of\s+(?:amended\s+)?assessment|(?:ATO|Australian\s+Taxation\s+Office|Queensland\s+Revenue\s+Office|IRS|HMRC)\s+(?:letter|correspondence|notice|audit|review)|(?:tax|revenue)\s+(?:audit|review)\s+(?:letter|notice|commencement)|notice\s+of\s+(?:audit|review|intention\s+to\s+(?:audit|assess))|IRS\s+notice\s+CP\d{2,4}|penalty\s+notice\s+(?:for|-)\s+(?:late\s+)?lodg(?:e)?ment)\b
 confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
+confidence_justification: >-
+  Medium: the primary phrases also appear in policies, guidance, blank forms and news, so enforce tiers require a populated field with a non-placeholder value and 85 adds a record-specific populated detail plus independent corroboration. Person and record values are customer-defined, so the field regexes use labelled loose values with a placeholder guard. 85/75 are heuristic evidence tiers, not measured accuracy.
 jurisdictions:
+  - au
   - global
 regulations:
-  - GDPR
+  - Taxation Administration Act 1953 (Cth)
+  - Taxation Administration Act 2001 (Qld)
+  - Privacy (Tax File Number) Rule 2015 (Cth)
+  - Privacy Act 1988 (Cth)
+  - IPA 2009 (Qld)
+frameworks:
+  - ISO 27001
+  - ISO 27701
 data_categories:
   - financial
+  - pii
 corroborative_evidence:
   keywords:
-    - tax authority correspondence
-    - tax
-    - authority
-    - correspondence
-    - payroll
-    - operations
+    - Commissioner of Taxation
+    - Taxation Administration Act
+    - income year
+    - tax return
+    - objection
+    - amended
+    - shortfall
+    - income tax return
   proximity: 300
-  keyword_lists:
-    - corporate-finance
-    - data-record-context
-    - generic-data-labels
 test_cases:
   should_match:
-    - value: tax authority correspondence
-      description: Primary topic phrase match
-    - value: tax office letter
-      description: Case-insensitive topic phrase match
-    - value: revenue authority
-      description: Alternative topic phrase match
-    - value: tax notice
-      description: Additional topic phrase match
+    - value: "Notice of amended assessment - individual\nTaxpayer name: Avery Teston\nIncome year: 2025\nAmount payable: $2,418.60\nDue date: 21/10/2026\nIssued by the Commissioner of Taxation."
+      description: "85: notice of amended assessment with taxpayer, amount payable, due date and Commissioner"
+      synthetic: true
+    - value: "ATO letter - commencement of review\nOur reference: 1-2FKQ8ZP\nClient name: Harbourline Trading Pty Ltd\nWe are reviewing your 2024-25 income tax return. Respond by 15/11/2026.\nShortfall penalty: $3,120.00 may apply."
+      description: "85: ATO review letter with client name, reference, response date and shortfall penalty"
+      synthetic: true
+    - value: "HMRC correspondence regarding taxpayer: Morgan Teston - scanned letter saved to the client file."
+      description: "75: HMRC correspondence naming the taxpayer, no amounts or dates"
+      synthetic: true
+    - value: "notice of assessment"
+      description: "65: bare phrase only - discovery tier"
+      synthetic: true
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: payroll reimbursement
-      description: Generic word pair from old broad template should not match
+    - value: "Scam alert: the ATO will never send you a link asking for your details in a notice of assessment email. This page explains how to verify contact."
+      description: "Scam warning guidance - must stay at or below 65"
+    - value: "Notice of assessment\nTaxpayer name: __________\nAmount payable: $______\nDue date: __/__/____"
+      description: "Blank notice template - must stay at or below 65"
+    - value: "The IRS notice CP2000 program sent a million letters last year, according to a news release."
+      description: "News - must stay at or below 65"
+    - value: "unrelated generic text without domain phrases"
+      description: "No relevant topic phrases present"
 false_positives:
-  - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
-    mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
-  - description: In English (as the primary international business language), standard business terminology overlapping with financial detection keywords in routine correspondence and documentation.
-    mitigation: Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for higher precision.
+  - description: "Policies, procedures, regulator guidance, fact sheets and training material that name the record type."
+    mitigation: "Enforce tiers require populated fields; guidance has labels without values, and policy/guidance/training/media-release framing is excluded by the NOT-group."
+  - description: "Blank forms, templates and system configuration screens."
+    mitigation: "Blank lines, bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded by template-exclusion."
+  - description: "News, statistics and vendor marketing."
+    mitigation: "No populated person or record fields, so these stay at 65 discovery."
+  - description: "Phishing emails that imitate tax authority notices."
+    mitigation: "These may reach 75/85 if they contain populated fields; they still warrant review as security events."
 exports:
   - purview_xml
   - yaml
@@ -67,60 +85,86 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Regex_tax_authority_correspondence
+    - confidence_level: 85
+      id_match: Regex_top500_094_tax_authority_correspondence_primary
       matches:
-        - ref: Pattern_global_top500_094_tax_authority_correspondence_label_context
-        - ref: Keyword_global_top500_094_tax_authority_correspondence_domain_context
+        - ref: Regex_top500_094_tax_authority_correspondence_taxpayer_field
+        - ref: Regex_top500_094_tax_authority_correspondence_notice_detail
+        - ref: Keyword_top500_094_tax_authority_correspondence_corroborative
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+            - Keyword_top500_094_tax_authority_correspondence_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_top500_094_tax_authority_correspondence_primary
+      matches:
+        - ref: Regex_top500_094_tax_authority_correspondence_taxpayer_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_top500_094_tax_authority_correspondence_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_tax_authority_correspondence
+      id_match: Regex_top500_094_tax_authority_correspondence_primary
       matches:
-        - ref: Keyword_tax_authority_correspondence
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
   regexes:
-    - id: Regex_tax_authority_correspondence
+    - id: Regex_top500_094_tax_authority_correspondence_primary
       pattern: >-
-        (?is)\b(?:tax\s+authority\s+correspondence|tax\s+office\s+letter|revenue\s+authority|tax\s+notice|assessment\s+notice|tax\s+audit|compliance\s+notice|penalty\s+notice|tax\s+ruling|ATO\s+correspondence|IRS\s+notice)\b
-    - id: Pattern_global_top500_094_tax_authority_correspondence_label_context
-      pattern: (?i)\b(?:tax\s+authority\s+correspondence)\b
+        (?i)\b(?:tax\s+authority\s+correspondence|notice\s+of\s+(?:amended\s+)?assessment|(?:ATO|Australian\s+Taxation\s+Office|Queensland\s+Revenue\s+Office|IRS|HMRC)\s+(?:letter|correspondence|notice|audit|review)|(?:tax|revenue)\s+(?:audit|review)\s+(?:letter|notice|commencement)|notice\s+of\s+(?:audit|review|intention\s+to\s+(?:audit|assess))|IRS\s+notice\s+CP\d{2,4}|penalty\s+notice\s+(?:for|-)\s+(?:late\s+)?lodg(?:e)?ment)\b
+    - id: Regex_top500_094_tax_authority_correspondence_taxpayer_field
+      pattern: >-
+        (?i)\b(?:employee(?:\s+(?:full\s+)?(?:name|no\.?|number|ID|#))?|staff\s+(?:member|name|no\.?|number|ID)|payroll\s+(?:no\.?|number|ID)|position\s+(?:no\.?|number)|payee(?:\s+name)?|taxpayer(?:\s+name)?|client\s+name|entity\s+name|client\s+(?:account\s+)?(?:number|ID)|our\s+reference|your\s+reference|case\s+(?:number|reference)|UTR|TIN)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9/'.-]{1,40}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_top500_094_tax_authority_correspondence_notice_detail
+      pattern: >-
+        (?i)\b(?:amount\s+(?:payable|due|owing|refundable)|balance\s+(?:owing|due|payable)|tax\s+(?:payable|assessed|shortfall)|refund(?:\s+amount)?|shortfall\s+(?:amount|penalty)|penalty(?:\s+amount)?|general\s+interest\s+charge|total\s+(?:amount\s+)?(?:due|payable|owing))(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:=\-]?[ \t]{0,3}-?(?:AUD|A\$|US\$|NZ\$|\$|£|€)[ \t]?\d{1,3}(?:,?\d{3}){0,3}(?:\.\d{2})?|\b(?:due\s+date|pay\s+by|respond\s+by|date\s+of\s+issue|issue\s+date|date\s+of\s+(?:this\s+)?notice)[ \t]{0,3}[:\-]?[ \t]{0,3}(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})
   keywords:
-    - id: Keyword_tax_authority_correspondence
+    - id: Keyword_top500_094_tax_authority_correspondence_corroborative
       groups:
         - match_style: word
           terms:
-            - tax authority correspondence
-            - tax office letter
-            - revenue authority
-            - tax notice
-            - assessment notice
-            - tax audit
-            - compliance notice
-            - penalty notice
-            - tax ruling
-            - ATO correspondence
-            - IRS notice
+            - Commissioner of Taxation
+            - Taxation Administration Act
+            - income year
+            - tax return
+            - objection
+            - amended
+            - shortfall
+            - income tax return
       strength: specific
-    - id: Keyword_global_top500_094_tax_authority_correspondence_domain_context
+    - id: Keyword_top500_094_tax_authority_correspondence_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - tax authority correspondence
-            - tax
-            - authority
-            - correspondence
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
+            - scam
+            - scam alert
+            - will never
+            - how to verify
+            - what your notice
+            - this page explains
       strength: domain
 risk_description: >-
-  This medium-confidence regex identifies references to tax-authority correspondence, revenue-agency letters, notices, or related compliance communications. A genuine case letter can reveal a taxpayer's liability, audit status, dispute, penalties, or lodgement history, yet the topic detector does not require a named taxpayer, tax number, amount, finding, or authentic notice structure. Regulatory guidance, reporting, templates, and routine discussions can produce the same vocabulary. Risk 4 OFFICIAL is appropriate for the normal phrase-level match; SENSITIVE requires attributable correspondence containing substantive tax affairs, enforcement, audit, or financial details.
+  The classifier identifies tax authority correspondence addressed to an identified taxpayer (75) with amounts, penalties or deadlines (85). These reveal a person's or business's tax position, debts and compliance activity. Scam warnings, blank templates and news stay at 65. Risk 4 supports OFFICIAL; individual taxpayer letters carrying TFNs should be handled as SENSITIVE.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -130,17 +174,25 @@ sensitivity_labels:
   nz_gov: RESTRICTED
   ca_gov: Protected B
 references:
-  - title: "Regulation (EU) 2016/679 (General Data Protection Regulation)"
-    url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
-frameworks:
-  - ISO 27001
-  - ISO 27701
+  - title: "Taxation Administration Act 1953 (Cth)"
+    url: https://www.legislation.gov.au/C1953A00001/latest/text
+  - title: "ATO - Your notice of assessment"
+    url: https://www.ato.gov.au/individuals-and-families/your-tax-return/your-notice-of-assessment
+  - title: "ATO - Scams, cyber safety and identity protection (decoy source)"
+    url: https://www.ato.gov.au/online-services/scams-cyber-safety-and-identity-protection
+  - title: "Privacy Act 1988 (Cth)"
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
+  - title: "Information Privacy Act 2009 (Qld)"
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+  - version: 1.3.0
+    date: '2026-09-24'
+    description: 'HR quality pass (2026-09-24): rebuilt tiers - 65 primary phrase (discovery), 75 primary + populated person/party field, 85 adds a distinct populated record-detail regex plus an independent corroborative keyword group; removed the self-corroborating Evidence_* phrase list so a single phrase no longer reaches 75/85; added template-exclusion and guidance/policy/media-release NOT-groups to enforce tiers; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys. Primary narrowed to authority correspondence. Regulations now cite the Taxation Administration Act 1953 (Cth), Taxation Administration Act 2001 (Qld) and the Privacy (Tax File Number) Rule 2015 (Cth) with the privacy statutes; references cite ATO and legislation sources.'
   - version: 1.2.2
     date: '2026-09-24'
-    description: "Metadata quality pass (2026-09-24): added 1 verified legislation/regulator references; filled empty frameworks (ISO 27001, ISO 27701)."
+    description: 'Metadata quality pass (2026-09-24): added 1 verified legislation/regulator references; filled empty frameworks (ISO 27001, ISO 27701).'
   - version: 1.2.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 1655 without changing detector or package metadata.'
@@ -159,7 +211,6 @@ remediation:
   catalog_quality_2026_06_02:
     status: applied
     changes:
-      - 'Mapped non-canonical confidence 80 to 75.'
-      - 'Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.'
-
+      - Mapped non-canonical confidence 80 to 75.
+      - Collapsed 2 duplicate 75-confidence tier(s) into the strictest canonical tier.
 risk_rating: 4

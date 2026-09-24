@@ -1,66 +1,69 @@
 schema: testpattern/v1
 name: Payroll journal entries
 slug: global-top500-093-payroll-journal-entries
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
-description: Detects references to payroll journal entries in financial and compliance documents. Commonly found in Australian regulatory filings, transaction records, and audit documentation.
+description: >-
+  Detects payroll journal postings: pay-run journals, wages journals, payroll accruals and payroll GL exports with populated ledger lines (wages expense, PAYG withholding payable, superannuation payable, net wages payable, payroll clearing) and a journal reference or posting/period date. Aggregate ledger data, capped at 75.
 operation: >-
-  Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Keyword
-  lists: industry-hr.
+  Primary: a payroll journal phrase (payroll journal/entry, wages journal, payroll accrual, payroll clearing account, payroll GL posting/export, pay run journal). The single enforce tier (75) requires two distinct populated structures within 300 characters: a payroll ledger line with a currency amount (wages/salaries expense or payable, net wages payable, PAYG withholding payable, super payable/expense, payroll clearing, payroll tax, leave provision) AND a journal/batch/pay-run reference or a posting/period/pay date. Capped at 75 because journals are aggregate ledger data. Enforce tier excludes template/fixture and textbook/training framing; 65 is discovery-only.
 pattern: >-
-  (?is)\b(?:payroll\s+journal\s+entries|journal\s+entry|general\s+ledger|payroll\s+accrual|wages\s+expense|PAYG\s+liability|superannuation\s+payable|payroll\s+clearing|chart\s+of\s+accounts|payroll\s+reconciliation)\b
-confidence: medium
-confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection.
+  (?i)\b(?:payroll\s+journal(?:\s+entr(?:y|ies))?|wages?\s+journal(?:\s+entr(?:y|ies))?|payroll\s+(?:accruals?|clearing\s+account|GL\s+posting|general\s+ledger\s+(?:posting|export)|posting\s+(?:summary|report))|salar(?:y|ies)\s+and\s+wages\s+journal|journal\s+entry\s+(?:for|-)\s+(?:the\s+)?pay\s+run|pay\s+run\s+journal)\b
+confidence: low
+confidence_justification: >-
+  Low: payroll journals are aggregate general-ledger postings (wages expense, PAYG payable, super payable, clearing accounts) that normally carry no employee-level data. The pattern is capped at 75: it needs a populated ledger line with an amount plus a populated journal reference or posting/period date, which separates real postings from accounting textbooks, but it never claims 85 because the record itself is low sensitivity. If a journal lists individual employees, other HR classifiers (pay slip, payroll master file) will detect that content.
 jurisdictions:
   - global
 regulations:
-  - AML/CTF Act (Cth)
-  - IPA 2009 (Qld)
-  - NDB Scheme (Cth)
-  - Privacy Act 1988 (Cth)
-  - GDPR
+  - Taxation Administration Act 1953 (Cth)
+  - Superannuation Guarantee (Administration) Act 1992 (Cth)
+  - Fair Work Regulations 2009 (Cth)
 frameworks:
   - ISO 27001
   - ISO 27701
-  - PCI-DSS
-  - SOC 2
 data_categories:
   - financial
 corroborative_evidence:
   keywords:
-    - payroll journal entries
-    - payroll
-    - journal
-    - entries
-    - tax
-    - operations
+    - debit
+    - credit
+    - general ledger
+    - cost centre
+    - accrual
+    - reversal
   proximity: 300
-  keyword_lists:
-    - industry-hr
 test_cases:
   should_match:
-    - value: payroll journal entries
-      description: Primary topic phrase match
-    - value: journal entry
-      description: Case-insensitive topic phrase match
-    - value: general ledger
-      description: Alternative topic phrase match
-    - value: payroll accrual
-      description: Additional topic phrase match
+    - value: "Payroll journal - pay run 2026-19\nPosting date: 25/09/2026\n6100 Wages and salaries expense  Dr  $412,880.00\n2150 PAYG withholding payable  Cr  $98,411.00\n2160 Superannuation payable  Cr  $49,545.60\n2170 Net wages payable  Cr  $264,923.40"
+      description: "75: pay-run journal with posting date and ledger lines (capped at 75)"
+      synthetic: true
+    - value: "Wages journal entry\nJournal number: JE-26-0412\nWages payable: $182,300.00\nPayroll clearing account: $182,300.00"
+      description: "75: wages journal entry with journal number and payable lines (capped at 75)"
+      synthetic: true
+    - value: "Payroll accrual\nPeriod ending: 30/06/2026\nAccrued wages expense: $64,210.00\nSuperannuation expense: $7,383.00"
+      description: "75: payroll accrual with period end and expense lines (capped at 75)"
+      synthetic: true
+    - value: "payroll journal"
+      description: "65: bare phrase only - discovery tier"
+      synthetic: true
   should_not_match:
-    - value: unrelated generic text without domain phrases
-      description: No relevant topic phrases present
-    - value: placeholder value 12345
-      description: Random text should not match topic-specific regex
-    - value: payroll reimbursement
-      description: Generic word pair from old broad template should not match
+    - value: "A payroll journal entry records wages expense as a debit and PAYG withholding payable as a credit. This training module walks through the steps."
+      description: "Accounting textbook / training - must stay at or below 65"
+    - value: "Payroll journal\nPosting date: __/__/____\nWages and salaries expense  Dr  $______"
+      description: "Blank journal template - must stay at or below 65"
+    - value: "The company restated its payroll accruals after an audit, according to a media release."
+      description: "News - must stay at or below 65"
+    - value: "unrelated generic text without domain phrases"
+      description: "No relevant topic phrases present"
 false_positives:
-  - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
-    mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
-  - description: In Australian English, standard business terminology overlapping with financial detection keywords in routine correspondence and documentation.
-    mitigation: Increase confidence threshold when scanning business correspondence. Layer with transaction-specific patterns for higher precision.
+  - description: "Accounting textbooks, training and ERP documentation describing payroll journals."
+    mitigation: "Enforce requires a ledger line with a real amount plus a journal reference or posting date; training/textbook framing is excluded."
+  - description: "Blank forms, templates and system configuration screens."
+    mitigation: "Blank lines, bracket placeholders, XXX and n/a/tbc values are rejected by the placeholder guard; template/fixture words are excluded by template-exclusion."
+  - description: "News, statistics and vendor marketing."
+    mitigation: "No populated person or record fields, so these stay at 65 discovery."
 exports:
   - purview_xml
   - yaml
@@ -71,57 +74,64 @@ purview:
   recommended_confidence: 75
   shared_keywords:
     - dict: template-exclusion
-      as: Evidence_template_exclusion
+      as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 85
-      id_match: Pattern_payroll_journal_entries
-      matches:
-        - ref: Evidence_payroll_journal_entries
-          min_count: 2
-          unique_results: true
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_payroll_journal_entries
+      id_match: Regex_top500_093_payroll_journal_entries_primary
       matches:
-        - ref: Evidence_payroll_journal_entries
+        - ref: Regex_top500_093_payroll_journal_entries_ledger_line
+        - ref: Regex_top500_093_payroll_journal_entries_journal_reference
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
-            - Evidence_template_exclusion
+            - Keyword_noise_exclusion
+            - Keyword_top500_093_payroll_journal_entries_guidance_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_payroll_journal_entries
+      id_match: Regex_top500_093_payroll_journal_entries_primary
       matches:
-        - ref: Evidence_payroll_journal_entries
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
-    - id: Pattern_payroll_journal_entries
+    - id: Regex_top500_093_payroll_journal_entries_primary
       pattern: >-
-        (?is)\b(?:payroll\s+journal\s+entries|journal\s+entry|general\s+ledger|payroll\s+accrual|wages\s+expense|PAYG\s+liability|superannuation\s+payable|payroll\s+clearing|chart\s+of\s+accounts|payroll\s+reconciliation)\b
+        (?i)\b(?:payroll\s+journal(?:\s+entr(?:y|ies))?|wages?\s+journal(?:\s+entr(?:y|ies))?|payroll\s+(?:accruals?|clearing\s+account|GL\s+posting|general\s+ledger\s+(?:posting|export)|posting\s+(?:summary|report))|salar(?:y|ies)\s+and\s+wages\s+journal|journal\s+entry\s+(?:for|-)\s+(?:the\s+)?pay\s+run|pay\s+run\s+journal)\b
+    - id: Regex_top500_093_payroll_journal_entries_ledger_line
+      pattern: >-
+        (?i)\b(?:(?:accrued\s+)?(?:wages?|salar(?:y|ies))(?:\s+and\s+(?:wages|salaries))?\s+(?:expense|payable)|net\s+wages\s+payable|PAYG\s+(?:withholding\s+)?(?:payable|liability)|super(?:annuation)?\s+(?:payable|expense)|payroll\s+(?:clearing(?:\s+account)?|tax\s+(?:expense|payable))|leave\s+(?:provision|liability))\b[^\n$]{0,40}(?:AUD|A\$|US\$|NZ\$|\$|£|€)[ \t]?\d{1,3}(?:,?\d{3}){0,3}(?:\.\d{2})?
+    - id: Regex_top500_093_payroll_journal_entries_journal_reference
+      pattern: >-
+        (?i)\b(?:posting\s+date|journal\s+date|period\s+end(?:ing)?|pay\s+period\s+end(?:ing)?|pay\s+run\s+ending|pay\s+date)[ \t]{0,3}[:\-]?[ \t]{0,3}(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]{0,6}\s+\d{4})|\b(?:journal|JE|batch|pay\s+run)\s+(?:no\.?|number|ID|reference)(?:[ \t]{0,3}\([^)\n]{1,20}\))?[ \t]{0,3}[:#=][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|x{3,})[A-Z0-9][A-Za-z0-9-]{2,20}\b|\bpay\s+run[ \t]20\d{2}-\d{1,3}\b
   keywords:
-    - id: Evidence_payroll_journal_entries
+    - id: Keyword_top500_093_payroll_journal_entries_guidance_exclusion
       groups:
         - match_style: word
           terms:
-            - payroll journal entries
-            - journal entry
-            - general ledger
-            - payroll accrual
-            - wages expense
-            - PAYG liability
-            - superannuation payable
-            - payroll clearing
-            - debit
-            - credit
-            - chart of accounts
-            - payroll reconciliation
+            - this policy
+            - this procedure
+            - this guideline
+            - this directive
+            - fact sheet
+            - training module
+            - e-learning
+            - learning module
+            - frequently asked questions
+            - media release
+            - news release
+            - policy statement
+            - walks through
+            - for example
+            - journal entries are
+            - accounting software
+            - book a demo
+      strength: domain
 risk_description: >-
-  The concept regex recognises payroll journals, general-ledger entries, payroll accruals, wages expense, PAYG liability, super payable, clearing accounts, and reconciliation language. An actual journal can reveal payroll totals, account structure, or timing useful for invoice or accounting fraud, but the hit does not require debit and credit values, an entity, or a posted entry. The normal impact is bounded to business accounting context and needs additional ledger detail, while training and generic finance material can match. Risk 4 OFFICIAL is proportionate; SENSITIVE would require a populated payroll ledger, exploitable account mapping, or employee-level data.
+  The classifier identifies populated payroll journal postings (aggregate wages, withholding and super liabilities with a journal reference or date), capped at 75. Journals reveal total payroll cost but not individual pay, so standalone harm is low. Textbooks, blank templates and news stay at 65. Risk 4 supports OFFICIAL.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -130,12 +140,24 @@ sensitivity_labels:
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
   ca_gov: Protected B
+references:
+  - title: "Taxation Administration Act 1953 (Cth)"
+    url: https://www.legislation.gov.au/C1953A00001/latest/text
+  - title: "ATO - PAYG withholding"
+    url: https://www.ato.gov.au/businesses-and-organisations/hiring-and-paying-your-workers/payg-withholding
+  - title: "Superannuation Guarantee (Administration) Act 1992 (Cth)"
+    url: https://www.legislation.gov.au/C2004A04402/latest/text
+  - title: "Fair Work Regulations 2009 (Cth) - regs 3.31-3.46 employee records and pay slips"
+    url: https://www.legislation.gov.au/F2009L02356/latest/text
 created: '2026-02-08'
 updated: '2026-09-24'
 changelog:
+  - version: 1.4.0
+    date: '2026-09-24'
+    description: 'HR quality pass (2026-09-24): rebuilt tiers and capped at 75 (record type is aggregate/operational, not person-level) - 65 primary phrase (discovery), 75 requires two distinct populated structures; removed the self-corroborating phrase evidence; added template-exclusion and guidance/policy NOT-groups; replaced bare-phrase tests with synthetic populated records and guidance/blank-form/news decoys. Primary narrowed (removed generic "journal entry", "general ledger", "chart of accounts", "payroll reconciliation"). Regulations now cite the Taxation Administration Act 1953 (Cth), Superannuation Guarantee (Administration) Act 1992 (Cth) and Fair Work Regulations 2009 (Cth); removed AML/CTF and privacy boilerplate as journals carry no person-level data.'
   - version: 1.3.2
     date: '2026-09-24'
-    description: "Metadata quality pass (2026-09-24): removed regulation tags that do not apply (SOCI Act 2018 (Cth)); added 3 verified legislation/regulator references."
+    description: 'Metadata quality pass (2026-09-24): removed regulation tags that do not apply (SOCI Act 2018 (Cth)); added 3 verified legislation/regulator references.'
   - version: 1.3.1
     date: '2026-07-14'
     description: 'v23 reviewed risk assessment: apply the individually reviewed workbook outcome from row 696 without changing detector or package metadata.'
@@ -153,12 +175,4 @@ changelog:
     description: Initial release
 author: testpattern-community
 license: MIT
-references:
-  - title: "Anti-Money Laundering and Counter-Terrorism Financing Act 2006 (Cth)"
-    url: https://www.legislation.gov.au/C2006A00169/latest/text
-  - title: "Information Privacy Act 2009 (Qld)"
-    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
-  - title: "Privacy Act 1988 (Cth)"
-    url: https://www.legislation.gov.au/C2004A03712/latest/text
-
 risk_rating: 4
