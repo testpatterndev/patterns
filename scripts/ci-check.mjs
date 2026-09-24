@@ -90,6 +90,16 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   if (typeof p.slug === 'string') patternSlugs.add(p.slug)
   if (typeof p.slug === 'string' && p.status === 'deprecated') deprecatedSlugs.add(p.slug)
 
+  // Purview has three confidence levels: low = 65, medium = 75, high = 85 (MS Learn, 'Learn about
+  // sensitive information types'). Other numbers are silently banded (<=65 low, 66-75 medium,
+  // 76-100 high), so e.g. a 95 tier is indistinguishable from 85 - require the canonical values.
+  const PURVIEW_LEVELS = [65, 75, 85]
+  if (p.purview && p.status !== 'deprecated') {
+    const rc = p.purview.recommended_confidence
+    if (rc !== undefined && !PURVIEW_LEVELS.includes(rc)) errors.push(`${p.slug ?? f}: purview.recommended_confidence must be 65|75|85 (low|medium|high), got ${rc}`)
+    for (const tier of p.purview.pattern_tiers ?? []) if (!PURVIEW_LEVELS.includes(tier.confidence_level)) errors.push(`${p.slug ?? f}: pattern_tiers confidence_level must be 65|75|85 (low|medium|high), got ${tier.confidence_level}`)
+  }
+
   const idMatchIds = new Set((p.purview?.pattern_tiers ?? []).map(t => t.id_match).filter(Boolean))
   const regexes = []
   if (typeof p.pattern === 'string') regexes.push({ id: 'TOP', src: p.pattern })
