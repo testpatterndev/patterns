@@ -20,6 +20,7 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [Council development / building application number](#council-development-application-number) | Queensland local governments (assessment managers) and private building certifiers | customer-defined | low | 3 |
 | [Council property / rate assessment number](#council-property-number) | Queensland local governments | customer-defined | low | 6 |
 | [Records management (eDRMS) record number](#edrms-record-number) | The customer's records management system (e.g. Content Manager, RecFind, Objective) | customer-defined | medium | 1 |
+| [Elector identifying number](#elector-identifying-number) | Electoral Commission of Queensland / Australian Electoral Commission (joint roll) | unpublished | low | 1 |
 | [Employee / staff ID](#employee-id) | The customer's payroll or HR system (e.g. Aurion, SAP, Workday) | customer-defined | low | 11 |
 | [Environmental incident / notification reference](#environmental-incident-reference) | The operator's incident system or the administering authority | customer-defined | low | 1 |
 | [Electrical Safety Office notification reference](#eso-incident-notification-reference) | Electrical Safety Office / WHSQ (Qld) | unpublished | low | 1 |
@@ -27,7 +28,7 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [Generator outage work order / reference](#generator-outage-work-order) | The generator's maintenance system (e.g. SAP PM, Maximo) | customer-defined | low | 1 |
 | [Queensland housing client / application number](#housing-client-number) | Queensland Government housing services (Housing Service Centres) | unpublished | low | 2 |
 | [Queensland social housing tenancy / property reference](#housing-tenancy-number) | Queensland Government housing services | unpublished | low | 3 |
-| [Infringement notice number](#infringement-notice-number) | Queensland Revenue Office / Department of Transport and Main Roads (camera-detected offences); issuing authorities for other penalty infringement notices | unpublished | medium | 3 |
+| [Infringement notice number](#infringement-notice-number) | Queensland Revenue Office / Department of Transport and Main Roads (camera-detected offences); issuing authorities for other penalty infringement notices | unpublished | medium | 4 |
 | [Law enforcement request / authorisation reference](#lea-request-reference) | The requesting enforcement agency or the carrier | unpublished | low | 1 |
 | [Library card / member number](#library-card-number) | The council library service (library management system) | customer-defined | low | 1 |
 | [My Aged Care ID](#my-aged-care-id) | My Aged Care (Australian Government Department of Health, Disability and Ageing) | unpublished | low | 1 |
@@ -806,6 +807,59 @@ samples: ["Our ref: D26/123456", "Record number D25/004471", "Our ref D26/000412
 
 **Used by:** `au-qld-council-closed-meeting-report`
 
+## elector-identifying-number
+
+**Elector identifying number** — issued by Electoral Commission of Queensland / Australian Electoral Commission (joint roll).
+
+The identifying number held for each elector on the Queensland electoral roll (Electoral Act 1992 (Qld) s 58(3)), which appears in restricted roll extracts, enrolment records and elector participation data.
+
+**Appears in:** Electoral roll extracts provided to candidates, parties, MPs and councils; Enrolment records; Elector participation (s 133A) data.
+
+**Labels:** `Elector ID`, `Elector number`, `Elector identifying number`, `Roll number`
+
+**Public format:** unpublished. Electoral Act 1992 (Qld) s 58(3) requires an identifying number on the roll, but its format was not verified from a primary source.
+
+**Public fallback** (precision: low):
+
+```
+(?i)\b(?:elector\s+(?:ID|no\.?|number|identifying\s+number)|roll\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9]*\d[A-Z0-9/.-]{1,24}\b
+```
+
+Elector ID labels are specific to electoral records but the value format is unverified; name, address and restricted roll fields supply the precision.
+
+**Customer supplies at engagement:**
+
+- A description of the elector identifying number format as issued by the customer's system (length, prefixes, separators, check digit if any).
+- The label text used on documents and exports (for example the exact field heading).
+- 5-10 masked or fictional sample values in the real format (never live values in the engagement record).
+- Whether the value always appears next to its label, or can also appear on its own (e.g. in spreadsheets).
+
+**How to replace:**
+
+1. Collect the customer inputs listed above during the engagement discovery session.
+2. Write a Boost-compatible regex for the value, anchored with \b and bounded quantifiers only (no nested or unbounded group quantifiers).
+3. If the identifier is only reliable next to its label, keep the documented label prefix in the regex.
+4. Record the regex and samples in the deployment overlay under this identifier key; the package builder applies it to every classifier slot that references this identifier (extend adds an alternative, replace swaps the regex).
+5. Re-run the classifier test cases with the overlay applied and check at least one real (redacted) document before enabling enforcement.
+
+**Overlay must pass:**
+
+- Every supplied sample matches the overlay regex; none of the classifier's should_not_match values do.
+- The regex passes the Purview-banned construct checks (scripts/lib/purview-banned.mjs) and compiles in Boost and JavaScript.
+- The regex does not match all-same-digit or obviously placeholder values (000000, 123456, XXXXXX).
+- Overlay values never appear in build logs or readiness output (counts and keys only).
+
+**Example overlay (fictional):**
+
+```yaml
+pattern: (?i)\belector\s+ID\s*[:#]?\s*E\d{8}\b
+samples: ["Elector ID: E20471820", "Elector ID E00719320", "elector id E44718201"]
+```
+
+**Sensitivity:** Links an identifiable elector to their restricted roll details (DOB, sex, occupation, enrolment date).
+
+**Used by:** `au-qld-electoral-roll-extract`
+
 ## employee-id
 
 **Employee / staff ID** — issued by The customer's payroll or HR system (e.g. Aurion, SAP, Workday).
@@ -1228,7 +1282,7 @@ samples: ["Infringement notice number: 2026084291", "Notice no. 7004418273", "no
 
 **Sensitivity:** Links a vehicle and its registered operator or driver to an alleged offence, location and time.
 
-**Used by:** `au-qld-council-infringement-sper-record`, `council-customer-reference`, `traffic-camera-record`
+**Used by:** `au-qld-council-infringement-sper-record`, `au-qld-non-voter-notice-record`, `council-customer-reference`, `traffic-camera-record`
 
 ## lea-request-reference
 
