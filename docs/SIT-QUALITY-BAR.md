@@ -63,9 +63,9 @@ classification:
       ...
 ```
 
-- **Tier** follows the risk band: Low for risk 1–5, Medium for 6–8, High for 9–10, and Alert
-  where `qgiscf_dlm` is N/A (a signal, not a classification). Anything else needs the
-  rationale to say why.
+- **Tier** is the handling tier of the Queensland outcome and always equals the generic
+  classification: OFFICIAL → Low, SENSITIVE → Medium, PROTECTED → High, and Alert where
+  `qgiscf_dlm` is N/A (a signal, not a classification). Risk sets the label; the tier follows the label.
 - **Generic** mirrors the Queensland outcome: OFFICIAL → Low, SENSITIVE *X* → Medium *X*,
   PROTECTED *X* → High *X*, markings → *Level* Government, N/A → N/A.
 - The **rationale** cites the pattern's current risk and labels. When either changes, rewrite
