@@ -250,10 +250,34 @@ if (existsSync(classResultsPath)) {
 const deprecatedCount = patterns.filter(p => p.status === 'deprecated').length
 const publishedPatterns = patterns.filter(p => p.status !== 'deprecated')
 
+// Deprecated slugs are still published as a compact `retired` map so consumers
+// can answer old links: the website 301s to `replaced_by` or returns 410 Gone.
+// replaced_by follows chains to the final live slug; null when there is none.
+const liveSlugs = new Set(publishedPatterns.map(p => p.slug))
+const deprecatedBySlug = new Map(patterns.filter(p => p.status === 'deprecated').map(p => [p.slug, p]))
+function liveReplacement(slug) {
+  const seen = new Set([slug])
+  let next = deprecatedBySlug.get(slug)?.replaced_by
+  while (next && deprecatedBySlug.has(next) && !seen.has(next)) {
+    seen.add(next)
+    next = deprecatedBySlug.get(next).replaced_by
+  }
+  return next && liveSlugs.has(next) ? next : null
+}
+const retired = Object.fromEntries([...deprecatedBySlug.keys()].sort().map(slug => {
+  const p = deprecatedBySlug.get(slug)
+  return [slug, {
+    name: p.name,
+    reason: String(p.deprecation_reason || '').replace(/\s+/g, ' ').trim(),
+    replaced_by: liveReplacement(slug)
+  }]
+}))
+
 const output = {
   version: '1.0.0',
   generated: new Date().toISOString(),
   patterns: publishedPatterns,
+  retired,
   collections,
   keywords: keywordDicts,
   packageTags: packageTags?.metadata ?? null,
@@ -273,7 +297,7 @@ if (outString.includes(TOKEN_LITERAL)) {
 }
 writeFileSync(OUT_FILE, outString)
 
-console.log(`Done: ${publishedPatterns.length} patterns (${deprecatedCount} deprecated excluded), ${collections.length} collections, ${keywordDicts.length} keyword dictionaries → patterns.json`)
+console.log(`Done: ${publishedPatterns.length} patterns (${deprecatedCount} deprecated excluded, ${Object.values(retired).filter(r => r.replaced_by).length} with a replacement), ${collections.length} collections, ${keywordDicts.length} keyword dictionaries → patterns.json`)
 if (resolvedCount > 0) {
   console.log(`  (${resolvedCount} patterns had keyword_lists references resolved)`)
 }
