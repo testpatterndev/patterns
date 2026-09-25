@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { validateClassification, validateReferences, validateRegulations } from '../classification.mjs'
+import { validateClassification, validateReferences, validateRegulations, tierForLabel } from '../classification.mjs'
 
 let passed = 0, failed = 0
 function t(name, fn) { try { fn(); passed++ } catch (e) { failed++; console.error(`FAIL ${name}: ${e.message}`) } }
@@ -46,6 +46,17 @@ t('untitled or non-http reference fails', () => {
 })
 
 t('regulations required', () => { assert.equal(validateRegulations({ regulations: [] }).length, 1); assert.deepEqual(validateRegulations({ regulations: ['Privacy Act 1988 (Cth)'] }), []) })
+
+t('tier must follow the label', () => {
+  const p = good(); p.sensitivity_labels = { qgiscf_dlm: 'PROTECTED Government' }
+  assert.ok(validateClassification(p).some(m => m.includes("does not match qgiscf_dlm 'PROTECTED Government' (expected 'High')")))
+  p.classification.tier = 'High'; p.classification.generic.classification = 'High'
+  assert.deepEqual(validateClassification(p), [])
+})
+t('tierForLabel', () => {
+  assert.equal(tierForLabel('OFFICIAL'), 'Low'); assert.equal(tierForLabel('SENSITIVE InfoTech'), 'Medium')
+  assert.equal(tierForLabel('Marking Protected'), 'High'); assert.equal(tierForLabel('N/A'), 'Alert'); assert.equal(tierForLabel(''), null)
+})
 
 console.log(`${passed} passed, ${failed} failed`)
 process.exit(failed ? 1 : 0)

@@ -70,6 +70,8 @@ classification:
   PROTECTED *X* → High *X*, markings → *Level* Government, N/A → N/A.
 - The **rationale** cites the pattern's current risk and labels. When either changes, rewrite
   the rationale in the same change.
+  CI fails a tier that no longer matches the label family, so a relabel can't leave its
+  reasoning behind.
 
 It is a top-level key rather than part of `sensitivity_labels`, which consumers read as a
 flat scheme → label map.
