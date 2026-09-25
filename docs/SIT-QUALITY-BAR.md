@@ -30,6 +30,7 @@ Authoritative expectations for pattern YAML in this repo. CI may enforce a subse
 | `description` / `operation` | Primary shapes, tier gates, what is discovery-only |
 | `risk_rating` + `risk_description` | Current match behaviour (not a previous weaker detector) |
 | `sensitivity_labels` (pspf, qgiscf, qgiscf_dlm, us_gov, uk_gov, nz_gov, ca_gov) | Same elevation as risk (e.g. risk ≥8 ⇒ not plain OFFICIAL) |
+| `classification` (tier, rationale, generic) | `risk_rating` and `sensitivity_labels` as they stand now (see below) |
 | `data_categories` | Semantic class (not default `pii` for business/IP; not `credentials` for findings/maps) |
 | `confidence` | Honesty about FP rate (digit shapes without checksum ⇒ not `high`) |
 | `recommended_confidence` | Align with lowest intended **enforce** tier |
@@ -42,6 +43,36 @@ Authoritative expectations for pattern YAML in this repo. CI may enforce a subse
 - risk 10 → PROTECTED / equivalent when justified  
 
 Workbook (v25+) and YAML must not diverge by more than one band without a changelog note.
+
+## Classification reasoning (`classification`)
+
+The reasoning behind a pattern's classification lives in the pattern, not in a workbook.
+PurviewDeploy regenerates SIT-Reference from it (Classification Tier, Classification
+Rationale, Generic Classification, Generic DLM, Generic Rationale), and a customer's
+edits to those columns are kept over the catalogue value.
+
+```yaml
+classification:
+  tier: Medium                 # Low | Medium | High | Alert
+  rationale: >-               # why this risk_rating and sensitivity_labels, and why the next level up is not met
+    ...
+  generic:                     # the same judgement for tenants without the Queensland scheme
+    classification: Medium     # Low | Medium | High | N/A
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      ...
+```
+
+- **Tier** is the handling tier of the Queensland outcome and always equals the generic
+  classification: OFFICIAL → Low, SENSITIVE → Medium, PROTECTED → High, and Alert where
+  `qgiscf_dlm` is N/A (a signal, not a classification). Risk sets the label; the tier follows the label.
+- **Generic** mirrors the Queensland outcome: OFFICIAL → Low, SENSITIVE *X* → Medium *X*,
+  PROTECTED *X* → High *X*, markings → *Level* Government, N/A → N/A.
+- The **rationale** cites the pattern's current risk and labels. When either changes, rewrite
+  the rationale in the same change.
+
+It is a top-level key rather than part of `sensitivity_labels`, which consumers read as a
+flat scheme → label map.
 
 ## Change checklist
 
