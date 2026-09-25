@@ -41,6 +41,8 @@ const MS_VALIDATORS = new Set(['Func_aba_routing','Func_australian_tax_file_numb
 const kwSlugs = new Set()
 const patternSlugs = new Set()
 const deprecatedSlugs = new Set()
+// Deprecated patterns' replaced_by targets, checked once every slug is known
+const replacedBy = []
 const errors = [], warns = []
 
 const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(b, fl) }
@@ -79,6 +81,10 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   if ('status' in p && !['active', 'deprecated'].includes(p.status)) errors.push(`${f}: status must be active|deprecated, got '${p.status}'`)
   if (p.status === 'deprecated' && !(typeof p.deprecation_reason === 'string' && p.deprecation_reason.trim())) errors.push(`${f}: deprecated pattern requires a non-empty deprecation_reason`)
   if ('deprecation_reason' in p && p.status !== 'deprecated') errors.push(`${f}: deprecation_reason present but status is not 'deprecated'`)
+  if ('replaced_by' in p) {
+    if (p.status !== 'deprecated') errors.push(`${f}: replaced_by present but status is not 'deprecated'`)
+    else replacedBy.push({ f, slug: p.slug, target: p.replaced_by })
+  }
   for (const msg of validateCustomisations(p, { kwSlugs, isDictionary: false, identifiers })) errors.push(`${p.slug ?? f}: ${msg}`)
   for (const c of Array.isArray(p.customisation) ? p.customisation : []) {
     if (c?.kind === 'identifier-format' && c.identifier && p.status !== 'deprecated') {
@@ -255,6 +261,16 @@ if (!existsSync(classifierIdsPath)) {
       }
     }
   }
+}
+
+// ── replaced_by: a deprecated pattern's successor must be a live pattern ──
+// compile.js publishes it in the catalog's `retired` map; the website 301s the
+// retired URL there, so a missing or deprecated target would redirect into a 404.
+for (const { f, slug, target } of replacedBy) {
+  if (typeof target !== 'string' || !target.trim()) errors.push(`${f}: replaced_by must be a pattern slug`)
+  else if (target === slug) errors.push(`${f}: replaced_by must not name the pattern itself`)
+  else if (!patternSlugs.has(target)) errors.push(`${f}: replaced_by '${target}' is not an existing pattern slug`)
+  else if (deprecatedSlugs.has(target)) errors.push(`${f}: replaced_by '${target}' is itself deprecated — point at its live replacement`)
 }
 
 // ── Collection integrity: every collection member must reference an existing pattern slug ──

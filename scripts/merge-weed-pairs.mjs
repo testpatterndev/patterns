@@ -254,6 +254,7 @@ function deprecate(slug, survivorSlug, reasonExtra = '') {
     return
   }
   data.status = 'deprecated'
+  data.replaced_by = survivorSlug
   data.deprecation_reason =
     `merged into ${survivorSlug} (${TODAY}) — near-duplicate detector consolidated to reduce package overlap and cross-fire; ${reasonExtra}`.trim()
   data.version = bumpVersion(data.version)
