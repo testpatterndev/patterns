@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { validateClassification, validateReferences } from '../classification.mjs'
+import { validateClassification, validateReferences, validateRegulations } from '../classification.mjs'
 
 let passed = 0, failed = 0
 function t(name, fn) { try { fn(); passed++ } catch (e) { failed++; console.error(`FAIL ${name}: ${e.message}`) } }
@@ -44,6 +44,8 @@ t('bare URL string fails', () => assert.ok(validateReferences({ references: ['ht
 t('untitled or non-http reference fails', () => {
   assert.equal(validateReferences({ references: [{ url: 'https://x.example' }, { title: 'T', url: 'ftp://x' }] }).length, 2)
 })
+
+t('regulations required', () => { assert.equal(validateRegulations({ regulations: [] }).length, 1); assert.deepEqual(validateRegulations({ regulations: ['Privacy Act 1988 (Cth)'] }), []) })
 
 console.log(`${passed} passed, ${failed} failed`)
 process.exit(failed ? 1 : 0)

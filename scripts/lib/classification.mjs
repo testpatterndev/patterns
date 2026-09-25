@@ -45,3 +45,8 @@ export function validateReferences(p) {
   })
   return out
 }
+
+export function validateRegulations(p) {
+  const regs = Array.isArray(p.regulations) ? p.regulations.filter(r => typeof r === 'string' && r.trim()) : []
+  return regs.length ? [] : ['regulations must name at least one binding law (frameworks such as PCI-DSS or NIST belong in frameworks)']
+}
