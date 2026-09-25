@@ -10,6 +10,8 @@
 //   - a collection member (data/collections/**/*.yaml patterns list, recursive like
 //     compile.js walkDir) that does not reference an existing pattern slug (dangling member)
 //   - an active pattern without complete classification reasoning, titled references or a regulation
+//   - a package block (data/blocks/*.json) that is malformed, names an unknown or deprecated
+//     pattern, or overlaps another block (scripts/lib/blocks.mjs)
 //     (scripts/lib/classification.mjs; SIT-Reference is generated from them)
 //   - a collection member that references a status: deprecated pattern (warning only —
 //     deprecated patterns stay in the catalog for discovery, but a new pack shouldn't
@@ -23,6 +25,7 @@ import { purviewBanned } from './lib/purview-banned.mjs'
 import { validateCustomisations } from './lib/customisation.mjs'
 import { loadIdentifiers, validateIdentifier, renderIdentifierDocs } from './lib/identifiers.mjs'
 import { validateClassification, validateReferences, validateRegulations } from './lib/classification.mjs'
+import { validateBlocks } from './lib/blocks.mjs'
 
 const BASE = fileURLToPath(new URL('..', import.meta.url))
 const patDir = join(BASE, 'data', 'patterns')
@@ -303,6 +306,19 @@ for (const file of walkYaml(colDir)) {
     if (deprecatedSlugs.has(m)) warns.push(`${label}: member '${m}' is a deprecated pattern — check its deprecation_reason before shipping this pack`)
     seen.add(m)
   }
+}
+
+// Package blocks: PurviewDeploy recipes are assembled from them, so each must name live
+// patterns only and no pattern may sit in two blocks.
+const blockDir = join(BASE, 'data', 'blocks')
+if (existsSync(blockDir)) {
+  const blockFiles = new Map()
+  for (const bf of readdirSync(blockDir).filter(f => f.endsWith('.json'))) {
+    try { blockFiles.set(bf, JSON.parse(readFileSync(join(blockDir, bf), 'utf-8'))) }
+    catch (e) { errors.push(`data/blocks/${bf}: JSON parse — ${e.message.split('\n')[0]}`) }
+  }
+  const activeSlugs = new Set([...patternSlugs].filter(s => !deprecatedSlugs.has(s)))
+  errors.push(...validateBlocks(blockFiles, activeSlugs, deprecatedSlugs))
 }
 
 console.log(`CI check: ${errors.length} error(s), ${warns.length} warning(s)`)
