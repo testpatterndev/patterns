@@ -9,6 +9,18 @@ const MIN_RATIONALE = 80
 
 const text = v => (typeof v === 'string' ? v.trim() : '')
 
+// Handling tier for a qgiscf_dlm: OFFICIAL -> Low, SENSITIVE -> Medium, PROTECTED -> High,
+// N/A -> Alert (markings by their level). Null when the label is missing or unrecognised.
+export function tierForLabel(dlm) {
+  const d = text(dlm)
+  if (!d) return null
+  if (d === 'N/A') return 'Alert'
+  if (/^(PROTECTED|Marking Protected)\b/.test(d)) return 'High'
+  if (/^(SENSITIVE|Marking Sensitive)\b/.test(d)) return 'Medium'
+  if (/^(OFFICIAL|Marking Official)\b/.test(d)) return 'Low'
+  return null
+}
+
 export function validateClassification(p) {
   const out = []
   const c = p.classification
@@ -26,6 +38,10 @@ export function validateClassification(p) {
     if (TIERS.includes(c.tier) && GENERIC_CLASSIFICATIONS.includes(g.classification) && c.tier !== expected)
       out.push(`classification.tier '${c.tier}' must equal the generic classification ('${expected}')`)
   }
+  // The tier follows the label: a relabel that leaves the tier behind leaves stale reasoning.
+  const expected = tierForLabel(p.sensitivity_labels?.qgiscf_dlm)
+  if (expected && TIERS.includes(c.tier) && c.tier !== expected)
+    out.push(`classification.tier '${c.tier}' does not match qgiscf_dlm '${p.sensitivity_labels.qgiscf_dlm}' (expected '${expected}') — rewrite the classification block with the label`)
   // A rationale that opens by stating a different risk than the pattern carries is stale
   // (house style opens "Risk N ..."; later mentions such as "the next higher risk 10" are fine).
   const opening = text(c.rationale).match(/^Risk (\d{1,2})\b/)
