@@ -6,11 +6,53 @@
 // same day must stay clean — the check exists to gate real uploads, not to enforce style.
 // Wired as `npm run test:purview-banned`.
 
-import { purviewBanned } from '../purview-banned.mjs'
+import { purviewBanned, CLASS_DOT_MULTI, CLASS_GROUP_QUANT, CLASS_UNCLOSED_PAREN } from '../purview-banned.mjs'
 
 const GROUP_QUANT = 'unbounded group quantifier — (...)+ / (...)* / (...){n,}'
 
 const cases = [
+  // ── Character-class members read without the brackets (live upload refused 2026-09-28) ──
+  {
+    name: 'dfv workplace-support class [..@.()+ -]{3,40} after a lone ( class (refused)',
+    src: '(?i)\\b(?:new\\s+phone\\s*[:#]\\s*(?!n/?a\\b|_{2,}|\\[|<)[A-Z0-9+(][A-Za-z0-9@.()+ -]{3,40}|review\\s+date)',
+    expect: [CLASS_DOT_MULTI, CLASS_GROUP_QUANT, CLASS_UNCLOSED_PAREN],
+  },
+  {
+    name: 'combolist v1 [\\w.+-] reads as .+ (refused 2026-07-09)',
+    src: '(?<![\\w.+-])[\\w.+-]{1,64}@[\\w.-]{1,253}\\.[a-zA-Z]{2,24}',
+    expect: [CLASS_DOT_MULTI],
+  },
+  {
+    name: 'lone ( inside a class',
+    src: '\\b[A-Z0-9+(][A-Z0-9]{4,12}\\b',
+    expect: [CLASS_UNCLOSED_PAREN],
+  },
+  {
+    name: 'rewritten dfv classes: reordered members, escaped lone (',
+    src: '(?i)\\b(?:new\\s+phone\\s*[:#]\\s*(?!n/?a\\b|_{2,}|\\[|<)[A-Z0-9+\\(][A-Za-z0-9@+ ().-]{3,40}|review\\s+date)',
+    expect: [],
+  },
+  {
+    name: 'dot and both parens in a range-quantified class inside a group (uploaded fine)',
+    src: "(?i)\\b(?:field|entry)(?:[ \\t]{1,3}[A-Za-z0-9 /&_'().-]{2,60})\\s*:",
+    expect: [],
+  },
+  {
+    name: 'lone ) inside a class (uploaded fine)',
+    src: '(?:\\s*\\([^)]{1,20}\\))?\\s*[:#]\\s*[A-Z][A-Za-z\'-]{1,30}',
+    expect: [],
+  },
+  {
+    name: 'combolist v2 [A-Za-z0-9._%+-] (uploaded fine)',
+    src: '[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\\.[A-Za-z]{2,24}:[^\\s:]{4,128}',
+    expect: [],
+  },
+  {
+    name: 'escaped parens inside a class stay clean',
+    src: '(?<=[\\s:=,"\'\\)\\(])[0-9A-F]{10}\\b',
+    expect: [],
+  },
+
   // ── Unbounded group quantifiers: live-rejected shapes ──
   {
     name: 'gcp-service-account-key newline group (rejected 2026-07-17)',
