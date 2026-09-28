@@ -9,23 +9,24 @@
 import { purviewBanned } from '../purview-banned.mjs'
 
 const GROUP_QUANT = 'unbounded group quantifier — (...)+ / (...)* / (...){n,}'
+const LIT = (lit) => `literal '${lit}' in regex text — Purview rejects it anywhere, even inside [...]`
 
 const cases = [
   // ── Unbounded group quantifiers: live-rejected shapes ──
   {
     name: 'gcp-service-account-key newline group (rejected 2026-07-17)',
     src: '(?:[\\\\]n|\\r|\\n)+[A-Za-z0-9+/=]{12,}',
-    expect: [GROUP_QUANT],
+    expect: [GROUP_QUANT, LIT(')+')],
   },
   {
     name: 'us-classification-banner caveat group (rejected pre-rewrite)',
     src: '\\b(?:TS|S|C)//(?:SI|TK|HCS)(?:/{1,2}(?:SI|TK|HCS))*\\b',
-    expect: [GROUP_QUANT],
+    expect: [GROUP_QUANT, LIT(')*')],
   },
   {
     name: 'portion mark with literal parens around quantified group (rejected pre-rewrite)',
     src: '\\((?:TS|S|C|U)//(?:SI|TK)(?://?(?:SI|TK))*\\)',
-    expect: [GROUP_QUANT],
+    expect: [GROUP_QUANT, LIT(')*')],
   },
   {
     name: 'bip39-style open-ended word group',
@@ -40,7 +41,7 @@ const cases = [
   {
     name: 'capture group with + flags',
     src: '\\bkey=([A-Z]|\\d)+\\b',
-    expect: [GROUP_QUANT],
+    expect: [GROUP_QUANT, LIT(')+')],
   },
 
   // ── Dot-like \S multi-match: live-rejected shapes ──
@@ -116,7 +117,7 @@ const cases = [
   {
     name: 'wildcard dot after a literal backslash still flags',
     src: 'C:\\\\.*',
-    expect: ['unbounded/braced dot quantifier'],
+    expect: ['unbounded/braced dot quantifier', LIT('.*')],
   },
   {
     name: 'anchor after a literal backslash still flags',
@@ -149,16 +150,53 @@ const cases = [
     expect: [],
   },
 
+  // ── Literal repeaters: `.`/`)` + `*`/`+` in the regex TEXT, even inside [...] ──
+  // Pinned 2026-09-28: the first two were rejected at a live tenant upload
+  // (ClassificationRulePackageValidationException); the third has the same `.+` class shape.
+  // Strings are the pre-fix catalog text, pinned here because the yamls were fixed.
+  {
+    name: 'au-family-domestic-violence-leave-record Regex_dfv_workplace_support: )+ inside [A-Za-z0-9@.()+ -] (rejected live)',
+    src: "(?i)\\b(?:(?:work\\s+)?(?:location|site|office|workplace|team)\\s+(?:changed|relocated|transferred|moved)(?:\\s+(?:to|from))?\\s*[:#-]?\\s*(?!(?:n/?a|unknown|tbc|tba|the|a|an|any|where)\\b|_{2,}|\\[|<)[A-Z0-9][A-Za-z0-9'-]{2,30}|(?:new|changed|unlisted)\\s+(?:work\\s+)?(?:email|phone|telephone|mobile|extension)(?:\\s+(?:number|address))?\\s*[:#]\\s*(?!(?:n/?a|unknown|tbc|tba)\\b|_{2,}|\\[|<)[A-Z0-9+(][A-Za-z0-9@.()+ -]{3,40}|(?:hours|roster|shifts?|start\\s+time|work\\s+pattern)\\s+(?:changed|varied|adjusted)(?:\\s+(?:to|from))?\\s*[:#-]?\\s*[0-9A-Z]|flexible\\s+(?:working\\s+)?arrangements?\\s*[:#]\\s*(?!(?:n/?a|unknown|tbc|tba|the|a|an|any)\\b|_{2,}|\\[|<)[A-Z0-9][A-Za-z0-9'-]{2,40}|review\\s+date\\s*[:#-]?\\s*\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})",
+    expect: [LIT(')+')],
+  },
+  {
+    name: 'global-top500-248 Evidence_package_coordinate: .+ inside [\\w.+-] (rejected live)',
+    src: "\\bpkg:(?:npm|maven|pypi|nuget|gem|golang|cargo|composer)/[\\w@./%-]{2,120}@[\\w.+-]{1,40}|@?\\b[a-z0-9][\\w.-]{1,60}(?:/[\\w.-]{1,60})?@\\d{1,4}\\.\\d{1,4}\\.\\d{1,6}\\b|\\b[a-z][\\w.-]{1,60}:[a-z][\\w.-]{1,60}:\\d{1,4}\\.\\d{1,4}(?:\\.\\d{1,6})?\\b",
+    expect: [LIT('.+')],
+  },
+  {
+    name: 'lawful-interception-warrant intercept_record_fields: .+ inside [A-Za-z0-9/.+-]',
+    src: "(?i)\\b(?:warrant\\s*(?:no\\.?|number|ref(?:erence)?|ID)|target\\s+(?:service|line|number|phone|handset|identifier|ID)|(?:intercepted|monitored)\\s+(?:service|line|number)|(?:line|session|call|product)\\s*(?:no\\.?|number|ID|ref(?:erence)?)|[AB]-party(?:\\s+(?:no\\.?|number))?|IMSI|MSISDN)\\s*[:#]\\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\\s+recorded|the|a|an|any|all|each|see|refer)\\b|_{2,}|\\[|<)[A-Z0-9+][A-Za-z0-9/.+-]{1,30}",
+    expect: [LIT('.+')],
+  },
+  {
+    name: 'literal backslash then .+ in a class still flags ([\\\\.+])',
+    src: '[\\\\.+]{1,4}',
+    expect: [LIT('.+')],
+  },
+  { name: 'escaped dot before + in a class stays clean', src: '[\\w\\.+-]{1,40}', expect: [] },
+  { name: 'escaped + after ) in a class stays clean', src: '[A-Za-z0-9@.()\\+ -]{3,40}', expect: [] },
+  { name: 'escaped dot then + outside a class stays clean', src: 'foo\\.+bar', expect: [] },
+  { name: 'escaped paren then + outside a class stays clean', src: 'x\\)+y', expect: [] },
+  { name: 'dot last in a quantified class stays clean', src: '[a-z0-9.]+@[\\w.-]{1,60}', expect: [] },
+  {
+    name: 'fixed au-family class [A-Za-z0-9+@.() -] stays clean',
+    src: '[A-Z0-9+(][A-Za-z0-9+@.() -]{3,40}',
+    expect: [],
+  },
+  { name: 'fixed 248 class [\\w+.-] stays clean', src: '@[\\w+.-]{1,40}', expect: [] },
+  { name: 'fixed lawful class [A-Za-z0-9/+.-] stays clean', src: '[A-Z0-9+][A-Za-z0-9/+.-]{1,30}', expect: [] },
+
   // ── Pre-existing rules keep working after the extraction ──
   {
     name: 'nested quantifier',
     src: '(?:a+)+b',
-    expect: ['nested quantifier', GROUP_QUANT],
+    expect: ['nested quantifier', GROUP_QUANT, LIT(')+')],
   },
   {
     name: 'unbounded dot quantifier',
     src: 'foo.*bar',
-    expect: ['unbounded/braced dot quantifier'],
+    expect: ['unbounded/braced dot quantifier', LIT('.*')],
   },
   {
     name: 'anchors',
