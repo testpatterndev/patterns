@@ -39,6 +39,19 @@
 
 export const stripClasses = (src) => src.replace(/\[(?:[^\]\\]|\\.)*\]/g, '[]')
 
+// Literal repeaters — calibrated 2026-09-28 against every regex Purview accepted on real
+// tenants (1920 regex ids in PurviewDeploy captures) and the two it rejected at a live tenant
+// upload ("groups of multiple match conditions like (.*, .+, ...)"): Purview reads the regex
+// TEXT, ignoring [...] context, so `.` or `)` immediately followed by `*` or `+` is rejected
+// anywhere — including inside a character class ([\w.+-], [@.()+ -]). Escaped pairs (`\.`,
+// `\)`, `\\`) are literals and are neutralized first. 2/2 rejected flagged, 0/1920 accepted.
+// Fix inside a class by reordering ([\w+.-]) or escaping (\+); keep `-` last.
+function literalRepeaters(src) {
+  const u = src.replace(/\\./g, 'x')
+  return [...new Set(u.match(/[.)][*+]/g) ?? [])]
+    .map((lit) => `literal '${lit}' in regex text — Purview rejects it anywhere, even inside [...]`)
+}
+
 export function purviewBanned(src) {
   const s = stripClasses(src)
   // Escape-neutralized copy: every `\x` pair collapses to a placeholder, so any `.`, `^`,
@@ -91,5 +104,6 @@ export function purviewBanned(src) {
     if (c === '(') depth++
     else if (c === ')') depth = Math.max(0, depth - 1)
   }
+  issues.push(...literalRepeaters(src))
   return issues
 }
