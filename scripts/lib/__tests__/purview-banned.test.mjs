@@ -9,6 +9,7 @@
 import { purviewBanned } from '../purview-banned.mjs'
 
 const GROUP_QUANT = 'unbounded group quantifier — (...)+ / (...)* / (...){n,}'
+const LB_SPACE = 'literal space in lookbehind — the exporter rewrites it to \\s+ (variable length); write [ ]'
 const LIT = (lit) => `literal '${lit}' in regex text — Purview rejects it anywhere, even inside [...]`
 
 const cases = [
@@ -212,6 +213,39 @@ const cases = [
     name: 'variable-length lookbehind',
     src: '(?<!\\w+)\\d{6}',
     expect: ['variable-length lookbehind'],
+  },
+
+  // ── Literal space in a lookbehind: the exporter turns ' ' into \s+ (variable length) ──
+  // Pinned 2026-10-01 from the Queensland electoral name-field regexes (1.0.3 / 1.0.2).
+  {
+    name: 'au-qld-silent-elector-record name field (exports as (?<![A-Za-z]\\s+))',
+    src: "(?i)\\b(?:surname|applicant(?:\\s+name)?|(?<![A-Za-z] )name)\\s*[:#]\\s*[A-Z][A-Za-z'-]{1,30}",
+    expect: [LB_SPACE],
+  },
+  {
+    name: 'au-qld-elector-participation-data name field',
+    src: "(?i)\\b(?:voter(?:\\s+name)?|(?<![A-Za-z] )(?:full\\s+)?name)\\s*[:#]\\s*[A-Z][A-Za-z'-]{1,30}",
+    expect: [LB_SPACE],
+  },
+  {
+    name: 'exported form of the same lookbehind',
+    src: '(?<![A-Za-z]\\s+)name',
+    expect: ['variable-length lookbehind'],
+  },
+  {
+    name: 'lookbehind space written as [ ] stays clean',
+    src: '(?<![A-Za-z][ ])name',
+    expect: [],
+  },
+  {
+    name: 'escaped space in a lookbehind stays clean',
+    src: '(?<![A-Za-z]\\ )name',
+    expect: [],
+  },
+  {
+    name: 'space in a lookahead stays clean',
+    src: 'name(?! of)',
+    expect: [],
   },
   {
     name: 'clean identifier pattern',

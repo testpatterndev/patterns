@@ -77,6 +77,18 @@ export function purviewBanned(src) {
   // `t` so escaped literals inside the body — `(?<=ref\?)`, `(?<=foo\))` — neither
   // false-flag as quantifiers nor end the body scan early.
   if (/\(\?<[=!][^)]*(?:[*+?]|\{\d+,)/.test(t)) issues.push('variable-length lookbehind')
+  // A literal space in a lookbehind body is fixed-length in the source, but the testpattern
+  // exporter (regex-compat.js normalizePdfRegex) rewrites every literal space outside [...]
+  // to \s+, so `(?<![A-Za-z] )` ships as the variable-length `(?<![A-Za-z]\s+)`. That is the
+  // only exporter rewrite that lengthens a fixed body (`\s?`/`\s{0,1}` are caught above).
+  // Write the space as `[ ]`. Calibrated 2026-10-01: flags the two Queensland electoral name-field
+  // regexes. Of the 2144 regexes Purview accepted on captured tenants (XML-decoded), 82 contain
+  // a lookbehind (20 distinct texts), all fixed-length; neither this rule nor the
+  // variable-length rule above flags any of them. No live-rejected variable-length lookbehind
+  // exists in the captures: the rejected side rests on Microsoft's documentation.
+  // Belt-and-braces: keep this rule after the exporter stops rewriting spaces inside lookaround
+  // bodies (testpattern.dev PR #21). It only demands `[ ]`, so it never flags a correct export.
+  if (/\(\?<[=!][^)]* /.test(t)) issues.push('literal space in lookbehind — the exporter rewrites it to \\s+ (variable length); write [ ]')
   // Unbounded quantifier applied to a GROUP — `(...)+`, `(...)*`, `(...){n,}` (lazy variants
   // included). This is the confirmed Purview "groups of multiple match conditions" rejection
   // class; see the header comment for the live evidence and why BOUNDED group quantifiers
