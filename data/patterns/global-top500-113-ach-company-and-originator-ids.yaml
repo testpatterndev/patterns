@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: ACH company and originator IDs
 slug: global-top500-113-ach-company-and-originator-ids
-version: 1.4.4
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -48,6 +48,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: clearing house
       description: Additional topic phrase match
+    - value: |-
+        Originator ID
+        Payee: Riverbend Supplies Pty Ltd
+        BSB: 064-000
+        Account number: 12345678
+        Payment reference: INV-20431
+      description: Populated payee/account reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -55,6 +63,14 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: bank transfer
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Originator ID:
+        Payee:
+        Account name:
+        Account number:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about originator id are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -76,7 +92,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_ach_originator_ids
       matches:
-        - ref: Evidence_ach_originator_ids
+        - ref: Regex_global_top500_113_ach_company_and_originator_ids_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -87,7 +103,11 @@ purview:
     - confidence_level: 75
       id_match: Pattern_ach_originator_ids
       matches:
-        - ref: Evidence_ach_originator_ids
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_ach_originator_ids
+            - Regex_global_top500_113_ach_company_and_originator_ids_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -96,11 +116,11 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_ach_originator_ids
-      matches:
-        - ref: Evidence_ach_originator_ids
   regexes:
     - id: Pattern_ach_originator_ids
       pattern: (?is)\b(?:originator\s+ID|company\s+ID|direct\s+entry|clearing\s+house|batch\s+header|originating\s+institution|payment\s+file|bulk\s+payment)\b
+    - id: Regex_global_top500_113_ach_company_and_originator_ids_record_structure
+      pattern: (?i)\b(?:payee|supplier|vendor|creditor|beneficiary|account\s+name|BSB|account\s+(?:no\.?|number)|invoice\s+(?:no\.?|number)|remittance\s+(?:no\.?|number|ref(?:erence)?)|payment\s+(?:ref(?:erence)?|date)|amount\s+paid)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_ach_originator_ids
       groups:
@@ -108,17 +128,8 @@ purview:
           terms:
             - text: ACH
               case_sensitive: true
-            - originator ID
-            - company ID
-            - direct entry
-            - clearing house
             - BECS
-            - batch header
-            - originating institution
-            - settlement
-            - payment file
             - AusPayNet
-            - bulk payment
       strength: specific
 risk_description: >-
   The concept regex recognises originator ID, company ID, direct entry, and clearing-house terminology with financial context rather than parsing an ACH identifier format. Company and originator IDs generally identify business participants in a payment rail, not an individual's bank account or a credential authorising transactions. Fraudulent origination still requires account instructions, authorisation, and processing access, while public scheme documents and bank guidance can match these terms. Risk 4 OFFICIAL reflects low standalone harm; SENSITIVE would require a non-public payment file, customer account linkage, or usable origination access.
@@ -150,8 +161,11 @@ references:
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires an independent populated payee/account field (Regex_global_top500_113_ach_company_and_originator_ids_record_structure), or one remaining corroborative term (ACH, BECS, AusPayNet); 85 requires 2 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (settlement). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.4.4
     date: '2026-09-25'
     description: >-

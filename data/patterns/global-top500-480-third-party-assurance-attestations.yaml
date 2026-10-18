@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Third-party assurance attestations
 slug: global-top500-480-third-party-assurance-attestations
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -46,6 +46,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: supplier audit
       description: Additional topic phrase match
+    - value: |-
+        Third-party assurance
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Third-party assurance - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -53,6 +61,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: data inventory compliance
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Third-party assurance:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about third-party assurance are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to third-party assurance attestations appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -76,8 +93,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_third_party_assurance_attestations
       matches:
-        - ref: Evidence_third_party_assurance_attestations
-          min_count: 2
+        - ref: Regex_global_top500_480_third_party_assurance_attestations_record_structure
+          min_count: 3
           unique_results: true
         - type: any
           min_matches: 0
@@ -87,7 +104,9 @@ purview:
     - confidence_level: 75
       id_match: Pattern_third_party_assurance_attestations
       matches:
-        - ref: Evidence_third_party_assurance_attestations
+        - ref: Regex_global_top500_480_third_party_assurance_attestations_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -96,29 +115,12 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_third_party_assurance_attestations
-      matches:
-        - ref: Evidence_third_party_assurance_attestations
   regexes:
     - id: Pattern_third_party_assurance_attestations
       pattern: >-
         (?is)\b(?:third[\s-]+party\s+assurance|assurance\s+attestation|vendor\s+assessment|supplier\s+audit|third[\s-]+party\s+risk|SOC\s+2\s+report|external\s+audit|assurance\s+report|CPS\s+234|CPS\s+230|compliance\s+attestation|security\s+assurance)\b
-  keywords:
-    - id: Evidence_third_party_assurance_attestations
-      groups:
-        - match_style: word
-          terms:
-            - third-party assurance
-            - assurance attestation
-            - vendor assessment
-            - supplier audit
-            - third-party risk
-            - SOC 2 report
-            - external audit
-            - assurance report
-            - CPS 234
-            - CPS 230
-            - compliance attestation
-            - security assurance
+    - id: Regex_global_top500_480_third_party_assurance_attestations_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
 risk_description: >-
   The concept detector recognises third-party assurance, assurance attestations, vendor assessments, supplier audits, and related independent-control evidence. A substantive attestation can reveal control coverage, exceptions, testing scope, audit qualifications, and reliance limitations that help attackers target weaknesses or alter commercial and procurement decisions. The ordinary unit concerns one supplier and assurance period with serious but bounded security, legal, and reputational consequences, while marketing claims and templates may match. Risk 8 SENSITIVE Personal-Privacy is defensible; PROTECTED is not met without critical-service dependency, system-scale control compromise, protected operations, or credible significant damage.
 sensitivity_labels:
@@ -142,8 +144,11 @@ classification:
       Medium and Medium InfoTech handling fit nonpublic third-party assurance findings and control coverage. High is
       reserved for critical providers with severe actionable exceptions.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_480_third_party_assurance_attestations_record_structure); 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Removed evidence no longer referenced by any tier (Evidence_third_party_assurance_attestations). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-

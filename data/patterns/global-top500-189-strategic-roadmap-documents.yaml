@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Strategic roadmap documents
 slug: global-top500-189-strategic-roadmap-documents
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -45,6 +45,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: multi-year plan
       description: Additional topic phrase match
+    - value: |-
+        Strategic roadmap
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Strategic roadmap - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -52,6 +60,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: merger fundraising
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Strategic roadmap:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about strategic roadmap are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to strategic roadmap documents appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -75,8 +92,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_strategic_roadmap
       matches:
-        - ref: Evidence_strategic_roadmap
-          min_count: 2
+        - ref: Regex_global_top500_189_strategic_roadmap_documents_record_structure
+          min_count: 3
           unique_results: true
         - type: any
           min_matches: 0
@@ -86,7 +103,9 @@ purview:
     - confidence_level: 75
       id_match: Pattern_strategic_roadmap
       matches:
-        - ref: Evidence_strategic_roadmap
+        - ref: Regex_global_top500_189_strategic_roadmap_documents_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -95,30 +114,12 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_strategic_roadmap
-      matches:
-        - ref: Evidence_strategic_roadmap
   regexes:
     - id: Pattern_strategic_roadmap
       pattern: >-
         (?is)\b(?:strategic\s+roadmap|strategy\s+roadmap|strategic\s+plan|multi[\s-]+year\s+plan|long[\s-]+range\s+plan|corporate\s+strategy|growth\s+strategy|strategic\s+priorities|board\s+strategy|strategic\s+initiative|business\s+transformation|competitive\s+positioning)\b
-  keywords:
-    - id: Evidence_strategic_roadmap
-      groups:
-        - match_style: word
-          terms:
-            - strategic roadmap
-            - strategy roadmap
-            - strategic plan
-            - multi-year plan
-            - long-range plan
-            - corporate strategy
-            - growth strategy
-            - strategic priorities
-            - board strategy
-            - strategic initiative
-            - business transformation
-            - competitive positioning
-            - confidential
+    - id: Regex_global_top500_189_strategic_roadmap_documents_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
 risk_description: >-
   The concept regex looks for strategic roadmaps, multi-year plans, priorities, milestones, and enterprise strategy language, with the intended unit being an internal forward plan rather than any published corporate vision. A detailed roadmap can expose investment sequence, capability gaps, product direction, dependencies, and abandoned options, helping competitors anticipate moves or suppliers exploit timing across the covered business. The medium-confidence rule is broad and can match public strategies, planning templates, and aspirational presentations without confidential detail. Risk 8 and SENSITIVE Financial remain defensible for an actionable internal roadmap; PROTECTED would require system-scale exploitable dependencies or strategic compromise capable of significant damage.
 sensitivity_labels:
@@ -143,8 +144,11 @@ classification:
       Medium Financial handling fits an internal forward plan whose priorities and timing give competitors an advantage.
       High is not reached by an organisation's own strategy document.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_189_strategic_roadmap_documents_record_structure); 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (confidential). Removed evidence no longer referenced by any tier (Evidence_strategic_roadmap). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-

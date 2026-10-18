@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Bills of lading
 slug: global-top500-151-bills-of-lading
-version: 1.4.4
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -45,6 +45,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: port of loading
       description: Additional topic phrase match
+    - value: |-
+        Bill of lading
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Bill of lading - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -52,6 +60,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: procurement inventory
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Bill of lading:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about bill of lading are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to bills of lading appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -75,7 +92,18 @@ purview:
     - confidence_level: 85
       id_match: Pattern_bills_of_lading
       matches:
-        - ref: Evidence_bills_of_lading
+        - ref: Regex_global_top500_151_bills_of_lading_record_structure
+          min_count: 3
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_bills_of_lading
+      matches:
+        - ref: Regex_global_top500_151_bills_of_lading_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -87,6 +115,7 @@ purview:
       id_match: Pattern_bills_of_lading
       matches:
         - ref: Evidence_bills_of_lading
+        - ref: Regex_global_top500_151_bills_of_lading_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -95,29 +124,23 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_bills_of_lading
-      matches:
-        - ref: Evidence_bills_of_lading
   regexes:
     - id: Pattern_bills_of_lading
       pattern: (?is)\b(?:bill\s+of\s+lading|freight\s+forwarder|cargo\s+manifest|port\s+of\s+loading|port\s+of\s+discharge|shipping\s+line)\b
     - id: Pattern_au_top500_151_bills_of_lading_label_context
       pattern: (?i)\b(?:bills\s+of\s+lading)\b
+    - id: Regex_global_top500_151_bills_of_lading_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
   keywords:
     - id: Evidence_bills_of_lading
       groups:
         - match_style: word
           terms:
-            - bill of lading
             - text: B/L
               case_sensitive: true
             - consignment
             - shipper
             - consignee
-            - freight forwarder
-            - cargo manifest
-            - port of loading
-            - port of discharge
-            - shipping line
       strength: specific
     - id: Keyword_au_top500_151_bills_of_lading_domain_context
       groups:
@@ -150,8 +173,11 @@ classification:
       Low and Low DLM fit an ordinary single-shipment document whose misuse depends on logistics access and additional
       current information. More complete or controllable cargo records require stronger handling.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_151_bills_of_lading_record_structure), or one remaining corroborative term plus one field; 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.4.4
     date: '2026-09-25'
     description: >-

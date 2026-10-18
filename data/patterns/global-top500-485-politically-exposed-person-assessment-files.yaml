@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Politically exposed person assessment files
 slug: global-top500-485-politically-exposed-person-assessment-files
-version: 1.2.3
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -35,6 +35,13 @@ test_cases:
       description: Alternative topic phrase match
     - value: PEP assessment
       description: Additional topic phrase match
+    - value: |-
+        Politically exposed person assessment files
+        Name: Avery Teston
+        Date of birth: 14/02/1988
+        Client number: C4471820
+      description: Populated person/client record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -42,6 +49,13 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: voter sovereign debt
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Politically exposed person assessment files:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about politically exposed person assessment files are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: >-
       Common words and phrases related to politically exposed person assessment files appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal
@@ -66,11 +80,25 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_pep_assessment
+      matches:
+        - ref: Regex_global_top500_485_politically_exposed_person_assessment_files_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_pep_assessment
       matches:
-        - ref: Pattern_global_top500_485_politically_exposed_person_assessment_files_label_context
-        - ref: Keyword_global_top500_485_politically_exposed_person_assessment_files_domain_context
+        - type: any
+          min_matches: 1
+          refs:
+            - Keyword_pep_assessment
+            - Regex_global_top500_485_politically_exposed_person_assessment_files_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -80,7 +108,6 @@ purview:
       discovery_only: true
       id_match: Regex_pep_assessment
       matches:
-        - ref: Keyword_pep_assessment
         - type: any
           min_matches: 0
           max_matches: 0
@@ -90,39 +117,18 @@ purview:
     - id: Regex_pep_assessment
       pattern: >-
         (?is)\b(?:politically\s+exposed\s+person\s+assessment\s+files|politically\s+exposed\s+person|PEP\s+screening|PEP\s+assessment|enhanced\s+due\s+diligence|anti[\s-]+money\s+laundering|beneficial\s+ownership|sanctions\s+screening|risk\s+rating|high[\s-]+risk\s+individual)\b
-    - id: Pattern_global_top500_485_politically_exposed_person_assessment_files_label_context
-      pattern: (?i)\b(?:politically\s+exposed\s+person\s+assessment\s+files)\b
+    - id: Regex_global_top500_485_politically_exposed_person_assessment_files_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Keyword_pep_assessment
       groups:
         - match_style: word
           terms:
-            - politically exposed person assessment files
-            - politically exposed person
-            - PEP screening
-            - PEP assessment
-            - enhanced due diligence
-            - anti-money laundering
             - text: AML
               case_sensitive: true
-            - beneficial ownership
-            - sanctions screening
-            - risk rating
             - text: KYC
               case_sensitive: true
-            - high-risk individual
       strength: specific
-    - id: Keyword_global_top500_485_politically_exposed_person_assessment_files_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - politically exposed person assessment files
-            - politically
-            - exposed
-            - person
-            - assessment
-            - files
-      strength: domain
 risk_description: >-
   The detector flags politically exposed persons, PEP screening or assessment, enhanced due diligence, beneficial ownership, sanctions checks, risk ratings, and high-risk individuals rather than confirming a completed client dossier. A genuine file can disclose a person's public connections, family or associate links, financial-crime suspicions, ownership interests, and institutional risk judgment, causing stigma, targeting, or unfair service denial. The normal unit is one customer or related-party assessment and the institution conducting it, while AML policy, training, and screening guidance can match. Risk 8 and SENSITIVE reflect serious contained privacy and financial harm; PROTECTED would require a highly consequential protected person, life-safety exposure, or a bulk intelligence holding whose loss could cause significant damage.
 sensitivity_labels:
@@ -150,8 +156,11 @@ frameworks:
   - ISO 27001
   - ISO 27701
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires an independent populated person/client field (Regex_global_top500_485_politically_exposed_person_assessment_files_record_structure), or one remaining corroborative term (AML, KYC); 85 requires 2 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Removed evidence no longer referenced by any tier (Keyword_global_top500_485_politically_exposed_person_assessment_files_domain_context, Pattern_global_top500_485_politically_exposed_person_assessment_files_label_context). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.2.3
     date: '2026-09-25'
     description: >-

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Forensic DNA profile records
 slug: global-top500-412-forensic-dna-profile-records
-version: 1.4.4
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -45,6 +45,13 @@ test_cases:
       description: Topic phrase, lowercase
     - value: 'this record references the dna profile held on file'
       description: Topic phrase within surrounding text
+    - value: |-
+        Dna profile
+        Name: Avery Teston
+        Date of birth: 14/02/1988
+        Case number: QP2600123456
+      description: Populated justice record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
@@ -52,6 +59,13 @@ test_cases:
       description: Random text should not match phrase marker
     - value: generic policy prose without anchors
       description: Should reject generic mentions without structural anchor terms
+    - value: |-
+        Dna profile:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about dna profile are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to forensic dna profile records appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -75,7 +89,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_forensic_dna_profile_records
       matches:
-        - ref: Evidence_forensic_dna_profile_records
+        - ref: Regex_global_top500_412_forensic_dna_profile_records_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -86,7 +100,11 @@ purview:
     - confidence_level: 75
       id_match: Pattern_forensic_dna_profile_records
       matches:
-        - ref: Evidence_forensic_dna_profile_records
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_forensic_dna_profile_records
+            - Regex_global_top500_412_forensic_dna_profile_records_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -98,21 +116,17 @@ purview:
   regexes:
     - id: Pattern_forensic_dna_profile_records
       pattern: (?i)\b(?:dna\s+profile|forensic\s+dna|str\s+loci|codis)\b
+    - id: Regex_global_top500_412_forensic_dna_profile_records_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|defendant|accused|offender|prisoner|inmate|detainee|respondent|applicant|witness|informant|suspect|subject\s+(?:name|person)|person\s+of\s+interest|POI|victim|complainant|officer|CNI|QPRIME|(?:file|case|matter|court|reference|ref|exhibit|brief|job|incident|report|investigation|occurrence)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_forensic_dna_profile_records
       groups:
         - match_style: word
           terms:
-            - forensic dna profile records
-            - dna profile
-            - forensic dna
-            - STR loci
-            - CODIS
             - dna database
             - genetic profile
             - dna evidence
             - biological sample
-            - law enforcement
             - forensic analysis
             - dna match
       strength: specific
@@ -147,8 +161,11 @@ references:
   - title: "OAIC - Notifiable Data Breaches scheme"
     url: https://www.oaic.gov.au/privacy/notifiable-data-breaches
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires an independent populated justice field (Regex_global_top500_412_forensic_dna_profile_records_record_structure), or one remaining corroborative term (dna database, genetic profile, dna evidence, biological sample, forensic analysis, dna match); 85 requires 2 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (law enforcement). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.4.4
     date: '2026-09-25'
     description: >-

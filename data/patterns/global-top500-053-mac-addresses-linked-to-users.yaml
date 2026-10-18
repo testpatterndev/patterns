@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: MAC addresses linked to users
 slug: global-top500-053-mac-addresses-linked-to-users
-version: 1.5.2
+version: 1.6.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -55,6 +55,13 @@ test_cases:
       description: Additional topic phrase match
     - value: 'Access log: MAC address assigned to employee Priya Rao.'
       description: Device-address concept with explicit user-linkage relation (reaches the enforcing tiers)
+    - value: |-
+        MAC addresses linked to users
+        Hostname: app-prd-01.corp.local
+        username: svc_deploy
+        Source 10.20.30.40 tcp/443
+      description: Populated technical artefact reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -66,6 +73,13 @@ test_cases:
       description: Hardware documentation without any user-linkage relation must not reach the enforcing tiers
     - value: Security training shows how a MAC address can be linked to users.
       description: Explanatory prose — linked to users is not an authored relational linkage phrase, so enforcement must not fire
+    - value: |-
+        MAC addresses linked to users:
+        Hostname:
+        username:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about mac addresses linked to users are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to mac addresses linked to users appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -89,10 +103,9 @@ purview:
     - confidence_level: 85
       id_match: Pattern_mac_address
       matches:
-        - ref: Evidence_mac_address
+        - ref: Regex_global_top500_053_mac_addresses_linked_to_users_record_structure
           min_count: 2
           unique_results: true
-        - ref: Evidence_mac_user_linkage
         - type: any
           min_matches: 0
           max_matches: 0
@@ -101,42 +114,35 @@ purview:
     - confidence_level: 75
       id_match: Pattern_mac_address
       matches:
-        - ref: Evidence_mac_address
-        - ref: Evidence_mac_user_linkage
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_mac_address
+            - Evidence_mac_user_linkage
+            - Regex_global_top500_053_mac_addresses_linked_to_users_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 65
-      id_match: Pattern_mac_address
-      matches:
-        - ref: Evidence_mac_address
       discovery_only: true
+      id_match: Pattern_mac_address
   regexes:
     - id: Pattern_mac_address
       pattern: >-
         (?is)\b(?:MAC\s+addresses\s+linked\s+to\s+users|MAC\s+address|hardware\s+address|physical\s+address|network\s+interface|WiFi\s+address|Bluetooth\s+address|device\s+fingerprint|network\s+identifier|ethernet\s+address|wireless\s+adapter)\b
     - id: Pattern_au_top500_053_mac_addresses_linked_to_users_label_context
       pattern: (?i)\b(?:mac\s+addresses\s+linked\s+to\s+users)\b
+    - id: Regex_global_top500_053_mac_addresses_linked_to_users_record_structure
+      pattern: (?i)\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:/\d{1,2})?\b|\bCVE-\d{4}-\d{4,7}\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:tcp|udp)\s*/?\s*\d{2,5}\b|\b(?:port|dport|sport)\s*[:=]?\s*\d{2,5}\b|\b(?:hostname|host|asset\s+ID|device\s+ID|sAMAccountName|UPN|username|account\s+name)\s*:\s*(?!_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9][A-Za-z0-9._\\@-]{2,63}
   keywords:
     - id: Evidence_mac_address
       groups:
         - match_style: word
           terms:
-            - MAC addresses linked to users
-            - MAC address
-            - hardware address
-            - physical address
-            - network interface
-            - WiFi address
-            - Bluetooth address
             - text: OUI
               case_sensitive: true
-            - device fingerprint
-            - network identifier
-            - ethernet address
-            - wireless adapter
       strength: specific
     - id: Evidence_mac_user_linkage
       groups:
@@ -181,8 +187,11 @@ classification:
       Medium InfoTech handling applies to a device-to-person mapping that enables tracking across network logs. It is
       not High because impact is limited to the linked users and devices.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.6.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires an independent populated technical artefact field (Regex_global_top500_053_mac_addresses_linked_to_users_record_structure), or one remaining corroborative term (OUI; assigned to, device owner, associated user, authenticated user, access log); 85 requires 2 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.5.2
     date: '2026-09-25'
     description: >-

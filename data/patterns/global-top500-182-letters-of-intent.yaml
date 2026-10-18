@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Letters of intent
 slug: global-top500-182-letters-of-intent
-version: 1.4.4
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -44,6 +44,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: binding offer
       description: Additional topic phrase match
+    - value: |-
+        Letters of intent
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Letters of intent - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -51,6 +59,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: merger fundraising
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Letters of intent:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about letters of intent are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to letters of intent appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -74,7 +91,18 @@ purview:
     - confidence_level: 85
       id_match: Pattern_letters_of_intent
       matches:
-        - ref: Evidence_letters_of_intent
+        - ref: Regex_global_top500_182_letters_of_intent_record_structure
+          min_count: 3
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_letters_of_intent
+      matches:
+        - ref: Regex_global_top500_182_letters_of_intent_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -86,6 +114,7 @@ purview:
       id_match: Pattern_letters_of_intent
       matches:
         - ref: Evidence_letters_of_intent
+        - ref: Regex_global_top500_182_letters_of_intent_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -94,31 +123,19 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_letters_of_intent
-      matches:
-        - ref: Evidence_letters_of_intent
   regexes:
     - id: Pattern_letters_of_intent
       pattern: >-
         (?is)\b(?:letters\s+of\s+intent|letter\s+of\s+intent|non[\s-]+binding\s+offer|binding\s+offer|preliminary\s+agreement|heads\s+of\s+agreement|memorandum\s+of\s+understanding|intent\s+to\s+acquire|acquisition\s+proposal|merger\s+proposal|indicative\s+offer)\b
+    - id: Regex_global_top500_182_letters_of_intent_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
   keywords:
     - id: Evidence_letters_of_intent
       groups:
         - match_style: word
           terms:
-            - letters of intent
-            - letter of intent
             - text: LOI
               case_sensitive: true
-            - non-binding offer
-            - binding offer
-            - preliminary agreement
-            - heads of agreement
-            - memorandum of understanding
-            - intent to acquire
-            - acquisition proposal
-            - merger proposal
-            - indicative offer
-            - confidential
       strength: specific
 risk_description: >-
   This regex targets letters of intent, binding or non-binding offers, exclusivity, and transaction terms, aiming at a negotiated legal instrument rather than the abbreviation LOI alone. A genuine letter can reveal price, conditions, timelines, exclusivity, proposed structure, and counterpart identities, allowing competitors or market participants to disrupt the deal and weakening each party's bargaining position. The medium-confidence concept rule can also find templates, academic examples, or already-announced arrangements. Risk 8 and SENSITIVE Legal fit serious but contained negotiation and contractual harm; PROTECTED would require a nationally strategic transaction, protected government interest, or compromise capable of significant damage.
@@ -143,8 +160,11 @@ classification:
       Medium and Medium Personal-Privacy handling suit confidential preliminary deal terms and the organizations or
       people negotiating them. High is reserved for exceptionally consequential protected or systemic transactions.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_182_letters_of_intent_record_structure), or one remaining corroborative term plus one field; 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (confidential). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.4.4
     date: '2026-09-25'
     description: >-

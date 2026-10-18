@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Passport application packets
 slug: global-top500-391-passport-application-packets
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -50,6 +50,13 @@ test_cases:
       description: Alternative topic phrase match
     - value: photo identification
       description: Additional topic phrase match
+    - value: |-
+        Passport application packets
+        Name: Avery Teston
+        Date of birth: 14/02/1988
+        Client number: C4471820
+      description: Populated person/client record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -57,6 +64,13 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: immigration case
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Passport application packets:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about passport application packets are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to passport application packets appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -80,7 +94,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_passport_application
       matches:
-        - ref: Evidence_passport_application
+        - ref: Regex_global_top500_391_passport_application_packets_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -91,7 +105,11 @@ purview:
     - confidence_level: 75
       id_match: Pattern_passport_application
       matches:
-        - ref: Evidence_passport_application
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_passport_application
+            - Regex_global_top500_391_passport_application_packets_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -100,27 +118,18 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_passport_application
-      matches:
-        - ref: Evidence_passport_application
   regexes:
     - id: Pattern_passport_application
       pattern: (?is)\b(?:passport\s+application\s+packets|travel\s+document|identity\s+document|photo\s+identification)\b
+    - id: Regex_global_top500_391_passport_application_packets_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_passport_application
       groups:
         - match_style: word
           terms:
-            - passport application packets
-            - passport
-            - application
-            - travel document
             - DFAT
-            - citizenship
-            - identity document
-            - biometric
-            - photo identification
             - consular
-            - nationality
 risk_description: >-
   Despite its composite-sounding name, this Passport application packets regex matches broad phrases such as passport application packets, travel document, identity document, or photo identification. It does not require an application form, applicant, passport number, photograph, supporting certificate, or assembled packet, so ordinary guidance and document checklists can trigger it. A genuine completed packet would expose a rich identity bundle suitable for fraud and would be SENSITIVE, but that composite record is not established by the detector. Risk 5 and OFFICIAL therefore assess the normal concept hit while making confirmed populated packet contents the next-classification threshold.
 sensitivity_labels:
@@ -152,8 +161,11 @@ references:
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires an independent populated person/client field (Regex_global_top500_391_passport_application_packets_record_structure), or one remaining corroborative term (DFAT, consular); 85 requires 2 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (citizenship, biometric, nationality). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-

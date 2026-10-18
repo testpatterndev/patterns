@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Building access badge location logs
 slug: global-top500-056-building-access-badge-location-logs
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -47,6 +47,12 @@ test_cases:
       description: Alternative topic phrase match
     - value: access log
       description: Additional topic phrase match
+    - value: |-
+        Building access: Recorded
+        Name: Avery Teston
+        Date of birth: 14/02/1988
+      description: Populated attribute field with a linked record field (85 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -54,6 +60,17 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: address mac
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Building access:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about building access are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
+    - value: |-
+        Building access:
+        Name: Avery Teston
+      description: "Record with the attribute label but no value: the label must not corroborate itself (discovery only)"
 false_positives:
   - description: Common words and phrases related to building access badge location logs appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -75,20 +92,17 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_building_access_badge
+      id_match: Regex_global_top500_056_building_access_badge_location_logs_populated_label
       matches:
-        - ref: Evidence_building_access_badge
-          min_count: 2
-          unique_results: true
+        - ref: Regex_global_top500_056_building_access_badge_location_logs_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
-      id_match: Pattern_building_access_badge
+      id_match: Regex_global_top500_056_building_access_badge_location_logs_populated_label
       matches:
-        - ref: Evidence_building_access_badge
         - type: any
           min_matches: 0
           max_matches: 0
@@ -97,31 +111,17 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_building_access_badge
-      matches:
-        - ref: Evidence_building_access_badge
   regexes:
     - id: Pattern_building_access_badge
       pattern: >-
         (?is)\b(?:building\s+access|badge\s+location|access\s+badge|access\s+log|swipe\s+card|entry\s+log|security\s+badge|door\s+access|badge\s+reader|access\s+control|building\s+entry|proximity\s+card)\b
     - id: Pattern_au_top500_056_building_access_badge_location_logs_label_context
       pattern: (?i)\b(?:building\s+access\s+badge\s+location\s+logs)\b
+    - id: Regex_global_top500_056_building_access_badge_location_logs_populated_label
+      pattern: (?i)\b(?:\b(?:building\s+access|badge\s+location|access\s+badge|access\s+log|swipe\s+card|entry\s+log|security\s+badge|door\s+access|badge\s+reader|access\s+control|building\s+entry|proximity\s+card)\b)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_global_top500_056_building_access_badge_location_logs_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
-    - id: Evidence_building_access_badge
-      groups:
-        - match_style: word
-          terms:
-            - building access
-            - badge location
-            - access badge
-            - access log
-            - swipe card
-            - entry log
-            - security badge
-            - door access
-            - badge reader
-            - access control
-            - building entry
-            - proximity card
     - id: Keyword_au_top500_056_building_access_badge_location_logs_domain_context
       groups:
         - match_style: word
@@ -156,8 +156,11 @@ classification:
       Generic Medium and Medium Personal-Privacy handling fit badge movement logs that expose an individual's workplace
       presence and access patterns with direct safety implications.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now uses the populated field as its primary (Regex_global_top500_056_building_access_badge_location_logs_populated_label: the label followed by a value); 85 requires the populated field plus a populated person/client field (Regex_global_top500_056_building_access_badge_location_logs_record_structure). Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Removed evidence no longer referenced by any tier (Evidence_building_access_badge). Added a populated positive and empty-form / policy-guidance decoys, plus a record with the label but no value.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-

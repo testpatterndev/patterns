@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Firmware internals
 slug: global-top500-212-firmware-internals
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -44,6 +44,13 @@ test_cases:
       description: Alternative topic phrase match
     - value: microcontroller code
       description: Additional topic phrase match
+    - value: |-
+        Firmware internals
+        Hostname: app-prd-01.corp.local
+        username: svc_deploy
+        Source 10.20.30.40 tcp/443
+      description: Populated technical artefact reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -51,6 +58,13 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: algorithm schematic
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Firmware internals:
+        Hostname:
+        username:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about firmware internals are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to firmware internals appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -74,7 +88,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_firmware_internals
       matches:
-        - ref: Evidence_firmware_internals
+        - ref: Regex_global_top500_212_firmware_internals_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -85,7 +99,11 @@ purview:
     - confidence_level: 75
       id_match: Pattern_firmware_internals
       matches:
-        - ref: Evidence_firmware_internals
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_firmware_internals
+            - Regex_global_top500_212_firmware_internals_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -94,26 +112,17 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_firmware_internals
-      matches:
-        - ref: Evidence_firmware_internals
   regexes:
     - id: Pattern_firmware_internals
       pattern: (?is)\b(?:firmware\s+internals|firmware\s+source|embedded\s+software|microcontroller\s+code|intellectual\s+property|proprietary\s+firmware|flash\s+memory|device\s+firmware|firmware\s+binary)\b
+    - id: Regex_global_top500_212_firmware_internals_record_structure
+      pattern: (?i)\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:/\d{1,2})?\b|\bCVE-\d{4}-\d{4,7}\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:tcp|udp)\s*/?\s*\d{2,5}\b|\b(?:port|dport|sport)\s*[:=]?\s*\d{2,5}\b|\b(?:hostname|host|asset\s+ID|device\s+ID|sAMAccountName|UPN|username|account\s+name)\s*:\s*(?!_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9][A-Za-z0-9._\\@-]{2,63}
   keywords:
     - id: Evidence_firmware_internals
       groups:
         - match_style: word
           terms:
-            - firmware internals
-            - firmware source
-            - embedded software
             - bootloader
-            - microcontroller code
-            - intellectual property
-            - proprietary firmware
-            - flash memory
-            - device firmware
-            - firmware binary
 risk_description: >-
   The detector identifies firmware internals, firmware source, embedded software, microcontroller code, flash memory, device firmware, binary, or proprietary-firmware terminology. A genuine internal firmware file can reveal boot logic, hardware controls, update paths, hidden interfaces, and exploitable defects, enabling cloning or attacks against the product owner and device users. Public firmware images, open embedded projects, and general documentation can also match, while the ordinary proprietary unit remains one product or component. Risk 8 supports SENSITIVE InfoTech; PROTECTED would require critical-device control, embedded production secrets, or system-scale exploitation capable of significant damage.
 sensitivity_labels:
@@ -137,8 +146,11 @@ classification:
       Medium InfoTech handling reflects firmware detail that aids exploitation of a product and its users. It is not
       High unless the firmware controls critical devices or carries signing secrets.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires an independent populated technical artefact field (Regex_global_top500_212_firmware_internals_record_structure), or one remaining corroborative term (bootloader); 85 requires 2 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-

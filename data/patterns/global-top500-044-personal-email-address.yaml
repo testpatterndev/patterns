@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Personal email address
 slug: global-top500-044-personal-email-address
-version: 1.4.3
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -53,6 +53,12 @@ test_cases:
       description: Alternative topic phrase match
     - value: email contact
       description: Additional topic phrase match
+    - value: |-
+        Personal email address: Recorded
+        Name: Avery Teston
+        Date of birth: 14/02/1988
+      description: Populated attribute field with a linked record field (85 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -64,6 +70,17 @@ test_cases:
       description: Role-mailbox decoy — a business support label must not reach the enforcing personal-email tiers
     - value: Sales team shared inbox email address for correspondence.
       description: Shared-inbox decoy — corporate email-address label must not reach the enforcing personal-email tiers
+    - value: |-
+        Personal email address:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about personal email address are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
+    - value: |-
+        Personal email address:
+        Name: Avery Teston
+      description: "Record with the attribute label but no value: the label must not corroborate itself (discovery only)"
 false_positives:
   - description: Common words and phrases related to personal email address appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -85,11 +102,17 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_personal_email
+      id_match: Regex_global_top500_044_personal_email_address_populated_label
       matches:
-        - ref: Evidence_personal_email
-          min_count: 2
-          unique_results: true
+        - ref: Regex_global_top500_044_personal_email_address_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_top500_044_personal_email_address_populated_label
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -107,8 +130,6 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_personal_email
-      matches:
-        - ref: Evidence_personal_email
     - confidence_level: 65
       id_match: Pattern_email_generic_label
       discovery_only: true
@@ -120,23 +141,18 @@ purview:
       pattern: (?is)\b(?:email\s+contact|email\s+address|correspondence\s+email|contact\s+email)\b
     - id: Pattern_au_top500_044_personal_email_address_label_context
       pattern: (?i)\b(?:personal\s+email\s+address)\b
+    - id: Regex_global_top500_044_personal_email_address_populated_label
+      pattern: (?i)\b(?:\b(?:personal\s+email\s+address|personal\s+email|private\s+email)\b)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_global_top500_044_personal_email_address_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_personal_email
       groups:
         - match_style: word
           terms:
-            - personal email address
-            - personal email
-            - private email
-            - email contact
-            - email address
-            - inbox
             - gmail
-            - outlook
             - hotmail
             - yahoo
-            - correspondence email
-            - contact email
     - id: Keyword_au_top500_044_personal_email_address_domain_context
       groups:
         - match_style: word
@@ -168,8 +184,11 @@ classification:
       Low with Low handling fits an email-label signal; even a populated private address supports phishing but provides
       no mailbox access.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now uses the populated field as its primary (Regex_global_top500_044_personal_email_address_populated_label: the label followed by a value), or the phrase plus one remaining corroborative term (gmail, hotmail, yahoo); 85 requires the populated field plus a populated person/client field (Regex_global_top500_044_personal_email_address_record_structure). Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (email contact, inbox, outlook, correspondence email, contact email). Added a populated positive and empty-form / policy-guidance decoys, plus a record with the label but no value.'
   - version: 1.4.3
     date: '2026-09-25'
     description: >-

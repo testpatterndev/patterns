@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Breach notification draft communications
 slug: global-top500-176-breach-notification-draft-communications
-version: 1.2.4
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -42,6 +42,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: notifiable data breach
       description: Additional topic phrase match
+    - value: |-
+        Breach notification draft communications
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Breach notification draft communications - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -49,6 +57,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: board policy
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Breach notification draft communications:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about breach notification draft communications are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: >-
       Common words and phrases related to breach notification draft communications appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal
@@ -73,11 +90,23 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_breach_notification_drafts
+      matches:
+        - ref: Regex_global_top500_176_breach_notification_draft_communications_record_structure
+          min_count: 3
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_breach_notification_drafts
       matches:
-        - ref: Pattern_global_top500_176_breach_notification_draft_communications_label_context
-        - ref: Keyword_global_top500_176_breach_notification_draft_communications_domain_context
+        - ref: Regex_global_top500_176_breach_notification_draft_communications_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -87,7 +116,6 @@ purview:
       discovery_only: true
       id_match: Regex_breach_notification_drafts
       matches:
-        - ref: Keyword_breach_notification_drafts
         - type: any
           min_matches: 0
           max_matches: 0
@@ -97,36 +125,8 @@ purview:
     - id: Regex_breach_notification_drafts
       pattern: >-
         (?is)\b(?:breach\s+notification\s+draft\s+communications|breach\s+notification|data\s+breach|notifiable\s+data\s+breach|affected\s+individuals|notification\s+letter|breach\s+assessment|incident\s+response|privacy\s+commissioner|mandatory\s+reporting|eligible\s+data\s+breach|remediation\s+steps)\b
-    - id: Pattern_global_top500_176_breach_notification_draft_communications_label_context
-      pattern: (?i)\b(?:breach\s+notification\s+draft\s+communications)\b
-  keywords:
-    - id: Keyword_breach_notification_drafts
-      groups:
-        - match_style: word
-          terms:
-            - breach notification draft communications
-            - breach notification
-            - data breach
-            - notifiable data breach
-            - affected individuals
-            - notification letter
-            - breach assessment
-            - incident response
-            - privacy commissioner
-            - mandatory reporting
-            - eligible data breach
-            - remediation steps
-      strength: specific
-    - id: Keyword_global_top500_176_breach_notification_draft_communications_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - breach notification draft communications
-            - breach
-            - notification
-            - draft
-            - communications
-      strength: domain
+    - id: Regex_global_top500_176_breach_notification_draft_communications_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
 risk_description: >-
   This concept detector recognizes breach notifications, notifiable data breaches, affected individuals, notification letters, privacy commissioners, assessments, reporting, and remediation steps rather than proving that a draft or actual incident exists. A real draft can prematurely expose incident scope, affected groups, legal conclusions, response gaps, and unverified wording, causing alarm, regulatory prejudice, phishing opportunities, or inconsistent public messaging. The ordinary unit is one breach and its affected people and organization, while statutory guidance, response plans, and model letters are frequent benign contexts. Risk 8 and SENSITIVE reflect serious contained incident and privacy harm; PROTECTED would require a critical service, protected operation, life safety, or significant damage.
 sensitivity_labels:
@@ -155,8 +155,11 @@ frameworks:
   - ISO 27001
   - ISO 27701
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.3.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_176_breach_notification_draft_communications_record_structure); 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Removed evidence no longer referenced by any tier (Keyword_breach_notification_drafts, Keyword_global_top500_176_breach_notification_draft_communications_domain_context, Pattern_global_top500_176_breach_notification_draft_communications_label_context). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.2.4
     date: '2026-09-25'
     description: >-

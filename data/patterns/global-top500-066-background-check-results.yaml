@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Background check results
 slug: global-top500-066-background-check-results
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -51,6 +51,13 @@ test_cases:
       description: Alternative topic phrase match
     - value: security clearance
       description: Additional topic phrase match
+    - value: |-
+        Background check
+        Name: Avery Teston
+        Date of birth: 14/02/1988
+        Client number: C4471820
+      description: Populated person/client record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -58,6 +65,13 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: employee interview
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Background check:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about background check are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to background check results appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -81,7 +95,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_background_check
       matches:
-        - ref: Evidence_background_check
+        - ref: Regex_global_top500_066_background_check_results_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -92,7 +106,11 @@ purview:
     - confidence_level: 75
       id_match: Pattern_background_check
       matches:
-        - ref: Evidence_background_check
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_background_check
+            - Regex_global_top500_066_background_check_results_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -101,31 +119,21 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_background_check
-      matches:
-        - ref: Evidence_background_check
   regexes:
     - id: Pattern_background_check
       pattern: >-
         (?is)\b(?:background\s+check|police\s+check|criminal\s+history|security\s+clearance|reference\s+check|pre[\s-]+employment\s+screening|character\s+check|national\s+police\s+check|working\s+with\s+children|fit\s+and\s+proper)\b
     - id: Pattern_au_top500_066_background_check_results_label_context
       pattern: (?i)\b(?:background\s+check\s+results)\b
+    - id: Regex_global_top500_066_background_check_results_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_background_check
       groups:
         - match_style: word
           terms:
-            - background check
-            - police check
-            - criminal history
-            - security clearance
-            - reference check
-            - pre-employment screening
             - vetting
-            - character check
-            - national police check
-            - working with children
             - WWCC
-            - fit and proper
     - id: Keyword_au_top500_066_background_check_results_domain_context
       groups:
         - match_style: word
@@ -165,8 +173,11 @@ references:
   - title: "OAIC - Notifiable Data Breaches scheme"
     url: https://www.oaic.gov.au/privacy/notifiable-data-breaches
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires an independent populated person/client field (Regex_global_top500_066_background_check_results_record_structure), or one remaining corroborative term (vetting, WWCC); 85 requires 2 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-
