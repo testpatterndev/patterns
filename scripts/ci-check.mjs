@@ -116,6 +116,14 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
     if (rc !== undefined && !PURVIEW_LEVELS.includes(rc)) errors.push(`${p.slug ?? f}: purview.recommended_confidence must be 65|75|85 (low|medium|high), got ${rc}`)
     for (const tier of p.purview.pattern_tiers ?? []) if (!PURVIEW_LEVELS.includes(tier.confidence_level)) errors.push(`${p.slug ?? f}: pattern_tiers confidence_level must be 65|75|85 (low|medium|high), got ${tier.confidence_level}`)
   }
+  // Purview has no tier-level count and the exporter ignores one, so a count on the tier
+  // would silently ship looser than written. Counts belong on a match node: to require N
+  // primary hits, add { ref: <id_match>, min_count: N, unique_results: true } to matches.
+  for (const [i, tier] of (p.purview?.pattern_tiers ?? []).entries()) {
+    for (const key of ['min_count', 'unique_results']) {
+      if (key in tier) errors.push(`${p.slug ?? f}: pattern_tiers[${i}].${key} is not exported; put it on a match node (e.g. { ref: <id_match>, ${key}: ... })`)
+    }
+  }
 
   const idMatchIds = new Set((p.purview?.pattern_tiers ?? []).map(t => t.id_match).filter(Boolean))
   const regexes = []

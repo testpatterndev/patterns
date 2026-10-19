@@ -236,7 +236,7 @@ function groupMatchedCount(node, text, reg) {
   for (const ref of node.refs ?? []) if (matches(reg.get(ref), text) === true) count++
   for (const child of node.children ?? []) {
     if (isAnyGroup(child)) { if (nodeSatisfied(child, text, reg)) count++ }
-    else if (child?.ref && matches(reg.get(child.ref), text) === true) count++
+    else if (child?.ref && ((child.min_count ?? 1) > 1 ? nodeSatisfied(child, text, reg) : matches(reg.get(child.ref), text) === true)) count++
   }
   return count
 }
@@ -302,14 +302,6 @@ function tierCanPass(tier, text, reg, filters) {
 function tierWouldFire(tier, text, reg, filters) {
   if (!idMatchSurvives(tier, text, reg, filters)) return false
   if (filters.docLevel.some((trips) => trips(text))) return false
-  // min_count/unique_results on the tier itself gate the id_match occurrence count.
-  if (tier.min_count !== undefined && tier.min_count > 1) {
-    const total = idMatchIds(tier)
-      .map((id) => matchCount(reg.get(id), text, tier.unique_results === true))
-      .filter((c) => c !== null)
-      .reduce((a, b) => a + b, 0)
-    if (total < tier.min_count) return false
-  }
   for (const node of tierNodes(tier)) if (!nodeSatisfied(node, text, reg)) return false
   return true
 }
