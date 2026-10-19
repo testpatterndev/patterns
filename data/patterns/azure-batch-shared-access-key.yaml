@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Azure Batch Shared Access Key
 slug: azure-batch-shared-access-key
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -80,16 +80,6 @@ purview:
     - confidence_level: 85
       id_match: Regex_azure_batch_shared_access_key
       matches:
-        - ref: Pattern_azure_batch_shared_access_key_label_context
-        - ref: Keyword_azure_batch_shared_access_key_domain_context
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_azure_batch_shared_access_key
-      matches:
         - ref: Keyword_azure_batch
         - type: any
           min_matches: 0
@@ -109,17 +99,12 @@ purview:
   regexes:
     - id: Regex_azure_batch_shared_access_key
       pattern: (?i)(?:AccountKey|SharedAccessKey|batch[._-]?key)\s*=\s*[A-Za-z0-9+/\s]{43,92}={0,2}
-    - id: Pattern_azure_batch_shared_access_key_label_context
-      pattern: (?i)\b(?:azure\s+batch\s+shared\s+access\s+key|azure|batch|shared|access|key)\b
   keywords:
     - id: Keyword_azure_batch
       groups:
         - match_style: word
           terms:
-            - batch
             - Azure Batch
-            - AccountKey
-            - SharedAccessKey
             - batch account
             - batch service
             - api key
@@ -129,17 +114,6 @@ purview:
             - connection string
             - shared key
       strength: specific
-    - id: Keyword_azure_batch_shared_access_key_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - azure batch shared access key
-            - azure
-            - batch
-            - shared
-            - access
-            - key
-      strength: domain
 risk_rating: 10
 risk_description: >-
   The pattern detects an 88-character Base64 Azure Batch AccountKey or SharedAccessKey in Batch configuration context. Combined with the account name and endpoint commonly stored nearby, the key can authenticate account-level requests, manipulate pools and jobs, run unauthorised workloads, and expose task outputs. The affected party is the owner of the Batch account and every workload relying on that account, with the credential conferring broad control rather than access to one job. Risk 10 PROTECTED is retained because a live account key can create broad privileged compute compromise and major operational or financial damage; placeholders and keys for other Azure services are precision issues, not reductions in true-positive harm.
@@ -168,8 +142,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-batch-shared-access-key
     title: Azure Batch shared access key entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-20'
+    description: 'Self-corroboration fix (85 needs independent context, as #80 intended for populated-label IdMatches): Purview counts a supporting match that sits inside the IdMatch span when a word break separates it (dev-tenant run 2026-10-19; ":" and "_" break words, "=" does not), so a single labelled value reached 85 on its own label. Removed the generated 85 tier whose evidence was the detector name split into words (Pattern_azure_batch_shared_access_key_label_context, Keyword_azure_batch_shared_access_key_domain_context); those words sit inside the IdMatch label, and the definitions are now unreferenced and removed. Removed from Keyword_azure_batch the terms that match inside the IdMatch label: batch, AccountKey, SharedAccessKey. The labelled value alone stays at its lower tier; 85 now needs context outside the label.'
   - version: 1.4.0
     date: '2026-10-19'
     description: 'Add a 75 tier on the populated label alone (Regex_azure_batch_shared_access_key, plus the noise exclusion). The 85 tiers relied on label keywords that sit inside the IdMatch, where "=" (or "$") joins them to the value, so Purview never matched them (dev-tenant word-break probe 2026-10-19, testpatterndev/testpattern.dev#30) and these values reached no enforcing tier. A populated label is 75 under the self-corroboration convention; 85 still needs independent context.'
