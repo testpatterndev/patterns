@@ -6,13 +6,55 @@
 // same day must stay clean — the check exists to gate real uploads, not to enforce style.
 // Wired as `npm run test:purview-banned`.
 
-import { purviewBanned } from '../purview-banned.mjs'
+import { purviewBanned, CLASS_DOT_MULTI, CLASS_GROUP_QUANT, CLASS_UNCLOSED_PAREN } from '../purview-banned.mjs'
 
 const GROUP_QUANT = 'unbounded group quantifier — (...)+ / (...)* / (...){n,}'
 const LB_SPACE = 'literal space in lookbehind — the exporter rewrites it to \\s+ (variable length); write [ ]'
 const LIT = (lit) => `literal '${lit}' in regex text — Purview rejects it anywhere, even inside [...]`
 
 const cases = [
+  // ── Character-class members read without the brackets (live upload refused 2026-09-28) ──
+  {
+    name: 'dfv workplace-support class [..@.()+ -]{3,40} after a lone ( class (refused)',
+    src: '(?i)\\b(?:new\\s+phone\\s*[:#]\\s*(?!n/?a\\b|_{2,}|\\[|<)[A-Z0-9+(][A-Za-z0-9@.()+ -]{3,40}|review\\s+date)',
+    expect: [LIT(')+'), CLASS_DOT_MULTI, CLASS_GROUP_QUANT, CLASS_UNCLOSED_PAREN],
+  },
+  {
+    name: 'combolist v1 [\\w.+-] reads as .+ (refused 2026-07-09)',
+    src: '(?<![\\w.+-])[\\w.+-]{1,64}@[\\w.-]{1,253}\\.[a-zA-Z]{2,24}',
+    expect: [LIT('.+'), CLASS_DOT_MULTI],
+  },
+  {
+    name: 'lone ( inside a class',
+    src: '\\b[A-Z0-9+(][A-Z0-9]{4,12}\\b',
+    expect: [CLASS_UNCLOSED_PAREN],
+  },
+  {
+    name: 'rewritten dfv classes: reordered members, escaped lone (',
+    src: '(?i)\\b(?:new\\s+phone\\s*[:#]\\s*(?!n/?a\\b|_{2,}|\\[|<)[A-Z0-9+\\(][A-Za-z0-9@+ ().-]{3,40}|review\\s+date)',
+    expect: [],
+  },
+  {
+    name: 'dot and both parens in a range-quantified class inside a group (uploaded fine)',
+    src: "(?i)\\b(?:field|entry)(?:[ \\t]{1,3}[A-Za-z0-9 /&_'().-]{2,60})\\s*:",
+    expect: [],
+  },
+  {
+    name: 'lone ) inside a class (uploaded fine)',
+    src: '(?:\\s*\\([^)]{1,20}\\))?\\s*[:#]\\s*[A-Z][A-Za-z\'-]{1,30}',
+    expect: [],
+  },
+  {
+    name: 'combolist v2 [A-Za-z0-9._%+-] (uploaded fine)',
+    src: '[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\\.[A-Za-z]{2,24}:[^\\s:]{4,128}',
+    expect: [],
+  },
+  {
+    name: 'escaped parens inside a class stay clean',
+    src: '(?<=[\\s:=,"\'\\)\\(])[0-9A-F]{10}\\b',
+    expect: [],
+  },
+
   // ── Unbounded group quantifiers: live-rejected shapes ──
   {
     name: 'gcp-service-account-key newline group (rejected 2026-07-17)',
@@ -158,22 +200,22 @@ const cases = [
   {
     name: 'au-family-domestic-violence-leave-record Regex_dfv_workplace_support: )+ inside [A-Za-z0-9@.()+ -] (rejected live)',
     src: "(?i)\\b(?:(?:work\\s+)?(?:location|site|office|workplace|team)\\s+(?:changed|relocated|transferred|moved)(?:\\s+(?:to|from))?\\s*[:#-]?\\s*(?!(?:n/?a|unknown|tbc|tba|the|a|an|any|where)\\b|_{2,}|\\[|<)[A-Z0-9][A-Za-z0-9'-]{2,30}|(?:new|changed|unlisted)\\s+(?:work\\s+)?(?:email|phone|telephone|mobile|extension)(?:\\s+(?:number|address))?\\s*[:#]\\s*(?!(?:n/?a|unknown|tbc|tba)\\b|_{2,}|\\[|<)[A-Z0-9+(][A-Za-z0-9@.()+ -]{3,40}|(?:hours|roster|shifts?|start\\s+time|work\\s+pattern)\\s+(?:changed|varied|adjusted)(?:\\s+(?:to|from))?\\s*[:#-]?\\s*[0-9A-Z]|flexible\\s+(?:working\\s+)?arrangements?\\s*[:#]\\s*(?!(?:n/?a|unknown|tbc|tba|the|a|an|any)\\b|_{2,}|\\[|<)[A-Z0-9][A-Za-z0-9'-]{2,40}|review\\s+date\\s*[:#-]?\\s*\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})",
-    expect: [LIT(')+')],
+    expect: [LIT(')+'), CLASS_DOT_MULTI, CLASS_GROUP_QUANT, CLASS_UNCLOSED_PAREN],
   },
   {
     name: 'global-top500-248 Evidence_package_coordinate: .+ inside [\\w.+-] (rejected live)',
     src: "\\bpkg:(?:npm|maven|pypi|nuget|gem|golang|cargo|composer)/[\\w@./%-]{2,120}@[\\w.+-]{1,40}|@?\\b[a-z0-9][\\w.-]{1,60}(?:/[\\w.-]{1,60})?@\\d{1,4}\\.\\d{1,4}\\.\\d{1,6}\\b|\\b[a-z][\\w.-]{1,60}:[a-z][\\w.-]{1,60}:\\d{1,4}\\.\\d{1,4}(?:\\.\\d{1,6})?\\b",
-    expect: [LIT('.+')],
+    expect: [LIT('.+'), CLASS_DOT_MULTI],
   },
   {
     name: 'lawful-interception-warrant intercept_record_fields: .+ inside [A-Za-z0-9/.+-]',
     src: "(?i)\\b(?:warrant\\s*(?:no\\.?|number|ref(?:erence)?|ID)|target\\s+(?:service|line|number|phone|handset|identifier|ID)|(?:intercepted|monitored)\\s+(?:service|line|number)|(?:line|session|call|product)\\s*(?:no\\.?|number|ID|ref(?:erence)?)|[AB]-party(?:\\s+(?:no\\.?|number))?|IMSI|MSISDN)\\s*[:#]\\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\\s+recorded|the|a|an|any|all|each|see|refer)\\b|_{2,}|\\[|<)[A-Z0-9+][A-Za-z0-9/.+-]{1,30}",
-    expect: [LIT('.+')],
+    expect: [LIT('.+'), CLASS_DOT_MULTI],
   },
   {
     name: 'literal backslash then .+ in a class still flags ([\\\\.+])',
     src: '[\\\\.+]{1,4}',
-    expect: [LIT('.+')],
+    expect: [LIT('.+'), CLASS_DOT_MULTI],
   },
   { name: 'escaped dot before + in a class stays clean', src: '[\\w\\.+-]{1,40}', expect: [] },
   { name: 'escaped + after ) in a class stays clean', src: '[A-Za-z0-9@.()\\+ -]{3,40}', expect: [] },
@@ -182,7 +224,7 @@ const cases = [
   { name: 'dot last in a quantified class stays clean', src: '[a-z0-9.]+@[\\w.-]{1,60}', expect: [] },
   {
     name: 'fixed au-family class [A-Za-z0-9+@.() -] stays clean',
-    src: '[A-Z0-9+(][A-Za-z0-9+@.() -]{3,40}',
+    src: '[A-Z0-9+\\(][A-Za-z0-9+@.() -]{3,40}',
     expect: [],
   },
   { name: 'fixed 248 class [\\w+.-] stays clean', src: '@[\\w+.-]{1,40}', expect: [] },

@@ -36,6 +36,22 @@
 // confirmed-rejected shapes (unbounded GROUP quantifiers; dot-like unbounded \S) and leave
 // bounded group quantifiers alone; catalog impact of both bans is zero as of 2026-07-17
 // (1685 patterns).
+//
+// MEASURED 2026-09-28: the validator does not honour CHARACTER-CLASS brackets. A live upload
+// was refused over [A-Za-z0-9@.()+ -]{3,40}; it has no wildcard and no quantified group, but
+// read without the brackets it contains `.()+`, i.e. `.+` and `()+`. That reading may also
+// account for the murky middle above (never isolated): combolist v1's [\w.+-] reads as `.+`,
+// and v2's [A-Za-z0-9._%+-] was accepted. [A-Za-z0-9 /&_'().-]{2,60} inside a group was
+// accepted in live uploads too (its parens are followed by `.`, never by a quantifier), so the
+// class checks below look only at the character sequence inside each class. Against every
+// Regex body in packages that applied
+// successfully (1214), they flag nothing. The unclosed `(` check is a conservative extra: the
+// refused regex had one, no accepted upload does, and one rejection cannot say whether it
+// mattered. A lone `)` in a class (`[^)]`) was accepted and is not flagged.
+
+export const CLASS_DOT_MULTI = 'class-blind dot multi-match — [.+] / [.()+] reads as .+'
+export const CLASS_GROUP_QUANT = 'class-blind group quantifier — [()+] reads as ()+'
+export const CLASS_UNCLOSED_PAREN = 'unclosed ( inside a character class — escape it as \\('
 
 export const stripClasses = (src) => src.replace(/\[(?:[^\]\\]|\\.)*\]/g, '[]')
 
@@ -117,5 +133,11 @@ export function purviewBanned(src) {
     else if (c === ')') depth = Math.max(0, depth - 1)
   }
   issues.push(...literalRepeaters(src))
+  // Character-class members read without the brackets (see the 2026-09-28 header note). Escaped
+  // members are neutralized first, so `[\(\)+]` and `[\w\.]` stay clean.
+  const bodies = [...src.replace(/\\./g, 'xx').matchAll(/\[\^?\]?[^\]]*\]/g)].map(([cls]) => cls.slice(1, -1))
+  if (bodies.some(b => /\.[()]*(?:[*+]|\{\d+,\d*\})/.test(b))) issues.push(CLASS_DOT_MULTI)
+  if (bodies.some(b => /\)(?:[*+]|\{\d+,\})/.test(b))) issues.push(CLASS_GROUP_QUANT)
+  if (bodies.some(b => /\([^)]*$/.test(b))) issues.push(CLASS_UNCLOSED_PAREN)
   return issues
 }
