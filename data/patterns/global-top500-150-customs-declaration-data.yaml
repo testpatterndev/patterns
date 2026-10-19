@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Customs declaration data
 slug: global-top500-150-customs-declaration-data
-version: 1.4.4
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -46,6 +46,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: tariff classification
       description: Additional topic phrase match
+    - value: |-
+        Customs declaration
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Customs declaration - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -53,6 +61,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: procurement inventory
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Customs declaration:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about customs declaration are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to customs declaration data appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -76,7 +93,18 @@ purview:
     - confidence_level: 85
       id_match: Pattern_customs_declaration
       matches:
-        - ref: Evidence_customs_declaration
+        - ref: Regex_global_top500_150_customs_declaration_data_record_structure
+          min_count: 3
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_customs_declaration
+      matches:
+        - ref: Regex_global_top500_150_customs_declaration_data_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -88,6 +116,7 @@ purview:
       id_match: Pattern_customs_declaration
       matches:
         - ref: Evidence_customs_declaration
+        - ref: Regex_global_top500_150_customs_declaration_data_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -96,29 +125,20 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_customs_declaration
-      matches:
-        - ref: Evidence_customs_declaration
   regexes:
     - id: Pattern_customs_declaration
       pattern: (?is)\b(?:customs\s+declaration|import\s+declaration|export\s+declaration|tariff\s+classification|customs\s+duty|border\s+force|goods\s+declaration|country\s+of\s+origin|harmonised\s+tariff)\b
     - id: Pattern_au_top500_150_customs_declaration_data_label_context
       pattern: (?i)\b(?:customs\s+declaration\s+data)\b
+    - id: Regex_global_top500_150_customs_declaration_data_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
   keywords:
     - id: Evidence_customs_declaration
       groups:
         - match_style: word
           terms:
-            - customs declaration
-            - import declaration
-            - export declaration
             - text: ABF
               case_sensitive: true
-            - tariff classification
-            - customs duty
-            - border force
-            - goods declaration
-            - country of origin
-            - harmonised tariff
       strength: specific
     - id: Keyword_au_top500_150_customs_declaration_data_domain_context
       groups:
@@ -153,8 +173,11 @@ classification:
       and shipment facts. High is reserved for exceptional consignments whose disclosure creates significant safety,
       national, or critical-service harm.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_150_customs_declaration_data_record_structure), or one remaining corroborative term plus one field; 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.4.4
     date: '2026-09-25'
     description: >-

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Market entry strategy papers
 slug: global-top500-190-market-entry-strategy-papers
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -45,6 +45,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: new market
       description: Additional topic phrase match
+    - value: |-
+        Market entry strategy
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Market entry strategy - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -52,6 +60,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: merger fundraising
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Market entry strategy:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about market entry strategy are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to market entry strategy papers appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -75,7 +92,18 @@ purview:
     - confidence_level: 85
       id_match: Pattern_market_entry_strategy
       matches:
-        - ref: Evidence_market_entry_strategy
+        - ref: Regex_global_top500_190_market_entry_strategy_papers_record_structure
+          min_count: 3
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_market_entry_strategy
+      matches:
+        - ref: Regex_global_top500_190_market_entry_strategy_papers_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -87,6 +115,7 @@ purview:
       id_match: Pattern_market_entry_strategy
       matches:
         - ref: Evidence_market_entry_strategy
+        - ref: Regex_global_top500_190_market_entry_strategy_papers_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -95,30 +124,18 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_market_entry_strategy
-      matches:
-        - ref: Evidence_market_entry_strategy
   regexes:
     - id: Pattern_market_entry_strategy
       pattern: >-
         (?is)\b(?:market\s+entry\s+strategy|market\s+entry|market\s+expansion|new\s+market|market\s+penetration|geographic\s+expansion|market\s+assessment|competitive\s+landscape|target\s+market|market\s+sizing|entry\s+barriers)\b
+    - id: Regex_global_top500_190_market_entry_strategy_papers_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
   keywords:
     - id: Evidence_market_entry_strategy
       groups:
         - match_style: word
           terms:
-            - market entry strategy
-            - market entry
             - go-to-market
-            - market expansion
-            - new market
-            - market penetration
-            - geographic expansion
-            - market assessment
-            - competitive landscape
-            - target market
-            - market sizing
-            - entry barriers
-            - confidential
 risk_description: >-
   This regex identifies market-entry strategy, expansion plans, new-market analysis, launch sequencing, and route-to-market language, aiming at an internal decision paper rather than public market research. A genuine strategy can reveal target geographies or segments, investment limits, channel choices, pricing assumptions, regulatory barriers, and planned timing, allowing competitors to pre-empt entry or counterparties to demand better terms. The medium-confidence detector may also match published consultancy reports and generic business-school material. Risk 8 and SENSITIVE Financial reflect serious contained competitive harm; PROTECTED would require a nationally strategic market action or compromise capable of significant damage.
 sensitivity_labels:
@@ -143,8 +160,11 @@ classification:
       Medium with Medium Personal-Privacy handling suits a confidential market initiative and its identifiable partners
       or decision-makers. High is reserved for protected policy or systemically consequential expansion plans.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_190_market_entry_strategy_papers_record_structure), or one remaining corroborative term plus one field; 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (confidential). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-

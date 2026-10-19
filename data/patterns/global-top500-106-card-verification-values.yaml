@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Card verification values
 slug: global-top500-106-card-verification-values
-version: 1.5.3
+version: 1.6.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -47,6 +47,12 @@ test_cases:
       description: Case-insensitive topic phrase match
     - value: card validation
       description: Additional topic phrase match
+    - value: |-
+        Card verification value: Recorded
+        Payee: Avery Teston
+        Account number: 12345678
+      description: Populated attribute field with a linked record field (85 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -58,6 +64,18 @@ test_cases:
       description: Generic verification-code wording demoted out of the primary - no card relation
     - value: PCI DSS cardholder policy update
       description: PCI and cardholder-data wording demoted out of the primary - corroborative evidence only
+    - value: |-
+        Card verification value:
+        Payee:
+        Account name:
+        Account number:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about card verification value are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
+    - value: |-
+        Card verification value:
+        Payee: Avery Teston
+      description: "Record with the attribute label but no value: the label must not corroborate itself (discovery only)"
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -77,11 +95,17 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_card_verification_values
+      id_match: Regex_global_top500_106_card_verification_values_populated_label
       matches:
-        - ref: Evidence_card_verification_values
-          min_count: 2
-          unique_results: true
+        - ref: Regex_global_top500_106_card_verification_values_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_top500_106_card_verification_values_populated_label
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -99,31 +123,27 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_card_verification_values
-      matches:
-        - ref: Evidence_card_verification_values
   regexes:
     - id: Pattern_card_verification_values
       pattern: (?is)\b(?:card\s+verification\s+value|card\s+security\s+code|card\s+validation)\b
+    - id: Regex_global_top500_106_card_verification_values_populated_label
+      pattern: (?i)\b(?:\b(?:card\s+verification\s+value|card\s+security\s+code|card\s+validation)\b)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_global_top500_106_card_verification_values_record_structure
+      pattern: (?i)\b(?:payee|supplier|vendor|creditor|beneficiary|account\s+name|BSB|account\s+(?:no\.?|number)|invoice\s+(?:no\.?|number)|remittance\s+(?:no\.?|number|ref(?:erence)?)|payment\s+(?:ref(?:erence)?|date)|amount\s+paid)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_card_verification_values
       groups:
         - match_style: word
           terms:
-            - card verification value
             - text: CVV
               case_sensitive: true
             - text: CVC
               case_sensitive: true
             - text: CID
               case_sensitive: true
-            - card security code
-            - verification code
-            - card validation
             - PCI DSS
             - cardholder data
-            - payment card
             - card-not-present
-            - three-digit code
       strength: specific
 risk_description: >-
   The regex recognises card-verification-value, card-security-code, verification-code, and card-validation phrases with financial context rather than parsing a three- or four-digit CVV. A genuine document containing a CVV could enable card-not-present fraud when paired with a PAN, but the normal match supplies neither the code nor the card account. The affected cardholder therefore faces little direct harm from the phrase alone, and PCI guidance, forms, and payment documentation are expected benign sources. Risk 4 OFFICIAL reflects that topic-level correlation value; SENSITIVE would require an actual verification value linked to card data.
@@ -148,8 +168,11 @@ classification:
       Low generic handling is appropriate for contextual card-verification terminology that lacks a confirmed account,
       card number, or transaction-enabling value.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.6.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now uses the populated field as its primary (Regex_global_top500_106_card_verification_values_populated_label: the label followed by a value), or the phrase plus one remaining corroborative term (CVV, CVC, CID, PCI DSS, cardholder data, card-not-present); 85 requires the populated field plus a populated payee/account field (Regex_global_top500_106_card_verification_values_record_structure). Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (verification code, payment card, three-digit code). Added a populated positive and empty-form / policy-guidance decoys, plus a record with the label but no value.'
   - version: 1.5.3
     date: '2026-09-25'
     description: >-

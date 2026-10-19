@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Loan covenant compliance records
 slug: global-top500-137-loan-covenant-compliance-records
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -49,6 +49,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: financial covenant
       description: Additional topic phrase match
+    - value: |-
+        Loan covenant
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Loan covenant - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -56,6 +64,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: credit premium
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Loan covenant:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about loan covenant are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -77,8 +94,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_loan_covenant
       matches:
-        - ref: Evidence_loan_covenant
-          min_count: 2
+        - ref: Regex_global_top500_137_loan_covenant_compliance_records_record_structure
+          min_count: 3
           unique_results: true
         - type: any
           min_matches: 0
@@ -88,7 +105,9 @@ purview:
     - confidence_level: 75
       id_match: Pattern_loan_covenant
       matches:
-        - ref: Evidence_loan_covenant
+        - ref: Regex_global_top500_137_loan_covenant_compliance_records_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -97,27 +116,12 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_loan_covenant
-      matches:
-        - ref: Evidence_loan_covenant
   regexes:
     - id: Pattern_loan_covenant
       pattern: >-
         (?is)\b(?:loan\s+covenant|covenant\s+compliance|debt\s+covenant|financial\s+covenant|covenant\s+breach|loan\s+agreement|credit\s+facility|debt\s+service\s+coverage|leverage\s+ratio|borrower\s+obligation)\b
-  keywords:
-    - id: Evidence_loan_covenant
-      groups:
-        - match_style: word
-          terms:
-            - loan covenant
-            - covenant compliance
-            - debt covenant
-            - financial covenant
-            - covenant breach
-            - loan agreement
-            - credit facility
-            - debt service coverage
-            - leverage ratio
-            - borrower obligation
+    - id: Regex_global_top500_137_loan_covenant_compliance_records_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
 risk_description: >-
   This detector finds loan-covenant compliance records covering financial tests, breaches, waivers, and borrower performance. Disclosure can reveal that a borrower is close to default, expose lender tolerances, or give counterparties leverage before a breach is publicly known. A normal record affects a particular facility and its parties and can cause material financing or reputational harm without enabling a transfer. Risk 7 and SENSITIVE are justified; a systemic portfolio report, imminent insolvency plan, or market-sensitive issuer event could raise the consequence.
 sensitivity_labels:
@@ -148,8 +152,11 @@ references:
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_137_loan_covenant_compliance_records_record_structure); 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Removed evidence no longer referenced by any tier (Evidence_loan_covenant). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-

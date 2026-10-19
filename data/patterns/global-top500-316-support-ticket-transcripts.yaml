@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Support ticket transcripts
 slug: global-top500-316-support-ticket-transcripts
-version: 1.4.3
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -54,6 +54,13 @@ test_cases:
       description: Additional topic phrase match
     - value: "Ticket ID=HD-771\n09:14 Customer: VPN fails after MFA\n09:16 Agent: Reset the device registration\n09:22 Customer: Access restored"
       description: Ticket ID with three timestamped alternating requester/agent messages - the transcript shape that satisfies Evidence_ticket_transcript_turn for enforcement
+    - value: |-
+        Support ticket
+        Name: Avery Teston
+        Date of birth: 14/02/1988
+        Client number: C4471820
+      description: Populated person/client record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -61,6 +68,13 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: backup outage
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Support ticket:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about support ticket are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
     mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
@@ -82,10 +96,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_support_ticket
       matches:
-        - ref: Evidence_support_ticket
-          min_count: 2
-          unique_results: true
-        - ref: Evidence_ticket_transcript_turn
+        - ref: Regex_global_top500_316_support_ticket_transcripts_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -96,10 +107,7 @@ purview:
     - confidence_level: 75
       id_match: Pattern_support_ticket
       matches:
-        - ref: Evidence_support_ticket
-        - ref: Evidence_ticket_transcript_turn
-          min_count: 2
-          unique_results: true
+        - ref: Regex_global_top500_316_support_ticket_transcripts_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -108,32 +116,12 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_support_ticket
-      matches:
-        - ref: Evidence_support_ticket
   regexes:
     - id: Pattern_support_ticket
       pattern: >-
         (?is)\b(?:support\s+ticket|ticket\s+transcript|help\s+desk|service\s+desk|case\s+number|ticket\s+ID|customer\s+complaint|resolution\s+notes|incident\s+ticket|support\s+request|ticket\s+history)\b
-    - id: Evidence_ticket_transcript_turn
-      pattern: >-
-        (?i)(?:\[?\d{1,2}:\d{2}(?::\d{2})?\]?[ \t]{0,4})?\b(?:requester|customer|user|agent|support)\b[ \t]{0,4}[-:>][ \t]{0,4}\S[^\r\n]{0,160}
-  keywords:
-    - id: Evidence_support_ticket
-      groups:
-        - match_style: word
-          terms:
-            - support ticket
-            - ticket transcript
-            - help desk
-            - service desk
-            - case number
-            - ticket ID
-            - customer complaint
-            - escalation
-            - resolution notes
-            - incident ticket
-            - support request
-            - ticket history
+    - id: Regex_global_top500_316_support_ticket_transcripts_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 risk_description: >-
   The pattern recognises support-ticket, ticket-transcript, help-desk, and service-desk language, indicating a support record or transcript rather than proving that a password is present. A leaked transcript can support impersonation by revealing user identities, device details, error messages, troubleshooting steps, and internal escalation paths. Harm ordinarily centres on the user and service involved in one ticket, and an attacker still needs actionable account or system details from the surrounding content. Risk 8 SENSITIVE reflects the serious contained exposure possible in a genuine transcript; a bulk ticket corpus, privileged credentials, or broad security architecture would be needed for PROTECTED.
 sensitivity_labels:
@@ -158,8 +146,11 @@ classification:
       credential, and internal diagnostic details. High is reserved for bulk ticket exports or exceptionally
       consequential privileged cases.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires an independent populated person/client field (Regex_global_top500_316_support_ticket_transcripts_record_structure); 85 requires 2 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (escalation). Removed evidence no longer referenced by any tier (Evidence_support_ticket, Evidence_ticket_transcript_turn). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.4.3
     date: '2026-09-25'
     description: >-

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Genetic data
 slug: global-top500-019-genetic-data
-version: 1.4.4
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -51,6 +51,12 @@ test_cases:
       description: Alternative topic phrase match
     - value: genetic profile
       description: Additional topic phrase match
+    - value: |-
+        Genetic data: Recorded
+        Patient: Avery Teston
+        Date of birth: 14/02/1988
+      description: Populated attribute field with a linked record field (85 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -58,6 +64,17 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: name disability
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Genetic data:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about genetic data are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
+    - value: |-
+        Genetic data:
+        Patient: Avery Teston
+      description: "Record with the attribute label but no value: the label must not corroborate itself (discovery only)"
 false_positives:
   - description: Common words and phrases related to genetic data appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -79,11 +96,17 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_genetic_data
+      id_match: Regex_global_top500_019_genetic_data_populated_label
       matches:
-        - ref: Evidence_genetic_data
-          min_count: 2
-          unique_results: true
+        - ref: Regex_global_top500_019_genetic_data_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_top500_019_genetic_data_populated_label
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -101,29 +124,25 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_genetic_data
-      matches:
-        - ref: Evidence_genetic_data
   regexes:
     - id: Pattern_genetic_data
       pattern: (?is)\b(?:genetic\s+data|genetic\s+information|genetic\s+test|genetic\s+profile|genetic\s+sample|genetic\s+marker)\b
     - id: Pattern_au_top500_019_genetic_data_label_context
       pattern: (?i)\b(?:genetic\s+data)\b
+    - id: Regex_global_top500_019_genetic_data_populated_label
+      pattern: (?i)\b(?:\b(?:genetic\s+data|genetic\s+information|genetic\s+test|genetic\s+profile|genetic\s+sample|genetic\s+marker)\b)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_global_top500_019_genetic_data_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|patient|client|participant|donor|recipient|clinician|URN|UR\s+number|MRN|medical\s+record\s+number|Medicare(?:\s+number)?|IHI|referring\s+(?:doctor|practitioner)|(?:specimen|accession|lab|laboratory|study|participant|patient|client|trial|case|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_genetic_data
       groups:
         - match_style: word
           terms:
-            - genetic data
-            - genetic information
             - text: DNA
               case_sensitive: true
             - genome
             - genomic
-            - genetic test
-            - genetic profile
             - hereditary
-            - genetic sample
-            - genetic marker
       strength: specific
     - id: Keyword_au_top500_019_genetic_data_domain_context
       groups:
@@ -155,8 +174,11 @@ classification:
       Medium generic classification and Medium Personal-Privacy DLM fit an individual genetic profile with persistent
       personal and familial consequences but contained scale.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now uses the populated field as its primary (Regex_global_top500_019_genetic_data_populated_label: the label followed by a value), or the phrase plus one remaining corroborative term (DNA, genome, genomic, hereditary); 85 requires the populated field plus a populated health field (Regex_global_top500_019_genetic_data_record_structure). Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Added a populated positive and empty-form / policy-guidance decoys, plus a record with the label but no value.'
   - version: 1.4.4
     date: '2026-09-25'
     description: >-

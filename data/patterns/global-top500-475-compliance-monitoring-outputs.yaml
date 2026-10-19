@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Compliance monitoring outputs
 slug: global-top500-475-compliance-monitoring-outputs
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -44,6 +44,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: audit findings
       description: Additional topic phrase match
+    - value: |-
+        Compliance monitoring
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Compliance monitoring - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -51,6 +59,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: data inventory compliance
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Compliance monitoring:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about compliance monitoring are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to compliance monitoring outputs appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -74,8 +91,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_compliance_monitoring_outputs
       matches:
-        - ref: Evidence_compliance_monitoring_outputs
-          min_count: 2
+        - ref: Regex_global_top500_475_compliance_monitoring_outputs_record_structure
+          min_count: 3
           unique_results: true
         - type: any
           min_matches: 0
@@ -85,7 +102,9 @@ purview:
     - confidence_level: 75
       id_match: Pattern_compliance_monitoring_outputs
       matches:
-        - ref: Evidence_compliance_monitoring_outputs
+        - ref: Regex_global_top500_475_compliance_monitoring_outputs_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -94,29 +113,12 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_compliance_monitoring_outputs
-      matches:
-        - ref: Evidence_compliance_monitoring_outputs
   regexes:
     - id: Pattern_compliance_monitoring_outputs
       pattern: >-
         (?is)\b(?:compliance\s+monitoring|monitoring\s+outputs|compliance\s+report|audit\s+findings|regulatory\s+compliance|privacy\s+compliance|risk\s+assessment|compliance\s+framework|monitoring\s+schedule|compliance\s+matrix|data\s+retention|impact\s+assessment)\b
-  keywords:
-    - id: Evidence_compliance_monitoring_outputs
-      groups:
-        - match_style: word
-          terms:
-            - compliance monitoring
-            - monitoring outputs
-            - compliance report
-            - audit findings
-            - regulatory compliance
-            - privacy compliance
-            - risk assessment
-            - compliance framework
-            - monitoring schedule
-            - compliance matrix
-            - data retention
-            - impact assessment
+    - id: Regex_global_top500_475_compliance_monitoring_outputs_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
 risk_description: >-
   The au-top500 concept regex keys on compliance reports, audit findings, risk assessments, compliance frameworks, data-retention obligations, and impact assessments, requiring six nearby governance terms. Routine policies, monitoring schedules, compliance matrices, and training material can satisfy this vocabulary without containing a current organisational result. An attributed report that names a failed obligation, affected system, retention gap, or unresolved impact can create legal and reconnaissance value, but generic framework discussion causes little standalone harm. Risk 5 and OFFICIAL suit the normal report-reference branch; SENSITIVE requires current named failures, regulated breach evidence, or detailed remediation information with direct operational or legal consequence.
 sensitivity_labels:
@@ -140,8 +142,11 @@ classification:
       Generic Low treatment fits high-level assurance results whose standalone harm is limited and becomes material only
       with specific control, system, or breach detail.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_475_compliance_monitoring_outputs_record_structure); 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Removed evidence no longer referenced by any tier (Evidence_compliance_monitoring_outputs). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-

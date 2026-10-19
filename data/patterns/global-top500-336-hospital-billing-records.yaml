@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Hospital billing records
 slug: global-top500-336-hospital-billing-records
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -47,6 +47,13 @@ test_cases:
       description: Alternative topic phrase match
     - value: hospital invoice
       description: Additional topic phrase match
+    - value: |-
+        Hospital billing
+        Patient: Avery Teston
+        Date of birth: 14/02/1988
+        MRN: 4471820
+      description: Populated health record reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -54,6 +61,13 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: patient biometric
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Hospital billing:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about hospital billing are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Medical terminology in health education materials, research publications, clinical guidelines, or public health documents without patient-specific data.
     mitigation: Require corroborative evidence keywords confirming patient context. Look for co-occurrence with patient identifiers such as medical record numbers or dates of birth.
@@ -75,7 +89,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_hospital_billing_records
       matches:
-        - ref: Evidence_hospital_billing_records
+        - ref: Regex_global_top500_336_hospital_billing_records_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -86,7 +100,11 @@ purview:
     - confidence_level: 75
       id_match: Pattern_hospital_billing_records
       matches:
-        - ref: Evidence_hospital_billing_records
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_hospital_billing_records
+            - Regex_global_top500_336_hospital_billing_records_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -95,28 +113,17 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_hospital_billing_records
-      matches:
-        - ref: Evidence_hospital_billing_records
   regexes:
     - id: Pattern_hospital_billing_records
       pattern: (?is)\b(?:hospital\s+billing|billing\s+record|patient\s+billing|hospital\s+invoice|medical\s+billing|claim\s+submission|billing\s+code|hospital\s+charges|inpatient\s+billing|DRG\s+code)\b
+    - id: Regex_global_top500_336_hospital_billing_records_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|patient|client|participant|donor|recipient|clinician|URN|UR\s+number|MRN|medical\s+record\s+number|Medicare(?:\s+number)?|IHI|referring\s+(?:doctor|practitioner)|(?:specimen|accession|lab|laboratory|study|participant|patient|client|trial|case|file)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_hospital_billing_records
       groups:
         - match_style: word
           terms:
-            - hospital billing
-            - billing record
-            - patient billing
-            - hospital invoice
-            - medical billing
-            - health
             - biomedical
-            - claim submission
-            - billing code
-            - hospital charges
-            - inpatient billing
-            - DRG code
 risk_description: >-
   The detector recognizes hospital and patient billing, medical invoices, claim submissions, charges, DRG codes, and inpatient billing in clinical context. A genuine bill can link identity, provider, dates, procedures, diagnosis-related groups, insurer, and financial liability, allowing condition inference, fraud, debt targeting, or dispute manipulation. The normal record is one account or episode rather than a hospital ledger, so the combined financial and health impact is serious but contained. Risk 8 and SENSITIVE are justified; PROTECTED would require a bulk revenue-cycle database, payment credentials, or compromise causing significant institutional and patient harm.
 sensitivity_labels:
@@ -148,8 +155,11 @@ references:
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires an independent populated health field (Regex_global_top500_336_hospital_billing_records_record_structure), or one remaining corroborative term (biomedical); 85 requires 2 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (health). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-

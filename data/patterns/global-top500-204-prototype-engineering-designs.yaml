@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Prototype engineering designs
 slug: global-top500-204-prototype-engineering-designs
-version: 1.4.4
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -46,6 +46,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: CAD drawing
       description: Additional topic phrase match
+    - value: |-
+        Prototype design
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Prototype design - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -53,6 +61,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: algorithm schematic
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Prototype design:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about prototype design are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to prototype engineering designs appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -76,7 +93,18 @@ purview:
     - confidence_level: 85
       id_match: Pattern_prototype_engineering
       matches:
-        - ref: Evidence_prototype_engineering
+        - ref: Regex_global_top500_204_prototype_engineering_designs_record_structure
+          min_count: 3
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Pattern_prototype_engineering
+      matches:
+        - ref: Regex_global_top500_204_prototype_engineering_designs_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -88,6 +116,7 @@ purview:
       id_match: Pattern_prototype_engineering
       matches:
         - ref: Evidence_prototype_engineering
+        - ref: Regex_global_top500_204_prototype_engineering_designs_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -96,31 +125,20 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_prototype_engineering
-      matches:
-        - ref: Evidence_prototype_engineering
   regexes:
     - id: Pattern_prototype_engineering
       pattern: >-
         (?is)\b(?:prototype\s+design|engineering\s+design|prototype\s+engineering|CAD\s+drawing|technical\s+drawing|design\s+specification|bill\s+of\s+materials|proof\s+of\s+concept|industrial\s+design|trade\s+secret)\b
+    - id: Regex_global_top500_204_prototype_engineering_designs_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
   keywords:
     - id: Evidence_prototype_engineering
       groups:
         - match_style: word
           terms:
-            - prototype design
-            - engineering design
-            - prototype engineering
-            - CAD drawing
-            - technical drawing
-            - design specification
-            - bill of materials
             - text: BOM
               case_sensitive: true
             - schematic
-            - proof of concept
-            - industrial design
-            - trade secret
-            - confidential
       strength: specific
 risk_description: >-
   The detector matches prototype design, engineering design, CAD drawing, technical drawing, design specification, bill of materials, proof of concept, industrial design, or trade-secret terminology. Those phrases can appear in public portfolios, tenders, standards, training, and references to a design without exposing the drawing, dimensions, component selection, or manufacturable package. A rival needs substantive geometry, BOM data, interfaces, tolerances, or test findings to copy or pre-empt the prototype. Risk 5 supports OFFICIAL; SENSITIVE would require the actual unreleased CAD, detailed engineering package, or proprietary prototype results.
@@ -145,8 +163,11 @@ classification:
       Low with Low handling fits references to a design. Medium is reserved for the substantive drawing, bill of
       materials or test findings a rival could copy.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_204_prototype_engineering_designs_record_structure), or one remaining corroborative term plus one field; 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (confidential). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.4.4
     date: '2026-09-25'
     description: >-

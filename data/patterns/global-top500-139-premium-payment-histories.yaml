@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Premium payment histories
 slug: global-top500-139-premium-payment-histories
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -47,6 +47,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: premium schedule
       description: Additional topic phrase match
+    - value: |-
+        Premium payment
+        Payee: Riverbend Supplies Pty Ltd
+        BSB: 064-000
+        Account number: 12345678
+        Payment reference: INV-20431
+      description: Populated payee/account reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -54,6 +62,14 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: credit premium
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Premium payment:
+        Payee:
+        Account name:
+        Account number:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about premium payment are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -75,7 +91,7 @@ purview:
     - confidence_level: 85
       id_match: Pattern_premium_payment
       matches:
-        - ref: Evidence_premium_payment
+        - ref: Regex_global_top500_139_premium_payment_histories_record_structure
           min_count: 2
           unique_results: true
         - type: any
@@ -86,7 +102,11 @@ purview:
     - confidence_level: 75
       id_match: Pattern_premium_payment
       matches:
-        - ref: Evidence_premium_payment
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_premium_payment
+            - Regex_global_top500_139_premium_payment_histories_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -95,26 +115,18 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_premium_payment
-      matches:
-        - ref: Evidence_premium_payment
   regexes:
     - id: Pattern_premium_payment
       pattern: (?is)\b(?:premium\s+payment|payment\s+history|insurance\s+premium|premium\s+schedule|policy\s+renewal|premium\s+adjustment|overdue\s+premium|payment\s+record)\b
+    - id: Regex_global_top500_139_premium_payment_histories_record_structure
+      pattern: (?i)\b(?:payee|supplier|vendor|creditor|beneficiary|account\s+name|BSB|account\s+(?:no\.?|number)|invoice\s+(?:no\.?|number)|remittance\s+(?:no\.?|number|ref(?:erence)?)|payment\s+(?:ref(?:erence)?|date)|amount\s+paid)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_premium_payment
       groups:
         - match_style: word
           terms:
-            - premium payment
-            - payment history
-            - insurance premium
-            - premium schedule
-            - policy renewal
-            - premium adjustment
             - policyholder
             - instalment
-            - overdue premium
-            - payment record
 risk_description: >-
   This detector finds histories or schedules of insurance-premium payments and related account status. A disclosed history can reveal whether a policyholder pays regularly, is overdue, or maintains particular coverage, assisting targeted scams or adverse inference. The normal match does not guarantee bank coordinates, claim details, or a rich identity record, so misuse generally needs the policyholder and policy context. Risk 4 and OFFICIAL fit that limited unit; a detailed personal history tied to account data or threatened lapse could merit SENSITIVE handling.
 sensitivity_labels:
@@ -138,8 +150,11 @@ classification:
       Low generic classification and Low DLM are appropriate for premium-payment terminology that becomes moderately
       sensitive only when populated with customer history.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires an independent populated payee/account field (Regex_global_top500_139_premium_payment_histories_record_structure), or one remaining corroborative term (policyholder, instalment); 85 requires 2 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-

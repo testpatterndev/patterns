@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: SWIFT or BIC codes
 slug: global-top500-104-swift-or-bic-codes
-version: 1.5.3
+version: 1.6.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -51,6 +51,12 @@ test_cases:
       description: Alternative topic phrase match
     - value: SWIFT network
       description: Additional topic phrase match
+    - value: |-
+        SWIFT code: Recorded
+        Payee: Avery Teston
+        Account number: 12345678
+      description: Populated attribute field with a linked record field (85 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -64,6 +70,18 @@ test_cases:
       description: Correspondent-bank wording demoted out of the primary - corroborative evidence only
     - value: wire transfer approval
       description: Generic payment wording demoted out of the primary
+    - value: |-
+        SWIFT code:
+        Payee:
+        Account name:
+        Account number:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about swift code are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
+    - value: |-
+        SWIFT code:
+        Payee: Avery Teston
+      description: "Record with the attribute label but no value: the label must not corroborate itself (discovery only)"
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -83,11 +101,17 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_swift_or_bic_codes
+      id_match: Regex_global_top500_104_swift_or_bic_codes_populated_label
       matches:
-        - ref: Evidence_swift_or_bic_codes
-          min_count: 2
-          unique_results: true
+        - ref: Regex_global_top500_104_swift_or_bic_codes_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_top500_104_swift_or_bic_codes_populated_label
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -105,29 +129,21 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_swift_or_bic_codes
-      matches:
-        - ref: Evidence_swift_or_bic_codes
   regexes:
     - id: Pattern_swift_or_bic_codes
       pattern: (?is)\b(?:SWIFT\s+code|BIC\s+code|bank\s+identifier\s+code|SWIFT\s+network)\b
+    - id: Regex_global_top500_104_swift_or_bic_codes_populated_label
+      pattern: (?i)\b(?:\b(?:SWIFT\s+code|BIC\s+code|bank\s+identifier\s+code|SWIFT\s+network)\b)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_global_top500_104_swift_or_bic_codes_record_structure
+      pattern: (?i)\b(?:payee|supplier|vendor|creditor|beneficiary|account\s+name|BSB|account\s+(?:no\.?|number)|invoice\s+(?:no\.?|number)|remittance\s+(?:no\.?|number|ref(?:erence)?)|payment\s+(?:ref(?:erence)?|date)|amount\s+paid)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_swift_or_bic_codes
       groups:
         - match_style: word
           terms:
-            - SWIFT code
-            - BIC code
-            - bank identifier code
-            - SWIFT
-            - text: BIC
-              case_sensitive: true
             - correspondent bank
             - wire transfer
             - international payment
-            - interbank
-            - SWIFT network
-            - bank code
-            - routing code
       strength: specific
 risk_description: >-
   The regex recognises SWIFT-code, BIC-code, bank-identifier-code, correspondent-bank, wire-transfer, international-payment, network, and routing-code terminology. It does not parse the eight- or eleven-character structure of a BIC and therefore may indicate only payment-rail discussion. Even a real BIC usually identifies a bank or branch rather than a personal account, and payment fraud needs beneficiary details plus authority. Risk 4 OFFICIAL reflects low standalone harm; SENSITIVE would require a complete non-public payment instruction or linked customer transaction.
@@ -159,8 +175,11 @@ references:
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.6.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now uses the populated field as its primary (Regex_global_top500_104_swift_or_bic_codes_populated_label: the label followed by a value), or the phrase plus one remaining corroborative term (correspondent bank, wire transfer, international payment); 85 requires the populated field plus a populated payee/account field (Regex_global_top500_104_swift_or_bic_codes_record_structure). Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (interbank, bank code, routing code). Added a populated positive and empty-form / policy-guidance decoys, plus a record with the label but no value.'
   - version: 1.5.3
     date: '2026-09-25'
     description: >-

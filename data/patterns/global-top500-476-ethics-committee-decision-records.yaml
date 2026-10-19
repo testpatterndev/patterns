@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Ethics committee decision records
 slug: global-top500-476-ethics-committee-decision-records
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -46,6 +46,14 @@ test_cases:
       description: Alternative topic phrase match
     - value: ethics approval
       description: Additional topic phrase match
+    - value: |-
+        Ethics committee
+        To: Executive Committee
+        From: Chief Financial Officer
+        Date: 14 August 2026
+        Subject: Ethics committee - FY27 review
+      description: Populated document header reaching the 75/85 structure gate
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -53,6 +61,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: data inventory compliance
       description: Generic word pair from old broad template should not match
+    - value: |-
+        Ethics committee:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about ethics committee are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Common words and phrases related to ethics committee decision records appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -76,8 +93,8 @@ purview:
     - confidence_level: 85
       id_match: Pattern_ethics_committee_decision_records
       matches:
-        - ref: Evidence_ethics_committee_decision_records
-          min_count: 2
+        - ref: Regex_global_top500_476_ethics_committee_decision_records_record_structure
+          min_count: 3
           unique_results: true
         - type: any
           min_matches: 0
@@ -87,7 +104,9 @@ purview:
     - confidence_level: 75
       id_match: Pattern_ethics_committee_decision_records
       matches:
-        - ref: Evidence_ethics_committee_decision_records
+        - ref: Regex_global_top500_476_ethics_committee_decision_records_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -96,29 +115,12 @@ purview:
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_ethics_committee_decision_records
-      matches:
-        - ref: Evidence_ethics_committee_decision_records
   regexes:
     - id: Pattern_ethics_committee_decision_records
       pattern: >-
         (?is)\b(?:ethics\s+committee|committee\s+decision|ethics\s+review|ethics\s+approval|research\s+ethics|human\s+research|ethical\s+compliance|committee\s+minutes|ethics\s+assessment|institutional\s+review|privacy\s+compliance|risk\s+assessment)\b
-  keywords:
-    - id: Evidence_ethics_committee_decision_records
-      groups:
-        - match_style: word
-          terms:
-            - ethics committee
-            - committee decision
-            - ethics review
-            - ethics approval
-            - research ethics
-            - human research
-            - ethical compliance
-            - committee minutes
-            - ethics assessment
-            - institutional review
-            - privacy compliance
-            - risk assessment
+    - id: Regex_global_top500_476_ethics_committee_decision_records_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
 risk_description: >-
   The regex recognises ethics-committee, ethics-review, committee-decision, and ethics-approval language rather than a dossier about misconduct or a research participant. Ordinary matches include meeting papers, approval notices, governance procedures, training, and published decisions, many of which contain no confidential personal facts. A substantive record could reveal applicant names, allegations, research risks, or deliberations, but those additional elements are not established by the detector's broad examples. Risk 4 supports OFFICIAL; SENSITIVE would require non-public findings, identifiable complainants or subjects, privileged deliberations, or consequential research and safety details.
 sensitivity_labels:
@@ -150,8 +152,11 @@ references:
   - title: "OAIC - Notifiable Data Breaches scheme"
     url: https://www.oaic.gov.au/privacy/notifiable-data-breaches
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-19'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-19'
+    description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now requires 2 distinct independent populated document header fields (Regex_global_top500_476_ethics_committee_decision_records_record_structure); 85 requires 3 distinct fields. Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list. Removed evidence no longer referenced by any tier (Evidence_ethics_committee_decision_records). Added a populated positive and empty-form / policy-guidance decoys.'
   - version: 1.3.4
     date: '2026-09-25'
     description: >-
