@@ -6,12 +6,14 @@ on:
       - 'data/**'
       - 'scripts/**'
       - 'docs/identifiers.md'
+      - '.github/workflows/ci.yml'
   push:
     branches-ignore: [main]   # main is gated inside compile-and-publish.yml before publishing
     paths:
       - 'data/**'
       - 'scripts/**'
       - 'docs/identifiers.md'
+      - '.github/workflows/ci.yml'
 
 jobs:
   validate:
@@ -39,3 +41,18 @@ jobs:
 
       - name: Catalog quality gate (ratcheted, see scripts/verify-catalog-quality.mjs)
         run: npm run check:quality
+
+      # testpattern.dev is private: TESTPATTERN_READ_TOKEN is a read-only token for it.
+      - name: Check out the testpattern SIT evaluator
+        uses: actions/checkout@v4
+        with:
+          repository: testpatterndev/testpattern.dev
+          token: ${{ secrets.TESTPATTERN_READ_TOKEN }}
+          path: .testpattern
+
+      - name: SIT evaluator gate (no should_not_match case may reach an enforcing tier)
+        env:
+          TESTPATTERN_PATTERNS_ROOT: ${{ github.workspace }}
+        run: |
+          npm ci --prefix .testpattern --no-audit --no-fund
+          node .testpattern/scripts/check-sit-evaluator-testcases.js --strict --report "$RUNNER_TEMP/sit-evaluator-testcases.json"
