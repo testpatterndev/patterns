@@ -1,16 +1,19 @@
 schema: testpattern/v1
 name: Australian Company Number
 slug: au-company-number
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Detects Australian Company Number patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
+  Detects nine-digit Australian Company Numbers (ACNs), issued by ASIC to every registered company and printed on
+  company documents, contracts, invoices and ASIC extracts. Grouped (3-3-3) and continuous forms are matched, and
+  company-number context lifts a match to 75 or 85. TestPattern's own detection logic: the Microsoft Purview built-in
+  Australian Company Number is catalogued separately as au-company-number-builtin.
 operation: >-
   Checksum: Modified Mod 10 with weights [8,7,6,5,4,3,2,1] (not enforced in the exported SIT — Purview has no usable ACN validator function; structural detection only). Reference:
   https://asic.gov.au/for-business/registering-a-company/steps-to-register-a-company/australian-company-numbers/australian-company-number-digit-check/,
-  https://clearwater.com.au/code/acn/, https://learn.microsoft.com/en-us/purview/sit-defn-australia-business-number
+  https://clearwater.com.au/code/acn/
   Corroborative evidence: 4 keywords within 300 characters. Keyword lists: au-identity-acn.
 pattern: \b\d{3}\s?\d{3}\s?\d{3}\b
 confidence: medium
@@ -46,6 +49,10 @@ test_cases:
       description: Continuous digits
     - value: 004 085 616
       description: Real ACN format
+    - value: 'Supplier details - ACN: 004 085 616'
+      description: Labelled ACN on a supplier record (specific keyword, 85 tier)
+    - value: 'Company extract for the registered entity, number 004 085 616'
+      description: Company-registration context without the ACN label (broad keywords, 75 tier)
   should_not_match:
     - value: '12345678'
       description: Only 8 digits
@@ -160,11 +167,20 @@ classification:
       Low generic handling is appropriate for a public corporate identifier with modest correlation and impersonation
       value. The inherited High generic fields contradicted the accepted OFFICIAL and Low assessment and are normalised.
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-australia-business-number
-    title: "Australia company number entity definition - Microsoft Learn"
+  - url: https://asic.gov.au/for-business/registering-a-company/steps-to-register-a-company/australian-company-numbers/australian-company-number-digit-check/
+    title: "Australian Company Number digit check - ASIC"
 created: '2026-02-08'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-20'
+    description: >-
+      Custom SIT again, as the owner originally decided: source changes from microsoft to testpattern-community, so
+      packages emit these tiers, noise filters and local noise filter as custom XML instead of referencing the Microsoft
+      built-in by GUID (which meant this logic never ran). The Microsoft entity is catalogued separately as
+      au-company-number-builtin. The description no longer calls this a copy of the built-in, and the reference now
+      points at ASIC rather than the Microsoft ABN page. Detection logic is unchanged; two labelled should_match
+      cases now exercise the 85 and 75 tiers.
   - version: 1.4.0
     date: '2026-10-19'
     description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its own ABN, ACN, VAT or registration number as printed on letterhead and invoices) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."
@@ -190,5 +206,5 @@ changelog:
     date: '2026-07-04'
     description: case/evidence metadata update
 author: testpattern-community
-source: microsoft
+source: testpattern-community
 license: MIT
