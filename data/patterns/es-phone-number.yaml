@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Spanish Phone Number
 slug: es-phone-number
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -27,7 +27,7 @@ operation: >-
   phone-context. Both the domestic and international (+34) sub-regexes are evidence-gated at every tier —
   no tier fires without positive corroborative evidence, per the phone-family convention — see
   confidence_justification.
-pattern: '(?<!\d)(?:\+34[\s.-]?(?:6[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[1-4][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|[89][1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)|6[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[1-4][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|[89][1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+pattern: '(?<!\d)(?:(?:\+|00)34[\s.-]?(?:6[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[1-4][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|[89][1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)|(?<!\d[ .-])(?:6[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[1-4][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|[89][1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d))(?!\d)'
 confidence: medium
 confidence_justification: >-
   Medium confidence: the mobile (6, or 7 with second digit 1-4) and geographic (8/9 with non-zero second
@@ -72,6 +72,8 @@ test_cases:
       description: Domestic geographic, leading 9 with non-zero second digit, illustrative synthetic value
     - value: 'International: +34 612 345 678'
       description: International +34 form of the mobile number, same 9 significant digits (no trunk 0 to drop)
+    - value: 'Teléfono: 0034 612 345 678'
+      description: International form written with the 00 dialling prefix instead of +
   should_not_match:
     - value: '512 345 678'
       description: Leading digit 5 is not a valid mobile (6, 7) or geographic (8, 9) leading digit
@@ -81,6 +83,10 @@ test_cases:
       description: Only 8 digits — one short of the required 9
     - value: '8612345678999'
       description: Valid-shaped digit run embedded inside a longer reference number, rejected by digit boundaries
+    - value: 'Phone: (07) 3123 4567 | ABN 51 824 753 556'
+      description: >-
+        Australian business number in a signature block next to a phone label. Its last nine digits (824 753 556) have
+        a valid geographic shape; the digit-group lookbehind rejects them because they continue a longer grouped number.
 false_positives:
   - description: >-
       A 9-digit sequence with a valid mobile or geographic leading-digit shape can still coincidentally
@@ -99,15 +105,14 @@ false_positives:
       own tenant's synthetic test data for live validation rather than relying on a non-existent official
       reserved range.
   - description: >-
-      The domestic sub-regex also fires inside the +34 international rendering when the number is written
-      with separators (empirically verified: in "+34 612 345 678" it matches the "612 345 678" substring —
-      Spain has no trunk prefix, so the digits after "+34 " are exactly the domestic form; the contiguous
-      "+34612345678" rendering is protected by the digit-boundary lookbehind).
+      A valid-shaped nine-digit run can be the tail of a longer space-grouped number, such as the Australian business
+      number "51 824 753 556" (its last nine digits read as a geographic 8xx number), which sits next to a phone label in
+      most Australian signature blocks.
     mitigation: >-
-      Benign co-fire, left in place deliberately: both sub-regexes carry identical evidence gating and
-      confidence levels, so the duplicate match cannot inflate confidence — it can only duplicate a finding
-      at the same level, which reporting layers de-duplicate by offset. A structural fix would need
-      variable-width negative lookbehind, which the universal engine target does not support.
+      The domestic sub-regex has a fixed-width lookbehind (?<!\d[ .-]) that rejects a match preceded by a digit and a
+      single separator, so it only starts at the beginning of a number. The same lookbehind stops it firing inside the
+      spaced +34 rendering ("+34 612 345 678"), which the international sub-regex reports instead; that sub-regex also
+      accepts the 00 dialling prefix ("0034 612 345 678"), a form the domestic sub-regex used to cover.
 exports:
   - purview_xml
   - yaml
@@ -166,9 +171,9 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_es_phone_domestic
-      pattern: '(?<!\d)(?:6[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[1-4][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|[89][1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+      pattern: '(?<!\d)(?<!\d[ .-])(?:6[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[1-4][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|[89][1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
     - id: Regex_es_phone_intl
-      pattern: '(?<!\d)\+34[\s.-]?(?:6[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[1-4][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|[89][1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+      pattern: '(?<!\d)(?:\+|00)34[\s.-]?(?:6[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|7[1-4][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|[89][1-9][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
   keywords:
     - id: Keyword_es_phone_specific
       groups:
@@ -214,8 +219,11 @@ references:
   - url: https://www.consumoresponde.es/art%C3%ADculos/tipologia_de_los_numeros_de_telefono_existentes_en_espana
     title: "Consumo Responde (Spanish government consumer service): Tipología de los números de teléfono existentes en España"
 created: '2026-07-06'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-20'
+    description: "Digit-group boundary (2026-10-16 boilerplate run): the domestic sub-regex fired at 75 on the last nine digits of an Australian ABN (\"ABN 51 824 753 556\" next to a \"Phone:\" label). The domestic sub-regex (and its top-level copy) now has a fixed-width lookbehind (?<!\\d[ .-]), so it cannot start inside a longer space-, dot- or hyphen-grouped number. That also removes the documented domestic co-fire inside \"+34 612 345 678\"; the international sub-regex now accepts the 00 dialling prefix so \"0034 612 345 678\" is still detected. Added the ABN signature line as a should_not_match and the 0034 form as a should_match."
   - version: 1.3.0
     date: '2026-10-19'
     description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its switchboard, fax and published mobile numbers) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."

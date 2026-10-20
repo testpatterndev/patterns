@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: TAJ szám
 slug: hu-social-security-taj
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -11,7 +11,7 @@ description: >-
 operation: >-
   Reference: https://learn.microsoft.com/en-us/purview/sit-defn-hungary-social-security-number Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: \b\d{3}\s?\d{3}\s?\d{3}\b
+pattern: \b(?<!\b\d\d\s)\d{3}\s?\d{3}\s?\d{3}\b
 confidence: medium
 confidence_justification: >-
   Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false positive rates. Added context gating and exclusion rules improve precision and reduce
@@ -54,7 +54,18 @@ test_cases:
       description: Too many digits (10)
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'Supplier ABN 51 824 753 556 is registered for GST.'
+      description: >-
+        Australian business number (2026-10-16 boilerplate run): its last nine digits are a 3-3-3 group, and this pattern has no checksum validator; the
+        ABN lookbehind rejects them.
 false_positives:
+  - description: >-
+      The last nine digits of a space-grouped Australian Business Number ("51 824 753 556") have the same 3-3-3 shape,
+      and every letterhead, signature and invoice carries the organisation's ABN.
+    mitigation: >-
+      A fixed-width lookbehind (?<!\b\d\d\s) rejects a nine-digit group that follows a standalone two-digit group and a
+      space, which is the ABN's 2-3-3-3 layout. It is deliberately narrower than "any preceding digit group", so a
+      value after a longer employee or row number in a space-separated table still matches.
   - description: Nine-digit sequences with optional spaces match phone numbers, postal codes, and other numeric references.
     mitigation: Require corroborative evidence keywords such as "TAJ" or "társadalombiztosítási" within the proximity window.
   - description: In multiple languages, similar terminology used in formal or administrative contexts (education, professional documentation) that does not constitute sensitive data collection.
@@ -102,7 +113,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_hu_taj
-      pattern: \b\d{3}\s?\d{3}\s?\d{3}\b
+      pattern: \b(?<!\b\d\d\s)\d{3}\s?\d{3}\s?\d{3}\b
     - id: Pattern_hu_social_security_taj_label_context
       pattern: (?i)\b(?:taj\s+szám|taj|social|security)\b
   keywords:
@@ -164,8 +175,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-hungary-social-security-number
     title: Hungarian Social Security Number (TAJ) entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-20'
+    description: "ABN tail (2026-10-16 boilerplate run): the nine-digit id_match fired at the 65 discovery tier on the last nine digits of an Australian ABN (\"ABN 51 824 753 556\") in letterheads, signatures and invoices. The id_match regex and its top-level copy now carry a fixed-width lookbehind (?<!\\b\\d\\d\\s) that rejects a nine-digit group following a standalone two-digit group and a space (the ABN 2-3-3-3 layout). Added the ABN line as a should_not_match."
   - version: 1.3.2
     date: '2026-09-25'
     description: >-

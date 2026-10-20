@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Netherlands Phone Number
 slug: nl-phone-number
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -29,7 +29,7 @@ operation: >-
   Corroborative evidence: keywords within 300 characters. Keyword lists: phone-context. Both the domestic
   and international (+31) sub-regexes are evidence-gated at every tier — no tier fires without positive
   corroborative evidence, per the phone-family convention — see confidence_justification.
-pattern: '(?<!\d)(?:\+31[\s.-]?(?:\(0\)[\s.-]?)?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+pattern: '(?<!\d)(?:\+31[\s.-]?(?:\(0\)[\s.-]?)?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|(?!0[1-57][\s.-])(?!0\d{3}[\s.-]\d{3}[\s.-]\d{3}(?!\d))0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
 confidence: medium
 confidence_justification: >-
   Medium confidence: the leading-digit constraint (01-07 domestic, restricting to geographic area codes and
@@ -87,7 +87,22 @@ test_cases:
       description: Only 7 digits after the 06 mobile prefix, one short of the required 8
     - value: '906123456789'
       description: Valid-shaped digit run embedded inside a longer reference number, rejected by digit boundaries
+    - value: 'Mobile: 0412 555 019'
+      description: >-
+        Australian mobile in 4-3-3 grouping (signature block, 2026-10-16 boilerplate run). 0412 is a real Dutch area
+        code (Oss), but Dutch notation writes a 6-digit subscriber number unsplit or in pairs, never 3-3.
+    - value: 'Phone: 07 3123 4567'
+      description: Australian landline in 2-4-4 grouping; no Dutch geographic area code is two digits long
 false_positives:
+  - description: >-
+      Australian numbers share the 10-digit trunk-0 shape (04 mobiles, 02/03/07/08 landlines), and 01-07 are Dutch
+      geographic prefixes, so an Australian signature-block number next to "Mobile:" reached 75.
+    mitigation: >-
+      Two lookaheads on the domestic sub-regex reject groupings that Dutch notation does not use: a separator straight
+      after a two-digit 01-05/07 prefix (Dutch geographic area codes are three or four digits; only 06 is two), and 4-3-3
+      grouping (a four-digit area code is followed by a six-digit subscriber number written unsplit or in pairs).
+      Residual risk: an Australian number written without separators still matches and relies on the phone-context
+      gating; a Dutch four-digit-area-code number written 4-3-3 is now a false negative.
   - description: >-
       A 10-digit sequence with a 01-07 leading digit can still coincidentally match invoice numbers, order
       numbers, or other structured identifiers of the same length and leading-digit distribution.
@@ -161,7 +176,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_nl_phone_domestic
-      pattern: '(?<!\d)0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
+      pattern: '(?<!\d)(?!0[1-57][\s.-])(?!0\d{3}[\s.-]\d{3}[\s.-]\d{3}(?!\d))0[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
     - id: Regex_nl_phone_intl
       pattern: '(?<!\d)\+31[\s.-]?(?:\(0\)[\s.-]?)?[1-7][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
   keywords:
@@ -210,8 +225,11 @@ references:
   - url: https://www.itu.int/rec/T-REC-E.123
     title: "ITU-T Recommendation E.123: Notation for national and international telephone numbers — the international \"(0)\" trunk-digit form is documented as common practice that E.123 advises against"
 created: '2026-07-06'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-20'
+    description: "Dutch grouping (2026-10-16 boilerplate run): the domestic sub-regex fired at 75 on an Australian mobile (\"Mobile: 0412 555 019\"). The domestic sub-regex and its top-level copy now reject two groupings Dutch notation does not use: a separator straight after a two-digit 01-05/07 prefix, and 4-3-3 grouping. Australian 4-3-3 mobiles and 2-4-4 landlines are added as should_not_match. Mobile 06, three-digit and four-digit area code forms in Dutch notation are unchanged."
   - version: 1.3.0
     date: '2026-10-19'
     description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its switchboard, fax and published mobile numbers) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."
