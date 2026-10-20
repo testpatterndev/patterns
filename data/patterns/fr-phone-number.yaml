@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: French Phone Number
 slug: fr-phone-number
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -26,7 +26,7 @@ operation: >-
   within 300 characters. Keyword lists: phone-context. Both the domestic and international (+33) sub-regexes
   are evidence-gated at every tier — no tier fires without positive corroborative evidence, per the
   phone-family convention — see confidence_justification.
-pattern: '(?<!\d)(?:\+33[\s.-]?(?:\(0\)[\s.-]?)?[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|0[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d)(?!\d)'
+pattern: '(?<!\d)(?:\+33[\s.-]?(?:\(0\)[\s.-]?)?[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d|0[1-79](?:\d{8}|(?:[\s.-]\d\d){4}))(?!\d)'
 confidence: medium
 confidence_justification: >-
   Medium confidence: the leading-digit constraint (01-07 and 09 domestic, restricting to geographic,
@@ -74,6 +74,8 @@ test_cases:
       description: International +33 form of the mobile fictional root, leading 0 dropped
     - value: 'En-tête : +33 (0)6 39 98 45 67'
       description: Widespread "+CC (0)" letterhead rendering — nonstandard per E.123 but ubiquitous on French letterheads
+    - value: 'Mobile : 0639984567'
+      description: Domestic mobile written without separators
     - value: 'Domicile: 09 70 12 34 56'
       description: Polyvalent 09 residential VoIP home-line range, illustrative synthetic value (ARCEP's audiovisual-works fictional roots include no 09 root)
   should_not_match:
@@ -85,7 +87,21 @@ test_cases:
       description: Only 8 digits total, two short of the required 10
     - value: '901990012345678'
       description: Valid-shaped digit run embedded inside a longer reference number, rejected by digit boundaries
+    - value: 'Mobile: 0412 555 019'
+      description: >-
+        Australian mobile in 4-3-3 grouping (signature block, 2026-10-16 boilerplate run). 04 is a valid French
+        geographic prefix, so only the grouping tells them apart; the domestic sub-regex needs French pairs or no separators.
+    - value: 'Phone: 07 3123 4567'
+      description: Australian landline in 2-4-4 grouping; not French pair grouping
 false_positives:
+  - description: >-
+      Australian numbers share the 10-digit trunk-0 shape (04 mobiles, 02/03/07/08 landlines), and 04 and 07 are valid
+      French prefixes, so an Australian signature-block number next to "Mobile:" reached 75.
+    mitigation: >-
+      The domestic sub-regex accepts only the French written forms: ten digits with no separators, or a separator
+      before every pair ("06 39 98 45 67", "06.39.98.45.67"). Australian 4-3-3 mobiles and 2-4-4 landlines no longer
+      match. An Australian number written without separators ("0412555019") is still indistinguishable and relies on
+      the phone-context gating.
   - description: >-
       A 10-digit sequence with a 01-07 or 09 leading digit can still coincidentally match invoice numbers,
       order numbers, or other structured identifiers of the same length and leading-digit distribution.
@@ -167,7 +183,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_fr_phone_domestic
-      pattern: '(?<!\d)0[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
+      pattern: '(?<!\d)0[1-79](?:\d{8}|(?:[\s.-]\d\d){4})(?!\d)'
     - id: Regex_fr_phone_intl
       pattern: '(?<!\d)\+33[\s.-]?(?:\(0\)[\s.-]?)?[1-79][\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d[\s.-]?\d(?!\d)'
   keywords:
@@ -215,8 +231,11 @@ references:
   - url: https://www.itu.int/rec/T-REC-E.123
     title: "ITU-T Recommendation E.123: Notation for national and international telephone numbers — the international \"(0)\" trunk-digit form is documented as common practice that E.123 advises against"
 created: '2026-07-06'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-20'
+    description: "French grouping (2026-10-16 boilerplate run): the domestic sub-regex fired at 75 on an Australian mobile (\"Mobile: 0412 555 019\") because it allowed a separator between any two digits. The domestic sub-regex and its top-level copy now accept only ten unseparated digits or five pairs with a separator before each pair, the way French numbers are written. Australian 4-3-3 mobiles and 2-4-4 landlines are added as should_not_match, and the unseparated form as a should_match. The +33 international sub-regex is unchanged."
   - version: 1.3.0
     date: '2026-10-19'
     description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its switchboard, fax and published mobile numbers) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."

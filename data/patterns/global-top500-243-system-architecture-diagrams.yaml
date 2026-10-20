@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: System architecture diagrams
 slug: global-top500-243-system-architecture-diagrams
-version: 1.2.5
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -40,6 +40,17 @@ test_cases:
     description: Alternative topic phrase match
   - value: infrastructure diagram
     description: Additional topic phrase match
+  - value: |-
+      System architecture
+      Hostname: app-prd-01.corp.local
+    description: Populated technical artefact with one field (75 tier)
+    synthetic: true
+  - value: |-
+      System architecture
+      Hostname: app-prd-01.corp.local
+      Source 10.20.30.40 tcp/443
+    description: Populated technical artefact with 2 distinct fields (85 tier)
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -47,6 +58,15 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: source code config
     description: Generic word pair from old broad template should not match
+  - value: System architecture diagrams
+    description: "Bare detector name: it reached 85 through the generated name-word tier and must not reach an enforcing tier"
+  - value: |-
+      System architecture:
+      Hostname:
+      username:
+    description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+  - value: "Policy guidance: this procedure explains how records about system architecture are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Authentication-related terminology in software documentation, security training materials, or system architecture
     descriptions without actual credentials.
@@ -72,63 +92,37 @@ purview:
   - confidence_level: 85
     id_match: Regex_system_architecture_diagrams
     matches:
-    - ref: Pattern_global_top500_243_system_architecture_diagrams_label_context
-    - ref: Keyword_global_top500_243_system_architecture_diagrams_domain_context
-    - ref: Keyword_system_architecture_diagrams
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+      - ref: Regex_global_top500_243_system_architecture_diagrams_record_structure
+        min_count: 2
+        unique_results: true
+      - type: any
+        min_matches: 0
+        max_matches: 0
+        refs:
+          - Keyword_noise_exclusion
   - confidence_level: 75
     id_match: Regex_system_architecture_diagrams
     matches:
-    - ref: Pattern_global_top500_243_system_architecture_diagrams_label_context
-    - ref: Keyword_global_top500_243_system_architecture_diagrams_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+      - ref: Regex_global_top500_243_system_architecture_diagrams_record_structure
+      - type: any
+        min_matches: 0
+        max_matches: 0
+        refs:
+          - Keyword_noise_exclusion
   - confidence_level: 65
     discovery_only: true
     id_match: Regex_system_architecture_diagrams
     matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+      - type: any
+        min_matches: 0
+        max_matches: 0
+        refs:
+          - Keyword_noise_exclusion
   regexes:
   - id: Regex_system_architecture_diagrams
     pattern: (?is)\b(?:system\s+architecture|architecture\s+diagram|network\s+topology|infrastructure\s+diagram|system\s+design|component\s+diagram|data\s+flow\s+diagram|deployment\s+architecture|service\s+map|technical\s+architecture)\b
-  - id: Pattern_global_top500_243_system_architecture_diagrams_label_context
-    pattern: (?i)\b(?:system\s+architecture\s+diagrams)\b
-  keywords:
-  - id: Keyword_system_architecture_diagrams
-    groups:
-    - match_style: word
-      terms:
-      - system architecture
-      - architecture diagram
-      - network topology
-      - infrastructure diagram
-      - system design
-      - component diagram
-      - data flow diagram
-      - deployment architecture
-      - service map
-      - technical architecture
-    strength: specific
-  - id: Keyword_global_top500_243_system_architecture_diagrams_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - system architecture diagrams
-      - system
-      - architecture
-      - diagrams
-    strength: domain
+  - id: Regex_global_top500_243_system_architecture_diagrams_record_structure
+    pattern: (?i)\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:/\d{1,2})?\b|\bCVE-\d{4}-\d{4,7}\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:tcp|udp)\s*/?\s*\d{2,5}\b|\b(?:port|dport|sport)\s*[:=]?\s*\d{2,5}\b|\b(?:hostname|host|asset\s+ID|device\s+ID|sAMAccountName|UPN|username|account\s+name)\s*:\s*(?!_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9][A-Za-z0-9._\\@-]{2,63}
 risk_description: The regex identifies system architecture, architecture diagram, network topology, or infrastructure diagram
   language, signalling a likely design artefact but not parsing the diagram itself. A genuine architecture diagram can reveal
   trust boundaries, service relationships, network paths, control points, and single points of failure that materially improve
@@ -167,8 +161,11 @@ references:
   - title: "Information security manual | Cyber.gov.au"
     url: https://www.cyber.gov.au/business-government/asds-cyber-security-frameworks/ism
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+- version: 1.3.0
+  date: '2026-10-20'
+  description: 'Generated name-word tier removed: the 85 and 75 tiers ANDed Pattern_*_label_context (the detector name, "System architecture diagrams") with Keyword_*_domain_context (its words), so the detector name next to any IdMatch phrase was enough for 85. Both lists sit inside the IdMatch phrase, so the bare name alone scored 85. Re-tiered in the #69 shape: 65 is the phrase alone (discovery only); 75 needs a populated technical artefact field (Regex_global_top500_243_system_architecture_diagrams_record_structure); 85 needs 2 distinct fields. Curated terms that sit inside an IdMatch hit were removed. Added the bare name, an empty form and a policy-guidance text as should_not_match, and populated records reaching 75 and 85.'
 - version: 1.2.5
   date: '2026-09-25'
   description: >-

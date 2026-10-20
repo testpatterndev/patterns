@@ -1,0 +1,208 @@
+schema: testpattern/v1
+name: My Health Record Clinical Document
+slug: au-my-health-record-clinical-document
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Populated clinical documents from or for the My Health Record system: shared health summaries,
+  event summaries, specialist letters, eReferrals, pharmacist shared medicines lists, advance care
+  planning documents and the Prescription and Dispense / Medicines Information views, when they carry
+  patient identifiers (IHI, name, DOB, Medicare) and My Health Record provenance. Printed or exported
+  copies of these documents leave the national system through clinic shared drives, email and patient
+  correspondence. Boundary: hospital discharge summaries and referral letters belong to
+  au-qld-health-discharge-summary-referral and general medical records to au-qld-health-medical-record;
+  a bare IHI value is au-individual-healthcare-identifier.
+operation: >-
+  Primary: shared health summary, event summary, specialist letter, eReferral / e-referral, pharmacist
+  shared medicines list, advance care planning document, Prescription and Dispense view, Medicines
+  (Information) view. 65 (discovery only): primary alone. 75: primary plus a populated patient field
+  (patient name, DOB, IHI, Medicare, DVA by label, or a bare 800360 IHI value) plus My Health Record
+  provenance (My Health Record, MHR, Australian Digital Health Agency, national digital health record).
+  85: the 75 evidence plus a populated document content or authorship field (medications, adverse
+  reactions, medical history, immunisations, diagnoses / interventions, clinical synopsis,
+  recommendations, document author, authoring organisation, HPI-I / HPI-O, document ID). Enforce
+  tiers exclude template wording and Agency / PHN guidance, webinar, fact sheet and training framing.
+pattern: >-
+  (?i)\b(?:shared\s+health\s+summary|event\s+summary|specialist\s+letter|e-?referral|pharmacist\s+shared\s+medicines\s+list|advance\s+care\s+planning\s+document|prescription\s+and\s+dispense\s+view|medicines\s+(?:information\s+)?view)\b
+confidence: medium
+confidence_justification: >-
+  Medium: the document type names are fixed by the My Health Record system and enforce tiers need a
+  populated patient field plus explicit My Health Record provenance. "Event summary" also appears in IT
+  and security reporting, which lacks the provenance and stays at 65. Copies with the provenance header
+  stripped will be missed at 75/85.
+jurisdictions:
+  - au
+regulations:
+  - My Health Records Act 2012 (Cth)
+  - Healthcare Identifiers Act 2010 (Cth)
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+  - Information Privacy Act 2009 (Qld)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - QGISCF
+data_categories:
+  - phi
+  - health
+  - pii
+corroborative_evidence:
+  keywords:
+    - My Health Record
+    - IHI
+    - document author
+    - adverse reactions
+    - medications
+    - HPI-O
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "SHARED HEALTH SUMMARY - uploaded to My Health Record\nPatient: Jordan Teston\nIHI: 8003600000000001\nDocument author: Dr K Teston, Riverbend Medical Practice\nMedications: Metformin 1 g BD; Atorvastatin 20 mg nocte\nAdverse reactions: Penicillin - urticaria"
+      description: 85 tier - shared health summary with IHI, My Health Record provenance, author, medications and adverse reactions
+      synthetic: true
+    - value: "Event summary (My Health Record)\nDate of birth: 19/07/1984\nMedicare number: 0000 00000 0\nClinical synopsis: Laceration left forearm sutured at after-hours clinic, review in 7 days"
+      description: 85 tier - event summary with DOB, Medicare, provenance and clinical synopsis
+      synthetic: true
+    - value: "Specialist letter - My Health Record view\nPatient name: Riley Teston\nDOB: 02/02/1950"
+      description: 75 tier - specialist letter with patient fields and provenance but no document content
+      synthetic: true
+  should_not_match:
+    - value: "Fact sheet: what is a shared health summary? Your GP can upload a shared health summary to your My Health Record so other providers can see your medicines, allergies and immunisations. Ask your practice about consent."
+      description: Agency / PHN fact sheet about the document type (65 at most)
+    - value: "Event summary\nName: web-prod-03\nSeverity: High\nThe failover completed at 02:14 and the incident ticket was closed."
+      description: IT event summary with a populated name field and no My Health Record provenance (65 at most)
+    - value: "Shared health summary (My Health Record)\nPatient name: ____________________\nIHI: ____________________\nMedications: ____________________\nAdverse reactions: ____________________"
+      description: Blank shared health summary form (65 at most)
+    - value: "My Health Record webinar for practice managers: registering your HPI-O, assigning NASH certificates and setting up the conformant clinical software."
+      description: Training webinar text without a document type or patient (no match)
+false_positives:
+  - description: Australian Digital Health Agency, PHN and practice fact sheets and webinars that describe shared health summaries and event summaries.
+    mitigation: No populated patient field, and fact sheet, webinar, training and guidance framing is excluded from enforce tiers.
+  - description: IT, security and operations reports titled "event summary".
+    mitigation: They carry no My Health Record provenance, so they stay at 65.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_mhr_document_primary
+      matches:
+        - ref: Regex_mhr_patient_field
+        - ref: Keyword_mhr_provenance
+        - ref: Regex_mhr_content_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_mhr_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_mhr_document_primary
+      matches:
+        - ref: Regex_mhr_patient_field
+        - ref: Keyword_mhr_provenance
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_mhr_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_mhr_document_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_mhr_document_primary
+      pattern: >-
+        (?i)\b(?:shared\s+health\s+summary|event\s+summary|specialist\s+letter|e-?referral|pharmacist\s+shared\s+medicines\s+list|advance\s+care\s+planning\s+document|prescription\s+and\s+dispense\s+view|medicines\s+(?:information\s+)?view)\b
+    - id: Regex_mhr_patient_field
+      pattern: >-
+        (?i)\b(?:(?:patient(?:\s+name)?|full\s+name|surname|given\s+names?|date\s+of\s+birth|DOB|IHI|individual\s+healthcare\s+identifier|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|DVA\s+(?:no\.?|number))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}|800360\d{10})\b
+    - id: Regex_mhr_content_field
+      pattern: >-
+        (?i)\b(?:medications?|current\s+medicines|adverse\s+reactions?|allergies(?:\s+and\s+adverse\s+reactions)?|medical\s+history|immuni[sz]ations?|diagnos[ie]s(?:\s*/\s*interventions)?|clinical\s+synopsis|recommendations|document\s+(?:author|ID|identifier)|authoring\s+(?:organisation|provider|clinician)|HPI-?[IO])(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.,-]{0,30}(?:[ \t]+[A-Za-z0-9][A-Za-z0-9/'.,;-]{0,30}){0,5}
+    - id: Regex_mhr_guidance_exclusion
+      pattern: >-
+        (?i)\b(?:fact\s?sheet|webinar|this\s+(?:policy|procedure|guideline|guide|page|article|video|course)|training\s+module|e-learning|frequently\s+asked\s+questions|how\s+to\s+(?:upload|view|create|author)|learn\s+more|ask\s+your\s+(?:GP|doctor|practice)|media\s+release)\b
+  keywords:
+    - id: Keyword_mhr_provenance
+      groups:
+        - match_style: word
+          terms:
+            - My Health Record
+            - text: MHR
+              case_sensitive: true
+            - Australian Digital Health Agency
+            - national digital health record
+            - My Health Record system
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  The classifier recognises My Health Record clinical document types and enforces only when a populated
+  patient field (IHI, name, DOB, Medicare) sits with explicit My Health Record provenance, with 85 also
+  needing document content or authorship. A shared health summary or event summary condenses a patient's
+  medicines, adverse reactions, medical history, immunisations and treating providers; together with the
+  IHI it links the person to their national health record. Unauthorised use or disclosure of health
+  information in the system is a civil penalty matter under the My Health Records Act 2012 (Cth). The
+  normal unit is one patient's document, so the harm is serious but contained. Risk 8 matches the other
+  single-patient clinical record classifiers.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy and Medium because a populated
+    My Health Record document discloses one patient's medicines, adverse reactions, history and IHI. PROTECTED is not
+    met: one document does not give bulk access to the national system, and system credentials such as NASH
+    certificates are handled by other classifiers.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling protects a single patient's national health summary. High would need bulk
+      extracts or access credentials for the national system.
+references:
+  - title: My Health Records Act 2012 (Cth)
+    url: https://www.legislation.gov.au/C2012A00063/latest/text
+  - title: Australian Digital Health Agency - My Health Record for healthcare providers
+    url: https://www.digitalhealth.gov.au/healthcare-providers/initiatives-and-programs/my-health-record
+  - title: Healthcare Identifiers Act 2010 (Cth)
+    url: https://www.legislation.gov.au/C2010A00072/latest/text
+  - title: Privacy Act 1988 (Cth)
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
+created: '2026-10-20'
+updated: '2026-10-20'
+changelog:
+  - version: 1.0.0
+    date: '2026-10-20'
+    description: >-
+      Initial release from the qghealth sector review: My Health Record clinical documents (shared health
+      summary, event summary, specialist letter, eReferral, pharmacist shared medicines list, advance care
+      planning document, Prescription and Dispense view). 65 phrase only; 75 needs a populated patient field
+      and My Health Record provenance; 85 adds document content or authorship. Fact sheet, webinar and
+      training framing excluded.
+author: testpattern-community
+license: MIT

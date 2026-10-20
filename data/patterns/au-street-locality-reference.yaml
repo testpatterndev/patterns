@@ -1,13 +1,13 @@
 schema: testpattern/v1
 name: Australian Street Locality Reference
 slug: au-street-locality-reference
-version: 2.6.0
+version: 2.7.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
   Identifies Australian physical addresses using structural street-number + street-name regex combined
-  with road-type, state/territory, and postcode corroborative evidence. Covers the implemented road-type
+  with state/territory, postcode, metro-locality and person corroborative evidence. Covers the implemented road-type
   endings: the standard abbreviated set plus the declared extended endings (Rise, View, Gardens, Loop,
   Trail, Track, Pass, Heights) — not the full GNAF classification list.
 operation: >-
@@ -65,6 +65,10 @@ test_cases:
       description: Extended road-type ending (Rise) with full geography; the primary begins matching at the street number
     - value: 'Level 2, 7B George Street, Sydney NSW 2000'
       description: Level-prefixed address; the existing primary matches from the 7B street number without prefix grammar
+    - value: 'Residential address: 15 Banksia Court, Riverbend QLD 4000'
+      description: Complete address with residential context outside the street line (85 tier)
+    - value: "Elector: Morgan Teston\nEnrolled address: 8 Sandpiper Court, Mackay QLD 4740"
+      description: Complete address with a labelled person (85 tier)
   should_not_match:
     - value: quarterly financial report for fiscal year 2024
       description: Business text with no address elements
@@ -75,6 +79,14 @@ test_cases:
     - value: Ocean levels rise by 12 centimetres.
       description: Prose containing rise without number-name-roadtype address structure
 false_positives:
+  - description: >-
+      An organisation's own office address in a letterhead or email signature is a complete Australian address with
+      state and postcode, and used to reach 85 with no person present (2026-10-16 boilerplate run).
+    mitigation: >-
+      A complete street line now tops out at 75; 85 needs a person within the window: a labelled name field (Name:,
+      Elector:, Owner:, Account holder: and similar), a date of birth, or residential/occupant wording (home or
+      residential address, resident, tenant, occupant, property address). The organisation's own address at 75 is
+      what the per-tenant local noise filter is for. A person named without a label (a signature block) does not count.
   - description: Street names in business names or landmarks.
     mitigation: Require structural patterns with road-type and geographic corroboration.
   - description: Navigation references mentioning road types without actual addresses.
@@ -116,11 +128,31 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    # The road type is always inside the IdMatch span, so it is not evidence.
+    # 75 = a complete street line (state + postcode, or a metro locality);
+    # 85 adds a person outside the address itself (a labelled name, date of
+    # birth, or residential/occupant wording), so a bare organisation
+    # letterhead address stays at 75.
     - confidence_level: 85
       local_noise_filter: true
       id_match: Pattern_street_structure
       matches:
-        - ref: Evidence_road_types
+        - ref: Evidence_state_territory
+        - ref: Pattern_au_postcode
+        - type: any
+          min_matches: 1
+          refs:
+            - Evidence_person_context
+            - Pattern_labelled_person
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Pattern_street_structure
+      matches:
         - ref: Evidence_state_territory
         - ref: Pattern_au_postcode
         - type: any
@@ -132,7 +164,6 @@ purview:
       local_noise_filter: true
       id_match: Pattern_street_structure
       matches:
-        - ref: Evidence_road_types
         - ref: Evidence_metro_areas
         - type: any
           min_matches: 0
@@ -147,55 +178,32 @@ purview:
       pattern: \b\d{1,5}[A-Za-z]?\s+[A-Za-z][A-Za-z\s'\-]{2,50}\s+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Place|Pl|Court|Ct|Crescent|Cres|Close|Cl|Lane|La|Way|Parade|Pde|Boulevard|Blvd|Terrace|Tce|Circuit|Cct|Highway|Hwy|Grove|Gv|Square|Sq|Esplanade|Esp|Rise|View|Gardens|Loop|Trail|Track|Pass|Heights)\b
     - id: Pattern_au_postcode
       pattern: \b(?:0[289]\d{2}|[1-9]\d{3})\b
+    - id: Pattern_labelled_person
+      pattern: >-
+        (?i)\b(?:name|resident|tenant|occupant|applicant|customer|account\s+holder|elector|owner|principal|mortgagor|offender|licensee|submitter|young\s+person|child)\s*[:#-]\s*(?!(?:full|given|first|last|customer|resident|tenant|occupant|account\s+holder)\s+name\b)(?!firstname\s+lastname\b)(?!(?:john|jane)\s+doe\b)[A-Z][A-Za-z'-]{1,30}(?:\s+[A-Z][A-Za-z'-]{1,30}){1,3}\b
+      description: A person-name field (label, colon, two to four name words); label set extends au-person-linked-residential-address's labelled-person regex
   keywords:
-    - id: Evidence_road_types
+    - id: Evidence_person_context
       groups:
         - match_style: word
           terms:
-            - Street
-            - St
-            - Road
-            - Rd
-            - Avenue
-            - Ave
-            - Drive
-            - Dr
-            - Place
-            - Pl
-            - Court
-            - Ct
-            - Crescent
-            - Cres
-            - Close
-            - Cl
-            - Lane
-            - La
-            - Way
-            - Parade
-            - Pde
-            - Boulevard
-            - Blvd
-            - Terrace
-            - Tce
-            - Circuit
-            - Cct
-            - Highway
-            - Hwy
-            - Grove
-            - Gv
-            - Square
-            - Sq
-            - Esplanade
-            - Esp
-            - Rise
-            - View
-            - Gardens
-            - Loop
-            - Trail
-            - Track
-            - Pass
-            - Heights
-      strength: domain
+            - date of birth
+            - text: DOB
+              case_sensitive: true
+            - home address
+            - residential address
+            - place of residence
+            - principal place of residence
+            - permanent address
+            - usual residential address
+            - property address
+            - resides at
+            - residing at
+            - lives at
+            - resident
+            - tenant
+            - occupant
+      strength: specific
     - id: Evidence_state_territory
       groups:
         - match_style: word
@@ -259,8 +267,11 @@ purview:
             - Bunbury
       strength: domain
 created: '2026-02-09'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 2.7.0
+    date: '2026-10-20'
+    description: "Bare letterhead address (2026-10-16 boilerplate run): \"Riverbend Regional Council / Level 4, 120 Wattle Street, Brisbane QLD 4000\" reached 85 with no person present. Both enforcing tiers relied on Evidence_road_types, which always matches inside the IdMatch span (the street line ends in a road type) and Purview counts it, so it was never independent evidence; it is removed. 75 = street line + state + postcode (new) or street line + metro locality; 85 = street line + state + postcode + a person: new Pattern_labelled_person (a labelled name field) or new Evidence_person_context (date of birth, DOB, home/residential address, resident, tenant, occupant, property address). recommended_confidence stays 85, so a bare complete address now reports at 75 instead of 85. Added residential-context and labelled-elector should_match cases."
   - version: 2.6.0
     date: '2026-10-19'
     description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its office street line) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."

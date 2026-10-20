@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Branch Routing Code
 slug: au-branch-routing-code
-version: 2.5.0
+version: 2.6.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -14,7 +14,7 @@ operation: >-
   co-occurrence (high), financial-institution keywords (medium), and broad deposit keywords (low)
   within 300 characters. Uses sentinel/test filters. Checksum: none (BSB codes have no public check digit;
   structural detection only).
-pattern: \b\d{3}[\-\s]?\d{3}\b
+pattern: '(?:\b(?<!-)(?<!\d[ -])\d{3}[\-\s]\d{3}\b(?![ -]\d{3}\b)|(?:(?<=BSB)|(?<=BSB[ :#])|(?<=BSB[:#][ ])|(?<=BSB[ ]no[ ])|(?<=BSB[ ]no\.[ ]))\d{6}\b)'
 confidence: low
 confidence_justification: >-
   Low confidence: 6-digit numbers are ubiquitous. Financial-institution keywords are essential.
@@ -51,8 +51,10 @@ test_cases:
   should_match:
     - value: 062-000
       description: CBA BSB with hyphen separator
-    - value: '012345'
-      description: BSB as 6 continuous digits
+    - value: 'BSB 012345'
+      description: BSB as 6 continuous digits straight after a BSB label
+    - value: 'BSB: 062000'
+      description: Contiguous BSB after a colon-terminated label
     - value: 923-100
       description: Credit union BSB with hyphen
     - value: '062 000'
@@ -68,7 +70,24 @@ test_cases:
       description: Placeholder-style value with only 2 digits in the second group — structurally rejected (sentinel full values like 000-000 are additionally dropped by AllDigitsSameFilter/TextMatchFilter in the SIT)
     - value: 12-3456
       description: Trivial example with a mis-split (2 then 4 digits) — structurally rejected; real 123-456 sentinels are excluded downstream by the test-value filter
+    - value: 'EFT payment to account number 1234 5678. Invoice number: INV-204511, customer reference 204511.'
+      description: >-
+        Invoice remittance block (2026-10-16 boilerplate run): a six-digit invoice or customer reference near EFT and
+        account-number wording. Contiguous six digits count only straight after a BSB label, and a digit run after a
+        hyphen (INV-204511) is rejected.
+    - value: 'ABN 51 824 753 556  ACN 004 085 616. Pay by EFT to the bank account shown on your invoice.'
+      description: >-
+        Business-number letterhead with banking wording: the 3-3 pieces of a longer space-grouped number (824 753,
+        004 085) are not BSBs; the digit-group lookarounds reject them.
 false_positives:
+  - description: >-
+      Invoice remittance blocks carry six-digit invoice and customer references, and ABN/ACN digit groups, next to
+      BSB, EFT and account-number wording, so they reached 75 as BSBs.
+    mitigation: >-
+      A contiguous six-digit run counts as a BSB only straight after a "BSB" label; the separated 3-3 form must not
+      follow a hyphen or a digit-and-separator, and must not be followed by a further three-digit group, so pieces of
+      ABNs (51 824 753 556), ACNs (004 085 616) and prefixed references (INV-204511) no longer match. An unlabelled
+      contiguous BSB is now a false negative.
   - description: 6-digit reference codes, postcodes, or dates in non-financial contexts.
     mitigation: Require financial-institution keywords in proximity.
   - description: Placeholder BSB values and trivial sequential examples in forms or training material.
@@ -143,9 +162,9 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Pattern_routing_code
-      pattern: \b\d{3}[\-\s]?\d{3}\b
+      pattern: '(?:\b(?<!-)(?<!\d[ -])\d{3}[\-\s]\d{3}\b(?![ -]\d{3}\b)|(?:(?<=BSB)|(?<=BSB[ :#])|(?<=BSB[:#][ ])|(?<=BSB[ ]no[ ])|(?<=BSB[ ]no\.[ ]))\d{6}\b)'
     - id: Pattern_bsb_hyphenated
-      pattern: \b\d{3}-\d{3}\b
+      pattern: '\b(?<!-)(?<!\d[ -])\d{3}-\d{3}\b(?![ -]\d{3}\b)'
     - id: Pattern_deposit_account
       pattern: (?is)\b(?:deposit\s+account|account\s+(?:number|no\.?|#|ref(?:erence)?)|bank\s+account|savings\s+account|cheque\s+account|transaction\s+account)\b\s{0,80}\b[A-Z0-9][A-Z0-9\-/]{4,24}\b
   keywords:
@@ -194,8 +213,11 @@ purview:
         - "123-456"
         - "123 456"
 created: '2026-02-08'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 2.6.0
+    date: '2026-10-20'
+    description: "Invoice remittance false positives (2026-10-16 boilerplate run): an invoice remittance block reached 75 on a six-digit invoice reference (INV-204511, \"reference 204511\") and on 3-3 pieces of the organisation ABN and ACN, because Pattern_routing_code matched any six digits near EFT or account-number wording. Pattern_routing_code (and its top-level copy) now matches a separated 3-3 BSB only when it does not continue a longer grouped number (no hyphen or digit-and-separator before it, no further three-digit group after it), and a contiguous six-digit BSB only straight after a BSB label (fixed-width lookbehinds), so the BSB label sits outside the IdMatch span. Pattern_bsb_hyphenated gets the same boundaries. Tier structure is unchanged. The bare \"012345\" should_match becomes \"BSB 012345\"; the remittance and letterhead lines are added as should_not_match."
   - version: 2.5.0
     date: '2026-10-19'
     description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its remit-to BSB, account number, SWIFT/BIC or IBAN) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Credit scores
 slug: global-top500-122-credit-scores
-version: 1.2.3
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -9,7 +9,7 @@ description: Detects references to credit scores in financial and compliance doc
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 5 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:credit\s+score|FICO\s+score|credit\s+rating|credit\s+assessment|risk\s+score|credit\s+bureau|score\s+range|credit\s+evaluation|credit\s+band|scoring\s+model)\b
+pattern: (?is)\b(?:credit\s+scores?|FICO\s+score|credit\s+rating|credit\s+assessment|risk\s+score|credit\s+bureau|score\s+range|credit\s+evaluation|credit\s+band|scoring\s+model)\b
 confidence: medium
 confidence_justification: identifier/document-structure anchored regex with constrained context replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
@@ -40,6 +40,20 @@ test_cases:
       description: Alternative topic phrase match
     - value: credit assessment
       description: Additional topic phrase match
+    - value: |-
+        Credit score
+        Name: Avery Teston
+      description: Populated person/client record with one field (75 tier)
+      synthetic: true
+    - value: |-
+        Credit score
+        Name: Avery Teston
+        Date of birth: 14/02/1988
+      description: Populated person/client record with 2 distinct fields (85 tier)
+      synthetic: true
+    - value: Credit score with VantageScore
+      description: Kept independent term "VantageScore" with the phrase (75 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -47,6 +61,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: credit premium
       description: Generic word pair from old broad template should not match
+    - value: Credit scores
+      description: "Bare detector name (regression guard): the IdMatch does not match it alone, but the generated name-word tier lifted it to 75 next to any IdMatch phrase; it must not reach an enforcing tier"
+    - value: |-
+        Credit score:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about credit score are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -65,11 +88,25 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_credit_scores
+      matches:
+        - ref: Regex_global_top500_122_credit_scores_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_credit_scores
       matches:
-        - ref: Pattern_global_top500_122_credit_scores_label_context
-        - ref: Keyword_global_top500_122_credit_scores_domain_context
+        - type: any
+          min_matches: 1
+          refs:
+            - Keyword_credit_scores
+            - Regex_global_top500_122_credit_scores_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -79,7 +116,6 @@ purview:
       discovery_only: true
       id_match: Regex_credit_scores
       matches:
-        - ref: Keyword_credit_scores
         - type: any
           min_matches: 0
           max_matches: 0
@@ -87,35 +123,16 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_credit_scores
-      pattern: (?is)\b(?:credit\s+score|FICO\s+score|credit\s+rating|credit\s+assessment|risk\s+score|credit\s+bureau|score\s+range|credit\s+evaluation|credit\s+band|scoring\s+model)\b
-    - id: Pattern_global_top500_122_credit_scores_label_context
-      pattern: (?i)\b(?:credit\s+scores)\b
+      pattern: (?is)\b(?:credit\s+scores?|FICO\s+score|credit\s+rating|credit\s+assessment|risk\s+score|credit\s+bureau|score\s+range|credit\s+evaluation|credit\s+band|scoring\s+model)\b
+    - id: Regex_global_top500_122_credit_scores_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#)|consumer|borrower)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Keyword_credit_scores
       groups:
         - match_style: word
           terms:
-            - credit score
-            - FICO score
-            - credit rating
-            - creditworthiness
-            - credit assessment
-            - risk score
-            - credit bureau
-            - score range
-            - credit evaluation
             - VantageScore
-            - credit band
-            - scoring model
       strength: specific
-    - id: Keyword_global_top500_122_credit_scores_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - credit scores
-            - credit
-            - scores
-      strength: domain
 risk_description: >-
   The medium-confidence detector finds credit score, FICO score, rating, assessment, risk-score, range, band, and scoring-model terminology in financial context. When linked to a consumer, a score can reveal creditworthiness and support discriminatory decisions, targeted high-cost lending, or convincing credit-themed impersonation. The normal true positive concerns one person or assessment and creates credible moderate privacy and financial harm, although the regex does not require a name or numeric score. Risk 7 and SENSITIVE are proportionate, while PROTECTED would require a large scoring dataset, protected model, or consequences amounting to significant damage.
 sensitivity_labels:
@@ -143,8 +160,11 @@ frameworks:
   - ISO 27001
   - ISO 27701
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.3.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 75 tier ANDed Pattern_*_label_context (the detector name, "Credit scores") with Keyword_*_domain_context (its words), so the detector name next to any IdMatch phrase was enough for 75. The IdMatch does not match the bare name, so it scored 0 alone, but the name as a heading lifted any IdMatch phrase near it. Re-tiered in the #69 shape: 65 is the phrase alone (discovery only); 75 needs a populated person/client record field (Regex_global_top500_122_credit_scores_record_structure) or the kept independent term VantageScore; 85 needs 2 distinct fields. Curated terms that sit inside an IdMatch hit were removed. "creditworthiness" restates the topic and is dropped. The detector name is the identifying phrase but lived only in the generated label regex, so the IdMatch now accepts the plural "credit scores" (65 discovery; enforcing still needs a populated field). Added the bare name, an empty form and a policy-guidance text as should_not_match, and populated records reaching 75 and 85.'
   - version: 1.2.3
     date: '2026-09-25'
     description: >-

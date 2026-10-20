@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Colombia Tax Identification Number
 slug: co-tax-id
-version: 1.3.4
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,7 +9,7 @@ description: >-
   Detects Colombia Tax Identification Number patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Due to the numeric format, corroborative evidence keywords are
   essential for reliable detection.
 operation: 'Corroborative evidence: 5 keywords within 300 characters. Keyword lists: tax-id, co-financial. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.'
-pattern: \b\d{6,10}-?\d?\b
+pattern: \b(?<!-)\d{6,10}-?\d?\b
 confidence: medium
 confidence_justification: >-
   Medium confidence: variable-length numeric patterns are common. Colombian NIT keywords like 'NIT' or 'DIAN' are required for reliable identification. Added context gating and exclusion rules improve
@@ -43,6 +43,8 @@ test_cases:
       description: Ten-digit Colombian tax ID
     - value: 123456-7
       description: Short-form Colombian NIT
+    - value: 'NIT: 900123456-7, razón social Ejemplo S.A.S., Bogotá, Colombia'
+      description: Labelled NIT with independent Colombian tax context (85 tier)
   should_not_match:
     - value: '12345'
       description: Too few digits for Colombian tax ID
@@ -50,9 +52,22 @@ test_cases:
       description: 12 digits exceeds maximum length for Colombian NIT
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: "TAX INVOICE\nInvoice number: INV-204511\nCustomer reference: 204511\nAmount due: $1,245.60"
+      description: >-
+        Australian invoice remittance block (2026-10-16 boilerplate run). The word "tax" used to satisfy both 85
+        evidence refs on its own; the prefixed INV-204511 is now rejected and the bare reference stays at 65 discovery.
+    - value: 'Factura número 204511, impuesto incluido'
+      description: Spanish-language invoice number; generic tax words without a NIT/RUT/DIAN label stay at 65 discovery
 false_positives:
   - description: Generic numeric sequences in non-tax contexts such as reference numbers or account identifiers
     mitigation: Require corroborative evidence keywords within the proximity window to distinguish tax identifiers from general numeric data.
+  - description: >-
+      Invoice, order and customer reference numbers in any tax invoice: a 6-10 digit run next to "tax", "factura" or
+      "impuesto" used to reach 85, because the word "tax" satisfied both 85 evidence refs at once.
+    mitigation: >-
+      75 needs a Colombian tax-ID label (NIT, RUT, DIAN, número de identificación tributaria) and 85 adds independent
+      Colombian tax context; generic tax words alone stay at the 65 discovery tier. The regex also rejects a digit run
+      that follows a hyphen, as in prefixed references like INV-204511.
   - description: Numbers from other identification schemes with similar digit patterns
     mitigation: Layer with jurisdiction-specific detection to prioritise matches in tax-related documents and cross-reference with other identifier types.
 exports:
@@ -68,17 +83,20 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    # A labelled value (NIT/RUT/DIAN within the window) is 75; 85 also needs
+    # independent Colombian tax context. A bare "tax" or "factura" next to an
+    # invoice or order number stays at the 65 discovery tier.
     - confidence_level: 85
       id_match: Regex_co_tax_id
       matches:
-        - ref: Pattern_co_tax_id_label_context
-        - ref: Keyword_co_tax_id_domain_context
+        - ref: Keyword_co_tax
+        - ref: Keyword_co_tax_context
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-    - confidence_level: 85
+    - confidence_level: 75
       id_match: Regex_co_tax_id
       matches:
         - ref: Keyword_co_tax
@@ -98,9 +116,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_co_tax_id
-      pattern: \b\d{6,10}-?\d?\b
-    - id: Pattern_co_tax_id_label_context
-      pattern: (?i)\b(?:colombia\s+tax\s+identification\s+number|colombia|tax)\b
+      pattern: \b(?<!-)\d{6,10}-?\d?\b
   keywords:
     - id: Keyword_co_tax
       groups:
@@ -114,20 +130,20 @@ purview:
               case_sensitive: true
             - registro único tributario
             - cédula tributaria
+      strength: specific
+    - id: Keyword_co_tax_context
+      groups:
+        - match_style: word
+          terms:
+            - Colombia
+            - colombiana
+            - colombiano
             - identificación fiscal
             - contribuyente
             - impuesto
             - declaración de renta
             - factura
             - razón social
-      strength: domain
-    - id: Keyword_co_tax_id_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - colombia tax identification number
-            - colombia
-            - tax
       strength: domain
   filters:
     - id: Guard_co_tax_id_same_digits
@@ -160,8 +176,11 @@ frameworks:
   - ISO 27001
   - ISO 27701
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-20'
+    description: "Invoice-number false positive (2026-10-16 boilerplate run): an Australian remittance block (\"Tax invoice\", \"Invoice number: INV-204511\") reached 85, because the generated 85 tier took the word \"tax\" as both its label and its domain evidence, and the second 85 tier fired on generic words such as factura or impuesto. Removed the generated tier with its Pattern_co_tax_id_label_context and Keyword_co_tax_id_domain_context. Keyword_co_tax now holds only the Colombian tax-ID labels (NIT, RUT, DIAN, número de identificación tributaria, registro único tributario, cédula tributaria); the generic tax words move to a new Keyword_co_tax_context with Colombia. 75 = value + label, 85 = value + label + context, 65 unchanged. The regex (and its top-level copy) rejects a digit run that follows a hyphen, so INV-204511 no longer matches. Added the remittance block and a Spanish invoice line as should_not_match."
   - version: 1.3.4
     date: '2026-09-25'
     description: 'References completed: every reference has a title and a verified URL.'
