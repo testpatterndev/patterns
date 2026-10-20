@@ -24,7 +24,7 @@ import yaml from 'js-yaml'
 import { purviewBanned } from './lib/purview-banned.mjs'
 import { validateCustomisations } from './lib/customisation.mjs'
 import { loadIdentifiers, validateIdentifier, renderIdentifierDocs } from './lib/identifiers.mjs'
-import { validateClassification, validateReferences, validateRegulations } from './lib/classification.mjs'
+import { validateClassification, validateIdcf, validateReferences, validateRegulations } from './lib/classification.mjs'
 import { validateBlocks } from './lib/blocks.mjs'
 
 const BASE = fileURLToPath(new URL('..', import.meta.url))
@@ -101,6 +101,7 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   if ('identifier_dependencies' in p) errors.push(`${p.slug ?? f}: identifier_dependencies is superseded — declare customisation entries of kind identifier-format referencing data/identifiers/`)
   if (p.status !== 'deprecated') {
     for (const msg of validateClassification(p)) errors.push(`${p.slug ?? f}: ${msg}`)
+    for (const msg of validateIdcf(p)) errors.push(`${p.slug ?? f}: ${msg}`)
     for (const msg of validateReferences(p)) errors.push(`${p.slug ?? f}: ${msg}`)
     for (const msg of validateRegulations(p)) errors.push(`${p.slug ?? f}: ${msg}`)
   }

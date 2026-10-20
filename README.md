@@ -119,6 +119,8 @@ author: testpattern-community
 license: MIT
 ```
 
+Sensitivity labels per scheme (`pspf`, `qgiscf`, `qgiscf_dlm`, `idcf`, `idcf_marker`, `us_gov`, `uk_gov`, `nz_gov`, `ca_gov`) live under `sensitivity_labels` (not shown above); the IDCF values are derived from the Queensland labels per [`docs/IDCF-CROSSWALK.md`](docs/IDCF-CROSSWALK.md) and CI rejects a stored value that disagrees with the derivation.
+
 The `purview` block is optional. When present, the website uses it for full Purview XML export with multiple confidence tiers, checksum validators, filters, and nested AND/OR/NOT match trees. When absent, the simple export path generates basic XML from the top-level `pattern` and `corroborative_evidence` fields.
 
 ## Export formats
