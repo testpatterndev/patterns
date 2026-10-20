@@ -1,0 +1,220 @@
+schema: testpattern/v1
+name: Corporate Purchasing Card Statement or Acquittal
+slug: au-corporate-purchasing-card-statement
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Corporate purchasing card (purchase card, P-card, corporate credit card) statements, transaction reports and purchasing card acquittals for an identified cardholder: the cardholder name, a masked card number, transaction lines (date, merchant, amount), cost centre or general ledger coding and the supervisor or delegate approval. Queensland Government agencies issue the Queensland Government Corporate Purchasing Card under the Treasurer's Guidelines made under the Financial and Performance Management Standard 2019, which require cardholders to acquit each statement with supporting documentation and supervisor review. A statement reveals where and when a named officer spends, the merchants an agency uses, card limits and coding, and is the record reviewed in card misuse investigations. global-top500-092-expense-reimbursement-claims anchors on expense claims and corporate card acquittal / reconciliation phrases; this SIT anchors on the card statement and transaction report structure, and a purchasing card acquittal can match both.
+operation: >-
+  Primary: [corporate] purchasing / purchase / corporate [credit] / P- card [monthly] statement, transaction report / listing / register / statement or activity report; purchasing / purchase / P-card acquittal; cardholder statement or transaction report / listing. 65 (discovery only): primary alone. 75: primary plus one of a populated cardholder field (cardholder [name], name on card, employee [name], staff member followed by a capitalised name), a masked card number (XXXX XXXX XXXX 1234, 4111 **** **** 1234, card ending 1234) or a transaction line (date, merchant text and a decimal amount on one line). 85: primary plus any two of cardholder, masked card, transaction line, populated cost centre / GL / account code / WBS / project code, or populated approver (approved by, approving officer, supervisor, delegate, certified / authorised / reviewed by), plus card-statement evidence (merchant, tax invoice, receipt, business purpose, statement period, credit limit, transaction date, GST, cardholder declaration, misuse, personal expenditure). Enforce tiers AND NOT the shared template-exclusion dictionary and a policy / guidance exclusion (guidelines for the use, this procedure, this policy, policy guidance, training module, fact sheet, frequently asked questions, media release). Field values are placeholder-guarded.
+pattern: >-
+  (?i)\b(?:(?:(?:corporate\s+)?purchasing|purchase|corporate(?:\s+credit)?|P-?)[ \t-]?card\s+(?:monthly\s+)?(?:statement|transaction\s+(?:report|listing|register|statement)|activity\s+report)|(?:(?:corporate\s+)?purchasing|purchase|P-?)[ \t-]?card\s+acquittal|card\s?holder\s+(?:statement|transaction\s+(?:report|listing)))s?\b
+confidence: medium
+confidence_justification: >-
+  Medium. Card statement phrases are specific, but card policies, procedures and training material repeat them, so enforce tiers need populated statement structure and policy framing is excluded. Transaction lines resemble other dated ledgers, so 85 also needs a second structure and card-statement evidence. 85/75 are heuristic evidence tiers, not measured accuracy. Test values are synthetic.
+jurisdictions:
+  - au
+  - au-qld
+regulations:
+  - Financial Accountability Act 2009 (Qld)
+  - Financial and Performance Management Standard 2019 (Qld)
+  - Information Privacy Act 2009 (Qld)
+frameworks:
+  - QGISCF
+  - Treasurer's Guidelines for the use of the Queensland Government Corporate Purchasing Card
+data_categories:
+  - financial
+  - pii
+  - government
+corroborative_evidence:
+  keywords:
+    - merchant
+    - tax invoice
+    - receipt
+    - business purpose
+    - statement period
+    - credit limit
+    - transaction date
+    - cardholder declaration
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Corporate purchasing card statement - statement period 01/09/2026 to 30/09/2026\nCardholder: Alex Teston\nCard number: XXXX XXXX XXXX 4417\n03/09/2026 Officeworks Toowoomba 214.60\n11/09/2026 Qantas Airways 489.00\nCost centre: 4410-220\nApproved by: Morgan Teston\nAll receipts attached; business purpose recorded for each merchant."
+      description: Monthly purchasing card statement with cardholder, masked card, transactions, coding and approval (85 tier)
+      synthetic: true
+    - value: "Purchasing card acquittal - October 2026\nCardholder: Jordan Teston\n14/10/2026 | Bunnings Warehouse Mackay | 96.35\nGL code: 61205\nTax invoice held for each transaction."
+      description: Purchasing card acquittal with cardholder, transaction line, GL code and receipt evidence (85 tier)
+      synthetic: true
+    - value: "P-card transaction report\nCardholder: Riley Teston"
+      description: Card transaction report naming the cardholder only (75 tier)
+      synthetic: true
+    - value: "Corporate card statement for card ending 4417 attached for review."
+      description: Corporate card statement with a masked card number only (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: "Corporate purchasing card procedure: cardholders must acquit each purchasing card statement within 10 business days. This procedure applies to all cardholders. Cardholder: the employee issued the card."
+      description: Card procedure (guidance exclusion, 65 only)
+    - value: "Purchasing card acquittal\nCardholder: __________\nCard number: XXXX XXXX XXXX ____\nCost centre: ________\nApproved by: __________"
+      description: Blank acquittal form (65 only)
+    - value: "The audit found that 312 purchasing card statements were acquitted late in 2025-26."
+      description: Aggregate audit finding (65 only)
+    - value: "unrelated generic text without domain phrases"
+      description: Unrelated
+false_positives:
+  - description: Purchasing card policies, procedures, Treasurer's Guidelines, training modules and FAQ.
+    mitigation: A policy / guidance exclusion suppresses every enforce tier, and they rarely carry a populated cardholder, masked card or transaction line.
+  - description: Expense claims and corporate card acquittals.
+    mitigation: global-top500-092-expense-reimbursement-claims also covers corporate card acquittals; a purchasing card acquittal can match both.
+  - description: Blank statement or acquittal forms.
+    mitigation: Field values are placeholder-guarded and blank masked numbers fail the four-digit tail.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_purchasing_card_primary
+      matches:
+        - type: any
+          min_matches: 2
+          refs:
+            - Regex_au_purchasing_card_cardholder_field
+            - Regex_au_purchasing_card_masked_number
+            - Regex_au_purchasing_card_transaction_line
+            - Regex_au_purchasing_card_cost_centre
+            - Regex_au_purchasing_card_approver
+        - ref: Keyword_au_purchasing_card_statement_evidence
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_purchasing_card_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_purchasing_card_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_purchasing_card_cardholder_field
+            - Regex_au_purchasing_card_masked_number
+            - Regex_au_purchasing_card_transaction_line
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_purchasing_card_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_purchasing_card_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_purchasing_card_primary
+      pattern: >-
+        (?i)\b(?:(?:(?:corporate\s+)?purchasing|purchase|corporate(?:\s+credit)?|P-?)[ \t-]?card\s+(?:monthly\s+)?(?:statement|transaction\s+(?:report|listing|register|statement)|activity\s+report)|(?:(?:corporate\s+)?purchasing|purchase|P-?)[ \t-]?card\s+acquittal|card\s?holder\s+(?:statement|transaction\s+(?:report|listing)))s?\b
+    - id: Regex_au_purchasing_card_cardholder_field
+      pattern: >-
+        (?i)\b(?:card\s?holder(?:\s+name)?|name\s+on\s+card|employee(?:\s+name)?|staff\s+member)[ \t]*[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not|none|nil|redacted|suppressed|the|a|an|any|all|each|see|refer|employee)\b|_{2,}|\[|<)(?:(?:Mr|Mrs|Ms|Miss|Dr)\.?[ \t]+)?[A-Z][A-Za-z'-]{1,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){1,3}
+    - id: Regex_au_purchasing_card_masked_number
+      pattern: >-
+        (?i)(?:(?:[X*#]{4}[ -]?){3}\d{4}\b|\b\d{4}[ -]?(?:[X*#]{4}[ -]?){2}\d{4}\b|\b(?:card\s+(?:ending(?:\s+in)?|no\.?\s+ending)|account\s+ending(?:\s+in)?)[ \t]{0,3}[:#]?[ \t]{0,3}\d{4}\b)
+    - id: Regex_au_purchasing_card_transaction_line
+      pattern: >-
+        \b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}[ \t,|]{1,6}[A-Za-z][^\n]{2,60}[ \t,|]\$?\d{1,3}(?:,\d{3}){0,3}\.\d{2}\b
+    - id: Regex_au_purchasing_card_cost_centre
+      pattern: >-
+        (?i)\b(?:cost\s+cent(?:re|er)|GL\s+(?:code|account)|general\s+ledger(?:\s+code)?|account\s+code|WBS(?:\s+element)?|project\s+code)[ \t]*[:#][ \t]{0,5}(?=[A-Z0-9-]{0,10}\d)[A-Z0-9][A-Z0-9-]{2,20}
+    - id: Regex_au_purchasing_card_approver
+      pattern: >-
+        (?i)\b(?:approved\s+by|approving\s+officer|supervisor|financial\s+delegate|delegate|certified\s+by|authorised\s+by|reviewed\s+by)[ \t]*[:#][ \t]{0,5}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not|none|nil|redacted|suppressed|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)(?:(?:Mr|Mrs|Ms|Miss|Dr)\.?[ \t]+)?[A-Z][A-Za-z'-]{1,30}(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){1,3}
+  keywords:
+    - id: Keyword_au_purchasing_card_statement_evidence
+      groups:
+        - match_style: word
+          terms:
+            - merchant
+            - tax invoice
+            - receipt
+            - receipts
+            - business purpose
+            - statement period
+            - credit limit
+            - transaction date
+            - text: GST
+              case_sensitive: true
+            - cardholder declaration
+            - misuse
+            - personal expenditure
+      strength: domain
+    - id: Keyword_au_purchasing_card_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - guidelines for the use
+            - this procedure
+            - this policy
+            - policy guidance
+            - training module
+            - fact sheet
+            - frequently asked questions
+            - media release
+      strength: noise
+risk_rating: 5
+risk_description: >-
+  The classifier identifies a corporate purchasing card statement, transaction report or acquittal for an identified cardholder with a masked card number, dated merchant transactions, cost coding or approval. It reveals a named officer's spending pattern, travel and suppliers, and is the core record in card misuse reviews. The full card number is normally masked, so the record does not enable card fraud by itself; a statement carrying a full card number is covered by the payment card number SITs. Policies, procedures, training, blank forms and aggregate audit findings are excluded from enforce tiers. Risk 5 supports OFFICIAL, in line with global-top500-092-expense-reimbursement-claims (risk 4 OFFICIAL); bulk statement extracts across many cardholders, or statements inside a misuse investigation, warrant SENSITIVE handling.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Low
+  rationale: >-
+    Risk 5 maps to PSPF OFFICIAL, QGISCF OFFICIAL and Low because a purchasing card statement shows a named officer's
+    business spending with a masked card number, comparable to an expense claim. SENSITIVE is not met for a single
+    statement; bulk cardholder extracts or statements held in a misuse investigation should be handled as SENSITIVE.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Low handling fits one officer's masked-card business transactions; bulk extracts and misuse investigation
+      files deserve stricter handling.
+references:
+  - title: Queensland Treasury - Treasurer's Guidelines for the use of the Queensland Government Corporate Purchasing Card
+    url: https://www.treasury.qld.gov.au/files/treasurers-guidelines-corporate-card.pdf
+  - title: Financial and Performance Management Standard 2019 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/sl-2019-0182
+  - title: Financial Accountability Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-009
+  - title: Information Privacy Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+created: '2026-10-20'
+updated: '2026-10-20'
+changelog:
+  - version: 1.0.0
+    date: '2026-10-20'
+    description: >-
+      Initial release (qgfin sector review gap). Purchasing card statements, transaction reports and acquittals. 75
+      needs a cardholder, masked card number or transaction line; 85 needs two statement structures plus card-statement
+      evidence. Policy / guidance and template framing are excluded on enforce tiers.
+author: testpattern-community
+license: MIT
