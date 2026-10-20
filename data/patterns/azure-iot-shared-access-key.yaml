@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Azure IoT Shared Access Key
 slug: azure-iot-shared-access-key
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -80,16 +80,6 @@ purview:
     - confidence_level: 85
       id_match: Regex_azure_iot_shared_access_key
       matches:
-        - ref: Pattern_azure_iot_shared_access_key_label_context
-        - ref: Keyword_azure_iot_shared_access_key_domain_context
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_azure_iot_shared_access_key
-      matches:
         - ref: Keyword_azure_iot_key
         - type: any
           min_matches: 0
@@ -118,16 +108,12 @@ purview:
   regexes:
     - id: Regex_azure_iot_shared_access_key
       pattern: (?i)(?:SharedAccessKey|iot[._-]?key|device[._-]?key|iothub[._-]?key)\s*[:=]\s*"?[A-Za-z0-9+/\s]{40,54}={0,2}"?
-    - id: Pattern_azure_iot_shared_access_key_label_context
-      pattern: (?i)\b(?:azure\s+iot\s+shared\s+access\s+key|azure|iot|shared|access|key)\b
   keywords:
     - id: Keyword_azure_iot_key
       groups:
         - match_style: word
           terms:
             - IoT Hub
-            - IoT
-            - SharedAccessKey
             - device key
             - IoT Hub key
             - azure-devices
@@ -138,17 +124,6 @@ purview:
             - symmetric key
             - SAS token
       strength: specific
-    - id: Keyword_azure_iot_shared_access_key_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - azure iot shared access key
-            - azure
-            - iot
-            - shared
-            - access
-            - key
-      strength: domain
 risk_rating: 8
 risk_description: >-
   This pattern accepts values labelled SharedAccessKey, iot_key, and device_key without requiring the IoT Hub endpoint or policy name. If live, the secret may enable telemetry spoofing, device impersonation, or operations allowed by its associated policy. A routine match can belong to one device, so fleet control and physical impact cannot be inferred from the key alone. Risk 8 SENSITIVE covers serious contained misuse; PROTECTED requires confirmed hub-level authority or critical safety consequences.
@@ -176,8 +151,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-iot-shared-access-key
     title: Azure IoT shared access key entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 1.6.0
+    date: '2026-10-20'
+    description: 'Self-corroboration fix (85 needs independent context, as #80 intended for populated-label IdMatches): Purview counts a supporting match that sits inside the IdMatch span when a word break separates it (dev-tenant run 2026-10-19; ":" and "_" break words, "=" does not), so a single labelled value reached 85 on its own label. Removed the generated 85 tier whose evidence was the detector name split into words (Pattern_azure_iot_shared_access_key_label_context, Keyword_azure_iot_shared_access_key_domain_context); those words sit inside the IdMatch label, and the definitions are now unreferenced and removed. Removed from Keyword_azure_iot_key the terms that match inside the IdMatch label: IoT, SharedAccessKey. The labelled value alone stays at its lower tier; 85 now needs context outside the label.'
   - version: 1.5.0
     date: '2026-10-19'
     description: 'Add a 75 tier on the populated label alone (Regex_azure_iot_shared_access_key, plus the noise exclusion). The 85 tiers relied on label keywords that sit inside the IdMatch, where "=" (or "$") joins them to the value, so Purview never matched them (dev-tenant word-break probe 2026-10-19, testpatterndev/testpattern.dev#30) and these values reached no enforcing tier. A populated label is 75 under the self-corroboration convention; 85 still needs independent context.'
