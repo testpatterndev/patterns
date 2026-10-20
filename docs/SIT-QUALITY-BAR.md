@@ -40,6 +40,7 @@ Authoritative expectations for pattern YAML in this repo. CI may enforce a subse
 - risk 1–4 → typically OFFICIAL / low DLM  
 - risk 5–7 → OFFICIAL or OFFICIAL:Sensitive depending on substance  
 - risk 8–9 → OFFICIAL:Sensitive / SENSITIVE (+ domain DLM)  
+- risk 9 → PROTECTED where a single record enables an attack on a critical system, or exposes a child, a whistleblower or bulk suppressed-address data  
 - risk 10 → PROTECTED / equivalent when justified  
 
 Workbook (v25+) and YAML must not diverge by more than one band without a changelog note.
