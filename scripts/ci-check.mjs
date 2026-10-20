@@ -28,6 +28,16 @@ import { validateClassification, validateIdcf, validateReferences, validateRegul
 import { validateBlocks } from './lib/blocks.mjs'
 
 const BASE = fileURLToPath(new URL('..', import.meta.url))
+
+// Never attach the local noise filter here: for a DFV service a "key office location" entry
+// *is* the confidential address, and BEC/payroll-redirect content names the organisation by design.
+const LOCAL_NOISE_FORBIDDEN = new Set([
+  'au-dfv-confidential-address',
+  'au-qld-postal-declaration-vote',
+  'global-top500-142-supplier-bank-change-requests',
+  'bank-account-with-payment-authorisation-token',
+  'global-top500-081-payroll-bank-account-details'
+])
 const patDir = join(BASE, 'data', 'patterns')
 const kwDir = join(BASE, 'data', 'keywords')
 const REQUIRED = ['schema', 'name', 'slug', 'type', 'confidence', 'jurisdictions', 'regulations', 'data_categories', 'test_cases']
@@ -124,6 +134,17 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
     for (const key of ['min_count', 'unique_results']) {
       if (key in tier) errors.push(`${p.slug ?? f}: pattern_tiers[${i}].${key} is not exported; put it on a match node (e.g. { ref: <id_match>, ${key}: ... })`)
     }
+  }
+
+  // local_noise_filter opts a tier in to the per-tenant Local Noise Exclusion dictionary
+  // (customer's own ABN, phones, mailboxes, office street line, remit-to banking). 65 stays
+  // unfiltered so discovery still reports those values, and protected-location and fraud
+  // detectors must never be able to hide a match behind an organisation-identity entry.
+  for (const tier of p.purview?.pattern_tiers ?? []) {
+    if (!('local_noise_filter' in tier)) continue
+    if (tier.local_noise_filter !== true) errors.push(`${p.slug ?? f}: local_noise_filter must be true when present, got ${JSON.stringify(tier.local_noise_filter)}`)
+    else if (!(tier.confidence_level > 65)) errors.push(`${p.slug ?? f}: local_noise_filter is only allowed on tiers above 65 (got ${tier.confidence_level})`)
+    else if (LOCAL_NOISE_FORBIDDEN.has(p.slug)) errors.push(`${p.slug}: local_noise_filter is forbidden on this pattern (protected location or fraud detector)`)
   }
 
   const idMatchIds = new Set((p.purview?.pattern_tiers ?? []).map(t => t.id_match).filter(Boolean))

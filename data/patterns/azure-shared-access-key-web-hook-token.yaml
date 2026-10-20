@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Azure Shared Access Key / Web Hook Token
 slug: azure-shared-access-key-web-hook-token
-version: 1.4.2
+version: 1.6.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -80,16 +80,6 @@ purview:
     - confidence_level: 85
       id_match: Regex_azure_shared_access_key_webhook
       matches:
-        - ref: Pattern_azure_shared_access_key_web_hook_token_label_context
-        - ref: Keyword_azure_shared_access_key_web_hook_token_domain_context
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      id_match: Regex_azure_shared_access_key_webhook
-      matches:
         - ref: Keyword_azure_shared_access_key_webhook
         - type: any
           min_matches: 0
@@ -105,40 +95,32 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    # Populated label alone is 75 (self-corroboration convention); 85 still needs
+    # independent context. The label evidence inside the IdMatch never matches (dev-tenant word-break probe 2026-10-19, testpatterndev/testpattern.dev#30).
+    - confidence_level: 75
+      id_match: Regex_azure_shared_access_key_webhook
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_azure_shared_access_key_webhook
       pattern: (?i)(?:SharedAccessKey|webhook[._-]?token|hook[._-]?token|access[._-]?key)\s*[:=]\s*"?[A-Za-z0-9+/]{30,60}={0,2}"?
-    - id: Pattern_azure_shared_access_key_web_hook_token_label_context
-      pattern: (?i)\b(?:azure\s+shared\s+access\s+key\s+/\s+web\s+hook\s+token|azure|shared|access|key|web|hook|token)\b
   keywords:
     - id: Keyword_azure_shared_access_key_webhook
       groups:
         - match_style: word
           terms:
             - shared access key
-            - webhook
             - web hook
-            - token
             - Azure
             - access key
-            - SharedAccessKey
             - notification
             - Event Grid
             - notification hub
             - endpoint
-      strength: domain
-    - id: Keyword_azure_shared_access_key_web_hook_token_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - azure shared access key / web hook token
-            - azure
-            - shared
-            - access
-            - key
-            - web
-            - hook
-            - token
       strength: domain
 risk_rating: 8
 risk_description: >-
@@ -169,8 +151,14 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-shared-access-key-web-hook-token
     title: Azure shared access key / web hook token entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.6.0
+    date: '2026-10-20'
+    description: 'Self-corroboration fix (85 needs independent context, as #80 intended for populated-label IdMatches): Purview counts a supporting match that sits inside the IdMatch span when a word break separates it (dev-tenant run 2026-10-19; ":" and "_" break words, "=" does not), so a single labelled value reached 85 on its own label. Removed the generated 85 tier whose evidence was the detector name split into words (Pattern_azure_shared_access_key_web_hook_token_label_context, Keyword_azure_shared_access_key_web_hook_token_domain_context); those words sit inside the IdMatch label, and the definitions are now unreferenced and removed. Removed from Keyword_azure_shared_access_key_webhook the terms that match inside the IdMatch label: webhook, token, SharedAccessKey. The labelled value alone stays at its lower tier; 85 now needs context outside the label.'
+  - version: 1.5.0
+    date: '2026-10-19'
+    description: 'Add a 75 tier on the populated label alone (Regex_azure_shared_access_key_webhook, plus the noise exclusion). The 85 tiers relied on label keywords that sit inside the IdMatch, where "=" (or "$") joins them to the value, so Purview never matched them (dev-tenant word-break probe 2026-10-19, testpatterndev/testpattern.dev#30) and these values reached no enforcing tier. A populated label is 75 under the self-corroboration convention; 85 still needs independent context.'
   - version: 1.4.2
     date: '2026-09-25'
     description: >-

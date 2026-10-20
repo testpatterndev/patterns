@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: IBAN values
 slug: global-top500-103-iban-values
-version: 1.5.0
+version: 1.6.1
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -96,6 +96,7 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
+      local_noise_filter: true
       id_match: Regex_global_top500_103_iban_values_populated_label
       matches:
         - ref: Regex_global_top500_103_iban_values_record_structure
@@ -105,6 +106,7 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
+      local_noise_filter: true
       id_match: Regex_global_top500_103_iban_values_populated_label
       matches:
         - type: any
@@ -113,6 +115,7 @@ purview:
           refs:
             - Evidence_template_exclusion
     - confidence_level: 75
+      local_noise_filter: true
       id_match: Pattern_iban_values
       matches:
         - ref: Evidence_iban_values
@@ -130,7 +133,7 @@ purview:
     - id: Regex_global_top500_103_iban_values_populated_label
       pattern: (?i)\b(?:\b(?:IBAN|international\s+bank\s+account\s+number)\b)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
     - id: Regex_global_top500_103_iban_values_record_structure
-      pattern: (?i)\b(?:payee|supplier|vendor|creditor|beneficiary|account\s+name|BSB|account\s+(?:no\.?|number)|invoice\s+(?:no\.?|number)|remittance\s+(?:no\.?|number|ref(?:erence)?)|payment\s+(?:ref(?:erence)?|date)|amount\s+paid)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+      pattern: (?i)\b(?:payee|supplier|vendor|creditor|beneficiary|account\s+name|BSB|invoice\s+(?:no\.?|number)|remittance\s+(?:no\.?|number|ref(?:erence)?)|payment\s+(?:ref(?:erence)?|date)|amount\s+paid)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
   keywords:
     - id: Evidence_iban_values
       groups:
@@ -175,8 +178,14 @@ references:
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-08'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 1.6.1
+    date: '2026-10-20'
+    description: 'Self-corroboration fix: the 85 payee/account field accepted "account number", which sits inside the populated attribute field ("International bank account number: ..."). Purview counts a supporting match contained in the IdMatch span (dev-tenant run 2026-10-19), so one populated field reached 85 on its own. Removed account number from the payee/account label list; 85 again needs a second, independent populated field.'
+  - version: 1.6.0
+    date: '2026-10-19'
+    description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its remit-to BSB, account number, SWIFT/BIC or IBAN) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."
   - version: 1.5.0
     date: '2026-10-19'
     description: 'Self-corroboration fix: Purview counts a supporting match whose span equals the IdMatch (dev-tenant gating test 2026-10-16), so the topic phrase corroborated itself and a bare heading reached the 75 enforcement tier. 75 now uses the populated field as its primary (Regex_global_top500_103_iban_values_populated_label: the label followed by a value), or the phrase plus one remaining corroborative term (beneficiary account, wire transfer, international payment, SEPA, correspondent bank, cross-border payment, bank identifier, account validation); 85 requires the populated field plus a populated payee/account field (Regex_global_top500_103_iban_values_record_structure). Phrase-only matches stay at 65 discovery. Removed the IdMatch''s own phrases from the evidence list and generic terms (remittance). Added a populated positive and empty-form / policy-guidance decoys, plus a record with the label but no value.'
