@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Underwriting decision rationales
 slug: global-top500-130-underwriting-decision-rationales
-version: 1.2.3
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -43,6 +43,17 @@ test_cases:
       description: Alternative topic phrase match
     - value: decline reason
       description: Additional topic phrase match
+    - value: |-
+        Underwriting decision
+        Name: Avery Teston
+      description: Populated person/client record with one field (75 tier)
+      synthetic: true
+    - value: |-
+        Underwriting decision
+        Name: Avery Teston
+        Date of birth: 14/02/1988
+      description: Populated person/client record with 2 distinct fields (85 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -50,6 +61,15 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: credit premium
       description: Generic word pair from old broad template should not match
+    - value: Underwriting decision rationales
+      description: "Bare detector name: it reached 75 through the generated name-word tier and must not reach an enforcing tier"
+    - value: |-
+        Underwriting decision:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about underwriting decision are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -68,11 +88,21 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_underwriting_decision
+      matches:
+        - ref: Regex_global_top500_130_underwriting_decision_rationales_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_underwriting_decision
       matches:
-        - ref: Pattern_global_top500_130_underwriting_decision_rationales_label_context
-        - ref: Keyword_global_top500_130_underwriting_decision_rationales_domain_context
+        - ref: Regex_global_top500_130_underwriting_decision_rationales_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -82,7 +112,6 @@ purview:
       discovery_only: true
       id_match: Regex_underwriting_decision
       matches:
-        - ref: Keyword_underwriting_decision
         - type: any
           min_matches: 0
           max_matches: 0
@@ -92,35 +121,8 @@ purview:
     - id: Regex_underwriting_decision
       pattern: >-
         (?is)\b(?:underwriting\s+decision|risk\s+assessment|approval\s+rationale|decline\s+reason|risk\s+appetite|underwriting\s+criteria|risk\s+classification|conditional\s+approval|risk\s+rating|loss\s+ratio)\b
-    - id: Pattern_global_top500_130_underwriting_decision_rationales_label_context
-      pattern: (?i)\b(?:underwriting\s+decision\s+rationales)\b
-  keywords:
-    - id: Keyword_underwriting_decision
-      groups:
-        - match_style: word
-          terms:
-            - underwriting decision
-            - risk assessment
-            - approval rationale
-            - decline reason
-            - risk appetite
-            - underwriting criteria
-            - risk classification
-            - conditional approval
-            - underwriter
-            - risk rating
-            - actuarial
-            - loss ratio
-      strength: specific
-    - id: Keyword_global_top500_130_underwriting_decision_rationales_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - underwriting decision rationales
-            - underwriting
-            - decision
-            - rationales
-      strength: domain
+    - id: Regex_global_top500_130_underwriting_decision_rationales_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#)|underwriter|borrower|insured\s+person)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 risk_description: >-
   This medium-confidence regex covers underwriting decision, risk assessment, approval rationale, decline reason, underwriting criteria, risk rating, and loss ratio with seven finance or record corroborators, so it can identify methodology discussion without an applicant or decision. A populated record linking an applicant to an outcome, reason, condition, or price can reveal personal or financial weaknesses and show how that application was evaluated. The direct impact falls on the applicant and the underwriting organisation, while manipulation of future applications depends on sufficiently specific decision logic rather than a generic risk term. Risk 7 and SENSITIVE Financial are retained for an attributable rationale; PROTECTED requires a decision corpus, proprietary model disclosure, or strategic exposure causing significant damage.
 sensitivity_labels:
@@ -152,8 +154,11 @@ frameworks:
   - ISO 27001
   - ISO 27701
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.3.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 75 tier ANDed Pattern_*_label_context (the detector name, "Underwriting decision rationales") with Keyword_*_domain_context (its words), so the detector name next to any IdMatch phrase was enough for 75. Both lists sit inside the IdMatch phrase, so the bare name alone scored 75. Re-tiered in the #69 shape: 65 is the phrase alone (discovery only); 75 needs a populated person/client record field (Regex_global_top500_130_underwriting_decision_rationales_record_structure); 85 needs 2 distinct fields. Curated terms that sit inside an IdMatch hit were removed. "underwriter" restates the topic and "actuarial" is generic; "underwriter" is now a populated-field label. Added the bare name, an empty form and a policy-guidance text as should_not_match, and populated records reaching 75 and 85.'
   - version: 1.2.3
     date: '2026-09-25'
     description: >-
