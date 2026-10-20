@@ -4,7 +4,7 @@
 // See data/blocks/README.md.
 
 export const BLOCK_SCHEMA = 'testpattern.block.v1'
-export const BLOCK_LAYERS = ['core', 'queensland-government', 'sector', 'extended']
+export const BLOCK_LAYERS = ['core', 'queensland-government', 'sector', 'extended', 'optional']
 export const BLOCK_DOMAINS = ['privacy', 'workforce', 'education', 'finance', 'health', 'legal', 'government', 'business',
   'security-ops', 'credentials', 'ai', 'critical-infrastructure', 'council']
 const ID = /^[a-z][a-z0-9-]*$/
@@ -30,6 +30,19 @@ export function validateBlocks(blocks, activeSlugs, deprecatedSlugs) {
       else owner.set(s, b.id)
     }
     if (new Set(b.patterns).size !== b.patterns.length) errors.push(`${at}: patterns lists a slug twice`)
+  }
+  // An optional block holds the lower-priority members of one source block: it is named
+  // <source>-optional and shares the source block's domain. Full packages take both; lean
+  // packages take only the source block.
+  const byId = new Map([...blocks.values()].filter(b => b && typeof b.id === 'string').map(b => [b.id, b]))
+  for (const [file, b] of blocks) {
+    if (!b || typeof b !== 'object' || (b.layer !== 'optional' && !String(b.id || '').endsWith('-optional'))) continue
+    const at = `data/blocks/${file}`
+    if (b.layer !== 'optional') { errors.push(`${at}: a block named *-optional must have layer 'optional'`); continue }
+    if (!String(b.id || '').endsWith('-optional')) { errors.push(`${at}: an optional block must be named <source block>-optional`); continue }
+    const source = byId.get(b.id.slice(0, -'-optional'.length))
+    if (!source || source.layer === 'optional') errors.push(`${at}: no source block '${b.id.slice(0, -'-optional'.length)}' for this optional block`)
+    else if (source.domain !== b.domain) errors.push(`${at}: domain must match its source block '${source.id}' (${source.domain})`)
   }
   return errors
 }
