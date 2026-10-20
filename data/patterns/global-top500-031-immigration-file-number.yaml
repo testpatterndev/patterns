@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Immigration file number
 slug: global-top500-031-immigration-file-number
-version: 1.4.3
+version: 1.5.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -50,6 +50,12 @@ test_cases:
       description: Topic phrase within surrounding text
     - value: Migration file reference held by Home Affairs.
       description: Source-authored synonym phrase surfaces via the discovery-only synonym branch
+    - value: |-
+        Immigration file number: Recorded
+        Name: Avery Teston
+        Date of birth: 14/02/1988
+      description: Populated attribute field with a linked record field (85 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text
       description: No relevant phrase context
@@ -63,6 +69,17 @@ test_cases:
       description: Policy file is not a case/file reference — adjacent-word requirement keeps it excluded
     - value: Visa conditions changed this year.
       description: Immigration topic alone is insufficient
+    - value: |-
+        Immigration file number:
+        Name:
+        Date of birth:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about immigration file number are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
+    - value: |-
+        Immigration file number:
+        Name: Avery Teston
+      description: "Record with the attribute label but no value: the label must not corroborate itself (discovery only)"
 false_positives:
   - description: Common words and phrases related to immigration file number appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal data.
     mitigation: Require corroborative evidence keywords within the proximity window to confirm sensitive data context rather than general discussion.
@@ -82,17 +99,19 @@ purview:
     - dict: template-exclusion
       as: Evidence_template_exclusion
       match_style: word
-    - dict: generic-data-labels
-      as: Evidence_generic_data_labels
-      match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_immigration_file
+      id_match: Regex_global_top500_031_immigration_file_number_populated_label
       matches:
-        - ref: Evidence_immigration_file
-          min_count: 2
-          unique_results: true
-        - ref: Evidence_generic_data_labels
+        - ref: Regex_global_top500_031_immigration_file_number_record_structure
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+    - confidence_level: 75
+      id_match: Regex_global_top500_031_immigration_file_number_populated_label
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -102,7 +121,6 @@ purview:
       id_match: Pattern_immigration_file
       matches:
         - ref: Evidence_immigration_file
-        - ref: Evidence_generic_data_labels
         - type: any
           min_matches: 0
           max_matches: 0
@@ -112,12 +130,20 @@ purview:
       discovery_only: true
       id_match: Pattern_immigration_file
       matches:
-        - ref: Evidence_immigration_file
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
     - confidence_level: 65
       id_match: Pattern_immigration_file_synonyms
       discovery_only: true
       description: Bounded case/reference synonym phrases (immigration/migration file, immigration reference, IMMI reference) — discovery inventory only; any adjacent code is not validated
   regexes:
+    - id: Regex_global_top500_031_immigration_file_number_populated_label
+      pattern: (?i)\b(?:\b(?:immigration\s+file\s+numbers?)\b)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_global_top500_031_immigration_file_number_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
     - id: Pattern_immigration_file
       pattern: (?i)\b(?:immigration\s+file\s+numbers?)\b
     - id: Pattern_immigration_file_synonyms
@@ -129,9 +155,6 @@ purview:
       groups:
         - match_style: word
           terms:
-            - immigration file number
-            - immigration file
-            - file number
             - immigration reference
             - Department of Home Affairs
             - visa application
@@ -171,8 +194,11 @@ classification:
       Generic Low and Low handling fit an immigration case reference whose material sensitivity depends on linkage to
       the person and substantive case information.
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-20'
+    description: 'Self-corroboration fix (PR #69 shape; this pattern was missed by #69): the evidence lists held the IdMatch phrase or phrases inside it (immigration file number, immigration file, file number; generic-data-labels, which holds number labels such as registration/file/identification number). Purview counts a supporting match that equals or sits inside the IdMatch span (dev-tenant tests 2026-10-16 and 2026-10-19), so a bare heading reached an enforcement tier. 75 now uses the populated field as its primary (Regex_global_top500_031_immigration_file_number_populated_label: the label followed by a value), or the phrase plus one remaining corroborative term (Evidence_immigration_file); 85 requires the populated field plus a populated person/client field (Regex_global_top500_031_immigration_file_number_record_structure). The record-structure field omits file so it cannot match inside the populated field. Phrase-only matches stay at 65 discovery. Added a populated positive and empty-form / policy-guidance decoys, plus a record with the label but no value.'
   - version: 1.4.3
     date: '2026-09-25'
     description: >-
