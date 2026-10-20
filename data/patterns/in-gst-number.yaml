@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: India GST Number
 slug: in-gst-number
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -54,6 +54,8 @@ test_cases:
       description: No leading state code digits, invalid format
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'india 22AAAAA0000A1Z5'
+      description: 'A generic word from the detector name ("india") next to a matching value is not 85 evidence; it reached 85 through the generated name-word tier'
 false_positives:
   - description: Generic numeric sequences in non-tax contexts such as reference numbers or account identifiers
     mitigation: Require corroborative evidence keywords within the proximity window to distinguish tax identifiers from general numeric data.
@@ -76,17 +78,6 @@ purview:
       local_noise_filter: true
       id_match: Regex_in_gst_number
       matches:
-        - ref: Pattern_in_gst_number_label_context
-        - ref: Keyword_in_gst_number_domain_context
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      local_noise_filter: true
-      id_match: Regex_in_gst_number
-      matches:
         - ref: Keyword_in_gst_number
         - type: any
           min_matches: 0
@@ -105,8 +96,6 @@ purview:
   regexes:
     - id: Regex_in_gst_number
       pattern: \b\d{2}[A-Z]{5}\d{4}[A-Z]\d[A-Z0-9][A-Z0-9]\b
-    - id: Pattern_in_gst_number_label_context
-      pattern: (?i)\b(?:india\s+gst\s+number|india|gst)\b
   keywords:
     - id: Keyword_in_gst_number
       groups:
@@ -126,14 +115,6 @@ purview:
             - GST return
             - GST filing
       strength: specific
-    - id: Keyword_in_gst_number_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - india gst number
-            - india
-            - gst
-      strength: domain
 risk_rating: 4
 risk_description: >-
   The detector finds an India Goods and Services Tax registration number-shaped value with nearby GST terminology and exclusions for sample or template text. A GST number identifies a registered business and can assist invoice spoofing, entity profiling, or false supplier representations when combined with other commercial details. Registration numbers are commonly shown on invoices and public business records, and the atomic identifier does not grant tax-account access or expose a natural person's finances. Risk 4 OFFICIAL reflects low standalone confidentiality harm; SENSITIVE would require confidential taxpayer records, authentication data, or a directly harmful linked filing.
@@ -162,8 +143,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-india-gst-number
     title: India GST Number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 85 tier whose only evidence was the detector name split into words (Pattern_in_gst_number_label_context + Keyword_in_gst_number_domain_context). One generic word such as "india" satisfied both lists, so any matching value next to it reached 85. The curated keyword tiers are unchanged and keep the identifying terms. Definitions left unreferenced are removed. Added a should_not_match case with "india" next to a valid value.'
   - version: 1.4.0
     date: '2026-10-19'
     description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its own ABN, ACN, VAT or registration number as printed on letterhead and invoices) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."
