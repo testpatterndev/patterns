@@ -1,0 +1,229 @@
+schema: testpattern/v1
+name: Healthcare Provider Identifier - Organisation
+slug: au-hpi-organisation
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Healthcare Provider Identifier - Organisation (HPI-O) values. The HPI-O is one of the four
+  healthcare identifiers assigned under the Healthcare Identifiers Act 2010 (Cth); it identifies a
+  healthcare provider organisation such as a hospital, medical practice, pathology or imaging
+  laboratory or pharmacy, and is used in My Health Record, secure messaging and NASH transactions. It
+  is a 16-digit number starting with the prefix 800362; the official format carries a Luhn check digit
+  (not enforced here, matching the sibling au-individual-healthcare-identifier and au-hpi-individual
+  classifiers). Labelled HPI-O references inside provider directories without a value are left to
+  global-top500-337-provider-identifier-records.
+operation: >-
+  Regex pattern using universal engine. The top-level regex \b800362\d{10}\b matches 16-digit numbers
+  starting with the fixed prefix 800362. Checksum: Luhn (NOT enforced in this regex-only pattern;
+  structural detection only, as for IHI and HPI-I). 65 (discovery only): the bare 800362 value. 75:
+  value plus an HPI-O term (HPI-O, HPIO, Healthcare Provider Identifier - Organisation, organisation
+  identifier). 85: HPI-O term plus independent organisation / HI Service context (hospital, medical
+  practice, pharmacy, pathology, diagnostic imaging, HI Service, HPOS, NASH, responsible officer,
+  organisation maintenance officer, Healthcare Provider Directory, secure messaging, My Health Record).
+  Template wording and non-health numeric context (invoice, tracking, serial, shipment) are excluded
+  from enforce tiers.
+pattern: \b800362\d{10}\b
+confidence: medium
+confidence_justification: >-
+  Medium: the 800362 prefix gives strong structural specificity to a 16-digit number, but the Luhn check
+  digit is not enforced, so other long numbers that happen to start 800362 surface at 65 until an HPI-O
+  label is present.
+jurisdictions:
+  - au
+regulations:
+  - Healthcare Identifiers Act 2010 (Cth)
+  - My Health Records Act 2012 (Cth)
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - ISO 27001
+data_categories:
+  - healthcare
+  - business-identifier
+corroborative_evidence:
+  keywords:
+    - HPI-O
+    - HPIO
+    - Healthcare Provider Identifier - Organisation
+    - HI Service
+    - NASH
+  proximity: 300
+  keyword_lists:
+    - au-healthcare-identifiers
+    - healthcare-identifiers
+test_cases:
+  should_match:
+    - value: '8003620000000001'
+      description: 65 tier - bare 800362 value with no context (discovery only)
+    - value: '8003629999999999'
+      description: 65 tier - upper range bare value (discovery only)
+    - value: 'HPI-O: 8003621234567890'
+      description: 75 tier - labelled HPI-O without organisation context
+    - value: "Organisation details - Riverbend Medical Practice\nHPI-O: 8003620000000019\nResponsible officer: Dr K Teston\nNASH certificate renewal due 30/11/2026; listed in the Healthcare Provider Directory."
+      description: 85 tier - practice record with HPI-O, responsible officer, NASH and Healthcare Provider Directory context
+    - value: 'Pathology laboratory registration (HI Service): Healthcare Provider Identifier - Organisation 8003621111111111 linked as a network organisation under the HHS seed.'
+      description: 85 tier - pathology laboratory HPI-O with HI Service context
+  should_not_match:
+    - value: '8003610000000001'
+      description: Wrong prefix (800361 is HPI-I)
+    - value: '8003600000000001'
+      description: Wrong prefix (800360 is IHI)
+    - value: '800362000000001'
+      description: Too few trailing digits (9 instead of 10)
+    - value: '80036200000000020'
+      description: Too many trailing digits (11 instead of 10)
+    - value: 'Invoice tracking number 8003621234567890 for shipment 44'
+      description: Valid-shaped non-health number must remain discovery-only
+false_positives:
+  - description: Long numeric sequences in unrelated contexts (tracking numbers, serial codes, account numbers) that start 800362.
+    mitigation: The bare value is discovery-only; enforce tiers need an HPI-O label and non-health numeric context is excluded.
+  - description: Public directory listings. HPI-Os are published to participating providers through the Healthcare Provider Directory.
+    mitigation: Low risk rating and OFFICIAL label reflect that the identifier is an organisational reference, not a secret.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Evidence_template_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Pattern_au_hpio
+      matches:
+        - ref: Evidence_hpio_terms
+        - ref: Evidence_hpio_organisation_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_hpio_non_health_exclusion
+    - confidence_level: 75
+      id_match: Pattern_au_hpio
+      matches:
+        - ref: Evidence_hpio_terms
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+            - Evidence_hpio_non_health_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Pattern_au_hpio
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Evidence_template_exclusion
+  regexes:
+    - id: Pattern_au_hpio
+      pattern: \b800362\d{10}\b
+  keywords:
+    - id: Evidence_hpio_terms
+      groups:
+        - match_style: word
+          terms:
+            - text: HPI-O
+              case_sensitive: true
+            - text: HPIO
+              case_sensitive: true
+            - Healthcare Provider Identifier Organisation
+            - Healthcare Provider Identifier - Organisation
+            - Healthcare Provider Identifier Organization
+            - organisation identifier
+      strength: specific
+    - id: Evidence_hpio_organisation_context
+      groups:
+        - match_style: word
+          terms:
+            - hospital
+            - medical practice
+            - general practice
+            - pharmacy
+            - pathology
+            - diagnostic imaging
+            - HI Service
+            - Healthcare Identifiers Service
+            - text: HPOS
+              case_sensitive: true
+            - text: NASH
+              case_sensitive: true
+            - responsible officer
+            - organisation maintenance officer
+            - Healthcare Provider Directory
+            - seed organisation
+            - network organisation
+            - secure messaging
+            - My Health Record
+      strength: domain
+    - id: Evidence_hpio_non_health_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - invoice
+            - tracking number
+            - shipment
+            - serial number
+            - consignment
+      strength: exclusion
+risk_rating: 4
+risk_description: >-
+  The classifier detects one 16-digit HPI-O value (prefix 800362) and enforces only with an HPI-O label,
+  with 85 adding organisation or HI Service context. An HPI-O identifies a provider organisation, not a
+  person: it is shared with every participating provider through the Healthcare Provider Directory and
+  appears on secure messages and My Health Record uploads. Disclosure can help a pretext against a
+  practice or support correlation of an organisation's digital health transactions, but the number gives
+  no patient information, no NASH certificate or HPOS access, and no billing authority. Risk 4 and OFFICIAL
+  reflect that bounded organisational exposure; a NASH certificate, HPOS credentials or linked patient
+  records would set the SENSITIVE threshold and are covered by their own classifiers.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+classification:
+  tier: Low
+  rationale: >-
+    Risk 4 maps to PSPF OFFICIAL, QGISCF OFFICIAL, the OFFICIAL DLM and the Low tier because an HPI-O is an organisational
+    healthcare identifier distributed through the Healthcare Provider Directory, with no patient information, access
+    secret or billing capability. SENSITIVE is not met without a linked NASH certificate, HPOS credential or patient
+    record; the HPI-I sibling sits one step higher at risk 5 because it identifies an individual practitioner.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Low with Low DLM suits an organisational provider identifier; meaningful misuse needs organisation credentials
+      or patient data that this value does not carry.
+references:
+  - title: Healthcare Identifiers Act 2010 (Cth)
+    url: https://www.legislation.gov.au/C2010A00072/latest/text
+  - title: Australian Digital Health Agency - Healthcare identifiers (IHI, HPI-I, HPI-O, HSP-O)
+    url: https://www.digitalhealth.gov.au/healthcare-providers/initiatives-and-programs/healthcare-identifiers
+  - title: My Health Records Act 2012 (Cth)
+    url: https://www.legislation.gov.au/C2012A00063/latest/text
+  - title: Privacy Act 1988 (Cth)
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
+created: '2026-10-20'
+updated: '2026-10-20'
+changelog:
+  - version: 1.0.0
+    date: '2026-10-20'
+    description: >-
+      Initial release from the qghealth sector review: standalone HPI-O value classifier (800362 prefix,
+      16 digits) mirroring au-individual-healthcare-identifier and au-hpi-individual. The Luhn check
+      digit is not enforced, as in both siblings; adding Func_credit_card to all three is an open owner
+      question. 65 bare value; 75 HPI-O label; 85 label plus organisation / HI Service context.
+author: testpattern-community
+license: MIT

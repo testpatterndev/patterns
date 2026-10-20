@@ -1,0 +1,213 @@
+schema: testpattern/v1
+name: QLD Health Discharge Summary or Referral Letter
+slug: au-qld-health-discharge-summary-referral
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Populated clinician-to-clinician transfer documents: hospital discharge summaries, discharge letters,
+  transfer of care summaries, GP and specialist referral letters and requests for specialist
+  consultation. They carry patient identifiers together with the structure of a handover between
+  treating teams: admission and discharge dates, discharge destination, referring, receiving or usual
+  GP, and clinical content such as principal diagnosis, medications on discharge, reason for referral
+  and follow-up arrangements. Boundary: au-qld-health-medical-record covers medical records generally
+  and fires on the bare phrase "discharge summary" plus a patient identifier; this classifier enforces
+  only when discharge or referral structure (dates, referring or receiving clinician) is also
+  populated. Shift handover sheets belong to au-qld-health-clinical-handover; My Health Record
+  documents to au-my-health-record-clinical-document.
+operation: >-
+  Primary: discharge summary / letter / referral, transfer of care summary or letter, GP / specialist /
+  medical / outpatient / clinical referral (letter), referral letter, letter of referral, request for
+  specialist consultation or opinion. 65 (discovery only): primary alone, which surfaces guidelines,
+  patient leaflets and blank forms. 75: primary plus a populated patient identifier field (patient
+  name, DOB, URN / UR number, MRN, Medicare, IHI, DVA, hospital or episode number) plus a populated
+  discharge / referral structure field (admission, discharge or referral date, length of stay,
+  discharge destination, referring / receiving / discharging / admitting / usual doctor, GP,
+  consultant or facility, referred to / by). 85: the 75 evidence plus a populated clinical content
+  field (principal / discharge / secondary diagnosis, procedures performed, medications on discharge,
+  medication changes, reason for referral or admission, presenting complaint, clinical summary,
+  follow-up plan, recommendations, investigations, allergies). Enforce tiers exclude the shared
+  template dictionary and guidance, patient-information, training and news framing.
+pattern: >-
+  (?i)\b(?:discharge\s+(?:summary|letter|referral)|transfer\s+of\s+care\s+(?:summary|letter)|(?:GP|specialist|medical|outpatient|clinical)\s+referral(?:\s+letter)?|referral\s+letter|letter\s+of\s+referral|request\s+for\s+specialist\s+(?:consultation|opinion))\b
+confidence: medium
+confidence_justification: >-
+  Medium: the document titles are standard across Queensland Health, private hospitals and general
+  practice, and enforce tiers need populated patient and handover-structure fields, which guidelines,
+  leaflets and blank forms lack. Field labels are matched by wording only, so a clinic letter that
+  uses the same labels without the title stays at 65 and an unusual layout with unlabelled fields may
+  be missed. 85/75 are heuristic evidence tiers, not measured accuracy.
+jurisdictions:
+  - au
+  - au-qld
+regulations:
+  - Hospital and Health Boards Act 2011 (Qld)
+  - Information Privacy Act 2009 (Qld)
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - QGISCF
+data_categories:
+  - phi
+  - health
+  - pii
+corroborative_evidence:
+  keywords:
+    - admission date
+    - discharge date
+    - referring doctor
+    - usual GP
+    - medications on discharge
+    - reason for referral
+    - follow-up
+    - principal diagnosis
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "DISCHARGE SUMMARY - Ipswich Hospital\nPatient: Jordan Teston\nURN: 552019\nAdmission date: 02/10/2026\nDischarge date: 06/10/2026\nUsual GP: Dr K Teston, Brassall Family Practice\nPrincipal diagnosis: Cellulitis right lower leg\nMedications on discharge: Cephalexin 500 mg QID for 5 days\nFollow-up: GP review in 48 hours"
+      description: 85 tier - discharge summary with patient, admission/discharge dates, usual GP, diagnosis and discharge medications
+      synthetic: true
+    - value: "Referral letter\nDate of referral: 14/09/2026\nReferring doctor: Dr Sam Teston (Provider 0000000Z)\nPatient name: Riley Teston\nDOB: 11/04/1959\nReason for referral: Progressive exertional dyspnoea, please assess for cardiac cause\nCurrent medications: Ramipril 5 mg daily"
+      description: 85 tier - GP referral letter with referring doctor, patient fields and reason for referral
+      synthetic: true
+    - value: "Transfer of care summary\nPatient: Morgan Teston\nMRN: 7781200\nDischarge destination: Residential aged care"
+      description: 75 tier - transfer of care summary with patient and discharge destination, no clinical content
+      synthetic: true
+    - value: "Specialist referral\nPatient name: Alex Teston\nMedicare number: 0000 00000 0\nReferred to: Dr P Teston, Orthopaedic Outpatients, Toowoomba Hospital"
+      description: 75 tier - specialist referral naming patient and receiving specialist only
+      synthetic: true
+  should_not_match:
+    - value: "Discharge summary request\nPatient name: Casey Teston\nUR number: 0093317\nCopy to be released to the requesting solicitor once the application is approved."
+      description: Medical-record request naming a patient but carrying no discharge or referral structure (au-qld-health-medical-record territory; 65 at most)
+    - value: "Discharge summary\nPatient: ____________________\nURN: ____________________\nAdmission date: __/__/____\nDischarge date: __/__/____\nPrincipal diagnosis: ____________________\nMedications on discharge: ____________________"
+      description: Blank discharge summary form (65 at most)
+    - value: "Going home from hospital - patient information leaflet. Before you leave, your team will give you a discharge summary and a copy will be sent to your GP. Ask your nurse what to expect and when your follow-up appointment is."
+      description: Patient information leaflet (65 at most)
+    - value: "This guideline sets the minimum content of a discharge summary and a referral letter: patient identifiers, admission and discharge dates, principal diagnosis, medications on discharge and follow-up. Training module for junior medical officers."
+      description: Clinical documentation guideline (65 at most)
+    - value: "The hospital car park will close for resurfacing on Saturday; staff should use the overflow lot."
+      description: Unrelated text
+false_positives:
+  - description: Clinical documentation guidelines, junior doctor training material and patient leaflets that name discharge summaries and referral letters and list their fields.
+    mitigation: They lack populated patient and handover fields, and guideline, patient-information, training and news framing is excluded from enforce tiers.
+  - description: Blank discharge and referral forms.
+    mitigation: Field values reject blank lines, underscores, brackets and placeholder words; fixture wording is excluded by the shared template-exclusion dictionary.
+  - description: Records requests and release-of-information letters that name a discharge summary.
+    mitigation: With no admission, discharge or referral date or clinician field they stay at 65; au-qld-health-medical-record covers them.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_discharge_referral_primary
+      matches:
+        - ref: Regex_discharge_referral_patient_field
+        - ref: Regex_discharge_referral_structure_field
+        - ref: Regex_discharge_referral_clinical_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_discharge_referral_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_discharge_referral_primary
+      matches:
+        - ref: Regex_discharge_referral_patient_field
+        - ref: Regex_discharge_referral_structure_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_discharge_referral_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_discharge_referral_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_discharge_referral_primary
+      pattern: >-
+        (?i)\b(?:discharge\s+(?:summary|letter|referral)|transfer\s+of\s+care\s+(?:summary|letter)|(?:GP|specialist|medical|outpatient|clinical)\s+referral(?:\s+letter)?|referral\s+letter|letter\s+of\s+referral|request\s+for\s+specialist\s+(?:consultation|opinion))\b
+    - id: Regex_discharge_referral_patient_field
+      pattern: >-
+        (?i)\b(?:patient(?:\s+name)?|full\s+name|surname|given\s+names?|date\s+of\s+birth|DOB|URN|UR\s*(?:no\.?|number)|MRN|medical\s+record\s+(?:no\.?|number)|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|IHI|DVA\s+(?:no\.?|number)|(?:hospital|episode)\s*(?:no\.?|number|ID))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_discharge_referral_structure_field
+      pattern: >-
+        (?i)\b(?:(?:date\s+of\s+)?(?:admission|discharge|referral)(?:\s+date)?|length\s+of\s+stay|discharge\s+destination|discharged\s+to|(?:referring|receiving|discharging|admitting|usual)\s+(?:doctor|practitioner|clinician|consultant|specialist|GP|facility|team)|referred\s+(?:to|by))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_discharge_referral_clinical_field
+      pattern: >-
+        (?i)\b(?:(?:principal|primary|discharge|secondary|additional|provisional|working)\s+diagnos[ie]s|diagnosis|comorbidities|procedures?\s+performed|(?:current\s+|discharge\s+)?medications?(?:\s+on\s+discharge)?|medication\s+changes|reason\s+for\s+(?:referral|admission)|presenting\s+(?:complaint|problem)|clinical\s+(?:summary|history)|history\s+of\s+presenting\s+(?:complaint|illness)|follow[\s-]?up(?:\s+(?:plan|arrangements|appointment))?|recommendations|management\s+plan|investigations|allergies)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.,-]{0,30}(?:[ \t]+[A-Za-z0-9][A-Za-z0-9/'.,-]{0,30}){0,5}
+    - id: Regex_discharge_referral_guidance_exclusion
+      pattern: >-
+        (?i)\b(?:this\s+(?:policy|procedure|guideline|guide|fact\s?sheet|leaflet|brochure|page|article|course)|patient\s+information\s+(?:sheet|leaflet)|what\s+to\s+expect|frequently\s+asked\s+questions|media\s+release|news\s+release|training\s+module|e-learning|how\s+to\s+(?:write|complete)|minimum\s+content|blank\s+form)\b
+risk_rating: 8
+risk_description: >-
+  The classifier recognises discharge summaries and referral letters and enforces only when a populated
+  patient identifier sits with discharge or referral structure (dates, referring, receiving or usual
+  clinician), with 85 also needing clinical content such as diagnosis, discharge medications or reason
+  for referral. These documents travel by fax, secure messaging, email and patient portals between
+  hospitals, GPs and specialists, so they are among the most frequently misdirected health records. One
+  document exposes identity, diagnosis, treatment, medications and the patient's treating clinicians,
+  enabling discrimination, coercion or fraud. The ordinary unit is one patient episode, so the harm is
+  serious but contained. Risk 8 matches au-qld-health-medical-record and au-qld-health-clinical-handover.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy and Medium because a populated
+    discharge summary or referral letter discloses one patient's identity, diagnosis, medications and treating
+    clinicians. PROTECTED is not met: the record covers a single episode and does not establish bulk patient scale,
+    privileged system access or significant patient-safety damage.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling protects diagnosis, treatment and medication details for one patient exchanged
+      between treating clinicians. High is not met unless discharge summaries are extracted in bulk.
+references:
+  - title: Hospital and Health Boards Act 2011 (Qld) - Part 7 confidentiality of patient information
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2011-032
+  - title: Information Privacy Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+  - title: Privacy Act 1988 (Cth)
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
+  - title: Australian Commission on Safety and Quality in Health Care - NSQHS Standards (Communicating for Safety)
+    url: https://www.safetyandquality.gov.au/standards/nsqhs-standards
+created: '2026-10-20'
+updated: '2026-10-20'
+changelog:
+  - version: 1.0.0
+    date: '2026-10-20'
+    description: >-
+      Initial release from the qghealth sector review: discharge summaries, transfer of care summaries and
+      referral letters. 65 phrase only; 75 needs a populated patient field and a discharge / referral
+      structure field; 85 adds a clinical content field. Guidance, patient-information, training and
+      template framing excluded from enforce tiers. Boundary with au-qld-health-medical-record documented.
+author: testpattern-community
+license: MIT

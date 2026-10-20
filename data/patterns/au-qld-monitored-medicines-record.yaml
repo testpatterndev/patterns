@@ -1,0 +1,224 @@
+schema: testpattern/v1
+name: QLD Monitored Medicines and Schedule 8 Record
+slug: au-qld-monitored-medicines-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Populated Queensland monitored-medicine records under the Medicines and Poisons Act 2019 (Qld):
+  QScript patient history reports and alerts, Schedule 8 (S8) and other monitored-medicine
+  prescriptions and dispensing records, controlled drug register entries, substance authorities
+  (prescribing approvals for S8 medicines) and Queensland Opioid Treatment Program records. They name
+  a patient and the monitored medicine prescribed or supplied, and often show dispensing history,
+  multiple-prescriber alerts or treatment for drug dependence. Boundary: general medication histories
+  and medication lists without a monitored-medicine frame belong to
+  global-top500-324-medication-histories; the PBS prescriber number alone is au-pbs-prescriber-number.
+operation: >-
+  Primary: QScript, monitored medicine(s), Schedule 8 / S8 medicine, drug, poison, prescription or
+  register, controlled drug prescription or register, drug of dependence, substance authority,
+  (Queensland) Opioid Treatment Program, QOTP. 65 (discovery only): primary alone, which surfaces
+  prescriber guidance, the monitored-medicines list and QScript training. 75: primary plus a populated
+  patient field (patient name, DOB, address, Medicare, IHI, URN / MRN) plus a populated medicine
+  record field (medicine / drug / item, strength, form, quantity, repeats, dose, directions, date
+  prescribed / dispensed / supplied, prescriber, dispensing pharmacy, indication). 85: the 75 evidence
+  plus independent monitoring or approval context (patient history, dispensing or prescription
+  history, multiple prescribers or pharmacies, early supply, high-risk, drug-dependent person,
+  dependence, approval / authority number, approval granted, opioid replacement, Medicines and Poisons
+  Act). Enforce tiers exclude template wording and guidance, user-guide, training and
+  reference-list framing.
+pattern: >-
+  (?i)\b(?:QScript|monitored\s+medicines?|Schedule\s+8\s+(?:medicines?|drugs?|poisons?|prescriptions?|register)|S8\s+(?:medicines?|drugs?|poisons?|prescriptions?|register)|controlled\s+drugs?\s+(?:prescriptions?|register)|drugs?\s+of\s+dependence|substance\s+authority|(?:Queensland\s+)?Opioid\s+Treatment\s+Program|QOTP)\b
+confidence: medium
+confidence_justification: >-
+  Medium: QScript, Schedule 8 and substance authority wording is specific to monitored medicines and the
+  enforce tiers need a populated patient and a populated medicine field, which guidance, the published
+  monitored-medicines list and training material lack. Pharmacy and GP systems that print S8 dispensing
+  labels with a patient name will match at 75; that is health information about a person and is an
+  accepted match.
+jurisdictions:
+  - au
+  - au-qld
+regulations:
+  - Medicines and Poisons Act 2019 (Qld)
+  - Information Privacy Act 2009 (Qld)
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - QGISCF
+data_categories:
+  - phi
+  - health
+  - pii
+corroborative_evidence:
+  keywords:
+    - patient history
+    - dispensing history
+    - multiple prescribers
+    - approval number
+    - drug-dependent person
+    - Medicines and Poisons Act
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "QScript patient history - search run 14/10/2026\nPatient: Jordan Teston\nDOB: 03/03/1977\nMedicine: Oxycodone 10 mg controlled-release tablets\nQuantity: 28\nDispensing pharmacy: Teston Pharmacy Nundah\nAlert: multiple prescribers in the last 90 days"
+      description: 85 tier - QScript patient history with patient, medicine, pharmacy and a multiple-prescriber alert
+      synthetic: true
+    - value: "Substance authority - Schedule 8 medicine\nPatient name: Riley Teston\nDate of birth: 21/06/1990\nDrug: Dexamfetamine 5 mg tablets\nDirections: 1 tablet mane and midi\nApproval number: QH-SA-2026-000000, approval granted for 12 months"
+      description: 85 tier - substance authority with patient, drug, directions and approval number
+      synthetic: true
+    - value: "Monitored medicine dispensing record\nPatient: Morgan Teston\nMedicine: Buprenorphine 8 mg sublingual tablets"
+      description: 75 tier - monitored medicine dispensing record with patient and medicine only
+      synthetic: true
+  should_not_match:
+    - value: "Monitored medicines list. The following substances are monitored medicines in Queensland: alprazolam, buprenorphine, codeine, dexamfetamine, fentanyl, methadone, oxycodone, tapentadol. This page explains prescriber obligations to check QScript."
+      description: Published monitored-medicines reference list and prescriber guidance (65 at most)
+    - value: "QScript user guide - training module 3. Search for a patient, review the patient history and record the outcome. Prescribers must check QScript before prescribing a monitored medicine."
+      description: QScript training material (65 at most)
+    - value: "Schedule 8 prescription\nPatient name: ____________________\nDate of birth: __/__/____\nDrug: ____________________\nQuantity: ________\nPrescriber: ____________________"
+      description: Blank S8 prescription pad (65 at most)
+    - value: "Supply 200 x M8 stainless bolts and S8 washers to the depot by Friday."
+      description: Unrelated hardware order (no match)
+false_positives:
+  - description: Queensland Health prescriber guidance, the published monitored-medicines list, QScript user guides and pharmacy training.
+    mitigation: No populated patient or medicine field, and guidance, training, user-guide and reference-list framing is excluded from enforce tiers.
+  - description: Blank prescription pads and controlled drug register templates.
+    mitigation: Field values reject blanks, underscores and placeholders; fixture wording is excluded by the shared template-exclusion dictionary.
+  - description: Pharmacy dispensing labels for S8 medicines naming a patient.
+    mitigation: Accepted match - the label is health information about an identified person and reaches 75.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_monitored_medicine_primary
+      matches:
+        - ref: Regex_monitored_medicine_patient_field
+        - ref: Regex_monitored_medicine_record_field
+        - ref: Keyword_monitored_medicine_monitoring_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_monitored_medicine_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_monitored_medicine_primary
+      matches:
+        - ref: Regex_monitored_medicine_patient_field
+        - ref: Regex_monitored_medicine_record_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_monitored_medicine_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_monitored_medicine_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_monitored_medicine_primary
+      pattern: >-
+        (?i)\b(?:QScript|monitored\s+medicines?|Schedule\s+8\s+(?:medicines?|drugs?|poisons?|prescriptions?|register)|S8\s+(?:medicines?|drugs?|poisons?|prescriptions?|register)|controlled\s+drugs?\s+(?:prescriptions?|register)|drugs?\s+of\s+dependence|substance\s+authority|(?:Queensland\s+)?Opioid\s+Treatment\s+Program|QOTP)\b
+    - id: Regex_monitored_medicine_patient_field
+      pattern: >-
+        (?i)\b(?:patient(?:\s+name)?|full\s+name|surname|given\s+names?|date\s+of\s+birth|DOB|(?:patient|residential)\s+address|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|IHI|URN|UR\s*(?:no\.?|number)|MRN|DVA\s+(?:no\.?|number))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_monitored_medicine_record_field
+      pattern: >-
+        (?i)\b(?:medicine|medication|drug|item|strength|form|quantity|qty|repeats|dose|dosage|directions|date\s+(?:prescribed|dispensed|supplied)|(?:prescribed|dispensed|supplied)\s+(?:on|date)|prescriber|prescribing\s+(?:doctor|practitioner)|dispensing\s+pharmacy|pharmacy|indication)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.,-]{0,30}(?:[ \t]+[A-Za-z0-9][A-Za-z0-9/'.,-]{0,30}){0,5}
+    - id: Regex_monitored_medicine_guidance_exclusion
+      pattern: >-
+        (?i)\b(?:this\s+(?:policy|procedure|guideline|guide|page|fact\s?sheet|article|course)|user\s+guide|training\s+module|e-learning|frequently\s+asked\s+questions|prescribers?\s+(?:must|should|are\s+required\s+to)|the\s+following\s+(?:substances|medicines)\s+are|media\s+release|learn\s+more)\b
+  keywords:
+    - id: Keyword_monitored_medicine_monitoring_context
+      groups:
+        - match_style: word
+          terms:
+            - patient history
+            - dispensing history
+            - prescription history
+            - multiple prescribers
+            - multiple pharmacies
+            - early supply
+            - high risk
+            - high-risk
+            - drug-dependent person
+            - drug dependent person
+            - dependence
+            - approval number
+            - authority number
+            - approval granted
+            - opioid replacement
+            - Medicines and Poisons Act
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  The classifier recognises QScript, Schedule 8, substance authority and opioid treatment records and
+  enforces only when a populated patient field sits with a populated medicine field, with 85 also needing
+  monitoring or approval context such as dispensing history, multiple-prescriber alerts or an approval
+  number. A genuine record shows that a named person is prescribed opioids, stimulants or benzodiazepines,
+  may be treated for drug dependence, or has been flagged for high-risk use. Disclosure can drive stigma,
+  discrimination in employment and insurance, and targeting for diversion or theft of medicines. The
+  normal unit is one patient's record, so the harm is serious but contained. Risk 8 matches
+  global-top500-330-substance-use-treatment-records and global-top500-324-medication-histories.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy and Medium because a populated
+    monitored-medicine record reveals a named patient's opioid, stimulant or benzodiazepine treatment and possible drug
+    dependence. PROTECTED is not met for one patient's record; a bulk QScript extract or the prescriber and pharmacy
+    access credentials for the system would be needed.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling protects one patient's controlled-medicine treatment and dependence history.
+      High is not met unless monitoring data is extracted in bulk.
+references:
+  - title: Medicines and Poisons Act 2019 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2019-026
+  - title: Queensland Health - QScript
+    url: https://www.health.qld.gov.au/clinical-practice/guidelines-procedures/medicines/qscript
+  - title: Queensland Health - Monitored medicines
+    url: https://www.health.qld.gov.au/clinical-practice/guidelines-procedures/medicines/monitored-medicines
+  - title: Information Privacy Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+created: '2026-10-20'
+updated: '2026-10-20'
+changelog:
+  - version: 1.0.0
+    date: '2026-10-20'
+    description: >-
+      Initial release from the qghealth sector review: QScript patient histories, Schedule 8 and monitored
+      medicine prescriptions and dispensing records, controlled drug registers, substance authorities and
+      opioid treatment program records. 65 phrase only; 75 needs a populated patient field and a populated
+      medicine field; 85 adds monitoring or approval context. Guidance, user-guide, training and
+      reference-list framing excluded.
+author: testpattern-community
+license: MIT
