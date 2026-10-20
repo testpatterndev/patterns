@@ -29,7 +29,7 @@ Authoritative expectations for pattern YAML in this repo. CI may enforce a subse
 | `slug` | Stable ID; may lag rename — document in description if so |
 | `description` / `operation` | Primary shapes, tier gates, what is discovery-only |
 | `risk_rating` + `risk_description` | Current match behaviour (not a previous weaker detector) |
-| `sensitivity_labels` (pspf, qgiscf, qgiscf_dlm, us_gov, uk_gov, nz_gov, ca_gov) | Same elevation as risk (e.g. risk ≥8 ⇒ not plain OFFICIAL) |
+| `sensitivity_labels` (pspf, qgiscf, qgiscf_dlm, idcf, idcf_marker, us_gov, uk_gov, nz_gov, ca_gov) | Same elevation as risk (e.g. risk ≥8 ⇒ not plain OFFICIAL); `idcf` / `idcf_marker` derived from `qgiscf_dlm` (CI-checked) |
 | `classification` (tier, rationale, generic) | `risk_rating` and `sensitivity_labels` as they stand now (see below) |
 | `data_categories` | Semantic class (not default `pii` for business/IP; not `credentials` for findings/maps) |
 | `confidence` | Honesty about FP rate (digit shapes without checksum ⇒ not `high`) |
@@ -41,6 +41,7 @@ Authoritative expectations for pattern YAML in this repo. CI may enforce a subse
 - risk 5–7 → OFFICIAL or OFFICIAL:Sensitive depending on substance  
 - risk 8–9 → OFFICIAL:Sensitive / SENSITIVE (+ domain DLM)  
 - risk 10 → PROTECTED / equivalent when justified  
+- IDCF (`idcf`, `idcf_marker`) is not chosen by hand: it follows `qgiscf_dlm` per `docs/IDCF-CROSSWALK.md` (OFFICIAL → DSL-2, SENSITIVE / Marking Sensitive → DSL-3, PROTECTED / Marking Protected → DSL-4, N/A / Marking PSPF → N/A); `node scripts/backfill-idcf-labels.mjs` fills it and CI rejects a mismatch  
 
 Workbook (v25+) and YAML must not diverge by more than one band without a changelog note.
 
