@@ -23,7 +23,7 @@ export function tierForLabel(dlm) {
 
 // IDCF (docs/IDCF-CROSSWALK.md): the Data Security Level follows qgiscf_dlm, falling back to
 // qgiscf then pspf when the DLM is absent; the marker comes only from the DLM's domain suffix.
-export const IDCF_LEVELS = ['DSL-2', 'DSL-3', 'DSL-4', 'N/A']
+export const IDCF_LEVELS = ['DSL-0', 'DSL-2', 'DSL-3', 'DSL-4', 'N/A']
 export const IDCF_MARKERS = ['Personal Privacy', 'Legal Privilege', 'Confidential']
 const IDCF_MARKER_BY_SUFFIX = { 'Personal-Privacy': 'Personal Privacy', Legal: 'Legal Privilege', 'Commercial-in-Confidence': 'Confidential' }
 
@@ -31,6 +31,7 @@ function idcfForLevel(label) {
   const d = text(label)
   if (!d) return null
   if (d === 'N/A' || d === 'Marking PSPF') return 'N/A'
+  if (d === 'PUBLIC') return 'DSL-0'
   if (/^(PROTECTED|Marking Protected)\b/.test(d)) return 'DSL-4'
   if (/^(SENSITIVE|Marking Sensitive|OFFICIAL: Sensitive)\b/.test(d)) return 'DSL-3'
   if (/^(OFFICIAL|Marking Official)\b/.test(d)) return 'DSL-2'
