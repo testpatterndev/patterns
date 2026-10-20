@@ -1,13 +1,13 @@
 schema: testpattern/v1
 name: Payroll Master File with Tax File Numbers
 slug: payroll-master-file-with-tax-file-numbers
-version: 1.4.4
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: Detects bulk payroll data files containing employee names, Tax File Numbers (TFNs), bank account details, and salary information. Disclosure enables mass identity theft, fraudulent tax returns, and targeted social engineering.
 operation: Regex for canonical nine-digit TFN format within 300 characters of payroll keywords (payroll, TFN, tax file, salary). The TFN regex uses the Australian mod-11 validator and sentinel/test filters, combined with BSB format regex or bank account terms. High confidence when multiple validated TFNs appear in the same document indicating a bulk file.
-pattern: \b\d{3}[\s\-]?\d{3}[\s\-]?\d{3}\b
+pattern: \b(?<!\b\d\d\s)\d{3}[\s\-]?\d{3}[\s\-]?\d{3}\b
 confidence: high
 confidence_justification: 'High confidence: checksum-valid TFN-format numbers co-occurring with payroll context keywords and BSB patterns in a document strongly indicates a payroll master file. The TFN validator plus sentinel/test filters reduce generic digit-run, phone-number, and placeholder false positives.'
 jurisdictions:
@@ -65,7 +65,18 @@ test_cases:
       description: fails mod-11 checksum (single-digit perturbation of valid value 255 446 951) — the TFN Checksum validator rejects it in the exported SIT
     - value: '637543758'
       description: fails mod-11 checksum (single-digit perturbation of valid value 637 543 757) — the TFN Checksum validator rejects it in the exported SIT
+    - value: 'Supplier ABN 51 824 753 556 is registered for GST.'
+      description: >-
+        Australian business number (2026-10-16 boilerplate run): its last nine digits are a 3-3-3 group (this ABN fails the TFN checksum, but about one ABN in eleven has a tail that passes it); the
+        ABN lookbehind rejects them.
 false_positives:
+  - description: >-
+      The last nine digits of a space-grouped Australian Business Number ("51 824 753 556") have the same 3-3-3 shape,
+      and every letterhead, signature and invoice carries the organisation's ABN.
+    mitigation: >-
+      A fixed-width lookbehind (?<!\b\d\d\s) rejects a nine-digit group that follows a standalone two-digit group and a
+      space, which is the ABN's 2-3-3-3 layout. It is deliberately narrower than "any preceding digit group", so a
+      value after a longer employee or row number in a space-separated table still matches.
   - description: HR onboarding forms requesting a single employee's TFN
     mitigation: Require multiple TFN-pattern matches (3+) in the same document to indicate bulk data rather than a single record
   - description: Aggregate payroll reports with summary statistics but no individual records
@@ -112,7 +123,7 @@ purview:
             - Filter_payroll_master_file_with_tax_file_numbers_exclusion
   regexes:
     - id: Pattern_payroll_master_file_with_tax_file_numbers_tax_file_number_format_8_9_digits
-      pattern: \b\d{3}[\s\-]?\d{3}[\s\-]?\d{3}\b
+      pattern: \b(?<!\b\d\d\s)\d{3}[\s\-]?\d{3}[\s\-]?\d{3}\b
       validators:
         - ref: Validator_australian_tfn
     - id: Pattern_payroll_master_file_with_tax_file_numbers_bsb_format_e_g_064_000_or_064000
@@ -237,8 +248,11 @@ references:
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-20'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-20'
+    description: "ABN tail (2026-10-16 boilerplate run): the nine-digit id_match fired at the 65 discovery tier on the last nine digits of an Australian ABN (\"ABN 51 824 753 556\") in letterheads, signatures and invoices. The id_match regex and its top-level copy now carry a fixed-width lookbehind (?<!\\b\\d\\d\\s) that rejects a nine-digit group following a standalone two-digit group and a space (the ABN 2-3-3-3 layout). Added the ABN line as a should_not_match. Purview already rejected this particular ABN through the TFN checksum validator, but about one ABN tail in eleven passes it, and then reaches 75 next to tax wording."
   - version: 1.4.3
     date: '2026-09-25'
     description: >-
