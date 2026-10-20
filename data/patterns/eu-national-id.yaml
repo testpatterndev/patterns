@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: EU National Identification Number
 slug: eu-national-id
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: universal
@@ -45,6 +45,14 @@ test_cases:
       description: German keyword match
     - value: carte nationale d'identité
       description: French keyword match
+    - value: "Personalausweisnummer: L01X00T47"
+      description: Populated ID-number field (75 tier)
+      synthetic: true
+    - value: |-
+        Personalausweisnummer: L01X00T47
+        Name: Avery Teston
+      description: Populated ID-number field with a person field (85 tier)
+      synthetic: true
   should_not_match:
     - value: employee badge number
       description: Non-identity reference
@@ -52,6 +60,16 @@ test_cases:
       description: Generic number reference
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: EU National Identification Number
+      description: "Bare detector name: it reached 75 through the generated name-word tier and must not reach an enforcing tier"
+    - value: "ID card number: EMP-20417"
+      description: A bare "ID card number" field (for example a staff card) is not a national ID; it is not a populated-label primary
+    - value: |-
+        Personalausweisnummer:
+        Name: Avery Teston
+      description: "Person record with the ID label but no value: the label must not corroborate itself (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about national identification number are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Broad keyword matching across EU languages may match general policy discussion, training materials, or compliance documentation.
     mitigation: Layer with additional contextual signals such as structured identifiers or form fields to distinguish actual data from policy references.
@@ -70,20 +88,18 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Keyword_eu_national_id_primary
+    - confidence_level: 85
+      id_match: Regex_eu_national_id_populated_label
       matches:
-        - ref: Pattern_eu_national_id_label_context
-        - ref: Keyword_eu_national_id_domain_context
+        - ref: Regex_eu_national_id_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Keyword_eu_national_id_primary
+      id_match: Regex_eu_national_id_populated_label
       matches:
-        - ref: Keyword_eu_national_id_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -117,33 +133,11 @@ purview:
             - identiteitsbewijs
             - bilhete de identidade
       strength: specific
-    - id: Keyword_eu_national_id_context
-      groups:
-        - match_style: word
-          terms:
-            - identification number
-            - identity card
-            - identity document
-            - ID card
-            - Personalausweisnummer
-            - numéro d'identité
-            - numero di identità
-            - número de identidad
-            - Ausweisnummer
-            - identitätsnummer
-            - government ID
-            - national register
-      strength: specific
-    - id: Keyword_eu_national_id_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - eu national identification number
-            - national
-      strength: domain
   regexes:
-    - id: Pattern_eu_national_id_label_context
-      pattern: (?i)\b(?:national\s+identification\s+number|personalausweis|carte\s+nationale|documento\s+nacional\s+de\s+identidad|identity\s+card\s+number)\b
+    - id: Regex_eu_national_id_populated_label
+      pattern: (?i)\b(?:national\s+identification(?:\s+(?:no\.?|number))?|national\s+identity\s+(?:card\s+)?(?:no\.?|number)|identity\s+number|national\s+ID(?:\s+(?:card\s+)?(?:no\.?|number))?|identity\s+card\s+(?:no\.?|number)|personalausweis(?:nummer)?|Ausweisnummer|carte\s+nationale(?:\s+d'identit[ée])?|num[ée]ro\s+d'identit[ée]|carta\s+d'identit[àa]|numero\s+di\s+identit[àa]|documento\s+nacional\s+de\s+identidad|n[úu]mero\s+de\s+identidad|DNI|identitetsbevis|henkil[öo]llisyystodistus|identiteitsbewijs|bilhete\s+de\s+identidade)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_eu_national_id_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 risk_rating: 5
 risk_description: >-
   This concept regex recognises phrases such as national identification number, Personalausweis, carte nationale, documento nacional de identidad, and identity card number across EU languages. It does not extract or validate any member-state identifier value, so the match is primarily a document label or discussion topic that can help locate identity material. Harm to a person requires a populated number and attributable context, while policies, training, and compliance guidance are documented benign sources. Risk 5 OFFICIAL recognises the locator value of a genuine identity-record heading; SENSITIVE would require confirmation of an actual identifier or composite identity file.
@@ -173,8 +167,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-eu-national-identification-number
     title: EU National Identification Number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 75 tier ANDed Pattern_*_label_context (the detector name, "EU National Identification Number") with Keyword_*_domain_context (its words), so the detector name next to any IdMatch phrase was enough for 75. Both lists sit inside the IdMatch phrase, so the bare name alone scored 75. Re-tiered in the #69 attribute shape: 65 is the phrase alone (discovery only); 75 needs the ID label followed by a value (Regex_eu_national_id_populated_label, now the enforcing primary); 85 adds a populated person field (Regex_eu_national_id_record_structure). Curated terms that sit inside an IdMatch hit were removed. The context list (identity card, Ausweisnummer, numéro d''identité and similar) only restated the primary in another wording or language, and "identification number" / "ID card" chain onto the primary''s own words, so "national identification number" alone reached 75. Those wordings are now labels in the populated-field regex. Added the bare name, a person record with the ID label but no value and a policy-guidance text as should_not_match, and populated ID fields reaching 75 and 85.'
   - version: 1.3.2
     date: '2026-09-25'
     description: >-
