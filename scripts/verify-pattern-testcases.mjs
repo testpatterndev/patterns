@@ -49,6 +49,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import yaml from 'js-yaml'
 import { resolveCustomisationFallbacks } from './lib/customisation.mjs'
+import { emulateKeep, expandScopedI } from './lib/boost-to-js.mjs'
 
 const ROOT = join(import.meta.dirname, '..')
 const PAT_DIR = join(ROOT, 'data', 'patterns')
@@ -67,13 +68,7 @@ let warnings = 0
 // flags. Case-insensitive is forced by repo convention unless p.case_sensitive — but a
 // regex that INTENTIONALLY carries (?i) keeps case-insensitivity even on a
 // case_sensitive pattern (the inline flag is authored per-regex and wins).
-// Boost's \K ("keep") drops everything matched before it from the reported value.
-// JS has no \K; a top-level `prefix\Krest` reports the same text as `(?<=prefix)rest`.
-export function emulateKeep(body) {
-  const i = body.indexOf('\\K')
-  if (i < 0 || body[i - 1] === '\\') return body
-  return `(?<=${body.slice(0, i)})${body.slice(i + 2)}`
-}
+// \K and scoped (?i:...) are translated by lib/boost-to-js.mjs (shared with ci-check).
 
 const toRe = (src, caseSensitive, extraFlags = '') => {
   let body = String(src)
@@ -93,7 +88,7 @@ const toRe = (src, caseSensitive, extraFlags = '') => {
     if (m[1].includes('m')) flags += 'm'
   }
   // After the leading flag group is gone, so the flag does not end up inside the lookbehind.
-  body = emulateKeep(body)
+  body = expandScopedI(emulateKeep(body))
   return new RegExp(body, [...new Set(flags)].join(''))
 }
 
