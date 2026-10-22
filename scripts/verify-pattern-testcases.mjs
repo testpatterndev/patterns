@@ -77,9 +77,9 @@ export function emulateKeep(body) {
 
 const toRe = (src, caseSensitive, extraFlags = '') => {
   let body = String(src)
-  // A leading (?-i) is Boost's case-sensitive switch (Purview regex is
-  // case-insensitive by default). JS has no bare (?-i), so strip it and match
-  // case-sensitively.
+  // A leading (?-i) is Boost's explicit case-sensitive switch (a dev-tenant test
+  // found Purview case-sensitive by default; (?-i) makes that explicit). JS has
+  // no bare (?-i), so strip it and match case-sensitively.
   if (body.startsWith('(?-i)')) {
     body = body.slice(5)
     caseSensitive = true
