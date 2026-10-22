@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Individual Name Record
 slug: au-individual-name-record
-version: 2.7.3
+version: 3.0.0
 type: keyword_proximity
 pattern_class: concept
 engine: boost_regex
@@ -10,12 +10,23 @@ description: >-
   from the consolidated Australian forename and surname dictionaries. Supports the multicultural
   name coverage represented in Australian birth, immigration, and administrative sources.
 operation: >-
-  Capitalised two-to-four component name structure is the primary signal. The consolidated Australian
-  dictionaries are supporting evidence only: 65 requires either dictionary and is discovery-only, 75
-  adds an explicit person-to-name relation plus both dictionary classes, and 85 additionally requires
-  a name-field label (including legal name, legal full name, full legal name, and family name). Placeholder
-  values after a field label (N/A, TBC, Not recorded, Full Name, blanks) do not count as a person relation.
-  Strong business-suffix and formatted-address collisions veto enforcement.
+  The primary match is a pair of capitalised words (John Smith, JOHN SMITH, Ewan McDonald, Jane Smith-Jones).
+  Purview reads line breaks and tabs as spaces, so longer runs would glue a name to the words around it;
+  instead every adjacent pair is checked. Three IdMatch regexes cover the pair alignments (plain, and with
+  one or three capitalised words consumed before \K), so a name is found after up to four other capitalised
+  words and the reported value is the pair itself. A leading (?-i) makes them case-sensitive, so lowercase
+  prose does not match; a fourth regex matches a pair in any case directly after a name label (customer
+  name: harry tobin), so names typed in lowercase on forms are still found; titles and salutations (Mr, Dr, Dear, Regards and similar, in any case) cannot be
+  part of the pair; a pair followed by a road-type or company word (Road, Street, Pty, Ltd, Holdings,
+  Corporation and similar) is not a name. Two value filters keep only pairs whose first word is in the
+  consolidated Australian forename dictionary and whose second word is in the surname dictionary. A pair may
+  hold one known middle particle (Van, Thi, Bin, De, Al and similar), so Nguyen Van Minh is one match; other
+  names of three or more parts are reported as overlapping pairs. Keep the regexes in this order: when two
+  patterns match at the same word, Purview keeps the earlier one before the filters run. 65 is
+  discovery-only; 75 adds an explicit
+  person-to-name relation and record context; 85 additionally requires a name-field label (including legal
+  name, legal full name, full legal name, and family name). Placeholder values after a field label (N/A, TBC,
+  Not recorded, Full Name, blanks) do not count as a person relation. Template fixtures veto every tier.
 case_sensitive: true
 confidence: medium
 confidence_justification: >-
@@ -54,6 +65,26 @@ test_cases:
       description: 85 probe - populated legal-full-name, family-name, and given-name fields in one record
     - value: 'Member recorded as Oliver Bennett; legal name change lodged with the registry.'
       description: Exact 75 probe - person-to-name relation with both dictionary classes but no labelled name field
+    - value: "Kind Regards\nHarry Tobin\nSenior Consultant"
+      description: Signature block - the reported value is the name line only, not the sign-off or job title
+    - value: Approved By Project Manager Harry Tobin
+      description: Labels and job titles on the same line are not part of the reported name
+    - value: Dr Jane Smith-Jones
+      description: Title is skipped and a hyphenated surname is kept whole
+    - value: Ewan McDonald and Sean O'Brien attended.
+      description: Mc and O' surname shapes
+    - value: 'DEAR JOHN SMITH,'
+      description: All-caps name; the salutation is skipped in any case
+    - value: John SMITH signed the form.
+      description: Surname written in capitals
+    - value: Approved Harry Tobin
+      description: One capitalised word before the name (offset pair)
+    - value: Document Control Officer Harry Tobin
+      description: Three capitalised words before the name (three-word offset pair)
+    - value: 'customer name: harry tobin'
+      description: Lowercase name after a name label
+    - value: 'Full name: mr harry tobin'
+      description: Lowercase name with a title after a name label
   should_not_match:
     - value: Please review the attached quarterly sales figures before Friday.
       description: Generic business text with no name pattern
@@ -77,6 +108,30 @@ test_cases:
       description: News decoy with a real-looking name and legal-name phrasing but no record field or person relation stays below enforcement
     - value: 'Training example: full legal name: Oliver Bennett'
       description: Training fixture with a populated legal-name field is vetoed by the template exclusion
+    - value: Kind Regards
+      description: Sign-off words are never a name
+    - value: The Contract Price was agreed.
+      description: Ends with a surname-list word but does not start with a forename
+    - value: Grace Records Management
+      description: Starts with a forename but does not end with a surname
+    - value: Please ensure the Wall Seal is replaced.
+      description: Two ordinary words that were in the name lists before the 2026-10-22 dictionary review
+    - value: Riverbend Power Station
+      description: Place name; Station is not a surname
+    - value: the client will grant access in may
+      description: Lowercase prose cannot match the case-sensitive name structure
+    - value: Annual Report Summary
+      description: Ann must match a whole word, not the start of Annual
+    - value: PROJECT STATUS REPORT
+      description: All-caps heading is not a name
+    - value: Harry Tobin Pty Ltd
+      description: Company named after a person - a pair followed by a company word is not a name
+    - value: Harry Tobin Holdings
+      description: Company named after a person
+    - value: spoke to harry tobin yesterday
+      description: Lowercase name without a name label is not matched (by design)
+    - value: 'contact: please call reception'
+      description: Words after a label that are not a forename and surname
 false_positives:
   - description: Common surnames such as Brown, Young, or Green appear frequently as everyday words.
     mitigation: Use corroborative evidence keywords to filter. Require PII context.
@@ -128,43 +183,76 @@ purview:
     - dict: au-surnames-australian
       as: Evidence_au_surname_registry
       match_style: word
+  filters:
+    - id: Filter_name_starts_with_forename
+      type: TextMatchFilter
+      direction: StartsWith
+      logic: Include
+      text_processor_ref: Evidence_au_forename_registry
+    - id: Filter_name_ends_with_surname
+      type: TextMatchFilter
+      direction: EndsWith
+      logic: Include
+      text_processor_ref: Evidence_au_surname_registry
   pattern_tiers:
     - confidence_level: 85
-      id_match: Pattern_individual_name
+      id_match:
+        type: any
+        ids:
+          - Pattern_individual_name
+          - Pattern_individual_name_offset1
+          - Pattern_individual_name_offset3
+          - Pattern_individual_name_labelled
       matches:
+        - ref: Evidence_au_forename_registry
+          proximity: 1
+        - ref: Evidence_au_surname_registry
+          proximity: 1
         - ref: Pattern_individual_name_relation
         - ref: Evidence_name_record_context
-        - ref: Evidence_au_forename_registry
-        - ref: Evidence_au_surname_registry
         - ref: Pattern_individual_name_field
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-            - Pattern_non_person_name_collision
     - confidence_level: 75
-      id_match: Pattern_individual_name
+      id_match:
+        type: any
+        ids:
+          - Pattern_individual_name
+          - Pattern_individual_name_offset1
+          - Pattern_individual_name_offset3
+          - Pattern_individual_name_labelled
       matches:
+        - ref: Evidence_au_forename_registry
+          proximity: 1
+        - ref: Evidence_au_surname_registry
+          proximity: 1
         - ref: Pattern_individual_name_relation
         - ref: Evidence_name_record_context
-        - ref: Evidence_au_forename_registry
-        - ref: Evidence_au_surname_registry
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-            - Pattern_non_person_name_collision
     - confidence_level: 65
       discovery_only: true
-      id_match: Pattern_individual_name
+      id_match:
+        type: any
+        ids:
+          - Pattern_individual_name
+          - Pattern_individual_name_offset1
+          - Pattern_individual_name_offset3
+          - Pattern_individual_name_labelled
       matches:
-        - type: any
-          min_matches: 1
-          refs:
-            - Evidence_au_forename_registry
-            - Evidence_au_surname_registry
+        # A forename and a surname inside the match (proximity 1 = overlapping).
+        # Redundant while the value filters apply; keeps the tier gated on the name
+        # lists if a deployer drops the filters.
+        - ref: Evidence_au_forename_registry
+          proximity: 1
+        - ref: Evidence_au_surname_registry
+          proximity: 1
         - type: any
           min_matches: 0
           max_matches: 0
@@ -172,13 +260,17 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Pattern_individual_name
-      pattern: \b(?:[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}|[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}|[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20})\b
+      pattern: '(?-i)\b(?!(?i:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Sir|Dear|Hi|Hello|Regards|Kind|Thanks)\b)(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\s+(?:(?:Van|Thi|Duc|Bin|Binti|Binte|Ibn|Abu|Al|El|De|Del|Della|Di|Da|Dos|Du|Le|La|Von|Der|Den|Ter|Ten)\s+)?(?!(?i:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Sir|Dear|Hi|Hello|Regards|Kind|Thanks)\b)(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\b(?!\s+(?i:Street|St|Road|Rd|Avenue|Ave|Drive|Lane|Court|Place|Parade|Terrace|Crescent|Highway|Boulevard|Close|Circuit|Way|Pty|Ltd|Limited|Holdings|Group|Corporation|Corp|Company|Inc|Engineering|Consulting|Services|Partners|Associates|Council|University)\b)'
+    - id: Pattern_individual_name_offset1
+      pattern: '(?-i)\b(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\s+\K(?!(?i:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Sir|Dear|Hi|Hello|Regards|Kind|Thanks)\b)(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\s+(?:(?:Van|Thi|Duc|Bin|Binti|Binte|Ibn|Abu|Al|El|De|Del|Della|Di|Da|Dos|Du|Le|La|Von|Der|Den|Ter|Ten)\s+)?(?!(?i:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Sir|Dear|Hi|Hello|Regards|Kind|Thanks)\b)(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\b(?!\s+(?i:Street|St|Road|Rd|Avenue|Ave|Drive|Lane|Court|Place|Parade|Terrace|Crescent|Highway|Boulevard|Close|Circuit|Way|Pty|Ltd|Limited|Holdings|Group|Corporation|Corp|Company|Inc|Engineering|Consulting|Services|Partners|Associates|Council|University)\b)'
+    - id: Pattern_individual_name_offset3
+      pattern: '(?-i)\b(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\s+(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\s+(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\s+\K(?!(?i:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Sir|Dear|Hi|Hello|Regards|Kind|Thanks)\b)(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\s+(?:(?:Van|Thi|Duc|Bin|Binti|Binte|Ibn|Abu|Al|El|De|Del|Della|Di|Da|Dos|Du|Le|La|Von|Der|Den|Ter|Ten)\s+)?(?!(?i:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Sir|Dear|Hi|Hello|Regards|Kind|Thanks)\b)(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\b(?!\s+(?i:Street|St|Road|Rd|Avenue|Ave|Drive|Lane|Court|Place|Parade|Terrace|Crescent|Highway|Boulevard|Close|Circuit|Way|Pty|Ltd|Limited|Holdings|Group|Corporation|Corp|Company|Inc|Engineering|Consulting|Services|Partners|Associates|Council|University)\b)'
+    - id: Pattern_individual_name_labelled
+      pattern: '(?i)\b(?:full\s+legal\s+name|legal\s+full\s+name|full\s+name|legal\s+name|first\s+name|last\s+name|surname|given\s+name|family\s+name|middle\s+name|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+name|applicant|customer|client|patient|employee|member|holder|contact)\s*(?::|-|is)\s*(?:(?:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Sir)\.?\s+)?\K(?!(?:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Sir)\b)(?:O[’''])?[A-Z][A-Z]{1,20}(?:-[A-Z][A-Z]{1,20})?\s+(?:(?:Van|Thi|Duc|Bin|Binti|Binte|Ibn|Abu|Al|El|De|Del|Della|Di|Da|Dos|Du|Le|La|Von|Der|Den|Ter|Ten)\s+)?(?:O[’''])?[A-Z][A-Z]{1,20}(?:-[A-Z][A-Z]{1,20})?\b(?!\s+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Lane|Court|Place|Parade|Terrace|Crescent|Highway|Boulevard|Close|Circuit|Way|Pty|Ltd|Limited|Holdings|Group|Corporation|Corp|Company|Inc|Engineering|Consulting|Services|Partners|Associates|Council|University)\b)'
     - id: Pattern_individual_name_relation
       pattern: (?i)\b(?:(?:full\s+legal\s+name|legal\s+full\s+name|full\s+name|legal\s+name|first\s+name|last\s+name|surname|given\s+name|family\s+name|middle\s+name|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+name|applicant|customer|client|patient|employee|member|holder|contact)\s*(?::|-|is)\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|(?:full|legal|given|first|last|family)\s+name\b|_{2,}|\[|<)(?:[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20})|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+(?:identified\s+as|recorded\s+as|named|details\s+for)\s+(?:[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}\s+[a-z]{2,20}|[a-z]{2,20}\s+[a-z]{2,20}))\b
     - id: Pattern_individual_name_field
       pattern: (?i)\b(?:full\s+legal\s+name|legal\s+full\s+name|full\s+name|legal\s+name|first\s+name|last\s+name|surname|given\s+name|family\s+name|middle\s+name|(?:applicant|customer|client|patient|employee|member|holder|contact)\s+name|applicant|customer|client|patient|employee|member|holder|contact)\s*(?::|-|is)\s*
-    - id: Pattern_non_person_name_collision
-      pattern: (?i)\b(?:(?:engineering|consulting|holdings|services|pty\s+ltd|ltd|limited|company|corporation|council|university)|(?:street|road|avenue|highway|parade|drive|lane|terrace|crescent)\s*,?\s*(?:NSW|QLD|VIC|TAS|SA|WA|NT|ACT|\d{4}))\b
   keywords:
     - id: Evidence_name_record_context
       groups:
@@ -213,8 +305,24 @@ references:
   - title: "OAIC - Notifiable Data Breaches scheme"
     url: https://www.oaic.gov.au/privacy/notifiable-data-breaches
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-22'
 changelog:
+  - version: 3.0.0
+    date: '2026-10-22'
+    description: >-
+      Match the name itself, not the words around it (tested on a dev tenant). The primary match is a pair
+      of capitalised words, checked by value filters that require the first word to be in the forename
+      dictionary and the second in the surname dictionary. Purview reads line breaks and tabs as spaces, so
+      every adjacent pair is tried: three IdMatch regexes (plain, and one or three words consumed before \K)
+      find the name after up to four other capitalised words. The regexes are case-sensitive in Purview
+      ((?-i)), accept ALL CAPS and mixed case (McDonald), skip titles and salutations in any case, and reject
+      a pair followed by a road-type or company word; this replaces the business/address collision veto,
+      which also suppressed real people named next to their employer. Forename and surname evidence now has
+      to sit inside the match (proximity 1), which keeps every tier gated on the name lists if a deployer
+      drops the filters. A pair may hold one known middle particle (Nguyen Van Minh); other multi-part names
+      are reported as overlapping pairs. Lowercase names are matched only directly after a name label
+      (customer name: harry tobin), so lowercase prose stays out. Tested on a dev tenant. Needs the
+      dictionary-backed TextMatchFilter export (text_processor_ref).
   - version: 2.7.3
     date: '2026-09-25'
     description: >-

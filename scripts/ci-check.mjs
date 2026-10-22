@@ -61,7 +61,10 @@ const deprecatedSlugs = new Set()
 const replacedBy = []
 const errors = [], warns = []
 
-const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(b, fl) }
+// A leading (?-i) is Boost's case-sensitive switch; JS has no bare (?-i), so strip it and drop the i flag.
+// Boost's \K has no JS equivalent; a top-level `prefix\Krest` compiles as `(?<=prefix)rest`.
+const emulateKeep = (b) => { const i = b.indexOf('\\K'); return i < 0 || b[i - 1] === '\\' ? b : `(?<=${b.slice(0, i)})${b.slice(i + 2)}` }
+const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; if (b.startsWith('(?-i)')) { b = b.slice(5); fl = '' } const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(emulateKeep(b), fl) }
 
 // Build kwSlugs (used by the pattern loop below for keyword_list/shared-dict reference
 // checks) and validate each dictionary's own {{CUSTOMISE:*}} declarations. This must run
