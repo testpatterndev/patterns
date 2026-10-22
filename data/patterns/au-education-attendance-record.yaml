@@ -29,8 +29,10 @@ operation: >-
   delimited status cell (present, absent, late ...) below a header that puts a student column (student
   ID / code / name / number, EQ ID, LUI, roll class, homeroom, form class, year level) and an attendance
   column (attendance, attendance status / code, absence reason / type / code, status, AM, PM) within
-  200 characters of each other reaches 75, and 85 with a date cell. Purview reads tabs as spaces, so
-  the table path recognises comma, semicolon and pipe delimited exports. Enforce tiers exclude procedure, policy, guideline,
+  200 characters of each other, plus a delimited date cell, reaches 75, and 85 with a second status
+  cell. The date cell keeps prose field lists ("student name, class, status, absent or late") out of
+  the table path. Purview reads tabs as spaces, so the table path recognises comma, semicolon and pipe
+  delimited exports. Enforce tiers exclude procedure, policy, guideline,
   newsletter, training and FAQ framing. The shared template dictionary is not applied, so a completed
   register that keeps a form-template footer still matches; blank registers fail the field-value guards.
 pattern: >-
@@ -123,6 +125,8 @@ purview:
       id_match: Regex_attendance_table_row
       matches:
         - ref: Regex_attendance_table_header
+        - ref: Regex_attendance_table_status_cells
+          min_count: 2
         - ref: Regex_attendance_table_date
         - type: any
           min_matches: 0
@@ -143,6 +147,7 @@ purview:
       id_match: Regex_attendance_table_row
       matches:
         - ref: Regex_attendance_table_header
+        - ref: Regex_attendance_table_date
         - type: any
           min_matches: 0
           max_matches: 0
@@ -170,9 +175,12 @@ purview:
     - id: Regex_attendance_table_row
       pattern: >-
         (?i)[,\t;|][ \t]*"?(?:present|absent|late|partial(?:[ \t]+absence)?|excused|explained|unexplained|illness|sick|medical|appointment|holiday|suspended)\b
+    - id: Regex_attendance_table_status_cells
+      pattern: >-
+        (?i)[,;|][ \t]*"?(?:present|absent|late|partial(?:[ \t]+absence)?|excused|explained|unexplained|illness|sick|medical|appointment|holiday|suspended)\b
     - id: Regex_attendance_table_date
       pattern: >-
-        (?:\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}/(?:\d{4}|\d{2})\b)
+        [,;|][ \t]*"?(?:\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/(?:\d{4}|\d{2}))\b
     - id: Regex_attendance_guidance_exclusion
       pattern: >-
         (?i)\b(?:this[ \t]+(?:policy|procedure|guideline|guide|fact[ \t]?sheet|newsletter|page|article|course)|frequently[ \t]+asked[ \t]+questions|media[ \t]+release|news[ \t]+release|training[ \t]+module|e-learning|how[ \t]+to[ \t]+(?:mark|record|complete)|blank[ \t]+form)\b
@@ -207,7 +215,10 @@ test_cases:
       description: 85 tier - slash-formatted date variant
       synthetic: true
     - value: "Student ID,Student Name,Class,Date,Status\nRG20451,Avery Teston,7B,2026-09-10,Absent"
-      description: 85 tier - attendance export with a student column, status cell and date
+      description: 75 tier - one-row attendance export with a student column, status cell and date cell
+      synthetic: true
+    - value: "Student ID,Student Name,Class,Date,Status\nRG20451,Avery Teston,7B,2026-09-10,Absent\nRG20452,Jordan Teston,7B,2026-09-10,Absent\nRG20453,Casey Teston,7B,2026-09-10,Late"
+      description: 85 tier - attendance export with several status rows
       synthetic: true
     - value: "Student Code,Surname,First Name,Roll Class,Date,AM,PM\nAVT0012,Teston,Avery,7B,10/09/2026,Present,Absent\nJOT0031,Teston,Jordan,7B,10/09/2026,Late,Present"
       description: 85 tier - school system export with AM and PM columns
@@ -249,6 +260,12 @@ test_cases:
     - value: "Staff meeting attendance record\nName: Avery Teston\nStatus: Present\nApologies: Jordan Teston"
       description: Meeting attendance with no student field (65 at most)
       synthetic: true
+    - value: "Rolls list student name, class, status (present, absent or late) and the teacher's initials."
+      description: Prose field list shaped like a header and a status cell
+      synthetic: true
+    - value: "Class rolls record the student ID, roll class, status, absent or late codes and the reason."
+      description: Prose field list after a roll title (65 at most)
+      synthetic: true
 false_positives:
   - description: Roll marking procedures, newsletters and attendance campaign material that name rolls, absences and status values.
     mitigation: They lack a populated student field, and procedure, newsletter, training and FAQ framing is excluded from enforce tiers.
@@ -273,7 +290,8 @@ changelog:
       unexplained absences and daily or period attendance. 75 needs a populated student field (now also
       child, code, EQ ID, LUI, USI) and a populated attendance field (more status values, AM / PM / period,
       days absent, attendance rate); 85 adds a school context field or record evidence. The fixed CSV header
-      is replaced by a table path for any header with a student column and an attendance column. Discovery
+      is replaced by a table path for any header with a student column and an attendance column plus a
+      date cell (85 with a second status cell). Discovery
       tier added. Recommended confidence 85 -> 75. Staff timesheet, staff export, procedure, newsletter and
       meeting decoys added. Risk and labels unchanged.
   - version: 1.0.3

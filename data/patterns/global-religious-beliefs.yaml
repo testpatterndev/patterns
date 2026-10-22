@@ -18,7 +18,7 @@ description: >-
   Article 9 and Australian anti-discrimination and privacy law. Topic-grade detector, low
   confidence by design.
 operation: >-
-  The primary regex matches explicit religious/philosophical-belief phrases, religious instruction, special religious education, religious background and structured religion, faith or denomination labels. 65 (discovery only): phrase alone - policy, guidance, news, program timetables and survey-design text naming the category stays here. 75: phrase plus a populated identified-person field (name, DOB, student/learner/employee/member/customer/patient/participant number or ID, EQ ID, LUI, USI, parent or guardian name, data subject). 85: person field plus a named religion or denomination value (Christian, Catholic, Anglican, Uniting, Seventh-day Adventist, Muslim, Hindu, Sikh, Jewish, Buddhist, no religion ...) plus independent record evidence (chaplaincy, pastoral care, congregation, parish, baptism, sacraments, prayer, halal/kosher, Sabbath, Ramadan, religious dress, religious leave). A second 75 path takes a table header that puts a person column (student, employee, member, patient ... ID or name) and a Religion, Denomination or Faith column within 160 characters of each other, plus a named religion value nearby, so a populated export reaches 75 and an empty header does not. Template framing and guidance/policy/public-aggregate framing are excluded from 75/85.
+  The primary regex matches explicit religious/philosophical-belief phrases, religious instruction, special religious education, religious background and structured religion, faith or denomination labels. 65 (discovery only): phrase alone - policy, guidance, news, program timetables and survey-design text naming the category stays here. 75: phrase plus a populated identified-person field (name, DOB, student/learner/employee/member/customer/patient/participant number or ID, EQ ID, LUI, USI, parent or guardian name, data subject). 85: person field plus a named religion or denomination value (Christian, Catholic, Anglican, Uniting, Seventh-day Adventist, Muslim, Hindu, Sikh, Jewish, Buddhist, no religion ...) plus independent record evidence (chaplaincy, pastoral care, congregation, parish, baptism, sacraments, prayer, halal/kosher, Sabbath, Ramadan, religious dress, religious leave). A second 75 path takes a table header that puts a person column (student, employee, member, patient ... ID or name) and a Religion, Denomination or Faith column within 160 characters of each other, plus at least two delimited cells holding a named religion value, so a populated export reaches 75 while an empty header, or a prose field list that names one or two religions, does not. Template framing and guidance/policy/public-aggregate framing are excluded from 75/85.
 pattern: (?i)\b(?:religious\s+(?:or\s+philosophical\s+)?beliefs?|philosophical\s+beliefs?|religious\s+affiliations?|faith\s+affiliations?|belief\s+systems?|faith\s+traditions?|religious\s+(?:observance|preference|background|instruction|denominations?|conversion\s+record)|special\s+religious\s+education|place\s+of\s+worship|(?:religion|faith|denomination)\s*(?::|(?:field|code|response)))
 confidence: low
 confidence_justification: >-
@@ -111,7 +111,20 @@ test_cases:
       description: Program timetable with no identified person (65 discovery at most)
     - value: "Student ID,Student Name,Year,Religion\n,,,\n,,,"
       description: Empty export header with a religion column
+    - value: "Information collection notice: the school collects your child's student name, date of birth, religion (for example Catholic, Anglican or Uniting) and medical conditions for religious instruction."
+      description: Collection notice listing fields in prose (65 discovery at most)
+    - value: "The enrolment system stores student ID, year level, religion, Catholic baptism status and parish for each family."
+      description: System description listing fields in prose
+    - value: "Student ID,Student Name,Year,Religion\nRG20451,Christian Teston,7,\nRG20452,Jordan Teston,7,"
+      description: Export with a blank religion column and one student named Christian
 false_positives:
+  - description: >-
+      A person table with a Religion column whose religion cells are blank but whose name column holds
+      two or more students or staff named Christian, or a delimited prose list naming two or more
+      religions near a person-and-religion field list.
+    mitigation: >-
+      Rare residuals of the table path, which needs two delimited religion-value cells. Purview reads line
+      breaks as spaces, so a cell cannot be tied to the Religion column itself.
   - description: >-
       Generic corporate or educational use of "believe"/"religion"/"religious" (values
       statements, history/comparative-religion content) has nothing to do with a personal
@@ -158,7 +171,8 @@ purview:
     - confidence_level: 75
       id_match: Regex_global_religious_beliefs_table_header
       matches:
-        - ref: Regex_global_religious_beliefs_religion_value
+        - ref: Regex_global_religious_beliefs_religion_cell
+          min_count: 2
         - type: any
           min_matches: 0
           max_matches: 0
@@ -179,6 +193,8 @@ purview:
       pattern: (?i)\b(?:religious\s+(?:or\s+philosophical\s+)?beliefs?|philosophical\s+beliefs?|religious\s+affiliations?|faith\s+affiliations?|belief\s+systems?|faith\s+traditions?|religious\s+(?:observance|preference|background|instruction|denominations?|conversion\s+record)|special\s+religious\s+education|place\s+of\s+worship|(?:religion|faith|denomination)\s*(?::|(?:field|code|response)))
     - id: Regex_global_religious_beliefs_table_header
       pattern: (?i)(?:\b(?:student|learner|pupil|employee|staff|member|patient|client|participant)[ \t]*(?:ID|no\.?|number|name)\b[^\r\n]{0,160}[,\t;|][ \t]*"?(?:religion|religious[ \t]+affiliation|denomination|faith)\b|\b(?:religion|religious[ \t]+affiliation|denomination|faith)"?[ \t]*[,\t;|][^\r\n]{0,160}\b(?:student|learner|pupil|employee|staff|member|patient|client|participant)[ \t]*(?:ID|no\.?|number|name)\b)
+    - id: Regex_global_religious_beliefs_religion_cell
+      pattern: (?i)[,;|][ \t]*"?(?:Christian(?:ity)?|Catholic(?:ism)?|Roman\s+Catholic|Anglican|Uniting(?:\s+Church)?|Combined\s+Churches|Presbyterian|Baptist|Pentecostal|Lutheran|Methodist|Seventh[\s-]day\s+Adventist|Adventist|Church(?:es)?\s+of\s+Christ|Salvation\s+Army|Greek\s+Orthodox|Orthodox|Coptic|Maronite|Assyrian\s+Church|Quaker|Mormon|Latter-day\s+Saints?|Jehovah\W?s\s+Witness(?:es)?|Muslim|Islam(?:ic)?|Sunni|Shia|Hindu(?:ism)?|Buddhis[mt]|Sikh(?:ism)?|Jewish|Judaism|Jain(?:ism)?|Tao(?:ism|ist)|Shinto|Zoroastrian|Druze|Baha\W?i|Shaivism|Vaishnavism|Aboriginal\s+(?:traditional\s+)?(?:spirituality|religions?)|humanis[mt]|agnostic|atheis[mt]|secular\s+beliefs|no\s+religion)\b
     - id: Regex_global_religious_beliefs_person_fields
       pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|preferred\s+name|date\s+of\s+birth|DOB|employee(?:\s+name)?|(?:employee|staff|member|customer|client|patient|participant|respondent|person|applicant|voter|record)\s*(?:no\.?|number|ID)|staff\s+member|member(?:\s+name)?|patient(?:\s+name)?|client(?:\s+name)?|customer(?:\s+name)?|applicant(?:\s+name)?|data\s+subject|resident(?:\s+name)?|(?:student|learner|pupil|child|parent|guardian|carer)(?:\s+(?:full\s+)?name)?|(?:student|learner|pupil)\s*(?:no\.?|number|ID)|parent/guardian(?:\s+name)?|EQ\s*ID|LUI|USI)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
     - id: Regex_global_religious_beliefs_religion_value
@@ -285,7 +301,8 @@ changelog:
       Churches of Christ, Salvation Army, Coptic, Maronite, Islamic, the -ism forms, Jain, Taoist, Shinto,
       Aboriginal spirituality, humanism and secular beliefs. 85 evidence adds baptism, parish, sacraments,
       faith formation, prayer time, religious dress and festivals. New 75 path: a table header with a person
-      column and a Religion, Denomination or Faith column, plus a named religion value. Religious Education as
+      column and a Religion, Denomination or Faith column, plus two delimited religion-value cells, so prose
+      field lists stay out. Religious Education as
       a subject stays out. Education positives and decoys added (report card, given name Christian, blank RI
       consent, RI procedure and timetable, empty export).
   - version: 1.3.1
