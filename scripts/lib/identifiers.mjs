@@ -22,6 +22,7 @@ const nonEmptyList = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => t
 const longText = (v, n = MIN_TEXT) => typeof v === 'string' && v.trim().length >= n
 const toJsRe = (src) => {
   let body = String(src).trim(), flags = ''
+  if (body.startsWith('(?-i)')) body = body.slice(5) // Boost case-sensitive switch; already case-sensitive here
   const m = body.match(/^\(\?([ims]+)\)/)
   if (m) { body = body.slice(m[0].length); if (m[1].includes('i')) flags += 'i' }
   return new RegExp(body, flags)

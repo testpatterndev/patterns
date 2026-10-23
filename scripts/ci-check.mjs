@@ -22,6 +22,7 @@ import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
 import { purviewBanned } from './lib/purview-banned.mjs'
+import { emulateKeep, expandScopedI } from './lib/boost-to-js.mjs'
 import { validateCustomisations } from './lib/customisation.mjs'
 import { loadIdentifiers, validateIdentifier, renderIdentifierDocs } from './lib/identifiers.mjs'
 import { validateClassification, validateIdcf, validateReferences, validateRegulations } from './lib/classification.mjs'
@@ -64,7 +65,9 @@ const deprecatedSlugs = new Set()
 const replacedBy = []
 const errors = [], warns = []
 
-const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(b, fl) }
+// A leading (?-i) is Boost's case-sensitive switch; JS has no bare (?-i), so strip it and drop the i flag.
+// \K and scoped (?i:...) are translated by lib/boost-to-js.mjs (shared with verify-pattern-testcases).
+const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; if (b.startsWith('(?-i)')) { b = b.slice(5); fl = '' } const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(expandScopedI(emulateKeep(b)), fl) }
 
 // Build kwSlugs (used by the pattern loop below for keyword_list/shared-dict reference
 // checks) and validate each dictionary's own {{CUSTOMISE:*}} declarations. This must run

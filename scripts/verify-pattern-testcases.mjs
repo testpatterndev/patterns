@@ -49,6 +49,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import yaml from 'js-yaml'
 import { resolveCustomisationFallbacks } from './lib/customisation.mjs'
+import { emulateKeep, expandScopedI } from './lib/boost-to-js.mjs'
 
 const ROOT = join(import.meta.dirname, '..')
 const PAT_DIR = join(ROOT, 'data', 'patterns')
@@ -67,8 +68,17 @@ let warnings = 0
 // flags. Case-insensitive is forced by repo convention unless p.case_sensitive — but a
 // regex that INTENTIONALLY carries (?i) keeps case-insensitivity even on a
 // case_sensitive pattern (the inline flag is authored per-regex and wins).
+// \K and scoped (?i:...) are translated by lib/boost-to-js.mjs (shared with ci-check).
+
 const toRe = (src, caseSensitive, extraFlags = '') => {
   let body = String(src)
+  // A leading (?-i) is Boost's explicit case-sensitive switch (a dev-tenant test
+  // found Purview case-sensitive by default; (?-i) makes that explicit). JS has
+  // no bare (?-i), so strip it and match case-sensitively.
+  if (body.startsWith('(?-i)')) {
+    body = body.slice(5)
+    caseSensitive = true
+  }
   let flags = (caseSensitive ? '' : 'i') + extraFlags
   const m = body.match(/^\(\?([ims]+)\)/)
   if (m) {
@@ -77,6 +87,8 @@ const toRe = (src, caseSensitive, extraFlags = '') => {
     if (m[1].includes('s')) flags += 's'
     if (m[1].includes('m')) flags += 'm'
   }
+  // After the leading flag group is gone, so the flag does not end up inside the lookbehind.
+  body = expandScopedI(emulateKeep(body))
   return new RegExp(body, [...new Set(flags)].join(''))
 }
 
@@ -184,11 +196,36 @@ const matches = (matcher, text) => {
 // ---------- purview.filters ----------
 // Split into match-level filters (suppress an individual id_match hit) and
 // document-level filters (suppress the whole detection when tripped by the text).
-function compileFilters(p, slug) {
+function compileFilters(p, slug, reg) {
   const matchLevel = []
   const docLevel = []
   for (const f of p.purview?.filters ?? []) {
-    if (f.type === 'AllDigitsSameFilter') {
+    if (f.type === 'TextMatchFilter' && f.text_processor_ref) {
+      // Terms come from a keyword in this block (e.g. a shared registry dictionary).
+      // Full: the value equals a term. StartsWith/EndsWith: the value starts/ends with
+      // a term at a token boundary. Include keeps only values that pass; Exclude drops them.
+      const kw = reg.get(f.text_processor_ref)
+      if (!kw || kw.kind !== 'keyword') {
+        console.log(`  warn  ${slug}: filter text_processor_ref '${f.text_processor_ref}' is not a keyword in this block`); warnings++
+        continue
+      }
+      const terms = new Set(kw.terms.map((t) => t.text.toLowerCase()))
+      const direction = f.direction ?? 'Full'
+      const hit = (value) => {
+        const v = value.toLowerCase()
+        if (direction === 'Full') return terms.has(v)
+        const tokens = v.split(/[^a-z0-9']+/).filter(Boolean)
+        if (!tokens.length) return false
+        // Try every leading/trailing run of tokens so multi-word terms count too.
+        for (let n = 1; n <= tokens.length; n++) {
+          const part = direction === 'StartsWith' ? tokens.slice(0, n).join(' ') : tokens.slice(-n).join(' ')
+          if (terms.has(part)) return true
+        }
+        return false
+      }
+      const include = (f.logic ?? 'Exclude') === 'Include'
+      matchLevel.push((m) => (include ? hit(m) : !hit(m)))
+    } else if (f.type === 'AllDigitsSameFilter') {
       // Rejects a matched value whose digits are all the same digit (e.g. all-zeros IDs).
       matchLevel.push((m) => {
         const digits = m.match(/[0-9]/g)
@@ -346,7 +383,7 @@ function verifyPattern(slug) {
   catch (e) { failures++; console.log(`  MISSING/UNREADABLE ${slug}: ${e.message}`); return }
 
   const { reg, divergent } = buildRegistry(p, slug)
-  const filters = compileFilters(p, slug)
+  const filters = compileFilters(p, slug, reg)
   const tiers = (p.purview?.pattern_tiers ?? []).filter((t) => tierEvaluable(t, reg))
 
   // Dangling refs make positive evidence unsatisfiable and exclusions unverifiable — surface them.
