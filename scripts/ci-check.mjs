@@ -36,7 +36,10 @@ const LOCAL_NOISE_FORBIDDEN = new Set([
   'au-qld-postal-declaration-vote',
   'global-top500-142-supplier-bank-change-requests',
   'bank-account-with-payment-authorisation-token',
-  'global-top500-081-payroll-bank-account-details'
+  'global-top500-081-payroll-bank-account-details',
+  // Every payment line in an ABA file carries the organisation's own trace account and remitter
+  // name, so a local noise entry for its own banking would hide genuine payment files.
+  'au-bulk-payment-file-aba-bpay-eft'
 ])
 const patDir = join(BASE, 'data', 'patterns')
 const kwDir = join(BASE, 'data', 'keywords')
