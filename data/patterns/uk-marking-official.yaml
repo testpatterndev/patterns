@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: UK Marking - OFFICIAL / OFFICIAL-SENSITIVE
 slug: uk-marking-official
-version: 1.1.2
+version: 1.2.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -64,6 +64,8 @@ test_cases:
       description: PDF line-wrap between the OFFICIAL- hyphen and SENSITIVE (the [\s-]+ separator tolerates a wrap-inserted newline)
     - value: "This memo must be handled under Cabinet Office guidance; it is marked OFFICIAL and should be treated accordingly by HMG staff."
       description: Gated bare-OFFICIAL form — UK central-government/GSCP corroborative evidence (Cabinet Office, HMG) present within 300 characters
+    - value: 'Official-Sensitive - Personal Data'
+      description: Capitalised structured marking with descriptor
   should_not_match:
     - value: "please visit our official website for further official announcements"
       description: lowercase English word (case-sensitive exclusion)
@@ -73,6 +75,8 @@ test_cases:
       description: ALL-CAPS non-government collocation — excluded from the top-level pattern (no -SENSITIVE present) and from the gated bare tier by the OFFICIAL-collocation NOT-group
     - value: "DISCLOSURE OF THIS MATERIAL MAY CONSTITUTE AN OFFENCE UNDER THE OFFICIAL SECRETS ACT 1989."
       description: ALL-CAPS statutory citation — excluded from the top-level pattern (no -SENSITIVE present) and from the gated bare tier by the OFFICIAL SECRETS ACT NOT-group
+    - value: 'the official opening is on friday'
+      description: Lowercase prose is not a marking
 false_positives:
   - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare OFFICIAL-SENSITIVE banner tier relies on — any all-caps rendering of the phrase can fire with no protective-marking intent.
     mitigation: Treat banner-tier-only (85) hits as lower confidence when the surrounding text is itself all-caps; the structured descriptor tier (85) with a verified GSCP handling-instruction/descriptor term remains the more reliable signal.
@@ -176,11 +180,11 @@ purview:
             - Keyword_official_collocation_exclusion
   regexes:
     - id: Regex_uk_official_sensitive_structured
-      pattern: '\bOFFICIAL[\s-]+SENSITIVE[\s-]+-[\s-]+(?:RECIPIENTS ONLY|FOR PUBLIC RELEASE|HMG USE ONLY|EMBARGOED|PERSONAL DATA|LEGAL PROFESSIONAL PRIVILEGE|LPP|MARKET SENSITIVE|COMMERCIAL|HR\s*/\s*MANAGEMENT|LEGAL)\b'
+      pattern: '(?-i)\b(?:OFFICIAL|Official)[\s-]+(?:SENSITIVE|Sensitive)[\s-]+-[\s-]+(?i:RECIPIENTS ONLY|FOR PUBLIC RELEASE|HMG USE ONLY|EMBARGOED|PERSONAL DATA|LEGAL PROFESSIONAL PRIVILEGE|LPP|MARKET SENSITIVE|COMMERCIAL|HR\s*/\s*MANAGEMENT|LEGAL)\b'
     - id: Regex_uk_official_sensitive_banner
-      pattern: '\bOFFICIAL[\s-]+SENSITIVE\b'
+      pattern: '(?-i)\bOFFICIAL[\s-]+SENSITIVE\b'
     - id: Regex_uk_official_bare
-      pattern: '\bOFFICIAL\b'
+      pattern: '(?-i)\bOFFICIAL\b'
   keywords:
     - id: Keyword_official_collocation_exclusion
       groups:
@@ -188,23 +192,49 @@ purview:
           terms:
             - text: OFFICIAL SPONSOR
               case_sensitive: true
+            - text: Official Sponsor
+              case_sensitive: true
             - text: OFFICIAL PARTNER
+              case_sensitive: true
+            - text: Official Partner
               case_sensitive: true
             - text: OFFICIAL WEBSITE
               case_sensitive: true
+            - text: Official Website
+              case_sensitive: true
             - text: OFFICIAL STATEMENT
+              case_sensitive: true
+            - text: Official Statement
               case_sensitive: true
             - text: OFFICIAL LAUNCH
               case_sensitive: true
+            - text: Official Launch
+              case_sensitive: true
             - text: OFFICIAL OPENING
+              case_sensitive: true
+            - text: Official Opening
               case_sensitive: true
             - text: OFFICIAL RECEIVER
               case_sensitive: true
+            - text: Official Receiver
+              case_sensitive: true
             - text: OFFICIAL SECRETS ACT
               case_sensitive: true
+            - text: Official Secrets Act
+              case_sensitive: true
 created: '2026-07-07'
-updated: '2026-09-25'
+updated: '2026-10-22'
 changelog:
+  - version: 1.2.0
+    date: '2026-10-22'
+    description: >-
+      Case handling made explicit and tested on a dev tenant. Each regex starts with (?-i). Marking words
+      introduced by structure (a classification label, the X-Protective-Marking SEC= field, brackets, the NZ
+      // form, the UK ' - descriptor' form, the EU 'UE/EU' form) match UPPER CASE or Capitalised; bare words
+      and unlabelled banners stay UPPER CASE only, so prose such as "Official figures..." or "Top Secret
+      Recipes" does not reach an enforcing tier. Never all lowercase. Labels, header fields and exclusion
+      lookaheads accept any case through a scoped (?i:...); acronyms stay upper case. Case-sensitive exclusion
+      terms gain Capitalised twins.
   - version: 1.1.2
     date: '2026-09-25'
     description: >-
