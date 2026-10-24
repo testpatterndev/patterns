@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Hungarian Value Added Tax Number
 slug: hu-vat-number
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -52,6 +52,8 @@ test_cases:
       description: Polish prefix, not Hungarian VAT format
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'tax HU12345678'
+      description: 'A generic word from the detector name ("tax") next to a matching value is not 85 evidence; it reached 85 through the generated name-word tier'
 false_positives:
   - description: Other identifier schemes that coincidentally share a similar prefix and digit structure
     mitigation: Validate the complete format including prefix and digit count. Layer with document context to confirm financial or tax-related content.
@@ -74,17 +76,6 @@ purview:
       local_noise_filter: true
       id_match: Regex_hu_vat
       matches:
-        - ref: Pattern_hu_vat_number_label_context
-        - ref: Keyword_hu_vat_number_domain_context
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      local_noise_filter: true
-      id_match: Regex_hu_vat
-      matches:
         - ref: Keyword_hu_vat
         - type: any
           min_matches: 0
@@ -103,8 +94,6 @@ purview:
   regexes:
     - id: Regex_hu_vat
       pattern: \bHU\d{8}\b
-    - id: Pattern_hu_vat_number_label_context
-      pattern: (?i)\b(?:hungarian\s+value\s+added\s+tax\s+number|hungarian|value|added|tax|vat)\b
   keywords:
     - id: Keyword_hu_vat
       groups:
@@ -123,16 +112,6 @@ purview:
             - általános forgalmi adó
             - magyar ÁFA
       strength: specific
-    - id: Keyword_hu_vat_number_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - hungarian value added tax number
-            - hungarian
-            - added
-            - tax
-            - vat
-      strength: domain
 risk_rating: 5
 risk_description: >-
   The VAT detector recognizes the HU prefix followed by exactly eight digits and requires VAT or Hungarian financial terminology. It identifies a business registration used on invoices and tax-validation records, not a person's private financial account or filing credential. A copied value may make a sham supplier or invoice look plausible, but useful fraud still requires company identity, payment details, and entry into an accounts-payable process. Risk 5 and OFFICIAL fit that bounded entity-level risk; confidential returns, banking changes, or a coordinated payment-redirection package would raise the context toward SENSITIVE.
@@ -164,8 +143,11 @@ frameworks:
   - ISO 27001
   - ISO 27701
 created: '2026-02-09'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 85 tier whose only evidence was the detector name split into words (Pattern_hu_vat_number_label_context + Keyword_hu_vat_number_domain_context). One generic word such as "tax" satisfied both lists, so any matching value next to it reached 85. The curated keyword tiers are unchanged and keep the identifying terms. Definitions left unreferenced are removed. Added a should_not_match case with "tax" next to a valid value.'
   - version: 1.4.0
     date: '2026-10-19'
     description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its own ABN, ACN, VAT or registration number as printed on letterhead and invoices) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."
