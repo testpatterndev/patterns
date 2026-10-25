@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: EU Social Security Number (SSN) or Equivalent ID
 slug: eu-social-security-number
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: universal
@@ -45,6 +45,14 @@ test_cases:
       description: German keyword match
     - value: numéro de sécurité sociale
       description: French keyword match
+    - value: "Sozialversicherungsnummer: 65170839J003"
+      description: Populated ID-number field (75 tier)
+      synthetic: true
+    - value: |-
+        Sozialversicherungsnummer: 65170839J003
+        Name: Avery Teston
+      description: Populated ID-number field with a person field (85 tier)
+      synthetic: true
   should_not_match:
     - value: employee benefits plan
       description: Non-SSN reference
@@ -52,6 +60,16 @@ test_cases:
       description: Generic insurance reference
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: EU Social Security Number (SSN) or Equivalent ID
+      description: "Bare detector name: it reached 75 through the generated name-word tier and must not reach an enforcing tier"
+    - value: "Insurance number: POL-4471820"
+      description: A bare "insurance number" field (an insurance policy) is not a social security number; it was a context term and is not a populated-label primary
+    - value: |-
+        Sozialversicherungsnummer:
+        Name: Avery Teston
+      description: "Person record with the ID label but no value: the label must not corroborate itself (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about social security number are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Broad keyword matching across EU languages may match general policy discussion, training materials, or compliance documentation.
     mitigation: Layer with additional contextual signals such as structured identifiers or form fields to distinguish actual data from policy references.
@@ -70,20 +88,18 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
-      id_match: Keyword_eu_ssn_primary
+    - confidence_level: 85
+      id_match: Regex_eu_social_security_number_populated_label
       matches:
-        - ref: Pattern_eu_social_security_number_label_context
-        - ref: Keyword_eu_social_security_number_domain_context
+        - ref: Regex_eu_social_security_number_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Keyword_eu_ssn_primary
+      id_match: Regex_eu_social_security_number_populated_label
       matches:
-        - ref: Keyword_eu_ssn_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -117,37 +133,11 @@ purview:
             - social insurance
             - national insurance
       strength: specific
-    - id: Keyword_eu_ssn_context
-      groups:
-        - match_style: word
-          terms:
-            - social security number
-            - Sozialversicherungsnummer
-            - numéro de sécurité sociale
-            - numero di previdenza sociale
-            - número de seguridad social
-            - burgerservicenummer
-            - personnummer
-            - henkilötunnus
-            - insurance number
-            - pension number
-            - NISS
-            - text: BSN
-              case_sensitive: true
-      strength: domain
-    - id: Keyword_eu_social_security_number_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - eu social security number (ssn) or equivalent id
-            - social
-            - security
-            - ssn
-            - equivalent
-      strength: domain
   regexes:
-    - id: Pattern_eu_social_security_number_label_context
-      pattern: (?i)\b(?:social\s+security\s+number|sozialversicherungsnummer|numéro\s+de\s+sécurité\s+sociale|national\s+insurance\s+number)\b
+    - id: Regex_eu_social_security_number_populated_label
+      pattern: (?i)\b(?:social\s+security(?:\s+(?:no\.?|number))?|SSN|sozialversicherung(?:snummer)?|SV-?Nummer|(?:num[ée]ro\s+de\s+)?s[ée]curit[ée]\s+sociale|(?:numero\s+di\s+)?previdenza\s+sociale|(?:n[úu]mero\s+de\s+)?seguridad\s+social|sociale\s+zekerheid|burgerservicenummer|BSN|socialf[öo]rs[äa]kring|personnummer|sosiaaliturva|henkil[öo]tunnus|seguran[çc]a\s+social|NISS|social\s+insurance(?:\s+(?:no\.?|number))?|national\s+insurance(?:\s+(?:no\.?|number))?)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
+    - id: Regex_eu_social_security_number_record_structure
+      pattern: (?i)\b(?:name|full\s+name|surname|family\s+name|given\s+names?|date\s+of\s+birth|DOB|client|customer|applicant|claimant|tenant|household|resident|constituent|licensee|business\s+name|premises|CRN|ABN|(?:case|file|client|customer|application|reference|ref|claim|request|licence|permit|inspection|notice)\s*(?:no\.?|number|ID|#))(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 risk_rating: 3
 risk_description: >-
   This EU-wide detector matches multilingual phrases such as social security number, Sozialversicherungsnummer, or numéro de sécurité sociale rather than validating any member state's identifier value. A hit can indicate that a form, policy, or workflow discusses collection of social-security identifiers, but it does not expose a person's number on its own. The affected party and scale are therefore usually indeterminate, and policy, training, and blank-template text are documented false-positive contexts. Risk 3 and OFFICIAL fit the low topic-level signal; a structured national identifier or populated benefits record would be assessed separately and could raise the context toward SENSITIVE.
@@ -177,8 +167,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-eu-social-security-number-equivalent-identification
     title: EU Social Security Number (SSN) or Equivalent ID entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 75 tier ANDed Pattern_*_label_context (the detector name, "EU Social Security Number (SSN) or Equivalent ID") with Keyword_*_domain_context (its words), so the detector name next to any IdMatch phrase was enough for 75. Both lists sit inside the IdMatch phrase, so the bare name alone scored 75. Re-tiered in the #69 attribute shape: 65 is the phrase alone (discovery only); 75 needs the ID label followed by a value (Regex_eu_social_security_number_populated_label, now the enforcing primary); 85 adds a populated person field (Regex_eu_social_security_number_record_structure). Curated terms that sit inside an IdMatch hit were removed. The context list held the primary''s own phrases ("social security number", "insurance number") and national names for the same number (BSN, personnummer, NISS), so "social security number" alone reached 75. The national names are now labels in the populated-field regex. Added the bare name, a person record with the ID label but no value and a policy-guidance text as should_not_match, and populated ID fields reaching 75 and 85.'
   - version: 1.3.2
     date: '2026-09-25'
     description: >-

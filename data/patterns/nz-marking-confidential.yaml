@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: New Zealand Marking - CONFIDENTIAL
 slug: nz-marking-confidential
-version: 1.1.4
+version: 1.2.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -60,6 +60,8 @@ test_cases:
       description: Gated bracket form — New Zealand Government/PSR corroborative context present within 300 characters
     - value: "New Zealand Government agencies must handle this [CONFIDENTIAL] briefing under PSR requirements."
       description: Gated bracket form, second worked example — PSR corroborative context present
+    - value: '[Confidential]'
+      description: Capitalised marking form
   should_not_match:
     - value: "STRICTLY CONFIDENTIAL — do not distribute beyond this list"
       description: no bare-word tier — bare/title-case "CONFIDENTIAL" boilerplate never matches (locked design decision)
@@ -69,6 +71,8 @@ test_cases:
       description: bracket form present but excluded by the missing New Zealand government/PSR AND-gate (no corroborative context nearby)
     - value: "please keep this confidential between us until the announcement"
       description: lowercase English word (case-sensitive exclusion)
+    - value: 'please keep this confidential between us'
+      description: Lowercase prose is not a marking
 false_positives:
   - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the CONFIDENTIAL tokens rely on.
     mitigation: Treat hits as lower confidence when the surrounding text is itself all-caps; the `//` tier (85) remains the most reliable signal since it additionally requires the structural separator.
@@ -162,15 +166,25 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_nz_confidential_nsi
-      pattern: '\bCONFIDENTIAL//[A-Z]'
+      pattern: '(?-i)\b(?:CONFIDENTIAL|Confidential)//[A-Z]'
     - id: Regex_nz_confidential_bracket
-      pattern: '\[CONFIDENTIAL\]'
+      pattern: '(?-i)\[(?:CONFIDENTIAL|Confidential)\]'
 references:
   - title: "Privacy Act 2020 (NZ)"
     url: https://www.legislation.govt.nz/act/public/2020/0031/latest/whole.html
 created: '2026-07-04'
-updated: '2026-09-25'
+updated: '2026-10-22'
 changelog:
+  - version: 1.2.0
+    date: '2026-10-22'
+    description: >-
+      Case handling made explicit and tested on a dev tenant. Each regex starts with (?-i). Marking words
+      introduced by structure (a classification label, the X-Protective-Marking SEC= field, brackets, the NZ
+      // form, the UK ' - descriptor' form, the EU 'UE/EU' form) match UPPER CASE or Capitalised; bare words
+      and unlabelled banners stay UPPER CASE only, so prose such as "Official figures..." or "Top Secret
+      Recipes" does not reach an enforcing tier. Never all lowercase. Labels, header fields and exclusion
+      lookaheads accept any case through a scoped (?i:...); acronyms stay upper case. Case-sensitive exclusion
+      terms gain Capitalised twins.
   - version: 1.1.4
     date: '2026-09-25'
     description: >-

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Japan Bank Account Number
 slug: jp-bank-account
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -58,6 +58,8 @@ test_cases:
       description: Template/sample context should be excluded even when numeric-like values appear
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'japan 1234567'
+      description: 'A generic word from the detector name ("japan") next to a matching value is not 85 evidence; it reached 85 through the generated name-word tier'
 false_positives:
   - description: Generic numeric sequences such as reference numbers, invoice numbers, or identifiers from other domains
     mitigation: Require corroborative evidence keywords within the proximity window to distinguish financial account numbers from general numeric data.
@@ -82,16 +84,6 @@ purview:
       matches:
         - ref: Pattern_jp_bank_account_label_context
         - ref: Keyword_jp_bank_account
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 85
-      local_noise_filter: true
-      id_match: Regex_jp_bank_account
-      matches:
-        - ref: Keyword_jp_bank_account_domain_context
         - type: any
           min_matches: 0
           max_matches: 0
@@ -129,14 +121,6 @@ purview:
             - 支店番号
             - kouza bangou
       strength: specific
-    - id: Keyword_jp_bank_account_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - japan bank account number
-            - japan
-            - bank
-      strength: domain
   filters:
     - id: Filter_jp_bank_account_same_digits
       type: AllDigitsSameFilter
@@ -168,8 +152,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-japan-bank-account-number
     title: Japan Bank Account Number entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 85 tier whose only evidence was the detector name split into words (Keyword_jp_bank_account_domain_context). One generic word such as "japan" satisfied both lists, so any matching value next to it reached 85. The curated keyword tiers are unchanged and keep the identifying terms. Definitions left unreferenced are removed. Added a should_not_match case with "japan" next to a valid value.'
   - version: 1.4.0
     date: '2026-10-19'
     description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its remit-to BSB, account number, SWIFT/BIC or IBAN) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."

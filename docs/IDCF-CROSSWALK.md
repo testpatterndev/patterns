@@ -41,6 +41,7 @@ Queensland scheme (QGISCF) is the PSPF with Queensland DLMs, so the catalogue's
 
 | `qgiscf_dlm` family (`qgiscf` fallback) | `idcf` | IDCF anchor |
 |---|---|---|
+| `PUBLIC` | `DSL-0` | Catalogue decision (2026-10-20): PUBLIC is DSL-0. §4.7.1 lists published and publicly available material as DSL-0 data and says DSL-0 "may be appropriate for data suitable for public release". The IDCF's separate `Public` dissemination marker is not modelled. No pattern carries PUBLIC today; the PUBLIC label deploys without classifiers. |
 | `OFFICIAL`, `Marking Official` | `DSL-2` | §4.7.3: DSL-2 is the everyday level "for data that is not sensitive, confidential, or which has low business impact"; Table 12 examples are regular business correspondence, general expense receipts, draft reports, internal policy. That is the OFFICIAL band. |
 | `SENSITIVE *`, `Marking Sensitive` | `DSL-3` | §4.5.1 (OFFICIAL: Sensitive ↔ DSL-3). §4.7.4 / Table 13 examples: personal and sensitive information under the Privacy Act 1988, confidential IP and trade secrets, sensitive financial and market-sensitive information, personnel files, small-team deliberations. |
 | `PROTECTED *`, `Marking Protected` | `DSL-4` | §4.5.1 (PROTECTED ↔ DSL-4). §4.7.5 / Table 14 examples: nationally important data, highly confidential IP, sensitive information with serious impact, sensitive personnel files. |
@@ -53,10 +54,9 @@ the three has no `idcf`.
 
 ### Levels never assigned by the catalogue
 
-- **DSL-0** is "very low protection" and "does not automatically make the data suitable for
-  public release" (§4.7.1); the absence of a DSL label never means DSL-0 (§4.6). No detector
-  in this catalogue identifies data as needing no protection, so DSL-0 is a deployment-time
-  label only (a Purview label with no auto-labelling classifiers).
+- **DSL-0** is the PUBLIC label (see the table above). No detector identifies content as
+  public, and the absence of a DSL label never means DSL-0 (§4.6), so it is a deployment-time
+  label with no auto-labelling classifiers, exactly like the Queensland PUBLIC label.
 - **DSL-1** is for encrypted copies without their key, hard-copy originals and small
   quantities of low-sensitivity data, with physical controls only (§4.7.2). It is a
   container/copy decision, not a content classification.
@@ -97,7 +97,7 @@ sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Personal-Privacy
-  idcf: DSL-3                       # DSL-2 | DSL-3 | DSL-4 | N/A  (derived, CI-checked)
+  idcf: DSL-3                       # DSL-0 | DSL-2 | DSL-3 | DSL-4 | N/A  (derived, CI-checked)
   idcf_marker: Personal Privacy     # Personal Privacy | Legal Privilege | Confidential; omitted otherwise
 ```
 

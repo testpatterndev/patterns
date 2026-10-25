@@ -26,8 +26,20 @@ Every pattern has one **domain**, from its `package_tags.primary_component`: pri
 | Queensland Government layer | `<domain>-qg` | The rest of the Queensland Government package's selection in the domain |
 | Sector layer | `<domain>-<sector>` | Patterns outside the Queensland Government package that a sector package takes (council, education, ci, electoral) |
 | Extended | `<domain>-extended` | Domain patterns outside every current package; the former standalone qgcreds, qgfin and qghealth carried them |
+| Optional | `<block>-optional` | Lower-priority members of one block. Full packages take them; lean packages leave them out |
 
-The Queensland Government package is the shared core plus the Queensland Government layer in each domain. The credentials, finance and health domain packages are every block in their domain.
+The Queensland Government package is the shared core plus the Queensland Government layer in each domain, plus the optional block of each of those blocks. The lean Queensland Government package (qg-lean) is the same without the optional blocks. The credentials, finance and health domain packages are every block in their domain.
+
+### Optional blocks
+
+An optional block is named after the block it was split from (`finance` → `finance-optional`, `finance-qg` → `finance-qg-optional`) and has the same domain. Any package that takes the source block also takes its optional block, so its membership doesn't change when a pattern moves to the optional block. Only a lean package takes the source block alone.
+
+The optional layer was created on 2026-10-20 (Option B packaging) and holds two kinds of pattern:
+
+- **Low-risk patterns** (24): the harm comes only when they sit beside a stronger identifier that another pattern already targets (a street name, number plate, title reference, BSB, IBAN, CVV), or they are public register values, generic documents, or out-of-scope regulation (EU NIS2).
+- **Vendor credential detectors** (35): Snaffler file rules and SaaS, cloud and database credentials for platforms that are uncommon in Queensland Government estates. The generic credential, password and private-key patterns stay in `credentials`.
+
+The reason for each pattern is recorded in the pull request that moved it.
 
 A few patterns sit outside their own domain because their domain's block for them would have been too small to be useful: a people-records pattern goes with privacy, and operational-technology documentation goes with security operations.
 
@@ -36,5 +48,6 @@ A few patterns sit outside their own domain because their domain's block for the
 - `id` is kebab-case and matches the file name. `domain` and `layer` come from the lists above.
 - Every pattern is a live pattern. When a pattern is deprecated, move its block entry to its `replaced_by` pattern in the same change.
 - A pattern appears in at most one block.
+- An optional block (layer `optional`) is named `<source block>-optional`, its source block exists, and the two share a domain.
 
 The breakdown was derived on 2026-09-25 from the sealed QG, ECQ, LG, EDU and CI packages. Each package's recipe rebuilds its seal exactly.

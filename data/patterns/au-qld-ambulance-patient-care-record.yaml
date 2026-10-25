@@ -1,0 +1,213 @@
+schema: testpattern/v1
+name: QLD Ambulance Service Patient Care Record
+slug: au-qld-ambulance-patient-care-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Populated Queensland Ambulance Service (QAS) patient care records: electronic Ambulance Report Forms
+  (eARF, earlier ePARF), paper ambulance report forms and paramedic patient care records or reports.
+  They record the patient, the case or incident, chief complaint and mechanism of injury, vital-sign
+  observations, treatment and medicines given, and the transport destination or hospital handover.
+  Copies are requested by hospitals, police, insurers, lawyers and coroners, and travel outside the
+  QAS clinical system. Boundary: hospital clinical handover sheets belong to
+  au-qld-health-clinical-handover; police incident reports to qps-incident-report.
+operation: >-
+  Primary: eARF / ePARF / e-ARF, (electronic) ambulance report form, patient care record, ambulance
+  (patient) (care) record or report, paramedic (patient) (care) record or report. 65 (discovery only):
+  primary alone. 75: primary plus a populated patient field (patient name, DOB, age, Medicare, URN,
+  address) plus a populated clinical field (chief complaint, presenting problem, mechanism of injury,
+  observations, vital signs, GCS, BP, heart / pulse / respiratory rate, SpO2, BGL, pain score,
+  treatment, drugs or medications administered, provisional diagnosis, clinical assessment, triage
+  category, transport destination, transported to, destination hospital, handover). 85: the 75
+  evidence plus either a populated case field (case, incident, job, CAD or event number, dispatch /
+  call / at-scene time) or explicit QAS provenance (Queensland Ambulance Service, QAS, Triple Zero
+  call, Ambulance Service Act). Enforce tiers exclude template wording and Clinical Practice Manual,
+  guideline, training, news and patient-information framing.
+pattern: >-
+  (?i)\b(?:e-?P?ARF|(?:electronic\s+)?ambulance\s+report\s+form|patient\s+care\s+record|ambulance\s+(?:patient\s+)?(?:care\s+)?(?:record|report)|paramedic\s+(?:patient\s+)?(?:care\s+)?(?:record|report))\b
+confidence: medium
+confidence_justification: >-
+  Medium: eARF and ambulance report form wording is specific, and enforce tiers need a populated patient
+  and a populated clinical field. "Patient care record" is also used by aged care and hospital systems;
+  those records reach 75 when they carry observations or treatment, which is health information about a
+  person, and only reach 85 with a case number or QAS provenance.
+jurisdictions:
+  - au
+  - au-qld
+regulations:
+  - Ambulance Service Act 1991 (Qld)
+  - Information Privacy Act 2009 (Qld)
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - QGISCF
+data_categories:
+  - phi
+  - health
+  - pii
+corroborative_evidence:
+  keywords:
+    - Queensland Ambulance Service
+    - case number
+    - observations
+    - transport destination
+    - chief complaint
+    - GCS
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "eARF  Case number: 2026-1014-000000\nPatient: Jordan Teston\nDOB: 12/12/1948\nChief complaint: Central chest pain 40 min\nObservations: HR 112, BP 92/60, SpO2 94 percent RA, GCS 15\nTreatment: Aspirin 300 mg, GTN 400 mcg SL\nTransport destination: Princess Alexandra Hospital ED"
+      description: 85 tier - eARF with case number, patient, chief complaint, observations, treatment and destination
+      synthetic: true
+    - value: "Patient care record - Queensland Ambulance Service\nPatient name: Riley Teston\nMechanism of injury: Motorcycle versus car at 60 km/h\nGCS: 13\nTransported to: Gold Coast University Hospital"
+      description: 85 tier - patient care record with QAS provenance, patient, mechanism, GCS and destination
+      synthetic: true
+    - value: "Ambulance report form\nPatient: Morgan Teston\nPain score: 7/10\nDrugs administered: Methoxyflurane 3 mL inhaled"
+      description: 75 tier - ambulance report form with patient and treatment, no case number or provenance
+      synthetic: true
+  should_not_match:
+    - value: "Clinical Practice Manual: this guideline describes what paramedics must record in the eARF, including observations, treatment, transport destination and handover. Training module for graduate paramedics."
+      description: QAS Clinical Practice Manual / training text (65 at most)
+    - value: "Ambulance report form\nPatient: ____________________\nCase number: ____________________\nObservations: ____________________\nTransport destination: ____________________"
+      description: Blank ambulance report form (65 at most)
+    - value: "News: QAS paramedics responded to a two-vehicle crash on the Bruce Highway this morning; two people were taken to hospital in a stable condition."
+      description: News report about an ambulance response (no match)
+    - value: "Requests for a copy of an ambulance record must be made in writing; see the patient information page on how to apply and what fees apply."
+      description: Patient information about requesting records (65 at most)
+false_positives:
+  - description: QAS Clinical Practice Manual, paramedic training material and procedures that list eARF fields.
+    mitigation: No populated patient or clinical field, and manual, guideline, training and patient-information framing is excluded from enforce tiers.
+  - description: Aged care and hospital "patient care record" printouts with observations.
+    mitigation: These are health records about a person and are acceptable at 75; 85 needs a case number or QAS provenance.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_ambulance_record_primary
+      matches:
+        - ref: Regex_ambulance_patient_field
+        - ref: Regex_ambulance_clinical_field
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_ambulance_case_field
+            - Keyword_ambulance_qas_provenance
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_ambulance_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_ambulance_record_primary
+      matches:
+        - ref: Regex_ambulance_patient_field
+        - ref: Regex_ambulance_clinical_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_ambulance_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_ambulance_record_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_ambulance_record_primary
+      pattern: >-
+        (?i)\b(?:e-?P?ARF|(?:electronic\s+)?ambulance\s+report\s+form|patient\s+care\s+record|ambulance\s+(?:patient\s+)?(?:care\s+)?(?:record|report)|paramedic\s+(?:patient\s+)?(?:care\s+)?(?:record|report))\b
+    - id: Regex_ambulance_patient_field
+      pattern: >-
+        (?i)\b(?:patient(?:\s+name)?|full\s+name|surname|given\s+names?|date\s+of\s+birth|DOB|age|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|URN|UR\s*(?:no\.?|number)|(?:patient|home|residential)\s+address)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_ambulance_clinical_field
+      pattern: >-
+        (?i)\b(?:chief\s+complaint|presenting\s+(?:complaint|problem)|mechanism\s+of\s+injury|observations|vital\s+signs|vitals|GCS|BP|blood\s+pressure|(?:heart|pulse|respiratory|resp)\s+rate|SpO2|BGL|pain\s+score|treatment|(?:drugs?|medications?)\s+administered|provisional\s+diagnosis|clinical\s+(?:assessment|impression)|triage\s+category|transport\s+destination|transported\s+to|destination\s+hospital|handover)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.,-]{0,30}(?:[ \t]+[A-Za-z0-9][A-Za-z0-9/'.,-]{0,30}){0,5}
+    - id: Regex_ambulance_case_field
+      pattern: >-
+        (?i)\b(?:case|incident|job|CAD|event)\s*(?:no\.?|number|ID|ref(?:erence)?)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|unknown|tbc|tba|the|a|an|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{3,24}\b|(?:dispatch|call|at[\s-]scene|departed\s+scene|arrived\s+(?:at\s+)?hospital)\s+time[ \t]*[:#][ \t]{0,3}\d{1,2}:?\d{2}\b
+    - id: Regex_ambulance_guidance_exclusion
+      pattern: >-
+        (?i)\b(?:Clinical\s+Practice\s+(?:Manual|Guidelines?)|this\s+(?:policy|procedure|guideline|guide|page|fact\s?sheet|article|course)|training\s+module|e-learning|patient\s+information\s+page|how\s+to\s+apply|frequently\s+asked\s+questions|media\s+release|news\s*:)
+  keywords:
+    - id: Keyword_ambulance_qas_provenance
+      groups:
+        - match_style: word
+          terms:
+            - Queensland Ambulance Service
+            - text: QAS
+              case_sensitive: true
+            - Triple Zero call
+            - Ambulance Service Act
+            - Local Ambulance Service Network
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  The classifier recognises QAS eARF and ambulance patient care records and enforces only when a populated
+  patient field sits with a populated clinical field (complaint, observations, treatment, destination),
+  with 85 also needing a case number or QAS provenance. One record shows a named person's emergency
+  presentation: injuries, overdose, mental-health crisis, chest pain or obstetric emergency, the drugs
+  given and where they were taken. These records are routinely requested by police, insurers, lawyers
+  and coroners, so copies circulate outside the clinical system. Disclosure can expose stigmatised
+  conditions or the circumstances of an assault or accident. The normal unit is one case, so the harm is
+  serious but contained; risk 8 matches the other single-patient clinical record classifiers.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy and Medium because a populated
+    ambulance patient care record discloses one person's emergency presentation, observations, treatment and
+    destination. PROTECTED is not met: a single case record does not establish bulk patient scale, dispatch-system
+    access or significant operational damage.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling protects one patient's pre-hospital clinical record. High would need bulk case
+      extracts or access to the dispatch or eARF system.
+references:
+  - title: Ambulance Service Act 1991 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-1991-036
+  - title: Queensland Ambulance Service - Clinical Practice Manual
+    url: https://www.ambulance.qld.gov.au/clinical.html
+  - title: Information Privacy Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+created: '2026-10-20'
+updated: '2026-10-20'
+changelog:
+  - version: 1.0.0
+    date: '2026-10-20'
+    description: >-
+      Initial release from the qghealth sector review: QAS eARF / ePARF and ambulance patient care records.
+      65 phrase only; 75 needs a populated patient field and a populated clinical field; 85 adds a case
+      field or QAS provenance. Clinical Practice Manual, guideline, training, news and patient-information
+      framing excluded.
+author: testpattern-community
+license: MIT

@@ -88,6 +88,7 @@ t('idcf: falls back to qgiscf then pspf only when the DLM is absent', () => {
   assert.equal(idcf({ pspf: 'OFFICIAL: Sensitive' }).idcf, 'DSL-3')
   assert.equal(idcf({ pspf: 'PROTECTED' }).idcf, 'DSL-4')
   assert.equal(idcf({ pspf: 'N/A' }).idcf, 'N/A')
+  assert.equal(idcf({ qgiscf: 'PUBLIC' }).idcf, 'DSL-0', 'PUBLIC is DSL-0 (catalogue decision 2026-10-20)')
   assert.equal(idcf({ qgiscf: 'SENSITIVE' }).idcf_marker, undefined, 'no marker without a DLM')
   assert.equal(idcf({ qgiscf_dlm: 'Marking Official', qgiscf: 'OFFICIAL' }).idcf, 'DSL-2', 'Marking Official is the OFFICIAL band, like tierForLabel')
 })
