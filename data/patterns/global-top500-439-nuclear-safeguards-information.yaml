@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Nuclear safeguards information
 slug: global-top500-439-nuclear-safeguards-information
-version: 1.2.6
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -37,6 +37,24 @@ test_cases:
     description: Alternative topic phrase match
   - value: nuclear material
     description: Additional topic phrase match
+  - value: |-
+      Nuclear safeguards
+      To: Executive Committee
+      From: Chief Risk Officer
+    description: Populated document header with 2 fields (75 tier)
+    synthetic: true
+  - value: |-
+      Nuclear safeguards
+      To: Executive Committee
+      From: Chief Risk Officer
+      Date: 14 August 2026
+    description: Populated document header with 3 distinct fields (85 tier)
+    synthetic: true
+  - value: |-
+      Nuclear safeguards - plutonium
+      To: Executive Committee
+    description: Kept independent term "plutonium" with the phrase and one header field (75 tier)
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -44,6 +62,17 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: classified contingency
     description: Generic word pair from old broad template should not match
+  - value: Nuclear safeguards information
+    description: "Bare detector name: it reached 85 through the generated name-word tier and must not reach an enforcing tier"
+  - value: |-
+      Nuclear safeguards:
+      To:
+      From:
+      Date:
+      Subject:
+    description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+  - value: "Policy guidance: this procedure explains how records about nuclear safeguards are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Common words and phrases related to nuclear safeguards information appearing in policy documents, training
     materials, HR templates, or compliance guidelines without actual personal data.
@@ -73,64 +102,56 @@ purview:
   - confidence_level: 85
     id_match: Regex_nuclear_safeguards
     matches:
-    - ref: Pattern_global_top500_439_nuclear_safeguards_information_label_context
-    - ref: Keyword_global_top500_439_nuclear_safeguards_information_domain_context
-    - ref: Keyword_nuclear_safeguards
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+      - ref: Regex_global_top500_439_nuclear_safeguards_information_record_structure
+        min_count: 3
+        unique_results: true
+      - type: any
+        min_matches: 0
+        max_matches: 0
+        refs:
+          - Keyword_noise_exclusion
   - confidence_level: 75
     id_match: Regex_nuclear_safeguards
     matches:
-    - ref: Pattern_global_top500_439_nuclear_safeguards_information_label_context
-    - ref: Keyword_global_top500_439_nuclear_safeguards_information_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+      - ref: Regex_global_top500_439_nuclear_safeguards_information_record_structure
+        min_count: 2
+        unique_results: true
+      - type: any
+        min_matches: 0
+        max_matches: 0
+        refs:
+          - Keyword_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_nuclear_safeguards
+    matches:
+      - ref: Keyword_nuclear_safeguards
+      - ref: Regex_global_top500_439_nuclear_safeguards_information_record_structure
+      - type: any
+        min_matches: 0
+        max_matches: 0
+        refs:
+          - Keyword_noise_exclusion
   - confidence_level: 65
     discovery_only: true
     id_match: Regex_nuclear_safeguards
     matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+      - type: any
+        min_matches: 0
+        max_matches: 0
+        refs:
+          - Keyword_noise_exclusion
   regexes:
   - id: Regex_nuclear_safeguards
     pattern: (?is)\b(?:nuclear\s+safeguards|fissile\s+material|enrichment\s+facility|nuclear\s+material|safeguards\s+agreement|nuclear\s+security|radioactive\s+source|nuclear\s+facility|uranium\s+enrichment)\b
-  - id: Pattern_global_top500_439_nuclear_safeguards_information_label_context
-    pattern: (?i)\b(?:nuclear\s+safeguards\s+information)\b
+  - id: Regex_global_top500_439_nuclear_safeguards_information_record_structure
+    pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item|facility\s+(?:code|ID)|MBA|material\s+balance\s+area|batch\s+(?:no\.?|number))\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
   keywords:
   - id: Keyword_nuclear_safeguards
     groups:
     - match_style: word
       terms:
-      - nuclear safeguards
-      - IAEA
-      - fissile material
-      - enrichment facility
-      - nuclear material
-      - safeguards agreement
-      - nuclear security
-      - radioactive source
-      - nuclear facility
-      - nonproliferation
-      - uranium enrichment
       - plutonium
     strength: specific
-  - id: Keyword_global_top500_439_nuclear_safeguards_information_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - nuclear safeguards information
-      - nuclear
-      - safeguards
-    strength: domain
 risk_description: This concept regex identifies nuclear safeguards, fissile material, enrichment facilities, and nuclear-material
   records with nearby government context. A genuine record may reveal inventory-accounting arrangements, inspection findings,
   material movements, or control weaknesses, enabling regulatory evasion, theft planning, or damage to international confidence.
@@ -145,6 +166,7 @@ sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: PROTECTED Government
+  idcf: DSL-4
   us_gov: Top Secret
   uk_gov: TOP SECRET
   nz_gov: TOP SECRET
@@ -172,8 +194,11 @@ frameworks:
   - ISO 27001
   - ISO 27701
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+- version: 1.3.0
+  date: '2026-10-20'
+  description: 'Generated name-word tier removed: the 85 and 75 tiers ANDed Pattern_*_label_context (the detector name, "Nuclear safeguards information") with Keyword_*_domain_context (its words), so the detector name next to any IdMatch phrase was enough for 85. Both lists sit inside the IdMatch phrase, so the bare name alone scored 85. Re-tiered in the #69 shape: 65 is the phrase alone (discovery only); 75 needs 2 populated document header fields (Regex_global_top500_439_nuclear_safeguards_information_record_structure) or the kept independent term plutonium plus one field; 85 needs 3 distinct fields. Curated terms that sit inside an IdMatch hit were removed. IAEA and "nonproliferation" appear in any safeguards policy and are dropped. Added the bare name, an empty form and a policy-guidance text as should_not_match, and populated records reaching 75 and 85.'
 - version: 1.2.6
   date: '2026-09-25'
   description: >-

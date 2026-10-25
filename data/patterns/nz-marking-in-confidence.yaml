@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: New Zealand Marking - IN-CONFIDENCE
 slug: nz-marking-in-confidence
-version: 1.1.3
+version: 1.2.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -53,6 +53,8 @@ test_cases:
       description: Legacy SEEMail bracket trigger-word form
     - value: "IN-CONFIDENCE\nMinistry of Business, Innovation and Employment — briefing for the Minister"
       description: Bare document-banner form (PSR Classification Handbook document-marking convention — centred, bold, ALL CAPS)
+    - value: '[In-Confidence]'
+      description: Capitalised marking in brackets
   should_not_match:
     - value: "Please keep this in confidence between us until the announcement."
       description: lowercase English idiom (case-sensitive exclusion)
@@ -60,6 +62,8 @@ test_cases:
       description: bare banner tier excluded by the template/noise NOT-group (documentation/sample content)
     - value: "STAFF IN CONFIDENCE handling applies to this personnel file"
       description: "non-hyphenated \"IN CONFIDENCE\" (two words) is a known coverage gap — canonical PSR guidance renders the classification as the single hyphenated token IN-CONFIDENCE"
+    - value: 'the figures were shared in-confidence with the board'
+      description: Lowercase prose is not a marking
 false_positives:
   - description: ALL-CAPS prose (legal boilerplate, headers, or documents rendered entirely in capitals) defeats the case-sensitivity signal the bare IN-CONFIDENCE banner tier relies on.
     mitigation: Treat banner-tier-only (75) hits as lower confidence when the surrounding text is itself all-caps; the endorsed and legacy-bracket tiers (85) remain the reliable signal.
@@ -77,6 +81,7 @@ risk_description: >-
 sensitivity_labels:
   qgiscf: SENSITIVE
   qgiscf_dlm: Marking Sensitive
+  idcf: DSL-3
   psr: IN-CONFIDENCE
   pspf: "OFFICIAL: Sensitive"
   us_gov: "CUI"
@@ -129,17 +134,27 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_nz_in_confidence_endorsed
-      pattern: '\b(?:POLICY|MEDICAL|STAFF|EVALUATIVE|COMMERCIAL|APPOINTMENTS|HONOURS|BUDGET)(?:\s+|:\s*)IN-CONFIDENCE\b'
+      pattern: '(?-i)\b(?:POLICY|MEDICAL|STAFF|EVALUATIVE|COMMERCIAL|APPOINTMENTS|HONOURS|BUDGET)(?:\s+|:\s*)IN-CONFIDENCE\b'
     - id: Regex_nz_in_confidence_bracket
-      pattern: '\[IN-CONFIDENCE\]'
+      pattern: '(?-i)\[(?:IN|In)-(?:CONFIDENCE|Confidence)\]'
     - id: Regex_nz_in_confidence_bare
-      pattern: '\bIN-CONFIDENCE\b'
+      pattern: '(?-i)\bIN-CONFIDENCE\b'
 references:
   - title: "Privacy Act 2020 (NZ)"
     url: https://www.legislation.govt.nz/act/public/2020/0031/latest/whole.html
 created: '2026-07-04'
-updated: '2026-09-25'
+updated: '2026-10-22'
 changelog:
+  - version: 1.2.0
+    date: '2026-10-22'
+    description: >-
+      Case handling made explicit and tested on a dev tenant. Each regex starts with (?-i). Marking words
+      introduced by structure (a classification label, the X-Protective-Marking SEC= field, brackets, the NZ
+      // form, the UK ' - descriptor' form, the EU 'UE/EU' form) match UPPER CASE or Capitalised; bare words
+      and unlabelled banners stay UPPER CASE only, so prose such as "Official figures..." or "Top Secret
+      Recipes" does not reach an enforcing tier. Never all lowercase. Labels, header fields and exclusion
+      lookaheads accept any case through a scoped (?i:...); acronyms stay upper case. Case-sensitive exclusion
+      terms gain Capitalised twins.
   - version: 1.1.3
     date: '2026-09-25'
     description: >-

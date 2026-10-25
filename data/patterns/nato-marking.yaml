@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: NATO Marking - RESTRICTED / CONFIDENTIAL / SECRET / COSMIC TOP SECRET
 slug: nato-marking
-version: 1.1.2
+version: 1.2.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -69,6 +69,10 @@ test_cases:
       description: ALL-CAPS prose naming NSA (the agency) and NATO but with no marking — fails at the regex level (NATO is followed by COMMUNICATIONS, not a level word; the NSA abbreviation is deliberately not a shipped marking form)
     - value: "THE SUMMIT WILL COVER COSMIC BACKGROUND RADIATION AND OTHER TOP RESEARCH TOPICS"
       description: ALL-CAPS prose containing COSMIC and TOP but not the contiguous COSMIC TOP SECRET banner — fails at the regex level
+    - value: 'nato secret documents were discussed in the news'
+      description: Lowercase prose is not a marking
+    - value: 'Nato Secret was the title of the spy novel'
+      description: Capitalised prose, not a marking
 false_positives:
   - description: ALL-CAPS prose (headings, legal boilerplate, or documents rendered entirely in capitals) defeats the case-sensitivity signal; an all-caps rendering of "NATO SECRET" or "COSMIC TOP SECRET" with no marking intent (e.g. a headline or book title) can fire.
     mitigation: Treat hits as lower confidence when the surrounding text is itself all-caps. The NATO/COSMIC prefixes keep collision low relative to bare classification words, and the corroborative NATO/COSMIC/ATOMAL keywords within 300 characters reinforce genuine marking context.
@@ -101,6 +105,7 @@ risk_description: >-
 sensitivity_labels:
   qgiscf: PROTECTED
   qgiscf_dlm: Marking Protected
+  idcf: DSL-4
   nato: "NATO RESTRICTED / NATO CONFIDENTIAL / NATO SECRET / COSMIC TOP SECRET"
   us_gov: "CUI / CONFIDENTIAL / SECRET / TOP SECRET"
   uk_gov: "OFFICIAL-SENSITIVE / SECRET / TOP SECRET"
@@ -154,12 +159,22 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_nato_level
-      pattern: '\bNATO[\s-]+(?:RESTRICTED|CONFIDENTIAL|SECRET)\b'
+      pattern: '(?-i)\bNATO[\s-]+(?:RESTRICTED|CONFIDENTIAL|SECRET)\b'
     - id: Regex_nato_cosmic
-      pattern: '\bCOSMIC[\s-]+TOP[\s-]+SECRET\b'
+      pattern: '(?-i)\bCOSMIC[\s-]+TOP[\s-]+SECRET\b'
 created: '2026-07-07'
-updated: '2026-09-25'
+updated: '2026-10-22'
 changelog:
+  - version: 1.2.0
+    date: '2026-10-22'
+    description: >-
+      Case handling made explicit and tested on a dev tenant. Each regex starts with (?-i). Marking words
+      introduced by structure (a classification label, the X-Protective-Marking SEC= field, brackets, the NZ
+      // form, the UK ' - descriptor' form, the EU 'UE/EU' form) match UPPER CASE or Capitalised; bare words
+      and unlabelled banners stay UPPER CASE only, so prose such as "Official figures..." or "Top Secret
+      Recipes" does not reach an enforcing tier. Never all lowercase. Labels, header fields and exclusion
+      lookaheads accept any case through a scoped (?i:...); acronyms stay upper case. Case-sensitive exclusion
+      terms gain Capitalised twins.
   - version: 1.1.2
     date: '2026-09-25'
     description: >-

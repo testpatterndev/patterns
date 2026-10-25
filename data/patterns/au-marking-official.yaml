@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Marking - OFFICIAL
 slug: au-marking-official
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -56,6 +56,8 @@ test_cases:
       description: Medium-tier probe - standalone banner corroborated by explicit government marking context
     - value: 'X-Protective-Marking: VER=2024.1, NS=gov.au, SEC=OFFICIAL'
       description: High-tier probe - complete Australian protective-marking header
+    - value: 'Classification: Official'
+      description: Capitalised marking form
   should_not_match:
     - value: visit our official website for more information
       description: lowercase English word (case-sensitive exclusion)
@@ -79,6 +81,10 @@ test_cases:
       description: Blank template - empty classification fields must not enforce
     - value: 'Protective security training material: an email subject line such as [SEC=OFFICIAL] shows the marking applied to a message.'
       description: Training content quoting a SEC= subject marking is suppressed by the public-marking exclusion (never reaches 75)
+    - value: 'an official briefing was held for staff'
+      description: Lowercase prose is not a marking
+    - value: 'Official figures released by the Queensland Government show strong growth'
+      description: Capitalised prose, not a marking
 false_positives:
   - description: Uppercase use of OFFICIAL in non-marking contexts (e.g. "OFFICIAL OPENING").
     mitigation: Explicit PSPF/QGISCF government context or a structured marking field is required above discovery; the complete header remains the strict 85 path.
@@ -99,6 +105,7 @@ sensitivity_labels:
   nz_gov: "IN-CONFIDENCE"
   ca_gov: "Protected A"
   qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
 classification:
   tier: Low
   rationale: >-
@@ -154,11 +161,11 @@ purview:
       id_match: Regex_au_official_candidate
   regexes:
     - id: Regex_au_official_complete_header
-      pattern: '\bX-Protective-Marking:\s*VER=[0-9]{4}\.[0-9]+,\s*NS=gov\.au,\s*SEC=OFFICIAL\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive)'
+      pattern: '(?-i)\b(?i:X-Protective-Marking:\s*VER=[0-9]{4}\.[0-9]+,\s*NS=gov\.au,\s*SEC=)(?:OFFICIAL|Official)\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)(?i:sensitive))'
     - id: Regex_au_official_formal_label
-      pattern: '\b(?:SEC(?:URITY\s+CLASSIFICATION)?|Security\s+Classification|CLASSIFICATION|Classification|PROTECTIVE\s+MARKING|Protective\s+Marking|MARKING|Marking)\s*[:=]\s*OFFICIAL\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive)'
+      pattern: '(?-i)\b(?i:SEC(?:URITY\s+CLASSIFICATION)?|CLASSIFICATION|PROTECTIVE\s+MARKING|MARKING)\s*[:=]\s*(?:OFFICIAL|Official)\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)(?i:sensitive))'
     - id: Regex_au_official_candidate
-      pattern: '\bOFFICIAL\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)Sensitive)'
+      pattern: '(?-i)\bOFFICIAL\b(?!(?:[ ]|:[ ]?|[ ]?//[ ]?)(?i:sensitive))'
   keywords:
     - id: Keyword_au_gov_context
       groups:
@@ -206,8 +213,18 @@ references:
   - title: Criminal Code Act 1995 (Cth)
     url: https://www.legislation.gov.au/C2004A04868/latest/text
 created: '2026-06-29'
-updated: '2026-10-19'
+updated: '2026-10-22'
 changelog:
+  - version: 1.6.0
+    date: '2026-10-22'
+    description: >-
+      Case handling made explicit and tested on a dev tenant. Each regex starts with (?-i). Marking words
+      introduced by structure (a classification label, the X-Protective-Marking SEC= field, brackets, the NZ
+      // form, the UK ' - descriptor' form, the EU 'UE/EU' form) match UPPER CASE or Capitalised; bare words
+      and unlabelled banners stay UPPER CASE only, so prose such as "Official figures..." or "Top Secret
+      Recipes" does not reach an enforcing tier. Never all lowercase. Labels, header fields and exclusion
+      lookaheads accept any case through a scoped (?i:...); acronyms stay upper case. Case-sensitive exclusion
+      terms gain Capitalised twins.
   - version: 1.5.0
     date: '2026-10-19'
     description: Move the SEC= formal-label evidence term into a string-style group. As a word-style term it could not match "[SEC=...]" subject markings in Purview, because a letter follows the "=" (tenant gating claim 9), so the 75 tier never fired on them.

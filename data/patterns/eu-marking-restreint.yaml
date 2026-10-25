@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: EU Marking - RESTREINT UE/EU RESTRICTED (EUCI ladder)
 slug: eu-marking-restreint
-version: 1.1.2
+version: 1.2.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -63,6 +63,8 @@ test_cases:
       description: PDF line-wrap between the French and English halves (the [\s-]+ separator tolerates a wrap-inserted newline)
     - value: "Le dossier porte la mention CONFIDENTIEL UE dans l'en-tête."
       description: Single-language French component (CONFIDENTIEL UE) — the French half of the verified dual marking
+    - value: 'Restreint UE'
+      description: Capitalised marking form
   should_not_match:
     - value: "the document is restreint ue/eu restricted according to the summary note"
       description: lowercase prose (case-sensitive exclusion — the marking regex only matches the ALL-CAPS bilingual token)
@@ -70,6 +72,8 @@ test_cases:
       description: ALL-CAPS prose with "EU RESTRICTED" but no "UE/EU" bilingual construction — fails at the regex level (the dual marking requires the contiguous UE/EU token)
     - value: "THIS IS A SECRET AND CONFIDENTIAL BUSINESS PLAN FOR OUR EU EXPANSION"
       description: ALL-CAPS prose containing SECRET, CONFIDENTIAL and EU but not the EUCI bilingual marking — fails at the regex level
+    - value: 'the restreint ue label is described in the guide'
+      description: Lowercase prose is not a marking
 false_positives:
   - description: ALL-CAPS prose (headings, legal boilerplate, or fully-capitalised documents) can defeat the case-sensitivity signal, but only if it reproduces the exact bilingual "<FR-LEVEL> UE/EU <EN-LEVEL>" (or the French "<FR-LEVEL> UE") construction — which is itself the marking, so residual collision is very low.
     mitigation: The dual-form tier (85) is structurally near-unique; treat single-language French-component hits (75) as lower confidence in all-caps context. Corroborative EU/EUCI keywords within 300 characters reinforce genuine marking context.
@@ -97,6 +101,7 @@ risk_description: >-
 sensitivity_labels:
   qgiscf: SENSITIVE
   qgiscf_dlm: Marking Sensitive
+  idcf: DSL-3
   euci: "RESTREINT UE/EU RESTRICTED / CONFIDENTIEL UE/EU CONFIDENTIAL / SECRET UE/EU SECRET / TRÈS SECRET UE/EU TOP SECRET"
   us_gov: "CUI / CONFIDENTIAL / SECRET / TOP SECRET"
   uk_gov: "OFFICIAL-SENSITIVE / SECRET / TOP SECRET"
@@ -145,12 +150,22 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_eu_euci_dual
-      pattern: '\bRESTREINT[\s-]+UE/EU[\s-]+RESTRICTED\b|\bCONFIDENTIEL[\s-]+UE/EU[\s-]+CONFIDENTIAL\b|\bSECRET[\s-]+UE/EU[\s-]+SECRET\b|\b(?:TRÈS|TRES)[\s-]+SECRET[\s-]+UE/EU[\s-]+TOP[\s-]+SECRET\b'
+      pattern: '(?-i)\b(?:RESTREINT|Restreint)[\s-]+UE/EU[\s-]+(?:RESTRICTED|Restricted)\b|\b(?:CONFIDENTIEL|Confidentiel)[\s-]+UE/EU[\s-]+(?:CONFIDENTIAL|Confidential)\b|\b(?:SECRET|Secret)[\s-]+UE/EU[\s-]+(?:SECRET|Secret)\b|\b(?:(?:TRÈS|Très)|(?:TRES|Tres))[\s-]+(?:SECRET|Secret)[\s-]+UE/EU[\s-]+(?:TOP|Top)[\s-]+(?:SECRET|Secret)\b'
     - id: Regex_eu_euci_french
-      pattern: '\bRESTREINT[\s-]+UE\b|\bCONFIDENTIEL[\s-]+UE\b|\bSECRET[\s-]+UE\b|\b(?:TRÈS|TRES)[\s-]+SECRET[\s-]+UE\b'
+      pattern: '(?-i)\b(?:RESTREINT|Restreint)[\s-]+UE\b|\b(?:CONFIDENTIEL|Confidentiel)[\s-]+UE\b|\b(?:SECRET|Secret)[\s-]+UE\b|\b(?:(?:TRÈS|Très)|(?:TRES|Tres))[\s-]+(?:SECRET|Secret)[\s-]+UE\b'
 created: '2026-07-07'
-updated: '2026-09-25'
+updated: '2026-10-22'
 changelog:
+  - version: 1.2.0
+    date: '2026-10-22'
+    description: >-
+      Case handling made explicit and tested on a dev tenant. Each regex starts with (?-i). Marking words
+      introduced by structure (a classification label, the X-Protective-Marking SEC= field, brackets, the NZ
+      // form, the UK ' - descriptor' form, the EU 'UE/EU' form) match UPPER CASE or Capitalised; bare words
+      and unlabelled banners stay UPPER CASE only, so prose such as "Official figures..." or "Top Secret
+      Recipes" does not reach an enforcing tier. Never all lowercase. Labels, header fields and exclusion
+      lookaheads accept any case through a scoped (?i:...); acronyms stay upper case. Case-sensitive exclusion
+      terms gain Capitalised twins.
   - version: 1.1.2
     date: '2026-09-25'
     description: >-

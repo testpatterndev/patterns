@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Canada Marking - Protected A/B/C + Classified
 slug: ca-marking
-version: 1.1.2
+version: 1.2.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -66,6 +66,8 @@ test_cases:
       description: Gated bare SECRET — Canada-government corroborative context (Government of Canada, Directive on Security Management) present within 300 characters
     - value: "Marking: Protected-A applied to the salary schedule in the personnel file."
       description: Protected-A with a hyphen separator (the [\s-]+ separator tolerates a hyphen before the level letter)
+    - value: 'Protected B'
+      description: Capitalised marking form
   should_not_match:
     - value: "please keep these files protected and do not disclose anything secret without approval"
       description: lowercase prose (case-sensitive exclusion — neither "protected" nor "secret" is capitalised as a marking)
@@ -73,6 +75,10 @@ test_cases:
       description: ALL-CAPS prose — "PROTECTED A" is followed by the rest of "AREAS" (no word boundary after the A), so it fails at the regex level
     - value: "THE COMPANY'S TRADE SECRET FORMULA IS CONFIDENTIAL AND STORED UNDER AN NDA"
       description: ALL-CAPS non-government collocation — excluded from the top-level Protected pattern (no PROTECTED A/B/C) and from the gated bare tier by the TRADE SECRET NOT-group
+    - value: 'the protected area near the river is closed'
+      description: Lowercase prose is not a marking
+    - value: 'Top Secret Recipes is a popular cookbook'
+      description: Capitalised prose, not a marking
 false_positives:
   - description: ALL-CAPS prose (headings, legal boilerplate, or fully-capitalised documents) defeats the case-sensitivity signal the bare TOP SECRET / SECRET / CONFIDENTIAL tiers rely on — any all-caps rendering with no marking intent can fire those gated tiers if Canada-government context also happens to be present.
     mitigation: Treat gated-tier (65/75) hits as lower confidence when the surrounding text is itself all-caps. The Protected A/B/C tier (85) is structurally distinctive and does not depend on the context gate.
@@ -114,6 +120,7 @@ risk_description: >-
 sensitivity_labels:
   qgiscf: PROTECTED
   qgiscf_dlm: Marking Protected
+  idcf: DSL-4
   ca_gov: "Protected A / Protected B / Protected C / Confidential / Secret / Top Secret"
   us_gov: "CUI / CONFIDENTIAL / SECRET / TOP SECRET"
   uk_gov: "OFFICIAL-SENSITIVE / SECRET / TOP SECRET"
@@ -182,11 +189,11 @@ purview:
             - Keyword_ca_secret_collocation_exclusion
   regexes:
     - id: Regex_ca_protected
-      pattern: '\b(?:PROTECTED|Protected)[\s-]+[ABC]\b'
+      pattern: '(?-i)\b(?:(?:PROTECTED|Protected)|Protected)[\s-]+[ABC]\b'
     - id: Regex_ca_topsecret
-      pattern: '\bTOP[\s-]+SECRET\b'
+      pattern: '(?-i)\bTOP[\s-]+SECRET\b'
     - id: Regex_ca_classified
-      pattern: '\b(?:CONFIDENTIAL|SECRET)\b'
+      pattern: '(?-i)\b(?:CONFIDENTIAL|SECRET)\b'
   keywords:
     - id: Keyword_ca_secret_collocation_exclusion
       groups:
@@ -194,19 +201,41 @@ purview:
           terms:
             - text: TRADE SECRET
               case_sensitive: true
+            - text: Trade Secret
+              case_sensitive: true
             - text: TRADE SECRETS
+              case_sensitive: true
+            - text: Trade Secrets
               case_sensitive: true
             - text: CLIENT SECRET
               case_sensitive: true
+            - text: Client Secret
+              case_sensitive: true
             - text: API SECRET
+              case_sensitive: true
+            - text: API Secret
               case_sensitive: true
             - text: SECRET MANAGER
               case_sensitive: true
+            - text: Secret Manager
+              case_sensitive: true
             - text: SECRET SANTA
               case_sensitive: true
+            - text: Secret Santa
+              case_sensitive: true
 created: '2026-07-07'
-updated: '2026-09-25'
+updated: '2026-10-22'
 changelog:
+  - version: 1.2.0
+    date: '2026-10-22'
+    description: >-
+      Case handling made explicit and tested on a dev tenant. Each regex starts with (?-i). Marking words
+      introduced by structure (a classification label, the X-Protective-Marking SEC= field, brackets, the NZ
+      // form, the UK ' - descriptor' form, the EU 'UE/EU' form) match UPPER CASE or Capitalised; bare words
+      and unlabelled banners stay UPPER CASE only, so prose such as "Official figures..." or "Top Secret
+      Recipes" does not reach an enforcing tier. Never all lowercase. Labels, header fields and exclusion
+      lookaheads accept any case through a scoped (?i:...); acronyms stay upper case. Case-sensitive exclusion
+      terms gain Capitalised twins.
   - version: 1.1.2
     date: '2026-09-25'
     description: >-

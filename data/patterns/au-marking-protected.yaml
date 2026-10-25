@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Marking - PROTECTED
 slug: au-marking-protected
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: marking
 engine: boost_regex
@@ -58,6 +58,8 @@ test_cases:
       description: High-tier probe - complete Australian protective-marking header with caveat
     - value: 'Security Classification: SECRET'
       description: Formal SECRET marking rolls up into PROTECTED handling at the medium tier
+    - value: 'Security Classification: Protected'
+      description: Capitalised marking form
   should_not_match:
     - value: wetlands are a protected area under the act
       description: lowercase English word (case-sensitive exclusion)
@@ -81,6 +83,10 @@ test_cases:
       description: Blank template - empty classification fields must not enforce
     - value: 'Protective security training material: an email subject line such as [SEC=PROTECTED] shows the marking applied to a message.'
       description: Training content quoting a SEC= subject marking is suppressed by the public-marking exclusion (never reaches 75)
+    - value: 'the protected species list was updated'
+      description: Lowercase prose is not a marking
+    - value: 'Protected areas now cover a fifth of the state, the Australian Government said'
+      description: Capitalised prose, not a marking
 false_positives:
   - description: Uppercase PROTECTED in non-marking contexts (e.g. "PROTECTED SPECIES").
     mitigation: Explicit PSPF/QGISCF government context or a structured marking field is required above discovery; the complete header remains the strict 85 path.
@@ -97,6 +103,7 @@ sensitivity_labels:
   pspf: PROTECTED
   qgiscf: PROTECTED
   qgiscf_dlm: Marking Protected
+  idcf: DSL-4
   us_gov: "CUI Specified"
   uk_gov: "SECRET"
   nz_gov: "SECRET"
@@ -165,11 +172,11 @@ purview:
             - Keyword_secret_collocation_exclusion
   regexes:
     - id: Regex_au_protected_complete_header
-      pattern: '\bX-Protective-Marking:\s*VER=[0-9]{4}\.[0-9]+,\s*NS=gov\.au,\s*SEC=(?:PROTECTED|TOP-SECRET|SECRET)\b(?:,\s*CAVEAT=[A-Z0-9:/-]+)?'
+      pattern: '(?-i)\b(?i:X-Protective-Marking:\s*VER=[0-9]{4}\.[0-9]+,\s*NS=gov\.au,\s*SEC=)(?:(?:PROTECTED|Protected)|(?:TOP|Top)-(?:SECRET|Secret)|(?:SECRET|Secret))\b(?:(?i:,\s*CAVEAT=)[A-Z0-9:/-]+)?'
     - id: Regex_au_protected_formal_label
-      pattern: '\b(?:SEC(?:URITY\s+CLASSIFICATION)?|Security\s+Classification|CLASSIFICATION|Classification|PROTECTIVE\s+MARKING|Protective\s+Marking|MARKING|Marking)\s*[:=]\s*(?:PROTECTED|(?:TOP[\s-]+)?SECRET)\b'
+      pattern: '(?-i)\b(?i:SEC(?:URITY\s+CLASSIFICATION)?|CLASSIFICATION|PROTECTIVE\s+MARKING|MARKING)\s*[:=]\s*(?:(?:PROTECTED|Protected)|(?:(?:TOP|Top)[\s-]+)?(?:SECRET|Secret))\b'
     - id: Regex_au_protected_candidate
-      pattern: '\b(?:PROTECTED|(?:TOP[\s-]+)?SECRET)\b'
+      pattern: '(?-i)\b(?:PROTECTED|(?:TOP[\s-]+)?SECRET)\b'
   keywords:
     - id: Keyword_au_gov_context
       groups:
@@ -187,13 +194,23 @@ purview:
           terms:
             - text: TRADE SECRET
               case_sensitive: true
+            - text: Trade Secret
+              case_sensitive: true
             - text: TRADE SECRETS
+              case_sensitive: true
+            - text: Trade Secrets
               case_sensitive: true
             - text: CLIENT SECRET
               case_sensitive: true
+            - text: Client Secret
+              case_sensitive: true
             - text: API SECRET
               case_sensitive: true
+            - text: API Secret
+              case_sensitive: true
             - text: SECRET MANAGER
+              case_sensitive: true
+            - text: Secret Manager
               case_sensitive: true
     - id: Keyword_complete_marking_header
       groups:
@@ -231,8 +248,18 @@ references:
   - title: Criminal Code Act 1995 (Cth)
     url: https://www.legislation.gov.au/C2004A04868/latest/text
 created: '2026-06-29'
-updated: '2026-10-19'
+updated: '2026-10-22'
 changelog:
+  - version: 1.6.0
+    date: '2026-10-22'
+    description: >-
+      Case handling made explicit and tested on a dev tenant. Each regex starts with (?-i). Marking words
+      introduced by structure (a classification label, the X-Protective-Marking SEC= field, brackets, the NZ
+      // form, the UK ' - descriptor' form, the EU 'UE/EU' form) match UPPER CASE or Capitalised; bare words
+      and unlabelled banners stay UPPER CASE only, so prose such as "Official figures..." or "Top Secret
+      Recipes" does not reach an enforcing tier. Never all lowercase. Labels, header fields and exclusion
+      lookaheads accept any case through a scoped (?i:...); acronyms stay upper case. Case-sensitive exclusion
+      terms gain Capitalised twins.
   - version: 1.5.0
     date: '2026-10-19'
     description: Move the SEC= formal-label evidence term into a string-style group. As a word-style term it could not match "[SEC=...]" subject markings in Purview, because a letter follows the "=" (tenant gating claim 9), so the 75 tier never fired on them.

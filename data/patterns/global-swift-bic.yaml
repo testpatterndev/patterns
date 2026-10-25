@@ -1,13 +1,14 @@
 schema: testpattern/v1
-name: Swift Bic
+name: SWIFT BIC
 slug: global-swift-bic
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Detects Swift Bic patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use
-  this version as a starting point for customisation.
+  Detects ISO 9362 SWIFT Business Identifier Codes (BICs), the 8- or 11-character bank and branch codes used to route
+  international payments. SWIFT/BIC or banking context lifts a match to 85. TestPattern's own detection logic: the
+  Microsoft Purview built-in SWIFT Code is catalogued separately as global-swift-bic-builtin.
 operation: >-
   Reference: https://en.wikipedia.org/wiki/ISO_9362 Corroborative evidence: 9 keywords within 300 characters. Keyword lists: financial-deposit-terms. Uses additional domain-context evidence and
   explicit exclusion logic for template/sample/test text.
@@ -51,6 +52,8 @@ test_cases:
       description: BNP Paribas 8-character SWIFT/BIC
     - value: CHASUS33XXX
       description: JPMorgan Chase 11-character SWIFT/BIC
+    - value: 'Beneficiary bank SWIFT code: DEUTDEFF'
+      description: Labelled BIC in payment instructions (85 tier)
   should_not_match:
     - value: DEUT1EFF
       description: Contains a digit in the first 6 characters (must be all letters)
@@ -126,6 +129,7 @@ sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
   qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
   us_gov: CUI
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
@@ -143,14 +147,23 @@ classification:
       Generic Low and Low DLM treatment fit a publicly distributed institution code with negligible direct financial
       misuse. Generic Medium would require sensitive linkage rather than the routing datum alone.
 references:
-  - url: https://learn.microsoft.com/en-us/purview/sit-defn-swift-code
-    title: SWIFT code entity definition - Microsoft Learn
+  - url: https://www.swift.com/standards/data-standards/bic-business-identifier-code
+    title: BIC (Business Identifier Code) - Swift
 created: '2026-02-08'
-updated: '2026-10-20'
+updated: '2026-10-26'
 changelog:
+  - version: 1.6.0
+    date: '2026-10-26'
+    description: 'Generated name-word tier removed: the 85 tier whose only evidence was the detector name split into words (Pattern_global_swift_bic_label_context + Keyword_global_swift_bic_domain_context). Its identifying words are already in the curated keyword at the same level, so the tier was redundant. Definitions left unreferenced are removed.'
   - version: 1.5.0
     date: '2026-10-20'
-    description: 'Generated name-word tier removed: the 85 tier whose only evidence was the detector name split into words (Pattern_global_swift_bic_label_context + Keyword_global_swift_bic_domain_context). Its identifying words are already in the curated keyword at the same level, so the tier was redundant. Definitions left unreferenced are removed.'
+    description: >-
+      Custom SIT again, as the owner originally decided: source changes from microsoft to testpattern-community, so
+      packages emit these tiers, noise filters and local noise filter as custom XML instead of referencing the Microsoft
+      built-in by GUID (which meant this logic never ran). The Microsoft entity is catalogued separately as
+      global-swift-bic-builtin. Name and description no longer describe a copy of the built-in, and the reference
+      points at Swift's BIC standard. Detection logic is unchanged; a labelled should_match case now exercises the
+      85 tier.
   - version: 1.4.0
     date: '2026-10-19'
     description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). When the export enables it, each of those tiers gets a pattern-level TextMatchFilter (EndsWith, Exclude) reading that dictionary, so the organisation's own published values (its remit-to BSB, account number, SWIFT/BIC or IBAN) stop reaching 75/85 while the 65 tier still reports them. Detection logic and entity filters are unchanged, and the filter is inert until the customer adds entries."
@@ -176,7 +189,7 @@ changelog:
     date: '2026-07-04'
     description: Mapped non-canonical confidence 90 to 85.; Downgraded weak medium-confidence tier to low because evidence was generic, structural, or absent.
 author: testpattern-community
-source: microsoft
+source: testpattern-community
 license: MIT
 remediation:
   catalog_quality_2026_06_02:

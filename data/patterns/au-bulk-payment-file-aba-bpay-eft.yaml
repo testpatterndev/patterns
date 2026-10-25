@@ -1,0 +1,245 @@
+schema: testpattern/v1
+name: Australian Bulk Payment File (ABA Direct Entry, BPAY Batch or EFT Upload)
+slug: au-bulk-payment-file-aba-bpay-eft
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Bulk payment files prepared for upload to a bank: ABA / Cemtex Direct Entry files in the BECS fixed-width format, BPAY batch files and delimited EFT payment uploads. The ABA format has a descriptive record (type 0), one detail record per payment (type 1: BSB, account number, transaction code, amount in cents, account title and lodgement reference) and a file total record (type 7: 999-999 with net, credit and debit totals and a record count). An EFT upload is a delimited file of BSB, account and amount columns; a BPAY batch lists biller codes, customer reference numbers (CRNs) and amounts. A payment file holds many payees' bank accounts and amounts in the exact form the bank will process, so altering one line diverts a payment. This SIT anchors on the payment lines (type 1 detail records, delimited BSB/account/amount rows and labelled biller code / CRN lines), not on the type 0 header. whole-of-government-erp-payment-authorisation-file anchors on the type 0 header with ERP and authorisation context; a complete government ABA file can match both. A single set of bank details on an invoice or form does not match.
+operation: >-
+  Primary (one regex, any of): an ABA type 1 detail record (1, BSB 999-999, a 9-character account field, indicator blank/N/W/X/Y, transaction code 13 or 50-57, a 10-digit amount and the start of the account title); a delimited row of a hyphenated BSB, a 5-10 digit account number and a decimal amount (up to three other columns between account and amount); or a labelled BPAY line (biller code followed by a CRN or reference value). 65 (discovery only): primary alone. 75: primary plus one of a file control record (ABA type 0 descriptive record, ABA type 7 file total record, a labelled batch / file / control total or a labelled record / payment count), a payment-file column header (BSB ... account ... amount, or biller code ... CRN ... amount) or payment-file context (direct entry, Cemtex, BECS, ABA file, bulk / batch payment, payment file, EFT file, payment run, BPAY batch, lodgement reference, remitter). 85: three distinct primary lines ({ ref: primary, min_count: 3, unique_results: true }) plus a file control record or column header plus payment-file context. Fixed-width blanks are written as [ ] so the exporter's space rewrite cannot change them. Every enforce tier ANDs NOT the shared template-exclusion dictionary and a specification / guidance exclusion, so BECS format guides with worked records stay at 65.
+pattern: >-
+  (?i)(?:\b1\d{3}-\d{3}[ 0-9-]{9}[ NWXY](?:13|5[0-7])\d{10}[A-Z0-9&]|\b\d{3}-\d{3}[ \t]{0,2}[,|\t][ \t]{0,2}"?\d{5,10}"?[ \t]{0,2}[,|\t](?:[^\n,|\t]{1,40}[,|\t]){0,3}[ \t]{0,2}"?\$?\d{1,9}\.\d{2}\b|\bbiller\s+code[ \t]{0,3}[:#]?[ \t]{0,3}\d{3,10}[ \t]{0,3}[,|;\t]?[ \t]{0,3}(?:CRN|customer\s+ref(?:erence)?(?:\s+(?:no\.?|number))?|ref(?:erence)?(?:\s+(?:no\.?|number))?)[ \t]{0,3}[:#]?[ \t]{0,3}\d{2,20}\b)
+confidence: medium
+confidence_justification: >-
+  Medium. The ABA type 1 detail record is a rigid 120-character layout (BSB, account field, transaction code, 10-digit amount) that rarely occurs outside payment files, and delimited rows need a hyphenated BSB beside an account number and a decimal amount. Format specifications and bank help pages reproduce worked records, so enforce tiers need a control record, header or payment-file context, and guidance framing is excluded. A delimited row can still occur in a reconciliation or supplier master extract that is not a payment file. 85/75 are heuristic evidence tiers, not measured accuracy. Test values are synthetic.
+jurisdictions:
+  - au
+regulations:
+  - Privacy Act 1988 (Cth)
+  - Information Privacy Act 2009 (Qld)
+  - Financial Accountability Act 2009 (Qld)
+frameworks:
+  - QGISCF
+  - BECS Procedures (Australian Payments Network)
+data_categories:
+  - financial
+  - pii
+corroborative_evidence:
+  keywords:
+    - direct entry
+    - Cemtex
+    - BECS
+    - ABA file
+    - bulk payment
+    - batch payment
+    - payment file
+    - EFT file
+    - payment run
+    - BPAY batch
+    - lodgement reference
+  proximity: 300
+test_cases:
+  should_match:
+    - value: |-
+        Direct entry file - creditor payment run 17/10/2026 (ABA)
+        0                 01CBA       HARBOURVIEW SHIRE COUNC   301500CREDITORS   171026
+        1012-345 22334455 500001245000TESTON PLUMBING PTY LTD         INV 88120         012-345100200300HARBOURVIEW SC  00000000
+        1923-100100200345 500000389950RIVERBEND TESTON SUPPLIES       INV 88121         012-345100200300HARBOURVIEW SC  00000000
+        1484-799  6677881 500000072010J TESTON                        REFUND 4471       012-345100200300HARBOURVIEW SC  00000000
+        7999-999            000170696000017069600000000000                        000003
+      description: ABA Direct Entry file - descriptive record, three detail records and file total record (85 tier)
+      synthetic: true
+    - value: |-
+        EFT payment file - supplier run 2026-10-17
+        BSB,Account Number,Account Name,Amount,Reference
+        012-345,22334455,Teston Plumbing Pty Ltd,12450.00,INV88120
+        923-100,100200345,Riverbend Teston Supplies,3899.50,INV88121
+        484-799,6677881,J Teston,720.10,REFUND4471
+        File total: $17,069.60
+      description: Delimited EFT upload with column header, three payment rows and a file total (85 tier)
+      synthetic: true
+    - value: |-
+        BPAY batch - utilities run 15/10/2026
+        Biller code: 23796 CRN: 4400128813 Amount: $1,812.40
+      description: BPAY batch line with biller code and CRN plus BPAY batch context (75 tier)
+      synthetic: true
+    - value: |-
+        Re-keyed direct entry line for the bank:
+        1012-345 22334455 500001245000TESTON PLUMBING PTY LTD         INV 88120         012-345100200300HARBOURVIEW SC  00000000
+      description: Single ABA detail record with direct entry context (75 tier)
+      synthetic: true
+  should_not_match:
+    - value: |-
+        ABA file format specification - detail record (type 1). Field positions: 1 record type; 2-8 BSB in 999-999 format; 9-17 account number; 18 indicator; 19-20 transaction code; 21-30 amount in cents.
+        1012-345 22334455 500001245000TESTON PLUMBING PTY LTD         INV 88120
+      description: BECS format specification with a worked record (guidance exclusion, 65 only)
+    - value: "Please pay this invoice by EFT. BSB 012-345 Account 22334455 Account name Teston Plumbing Pty Ltd. Amount due $12,450.00."
+      description: Single set of payee bank details on an invoice (no payment-line structure)
+    - value: |-
+        Payment file
+        BSB,Account Number,Account Name,Amount,Reference
+      description: Blank EFT upload - header only
+    - value: "AusPayNet says the BECS direct entry framework will be wound down as payments move to the New Payments Platform."
+      description: News item about Direct Entry
+    - value: "unrelated generic text without domain phrases"
+      description: Unrelated
+false_positives:
+  - description: BECS / ABA format specifications, bank help pages and software documentation that reproduce worked detail records.
+    mitigation: A specification / guidance exclusion (file format specification, field positions, implementation guide, user guide, help article) suppresses every enforce tier, so they stay at 65.
+  - description: Supplier master or bank reconciliation extracts with BSB, account and amount columns that are not payment files.
+    mitigation: Without payment-file context, a control total or a payment-file header they reach at most 75 on a header; such extracts are still bank-detail bearing and warrant similar handling.
+  - description: Complete government ABA files produced by an ERP payment run.
+    mitigation: whole-of-government-erp-payment-authorisation-file also matches these (type 0 header + ERP and authorisation context) at PROTECTED Financial; this SIT carries the generic file without ERP authorisation context.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_bulk_payment_file_payment_line
+      matches:
+        - ref: Regex_au_bulk_payment_file_payment_line
+          min_count: 3
+          unique_results: true
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_bulk_payment_file_control_record
+            - Regex_au_bulk_payment_file_column_header
+        - ref: Keyword_au_bulk_payment_file_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_bulk_payment_file_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_bulk_payment_file_payment_line
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_bulk_payment_file_control_record
+            - Regex_au_bulk_payment_file_column_header
+            - Keyword_au_bulk_payment_file_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_bulk_payment_file_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_bulk_payment_file_payment_line
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_bulk_payment_file_payment_line
+      pattern: >-
+        (?i)(?:\b1\d{3}-\d{3}[ 0-9-]{9}[ NWXY](?:13|5[0-7])\d{10}[A-Z0-9&]|\b\d{3}-\d{3}[ \t]{0,2}[,|\t][ \t]{0,2}"?\d{5,10}"?[ \t]{0,2}[,|\t](?:[^\n,|\t]{1,40}[,|\t]){0,3}[ \t]{0,2}"?\$?\d{1,9}\.\d{2}\b|\bbiller\s+code[ \t]{0,3}[:#]?[ \t]{0,3}\d{3,10}[ \t]{0,3}[,|;\t]?[ \t]{0,3}(?:CRN|customer\s+ref(?:erence)?(?:\s+(?:no\.?|number))?|ref(?:erence)?(?:\s+(?:no\.?|number))?)[ \t]{0,3}[:#]?[ \t]{0,3}\d{2,20}\b)
+    - id: Regex_au_bulk_payment_file_control_record
+      pattern: >-
+        (?i)(?:\b0[ ]{17}\d{2}[A-Z]{3}[ ]{7}[A-Z0-9]|\b7999-999[ ]{12}\d{30}|\b(?:batch|file|net\s+file|control|payment\s+run)\s+(?:total|control\s+total)[ \t]{0,3}[:#][ \t]{0,3}(?:\$|A\$|AUD)?[ \t]?\d{1,3}(?:,\d{3}){0,4}(?:\.\d{2})?|\b(?:record|item|transaction|payment)\s+count[ \t]{0,3}[:#][ \t]{0,3}\d{1,6}\b)
+    - id: Regex_au_bulk_payment_file_column_header
+      pattern: >-
+        (?i)(?:\bBSB\b[^\n]{0,40}[,|\t][^\n]{0,60}\b(?:account|acct)\b[^\n]{0,80}\bamount\b|\bbiller[ _]?code\b[^\n]{0,60}\b(?:CRN|customer[ _]?ref(?:erence)?)\b[^\n]{0,60}\bamount\b)
+  keywords:
+    - id: Keyword_au_bulk_payment_file_context
+      groups:
+        - match_style: word
+          terms:
+            - direct entry
+            - Cemtex
+            - text: BECS
+              case_sensitive: true
+            - ABA file
+            - text: ABA
+              case_sensitive: true
+            - bulk payment
+            - batch payment
+            - payment file
+            - EFT file
+            - EFT payment file
+            - payment run
+            - BPAY batch
+            - lodgement reference
+            - remitter
+            - APCA user ID
+            - DE user ID
+      strength: specific
+    - id: Keyword_au_bulk_payment_file_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - file format specification
+            - format specification
+            - field positions
+            - implementation guide
+            - user guide
+            - help article
+            - help centre
+            - frequently asked questions
+            - how to create
+            - technical specification
+      strength: noise
+risk_rating: 8
+risk_description: >-
+  The classifier identifies a bulk payment file in bank upload form: ABA Direct Entry detail records, delimited BSB / account / amount rows or BPAY batch lines, with a control record, header or payment-file context. One file exposes many payees' bank accounts with amounts and references, and because it is the exact artefact the bank processes, interception or alteration of a single line diverts money (payment redirection fraud). Specifications, single invoice bank details and blank headers are excluded from enforce tiers. Risk 8 supports SENSITIVE Financial; whole-of-government-erp-payment-authorisation-file carries authorised government ERP payment runs at risk 10 PROTECTED Financial, and this generic file without authorisation context sits below it.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Financial
+  idcf: DSL-3
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Financial and Medium because a bulk payment
+    file exposes many payees' bank accounts and amounts in the form a bank will process, so tampering diverts funds.
+    PROTECTED is not met for the generic file: the authorised whole-of-government ERP payment run, with approval and
+    system context, is carried at PROTECTED by whole-of-government-erp-payment-authorisation-file.
+  generic:
+    classification: Medium
+    dlm: Medium Financial
+    rationale: >-
+      Medium Financial handling fits a file of many payees' bank details and amounts that is one edit away from a
+      diverted payment; authorised payment-run files with approval context deserve stricter handling.
+references:
+  - title: Australian Payments Network - Direct Entry (BECS)
+    url: https://auspaynet.com.au/resources/direct-entry
+  - title: Australian Payments Plus - BPAY
+    url: https://www.auspayplus.com.au/solutions/bpay
+  - title: Privacy Act 1988 (Cth)
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
+  - title: Information Privacy Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+  - title: Financial Accountability Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-009
+created: '2026-10-20'
+updated: '2026-10-20'
+changelog:
+  - version: 1.0.0
+    date: '2026-10-20'
+    description: >-
+      Initial release (qgfin sector review gap). Anchors on payment lines - ABA type 1 detail records, delimited
+      BSB / account / amount rows and labelled BPAY biller code / CRN lines. 75 needs a control record, payment-file
+      header or payment-file context; 85 needs three distinct payment lines, a control record or header and context.
+      Specification / guidance framing and template framing are excluded on enforce tiers.
+author: testpattern-community
+license: MIT

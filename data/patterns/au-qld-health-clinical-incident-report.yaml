@@ -1,0 +1,214 @@
+schema: testpattern/v1
+name: QLD Health Clinical Incident or Patient Safety Report
+slug: au-qld-health-clinical-incident-report
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Populated clinical incident and patient safety records from Queensland Hospital and Health Services:
+  RiskMan and PRIME CI clinical incident notifications, patient safety incident reports, severity
+  assessment code (SAC) ratings, sentinel event notifications, clinical reviews and root cause analysis
+  (RCA) reports under the Hospital and Health Boards Act 2011 (Qld). They identify the patient harmed
+  or at risk, the incident and its SAC or harm rating, and often the staff involved, contributing
+  factors and open disclosure. Boundary: pharmacovigilance and trial adverse event reports belong to
+  global-top500-339-adverse-event-reports; aged care SIRS notifications to
+  au-aged-care-serious-incident-notification; NDIS reportable incidents to au-ndis-reportable-incident.
+operation: >-
+  Primary: clinical incident (report, notification, record, form, review, analysis), patient safety
+  incident or event (report), RiskMan, PRIME CI, sentinel event, root cause analysis, severity
+  assessment code. 65 (discovery only): primary alone, which surfaces policies, statistics and IT root
+  cause analyses. 75: primary plus a populated patient field (patient name, DOB, URN / UR number, MRN,
+  Medicare, IHI) plus a populated incident field (incident number / ID / reference, incident date or
+  time, date of incident, location of incident, incident type or category, SAC rating / score, harm
+  level or rating, severity, outcome for patient). 85: the 75 evidence plus independent review context
+  (contributing factors, open disclosure, clinical review panel, review team, commissioning authority,
+  learning review, human factors, recommendations, findings, Hospital and Health Boards Act). Enforce
+  tiers exclude template wording and guideline, policy, training, statistics and media framing.
+pattern: >-
+  (?i)\b(?:clinical\s+incident(?:\s+(?:report|notification|record|form|review|analysis))?|patient\s+safety\s+(?:incident|event)(?:\s+report)?|RiskMan|PRIME\s+CI|sentinel\s+event|root\s+cause\s+analysis|severity\s+assessment\s+code)\b
+confidence: medium
+confidence_justification: >-
+  Medium: clinical incident, RiskMan, PRIME CI and SAC wording is specific to health incident management,
+  and enforce tiers need a populated patient field and a populated incident field. Root cause analysis
+  and incident numbers also appear in IT and WHS reporting, which lack a patient field and stay at 65.
+  Staff-only incidents without a patient are not covered.
+jurisdictions:
+  - au
+  - au-qld
+regulations:
+  - Hospital and Health Boards Act 2011 (Qld)
+  - Information Privacy Act 2009 (Qld)
+  - Privacy Act 1988 (Cth)
+  - NDB Scheme (Cth)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+  - QGISCF
+data_categories:
+  - phi
+  - health
+  - pii
+corroborative_evidence:
+  keywords:
+    - SAC rating
+    - incident number
+    - contributing factors
+    - open disclosure
+    - clinical review
+    - harm level
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "RiskMan clinical incident notification\nIncident ID: 000000\nDate of incident: 08/10/2026\nPatient: Jordan Teston\nURN: 334102\nSAC rating: 2\nSummary: unwitnessed fall in ensuite, fractured left wrist\nContributing factors: bed alarm not activated overnight; open disclosure completed with daughter."
+      description: 85 tier - RiskMan notification with incident ID, date, patient, SAC rating, contributing factors and open disclosure
+      synthetic: true
+    - value: "Patient safety incident report\nIncident number: CI-2026-000000\nPatient name: Riley Teston\nIncident type: Medication error - insulin dose omitted\nHarm level: Minor\nOpen disclosure completed 10/10/2026 by the nurse unit manager; findings referred to the medication safety committee."
+      description: 85 tier - patient safety incident report with incident number, patient, type, harm level and open disclosure
+      synthetic: true
+    - value: "Clinical incident form\nPatient: Morgan Teston\nIncident date: 03/10/2026\nLocation of incident: Ward 4A"
+      description: 75 tier - clinical incident form with patient, date and location only
+      synthetic: true
+  should_not_match:
+    - value: "This guideline describes clinical incident management in Hospital and Health Services: notify in RiskMan within 24 hours, assign a severity assessment code, and commission a clinical review or root cause analysis for SAC 1 events."
+      description: Clinical incident management guideline (65 at most)
+    - value: "Root cause analysis\nIncident number: INC0012345\nService: payroll API\nImpact: 40 minutes of failed batch jobs; contributing factors were an expired certificate and no alerting."
+      description: IT root cause analysis with incident number but no patient (65 at most)
+    - value: "Clinical incident form\nPatient: ____________________\nURN: ____________________\nIncident date: __/__/____\nSAC rating: ____\nDescription: ____________________"
+      description: Blank clinical incident form (65 at most)
+    - value: "Statewide clinical incident data: 312 SAC 1 incidents were reported in 2025-26, a 4 percent fall on the previous year."
+      description: Aggregate patient safety statistics (65 at most)
+false_positives:
+  - description: Clinical incident management policies, RiskMan user guides and patient safety training.
+    mitigation: No populated patient or incident field, and guideline, policy, training and media framing is excluded from enforce tiers.
+  - description: IT, cyber and WHS root cause analyses and incident reports.
+    mitigation: They carry incident numbers but no patient field, so they stay at 65.
+  - description: Published patient safety statistics and annual reports.
+    mitigation: Aggregate figures carry no patient field and stay at 65.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_clinical_incident_primary
+      matches:
+        - ref: Regex_clinical_incident_patient_field
+        - ref: Regex_clinical_incident_incident_field
+        - ref: Keyword_clinical_incident_review_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_clinical_incident_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_clinical_incident_primary
+      matches:
+        - ref: Regex_clinical_incident_patient_field
+        - ref: Regex_clinical_incident_incident_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Regex_clinical_incident_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_clinical_incident_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_clinical_incident_primary
+      pattern: >-
+        (?i)\b(?:clinical\s+incident(?:\s+(?:report|notification|record|form|review|analysis))?|patient\s+safety\s+(?:incident|event)(?:\s+report)?|RiskMan|PRIME\s+CI|sentinel\s+event|root\s+cause\s+analysis|severity\s+assessment\s+code)\b
+    - id: Regex_clinical_incident_patient_field
+      pattern: >-
+        (?i)\b(?:patient(?:\s+name)?|full\s+name|surname|given\s+names?|date\s+of\s+birth|DOB|URN|UR\s*(?:no\.?|number)|MRN|medical\s+record\s+(?:no\.?|number)|Medicare(?:\s+(?:card\s+)?(?:no\.?|number))?|IHI|(?:patient|hospital|episode)\s*(?:no\.?|number|ID))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|nil|none|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
+    - id: Regex_clinical_incident_incident_field
+      pattern: >-
+        (?i)\b(?:incident\s*(?:no\.?|number|ID|ref(?:erence)?|date|time|type|category)|date\s+of\s+incident|location\s+of\s+incident|SAC(?:\s+(?:rating|score|level))?|harm\s+(?:level|rating|score)|severity(?:\s+rating)?|outcome\s+for\s+(?:the\s+)?patient)(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.,-]{0,30}(?:[ \t]+[A-Za-z0-9][A-Za-z0-9/'.,-]{0,30}){0,5}
+    - id: Regex_clinical_incident_guidance_exclusion
+      pattern: >-
+        (?i)\b(?:this\s+(?:policy|procedure|guideline|guide|standard|page|fact\s?sheet|article|course)|user\s+guide|training\s+module|e-learning|frequently\s+asked\s+questions|statewide\s+(?:clinical\s+incident\s+)?data|annual\s+report|media\s+release)\b
+  keywords:
+    - id: Keyword_clinical_incident_review_context
+      groups:
+        - match_style: word
+          terms:
+            - contributing factors
+            - open disclosure
+            - clinical review panel
+            - review team
+            - commissioning authority
+            - learning review
+            - human factors
+            - recommendations
+            - findings
+            - Hospital and Health Boards Act
+      strength: specific
+risk_rating: 8
+risk_description: >-
+  The classifier recognises clinical incident, RiskMan / PRIME CI, SAC and root cause analysis records
+  and enforces only when a populated patient field sits with a populated incident field, with 85 also
+  needing review context such as contributing factors or open disclosure. A genuine record links a named
+  patient to an adverse outcome (fall, medication error, missed deterioration, death) and often names the
+  staff involved and the failures found. Disclosure can harm the patient and family, prejudice open
+  disclosure, coronial or litigation processes, and expose clinicians; RCA reports also carry statutory
+  confidentiality under the Hospital and Health Boards Act 2011 (Qld). The normal unit is one incident,
+  so risk 8 and SENSITIVE apply.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: CONFIDENTIAL
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy and Medium because a populated
+    clinical incident record links a named patient to an adverse outcome and can name staff and failures. PROTECTED is
+    not met for one incident: it does not expose a child protection matter, a whistleblower or bulk incident data, and
+    serious harm still depends on a single patient episode.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling protects the patient's harm event and the review findings for one incident.
+      High would need bulk incident extracts or a register of SAC 1 events.
+references:
+  - title: Queensland Health - Clinical incident management guideline (health service directive guideline)
+    url: https://www.health.qld.gov.au/system-governance/policies-standards/health-service-directives/patient-safety/clinical-incident-management
+  - title: Hospital and Health Boards Act 2011 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2011-032
+  - title: Queensland Health - Patient safety
+    url: https://www.health.qld.gov.au/clinical-practice/guidelines-procedures/patient-safety
+  - title: Information Privacy Act 2009 (Qld)
+    url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-014
+created: '2026-10-20'
+updated: '2026-10-20'
+changelog:
+  - version: 1.0.0
+    date: '2026-10-20'
+    description: >-
+      Initial release from the qghealth sector review: RiskMan / PRIME CI clinical incident notifications,
+      patient safety incident reports, SAC ratings, sentinel events, clinical reviews and RCA reports. 65
+      phrase only; 75 needs a populated patient field and a populated incident field; 85 adds review
+      context. Guideline, policy, training, statistics and media framing excluded.
+author: testpattern-community
+license: MIT

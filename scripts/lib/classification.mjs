@@ -21,6 +21,47 @@ export function tierForLabel(dlm) {
   return null
 }
 
+// IDCF (docs/IDCF-CROSSWALK.md): the Data Security Level follows qgiscf_dlm, falling back to
+// qgiscf then pspf when the DLM is absent; the marker comes only from the DLM's domain suffix.
+export const IDCF_LEVELS = ['DSL-0', 'DSL-2', 'DSL-3', 'DSL-4', 'N/A']
+export const IDCF_MARKERS = ['Personal Privacy', 'Legal Privilege', 'Confidential']
+const IDCF_MARKER_BY_SUFFIX = { 'Personal-Privacy': 'Personal Privacy', Legal: 'Legal Privilege', 'Commercial-in-Confidence': 'Confidential' }
+
+function idcfForLevel(label) {
+  const d = text(label)
+  if (!d) return null
+  if (d === 'N/A' || d === 'Marking PSPF') return 'N/A'
+  if (d === 'PUBLIC') return 'DSL-0'
+  if (/^(PROTECTED|Marking Protected)\b/.test(d)) return 'DSL-4'
+  if (/^(SENSITIVE|Marking Sensitive|OFFICIAL: Sensitive)\b/.test(d)) return 'DSL-3'
+  if (/^(OFFICIAL|Marking Official)\b/.test(d)) return 'DSL-2'
+  return null
+}
+
+// { idcf, idcf_marker } for a sensitivity_labels object. idcf is null when nothing derives it;
+// idcf_marker is undefined when the DLM carries no mapped suffix.
+export function idcfForLabels(labels) {
+  const l = labels && typeof labels === 'object' ? labels : {}
+  const dlm = text(l.qgiscf_dlm)
+  const idcf = idcfForLevel(dlm || text(l.qgiscf) || text(l.pspf))
+  const idcf_marker = IDCF_MARKER_BY_SUFFIX[dlm.match(/^(?:SENSITIVE|PROTECTED) (.+)$/)?.[1]]
+  return { idcf, idcf_marker }
+}
+
+export function validateIdcf(p) {
+  const l = p.sensitivity_labels
+  const { idcf, idcf_marker } = idcfForLabels(l)
+  if (!idcf) return []
+  const basis = ['qgiscf_dlm', 'qgiscf', 'pspf'].find(k => text(l[k]))
+  const fix = `— rerun node scripts/backfill-idcf-labels.mjs`
+  const out = []
+  if (l.idcf !== idcf)
+    out.push(`sensitivity_labels.idcf ${l.idcf === undefined ? 'is missing' : `'${l.idcf}' does not match`} ${basis} '${l[basis]}' (expected '${idcf}') ${fix}`)
+  if (l.idcf_marker !== idcf_marker)
+    out.push(`sensitivity_labels.idcf_marker ${l.idcf_marker === undefined ? 'is missing' : `'${l.idcf_marker}' does not match`} qgiscf_dlm '${l.qgiscf_dlm}' (expected ${idcf_marker ? `'${idcf_marker}'` : 'none'}) ${fix}`)
+  return out
+}
+
 export function validateClassification(p) {
   const out = []
   const c = p.classification

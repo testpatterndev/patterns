@@ -19,6 +19,18 @@ t('file name must match id', () => assert.ok(run(['other.json', block('finance',
 t('bad layer and domain fail', () => assert.equal(run(block('finance', ['a'], { layer: 'tier', domain: 'money' })).length, 2))
 t('empty block fails', () => assert.ok(run(block('finance', []))[0].includes('at least one')))
 t('duplicate slug in a block fails', () => assert.ok(run(block('finance', ['a', 'a'])).some(m => m.includes('twice'))))
+t('optional block next to its source passes', () =>
+  assert.deepEqual(run(block('finance', ['a']), block('finance-optional', ['b'], { layer: 'optional' })), []))
+t('optional block may not overlap its source', () =>
+  assert.ok(run(block('finance', ['a']), block('finance-optional', ['a'], { layer: 'optional' }))[0].includes('must not overlap')))
+t('optional block needs its source block', () =>
+  assert.ok(run(block('finance-optional', ['a'], { layer: 'optional' }))[0].includes("no source block 'finance'")))
+t('optional block shares its source domain', () =>
+  assert.ok(run(block('finance', ['a']), block('finance-optional', ['b'], { layer: 'optional', domain: 'health' }))[0].includes('domain must match')))
+t('optional layer needs the -optional name, and the reverse', () => {
+  assert.ok(run(block('finance', ['a']), block('finance-low', ['b'], { layer: 'optional' }))[0].includes('<source block>-optional'))
+  assert.ok(run(block('finance', ['a']), block('finance-optional', ['b']))[0].includes("layer 'optional'"))
+})
 
 console.log(`${passed} passed, ${failed} failed`)
 process.exit(failed ? 1 : 0)

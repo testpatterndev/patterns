@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Wire transfer instructions
 slug: global-top500-116-wire-transfer-instructions
-version: 1.2.4
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -43,6 +43,17 @@ test_cases:
       description: Alternative topic phrase match
     - value: routing number
       description: Additional topic phrase match
+    - value: |-
+        Wire transfer
+        Payee: Riverbend Supplies Pty Ltd
+      description: Populated payee/account with one field (75 tier)
+      synthetic: true
+    - value: |-
+        Wire transfer
+        Payee: Riverbend Supplies Pty Ltd
+        BSB: 064-000
+      description: Populated payee/account with 2 distinct fields (85 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -50,6 +61,16 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: bank transfer
       description: Generic word pair from old broad template should not match
+    - value: Wire transfer instructions
+      description: "Bare detector name: it reached 75 through the generated name-word tier and must not reach an enforcing tier"
+    - value: |-
+        Wire transfer:
+        Payee:
+        Account name:
+        Account number:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about wire transfer are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -68,11 +89,21 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_wire_transfer
+      matches:
+        - ref: Regex_global_top500_116_wire_transfer_instructions_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_wire_transfer
       matches:
-        - ref: Pattern_global_top500_116_wire_transfer_instructions_label_context
-        - ref: Keyword_global_top500_116_wire_transfer_instructions_domain_context
+        - ref: Regex_global_top500_116_wire_transfer_instructions_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -82,7 +113,6 @@ purview:
       discovery_only: true
       id_match: Regex_wire_transfer
       matches:
-        - ref: Keyword_wire_transfer
         - type: any
           min_matches: 0
           max_matches: 0
@@ -92,41 +122,15 @@ purview:
     - id: Regex_wire_transfer
       pattern: >-
         (?is)\b(?:wire\s+transfer|SWIFT\s+code|beneficiary\s+bank|routing\s+number|correspondent\s+bank|intermediary\s+bank|bank\s+account|transfer\s+instructions|wire\s+payment|funds\s+transfer|ABA\s+number)\b
-    - id: Pattern_global_top500_116_wire_transfer_instructions_label_context
-      pattern: (?i)\b(?:wire\s+transfer\s+instructions)\b
-  keywords:
-    - id: Keyword_wire_transfer
-      groups:
-        - match_style: word
-          terms:
-            - wire transfer
-            - SWIFT code
-            - beneficiary bank
-            - routing number
-            - IBAN
-            - correspondent bank
-            - intermediary bank
-            - bank account
-            - transfer instructions
-            - wire payment
-            - funds transfer
-            - ABA number
-      strength: specific
-    - id: Keyword_global_top500_116_wire_transfer_instructions_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - wire transfer instructions
-            - wire
-            - transfer
-            - instructions
-      strength: domain
+    - id: Regex_global_top500_116_wire_transfer_instructions_record_structure
+      pattern: (?i)\b(?:payee|supplier|vendor|creditor|beneficiary|account\s+name|BSB|invoice\s+(?:no\.?|number)|remittance\s+(?:no\.?|number|ref(?:erence)?)|payment\s+(?:ref(?:erence)?|date)|amount\s+paid|IBAN|SWIFT(?:\s*/\s*BIC)?|BIC|sort\s+code)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 risk_description: >-
   The concept regex detects wire transfer, SWIFT code, beneficiary bank, routing number, bank account, transfer instructions, and similar payment language with seven nearby finance or record terms; a standalone code or discussion is not an instruction to move funds. When sender, beneficiary, account, amount, approval, or payment-reference fields accompany the match, disclosure or alteration can redirect money and support business-email-compromise impersonation. The usual exposure concerns one payer, one beneficiary, and one transfer, and exploitation depends on a populated instruction passing the bank's verification controls. Risk 7 and SENSITIVE Financial are appropriate for that actionable record; PROTECTED requires privileged treasury authority, exceptional strategic value, or compromise capable of significant institutional damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Financial
+  idcf: DSL-3
   us_gov: CUI
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
@@ -150,8 +154,11 @@ frameworks:
   - ISO 27701
   - PCI-DSS
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.3.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 75 tier ANDed Pattern_*_label_context (the detector name, "Wire transfer instructions") with Keyword_*_domain_context (its words), so the detector name next to any IdMatch phrase was enough for 75. Both lists sit inside the IdMatch phrase, so the bare name alone scored 75. Re-tiered in the #69 shape: 65 is the phrase alone (discovery only); 75 needs a populated payee/account field (Regex_global_top500_116_wire_transfer_instructions_record_structure); 85 needs 2 distinct fields. Curated terms that sit inside an IdMatch hit were removed. "IBAN" without a value is not a record, so it is now a populated-field label. Added the bare name, an empty form and a policy-guidance text as should_not_match, and populated records reaching 75 and 85.'
   - version: 1.2.4
     date: '2026-09-25'
     description: >-

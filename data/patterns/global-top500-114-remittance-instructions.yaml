@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Remittance instructions
 slug: global-top500-114-remittance-instructions
-version: 1.2.4
+version: 1.4.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -9,7 +9,7 @@ description: Detects references to remittance instructions in financial and comp
 operation: >-
   Pattern type: regex (boost_regex engine). Regex uses structural anchors with proximity constraints to match domain-specific content. Corroborative evidence: 6 keywords within 300 characters. Uses
   additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: (?is)\b(?:payment\s+instruction|bank\s+transfer|wire\s+transfer|correspondent\s+bank|intermediary\s+bank|payment\s+reference|remit\s+to|funds\s+transfer)\b
+pattern: (?is)\b(?:remittance\s+instructions?|payment\s+instruction|bank\s+transfer|wire\s+transfer|correspondent\s+bank|intermediary\s+bank|payment\s+reference|remit\s+to|funds\s+transfer)\b
 confidence: medium
 confidence_justification: category-aware structural regex with anchor and context constraints replaces phrase-only detection. Added context gating and exclusion rules improve precision and reduce incidental matches.
 jurisdictions:
@@ -41,6 +41,17 @@ test_cases:
       description: Alternative topic phrase match
     - value: correspondent bank
       description: Additional topic phrase match
+    - value: |-
+        Payment instruction
+        Payee: Riverbend Supplies Pty Ltd
+      description: Populated payee/account with one field (75 tier)
+      synthetic: true
+    - value: |-
+        Payment instruction
+        Payee: Riverbend Supplies Pty Ltd
+        BSB: 064-000
+      description: Populated payee/account with 2 distinct fields (85 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -48,6 +59,16 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: office supplies purchase order summary
       description: No remittance/payment topic phrases present
+    - value: Remittance instructions
+      description: "Bare detector name (regression guard): the IdMatch does not match it alone, but the generated name-word tier lifted it to 75 next to any IdMatch phrase; it must not reach an enforcing tier"
+    - value: |-
+        Payment instruction:
+        Payee:
+        Account name:
+        Account number:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about payment instruction are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template documents without actual transaction data.
     mitigation: Require corroborative evidence keywords within the proximity window. Cross-reference with structured financial identifiers to confirm actual sensitive data.
@@ -66,11 +87,23 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
-    - confidence_level: 75
+    - confidence_level: 85
+      local_noise_filter: true
       id_match: Regex_remittance
       matches:
-        - ref: Pattern_global_top500_114_remittance_instructions_label_context
-        - ref: Keyword_global_top500_114_remittance_instructions_domain_context
+        - ref: Regex_global_top500_114_remittance_instructions_record_structure
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_remittance
+      matches:
+        - ref: Regex_global_top500_114_remittance_instructions_record_structure
         - type: any
           min_matches: 0
           max_matches: 0
@@ -80,7 +113,6 @@ purview:
       discovery_only: true
       id_match: Regex_remittance
       matches:
-        - ref: Keyword_remittance
         - type: any
           min_matches: 0
           max_matches: 0
@@ -88,41 +120,16 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_remittance
-      pattern: (?is)\b(?:payment\s+instruction|bank\s+transfer|wire\s+transfer|correspondent\s+bank|intermediary\s+bank|payment\s+reference|remit\s+to|funds\s+transfer)\b
-    - id: Pattern_global_top500_114_remittance_instructions_label_context
-      pattern: (?i)\b(?:remittance\s+instructions)\b
-  keywords:
-    - id: Keyword_remittance
-      groups:
-        - match_style: word
-          terms:
-            - remittance
-            - payment instruction
-            - beneficiary
-            - bank transfer
-            - wire transfer
-            - SWIFT
-            - IBAN
-            - correspondent bank
-            - intermediary bank
-            - payment reference
-            - remit to
-            - funds transfer
-      strength: specific
-    - id: Keyword_global_top500_114_remittance_instructions_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - remittance instructions
-            - remittance
-            - instructions
-      strength: domain
+      pattern: (?is)\b(?:remittance\s+instructions?|payment\s+instruction|bank\s+transfer|wire\s+transfer|correspondent\s+bank|intermediary\s+bank|payment\s+reference|remit\s+to|funds\s+transfer)\b
+    - id: Regex_global_top500_114_remittance_instructions_record_structure
+      pattern: (?i)\b(?:payee|supplier|vendor|creditor|beneficiary|account\s+name|BSB|account\s+(?:no\.?|number)|invoice\s+(?:no\.?|number)|remittance\s+(?:no\.?|number|ref(?:erence)?)|amount\s+paid|IBAN|SWIFT(?:\s*/\s*BIC)?|BIC|sort\s+code)(?:\s*\([^)]{1,20}\))?\s*[:#]\s*(?!(?:n/?a|name|full\s+name|given\s+names?|surname|first\s+name|last\s+name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}[:#])[A-Z0-9][A-Za-z0-9/'.@+-]*(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}
 risk_description: >-
   Remittance instructions detects payment-direction language such as remit to, beneficiary account, correspondent bank, and wire transfer within financial context. A normal match may be a template, published guidance, or correspondence that discusses where payment information belongs without containing a complete approved transfer order. An attacker would still need accurate beneficiary details, authority, and a successful process compromise to redirect funds, so standalone harm is limited. Risk 4 and OFFICIAL are defensible; SENSITIVE would be warranted for a live instruction containing complete routing, beneficiary, amount, and authorization details.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
   qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
   us_gov: CUI
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: RESTRICTED
@@ -144,8 +151,14 @@ frameworks:
   - ISO 27701
   - PCI-DSS
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-23'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-23'
+    description: "Local noise filter: every tier above 65 opts in to the per-tenant Local Noise Exclusion dictionary (local_noise_filter: true). Values the organisation publishes itself can be listed there (here: the organisation's own remit-to details, as printed on its invoices); a match whose value ends with a listed term stops reaching 75/85, and the 65 tier still reports every match. Inert until the customer adds entries."
+  - version: 1.3.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 75 tier ANDed Pattern_*_label_context (the detector name, "Remittance instructions") with Keyword_*_domain_context (its words), so the detector name next to any IdMatch phrase was enough for 75. The IdMatch does not match the bare name, so it scored 0 alone, but the name as a heading lifted any IdMatch phrase near it. Re-tiered in the #69 shape: 65 is the phrase alone (discovery only); 75 needs a populated payee/account field (Regex_global_top500_114_remittance_instructions_record_structure); 85 needs 2 distinct fields. Curated terms that sit inside an IdMatch hit were removed. "remittance" is the detector name; "beneficiary", "SWIFT" and "IBAN" without a value are not a record, so they are now populated-field labels. The detector name is the identifying phrase but lived only in the generated label regex, so the IdMatch now accepts "remittance instructions" (65 discovery; enforcing still needs a populated field). Added the bare name, an empty form and a policy-guidance text as should_not_match, and populated records reaching 75 and 85.'
   - version: 1.2.4
     date: '2026-09-25'
     description: >-

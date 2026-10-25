@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Breach likelihood and impact assessments
 slug: global-top500-468-breach-likelihood-and-impact-assessments
-version: 1.2.3
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -42,6 +42,19 @@ test_cases:
       description: Alternative topic phrase match
     - value: notifiable breach
       description: Additional topic phrase match
+    - value: |-
+        Breach likelihood
+        To: Executive Committee
+        From: Chief Risk Officer
+      description: Populated document header with 2 fields (75 tier)
+      synthetic: true
+    - value: |-
+        Breach likelihood
+        To: Executive Committee
+        From: Chief Risk Officer
+        Date: 14 August 2026
+      description: Populated document header with 3 distinct fields (85 tier)
+      synthetic: true
   should_not_match:
     - value: unrelated generic text without domain phrases
       description: No relevant topic phrases present
@@ -49,6 +62,17 @@ test_cases:
       description: Random text should not match topic-specific regex
     - value: data inventory compliance
       description: Generic word pair from old broad template should not match
+    - value: Breach likelihood and impact assessments
+      description: "Bare detector name: it reached 75 through the generated name-word tier and must not reach an enforcing tier"
+    - value: |-
+        Breach likelihood:
+        To:
+        From:
+        Date:
+        Subject:
+      description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+    - value: "Policy guidance: this procedure explains how records about breach likelihood are handled, who may access them and how long they are kept. It contains no records about any person or system."
+      description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
   - description: >-
       Common words and phrases related to breach likelihood and impact assessments appearing in policy documents, training materials, HR templates, or compliance guidelines without actual personal
@@ -73,11 +97,23 @@ purview:
       as: Keyword_noise_exclusion
       match_style: word
   pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_breach_assessment
+      matches:
+        - ref: Regex_global_top500_468_breach_likelihood_and_impact_assessments_record_structure
+          min_count: 3
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       id_match: Regex_breach_assessment
       matches:
-        - ref: Pattern_global_top500_468_breach_likelihood_and_impact_assessments_label_context
-        - ref: Keyword_global_top500_468_breach_likelihood_and_impact_assessments_domain_context
+        - ref: Regex_global_top500_468_breach_likelihood_and_impact_assessments_record_structure
+          min_count: 2
+          unique_results: true
         - type: any
           min_matches: 0
           max_matches: 0
@@ -87,7 +123,6 @@ purview:
       discovery_only: true
       id_match: Regex_breach_assessment
       matches:
-        - ref: Keyword_breach_assessment
         - type: any
           min_matches: 0
           max_matches: 0
@@ -97,42 +132,16 @@ purview:
     - id: Regex_breach_assessment
       pattern: >-
         (?is)\b(?:breach\s+likelihood|impact\s+assessment|data\s+breach|notifiable\s+breach|breach\s+notification|risk\s+of\s+harm|likelihood\s+assessment|severity\s+assessment|affected\s+individuals|privacy\s+compliance|incident\s+severity|breach\s+response)\b
-    - id: Pattern_global_top500_468_breach_likelihood_and_impact_assessments_label_context
-      pattern: (?i)\b(?:breach\s+likelihood\s+and\s+impact\s+assessments)\b
-  keywords:
-    - id: Keyword_breach_assessment
-      groups:
-        - match_style: word
-          terms:
-            - breach likelihood
-            - impact assessment
-            - data breach
-            - notifiable breach
-            - breach notification
-            - risk of harm
-            - likelihood assessment
-            - severity assessment
-            - affected individuals
-            - privacy compliance
-            - incident severity
-            - breach response
-      strength: specific
-    - id: Keyword_global_top500_468_breach_likelihood_and_impact_assessments_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - breach likelihood and impact assessments
-            - breach
-            - likelihood
-            - impact
-            - assessments
-      strength: domain
+    - id: Regex_global_top500_468_breach_likelihood_and_impact_assessments_record_structure
+      pattern: (?i)\b(?:To|From|Date|Subject|Re|Our\s+ref|Your\s+ref|File\s+(?:ref|no\.?|number)|Matter\s+(?:no\.?|number)|Prepared\s+by|Approved\s+by|Author|Version|Classification|Meeting\s+date|Agenda\s+item|incident\s*(?:ID|no\.?|number|ref(?:erence)?)|date\s+(?:detected|discovered)|records\s+affected)\s*:\s*(?!(?:n/?a|tbc|tba)\b|_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9$]
 risk_description: >-
   The detector responds to breach likelihood, notifiable breach, affected individuals, incident severity, response, and risk-of-harm language rather than requiring a completed incident assessment. A genuine record can disclose exposed data, victim groups, severity judgements, investigative gaps, and response plans, enabling extortion, evasion, or further targeting before containment. Impact is serious for the organisation and defined affected population but normally remains incident-bounded; public breach guidance and exercises can generate identical concept hits. Risk 8 and SENSITIVE are justified; PROTECTED would require an active uncontained compromise of high-consequence systems or data with a credible path to significant, widespread, or irreversible damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
   us_gov: CUI
   uk_gov: OFFICIAL-SENSITIVE
   nz_gov: IN-CONFIDENCE
@@ -153,8 +162,11 @@ frameworks:
   - ISO 27001
   - ISO 27701
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.3.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 75 tier ANDed Pattern_*_label_context (the detector name, "Breach likelihood and impact assessments") with Keyword_*_domain_context (its words), so the detector name next to any IdMatch phrase was enough for 75. Both lists sit inside the IdMatch phrase, so the bare name alone scored 75. Re-tiered in the #69 shape: 65 is the phrase alone (discovery only); 75 needs 2 populated document header fields (Regex_global_top500_468_breach_likelihood_and_impact_assessments_record_structure); 85 needs 3 distinct fields. Curated terms that sit inside an IdMatch hit were removed. Added the bare name, an empty form and a policy-guidance text as should_not_match, and populated records reaching 75 and 85.'
   - version: 1.2.3
     date: '2026-09-25'
     description: >-

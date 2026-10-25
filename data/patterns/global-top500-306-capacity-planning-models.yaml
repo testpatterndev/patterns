@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Capacity planning models
 slug: global-top500-306-capacity-planning-models
-version: 1.2.5
+version: 1.3.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -40,6 +40,17 @@ test_cases:
     description: Alternative topic phrase match
   - value: growth projection
     description: Additional topic phrase match
+  - value: |-
+      Capacity planning
+      Hostname: app-prd-01.corp.local
+    description: Populated technical artefact with one field (75 tier)
+    synthetic: true
+  - value: |-
+      Capacity planning
+      Hostname: app-prd-01.corp.local
+      Source 10.20.30.40 tcp/443
+    description: Populated technical artefact with 2 distinct fields (85 tier)
+    synthetic: true
   should_not_match:
   - value: unrelated generic text without domain phrases
     description: No relevant topic phrases present
@@ -47,6 +58,15 @@ test_cases:
     description: Random text should not match topic-specific regex
   - value: backup outage
     description: Generic word pair from old broad template should not match
+  - value: Capacity planning models
+    description: "Bare detector name: it reached 85 through the generated name-word tier and must not reach an enforcing tier"
+  - value: |-
+      Capacity planning:
+      Hostname:
+      username:
+    description: "Empty form: the heading and field labels without values must not corroborate themselves (discovery only)"
+  - value: "Policy guidance: this procedure explains how records about capacity planning are handled, who may access them and how long they are kept. It contains no records about any person or system."
+    description: Policy guidance naming the topic without any record (discovery only)
 false_positives:
 - description: Authentication-related terminology in software documentation, security training materials, or system architecture
     descriptions without actual credentials.
@@ -72,65 +92,37 @@ purview:
   - confidence_level: 85
     id_match: Regex_capacity_planning
     matches:
-    - ref: Pattern_global_top500_306_capacity_planning_models_label_context
-    - ref: Keyword_global_top500_306_capacity_planning_models_domain_context
-    - ref: Keyword_capacity_planning
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+      - ref: Regex_global_top500_306_capacity_planning_models_record_structure
+        min_count: 2
+        unique_results: true
+      - type: any
+        min_matches: 0
+        max_matches: 0
+        refs:
+          - Keyword_noise_exclusion
   - confidence_level: 75
     id_match: Regex_capacity_planning
     matches:
-    - ref: Pattern_global_top500_306_capacity_planning_models_label_context
-    - ref: Keyword_global_top500_306_capacity_planning_models_domain_context
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+      - ref: Regex_global_top500_306_capacity_planning_models_record_structure
+      - type: any
+        min_matches: 0
+        max_matches: 0
+        refs:
+          - Keyword_noise_exclusion
   - confidence_level: 65
     discovery_only: true
     id_match: Regex_capacity_planning
     matches:
-    - type: any
-      min_matches: 0
-      max_matches: 0
-      refs:
-      - Keyword_noise_exclusion
+      - type: any
+        min_matches: 0
+        max_matches: 0
+        refs:
+          - Keyword_noise_exclusion
   regexes:
   - id: Regex_capacity_planning
     pattern: (?is)\b(?:capacity\s+planning|capacity\s+model|resource\s+forecasting|growth\s+projection|throughput\s+analysis|peak\s+utilization|scaling\s+threshold|infrastructure\s+sizing|performance\s+baseline|demand\s+forecast|capacity\s+report)\b
-  - id: Pattern_global_top500_306_capacity_planning_models_label_context
-    pattern: (?i)\b(?:capacity\s+planning\s+models)\b
-  keywords:
-  - id: Keyword_capacity_planning
-    groups:
-    - match_style: word
-      terms:
-      - capacity planning
-      - capacity model
-      - resource forecasting
-      - growth projection
-      - throughput analysis
-      - peak utilization
-      - headroom
-      - scaling threshold
-      - infrastructure sizing
-      - performance baseline
-      - demand forecast
-      - capacity report
-    strength: specific
-  - id: Keyword_global_top500_306_capacity_planning_models_domain_context
-    groups:
-    - match_style: word
-      terms:
-      - capacity planning models
-      - capacity
-      - planning
-      - models
-    strength: domain
+  - id: Regex_global_top500_306_capacity_planning_models_record_structure
+    pattern: (?i)\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}(?:/\d{1,2})?\b|\bCVE-\d{4}-\d{4,7}\b|\b[a-z0-9-]{1,63}\.(?:local|internal|corp|lan|intranet)\b|\b(?:tcp|udp)\s*/?\s*\d{2,5}\b|\b(?:port|dport|sport)\s*[:=]?\s*\d{2,5}\b|\b(?:hostname|host|asset\s+ID|device\s+ID|sAMAccountName|UPN|username|account\s+name)\s*:\s*(?!_{2,}|\[|<|[A-Za-z][A-Za-z .'/-]{0,30}:)[A-Za-z0-9][A-Za-z0-9._\\@-]{2,63}
 risk_description: The detector identifies capacity planning, resource forecasts, growth projections, throughput, peak utilisation,
   scaling thresholds, sizing, performance baselines, and demand forecasts associated with planning models. A genuine model
   can disclose service demand, bottlenecks, spare capacity, planned growth, and investment assumptions that competitors or
@@ -141,6 +133,7 @@ sensitivity_labels:
   pspf: 'OFFICIAL: Sensitive'
   qgiscf: SENSITIVE
   qgiscf_dlm: SENSITIVE InfoTech
+  idcf: DSL-3
   us_gov: CUI
   uk_gov: OFFICIAL
   nz_gov: IN-CONFIDENCE
@@ -162,8 +155,11 @@ frameworks:
   - ISO 27001
   - NIST CSF
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+- version: 1.3.0
+  date: '2026-10-20'
+  description: 'Generated name-word tier removed: the 85 and 75 tiers ANDed Pattern_*_label_context (the detector name, "Capacity planning models") with Keyword_*_domain_context (its words), so the detector name next to any IdMatch phrase was enough for 85. Both lists sit inside the IdMatch phrase, so the bare name alone scored 85. Re-tiered in the #69 shape: 65 is the phrase alone (discovery only); 75 needs a populated technical artefact field (Regex_global_top500_306_capacity_planning_models_record_structure); 85 needs 2 distinct fields. Curated terms that sit inside an IdMatch hit were removed. "headroom" restates the topic and is dropped. Added the bare name, an empty form and a policy-guidance text as should_not_match, and populated records reaching 75 and 85.'
 - version: 1.2.5
   date: '2026-09-25'
   description: >-
