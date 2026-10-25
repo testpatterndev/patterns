@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: International Classification of Diseases (ICD-9-CM)
 slug: global-icd-9-cm
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -53,6 +53,8 @@ test_cases:
       description: Contains letters, not a valid ICD-9 format
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
+    - value: 'classification 250.00'
+      description: 'A generic word from the detector name ("classification") next to a matching value is not 75 evidence; it reached 75 through the generated name-word tier'
 false_positives:
   - description: Generic numeric sequences matching the digit pattern in non-health contexts
     mitigation: Require corroborative evidence keywords within the proximity window to distinguish health identifiers from general numeric data.
@@ -74,16 +76,6 @@ purview:
     - confidence_level: 75
       id_match: Regex_icd_9_cm
       matches:
-        - ref: Pattern_global_icd_9_cm_label_context
-        - ref: Keyword_global_icd_9_cm_domain_context
-        - type: any
-          min_matches: 0
-          max_matches: 0
-          refs:
-            - Keyword_noise_exclusion
-    - confidence_level: 75
-      id_match: Regex_icd_9_cm
-      matches:
         - ref: Keyword_icd_9_cm
         - type: any
           min_matches: 0
@@ -102,8 +94,6 @@ purview:
   regexes:
     - id: Regex_icd_9_cm
       pattern: \b\d{3}\.?\d{0,2}\b
-    - id: Pattern_global_icd_9_cm_label_context
-      pattern: (?i)\b(?:international\s+classification\s+of\s+diseases\s+\(icd\-9\-cm\)|classification|diseases|icd)\b
   keywords:
     - id: Keyword_icd_9_cm
       groups:
@@ -122,16 +112,9 @@ purview:
             - clinical diagnosis
             - discharge diagnosis
             - admitting diagnosis
+            - text: 'ICD'
+              case_sensitive: true
       strength: specific
-    - id: Keyword_global_icd_9_cm_domain_context
-      groups:
-        - match_style: word
-          terms:
-            - international classification of diseases (icd-9-cm)
-            - classification
-            - diseases
-            - icd
-      strength: domain
 risk_rating: 5
 risk_description: >-
   The low-confidence regex finds three-digit ICD-9-CM shapes with optional decimals and nearby diagnosis-code vocabulary; it identifies a clinical classification code, not a patient chart or confirmed diagnosis linkage. A code can reveal a condition only when its meaning is looked up and the surrounding document ties it to an identifiable person. The normal match is one short numeric code that also collides with ordinary references, so practical harm requires patient identity, encounter, or billing context. Risk 5 and OFFICIAL reflect that bounded standalone signal, while a person-linked diagnosis list or complete coded claim would meet SENSITIVE.
@@ -160,8 +143,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-international-classification-of-diseases-icd-9-cm
     title: International Classification of Diseases (ICD-9-CM) entity definition - Microsoft Learn
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 75 tier whose only evidence was the detector name split into words (Pattern_global_icd_9_cm_label_context + Keyword_global_icd_9_cm_domain_context). One generic word such as "classification" satisfied both lists, so any matching value next to it reached 75. The curated keyword tiers are unchanged and keep the identifying terms. Definitions left unreferenced are removed. Identifying terms that lived only in the generated list moved to the curated keyword: ICD. Added a should_not_match case with "classification" next to a valid value.'
   - version: 1.3.2
     date: '2026-09-25'
     description: >-
