@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Wholesale Electricity Hedge Book / Contract Position Report
 slug: au-energy-hedge-position-report
-version: 1.0.2
+version: 1.1.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -13,7 +13,7 @@ description: >-
   trade confirmations) and au-forward-curve-artefact (price curves); this classifier covers the aggregated position
   report.
 operation: >-
-  Primary: hedge book vocabulary (hedge book / position / cover / ratio / report / portfolio, contracted position,
+  Primary: hedge book vocabulary (hedge book / position / cover / ratio / report / portfolio, contract or contracted position,
   net open or net contracted position, open position, cap cover, swap volume, contract cover, position report). 75
   requires, within 300 characters, a populated position row: a NEM region ID followed on the same line by a MW or MWh
   volume. 85 requires two distinct position rows (min_count 2, unique) plus a $/MWh strike or price and an
@@ -21,7 +21,7 @@ operation: >-
   excludes template/fixture text and public reporting (AER State of the Market, ASX daily settlement prices, annual
   report / financial statement notes, media releases). 65 is discovery-only and will surface FX and securities
   position language.
-pattern: (?i)\b(?:hedge\s+(?:book|position|cover|ratio|report|portfolio)|contracted\s+position|net\s+(?:open|contracted)\s+position|open\s+position|cap\s+cover|swap\s+volume|contract\s+cover|position\s+report)\b
+pattern: (?i)\b(?:hedge\s+(?:book|position|cover|ratio|report|portfolio)|contract(?:ed)?\s+position|net\s+(?:open|contracted)\s+position|open\s+position|cap\s+cover|swap\s+volume|contract\s+cover|position\s+report)\b
 confidence: medium
 confidence_justification: >-
   Medium: the primary phrases are shared with financial-markets position reporting, so enforcement requires NEM
@@ -66,6 +66,9 @@ test_cases:
     - value: "Net open position report\nVIC1 PPA offtake 52,000 MWh unhedged for FY28 after the solar farm delay."
       description: Net open position with one populated row - intended 75
       synthetic: true
+    - value: "Contract position report - week 42\nNSW1 Q1-27 base swaps 95 MW bought, 40 MW sold; net 55 MW long."
+      description: Report titled "contract position" (not "contracted") with one region-volume row - intended 75
+      synthetic: true
   should_not_match:
     - value: "Forward curve snapshot: QLD1 Cal-27 base $96.25/MWh, QLD1 Cal-27 peak $128.40/MWh, NSW1 Cal-27 base $101.10/MWh. Hedge book valuation uses these marks."
       description: Forward curve prices with region and $/MWh but no volumes (au-forward-curve-artefact territory)
@@ -77,6 +80,8 @@ test_cases:
       description: Annual report hedging note (public)
     - value: "The generator said its hedge book was well positioned for the summer, according to a media release on Monday."
       description: News / media release
+    - value: "The fixed-term contract position in the trading team was converted to permanent from 1 July."
+      description: HR sense of "contract position" with no region-volume row (65 discovery at most)
 false_positives:
   - description: Forward curve extracts and price snapshots quote regions and $/MWh.
     mitigation: The position-row regex needs a MW or MWh volume after the region ID; prices in $/MWh alone do not qualify.
@@ -133,7 +138,7 @@ purview:
   regexes:
     - id: Regex_au_energy_hedge_primary
       pattern: >-
-        (?i)\b(?:hedge\s+(?:book|position|cover|ratio|report|portfolio)|contracted\s+position|net\s+(?:open|contracted)\s+position|open\s+position|cap\s+cover|swap\s+volume|contract\s+cover|position\s+report)\b
+        (?i)\b(?:hedge\s+(?:book|position|cover|ratio|report|portfolio)|contract(?:ed)?\s+position|net\s+(?:open|contracted)\s+position|open\s+position|cap\s+cover|swap\s+volume|contract\s+cover|position\s+report)\b
     - id: Regex_au_energy_hedge_position_row
       pattern: >-
         \b(?:QLD1|NSW1|VIC1|SA1|TAS1)\b[^\r\n]{0,150}(?<![\d.,/])\d{1,3}(?:,\d{3}){0,3}(?:\.\d{1,2})?\s?MWh?\b
@@ -206,8 +211,14 @@ references:
   - title: AEMO NEMweb current reports (NEM regional reference price regions QLD1, NSW1, VIC1, SA1, TAS1)
     url: https://nemweb.com.au/Reports/Current/
 created: '2026-09-24'
-updated: '2026-09-25'
+updated: '2026-10-23'
 changelog:
+  - version: 1.1.0
+    date: '2026-10-23'
+    description: >-
+      Primary also matches "contract position" (the usual report title), not only "contracted position". Tier gates,
+      risk and labels unchanged; the HR sense ("fixed-term contract position") stays at 65 discovery because it has no
+      region-volume row.
   - version: 1.0.2
     date: '2026-09-25'
     description: >-
