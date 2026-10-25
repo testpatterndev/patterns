@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Stripe Key
 slug: global-stripe-key
-version: 1.4.1
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -59,6 +59,8 @@ test_cases:
     description: Too few characters (23 instead of minimum 24)
   - value: template example placeholder record identifier
     description: Template/sample context should be excluded even when anchor words are present
+  - value: 'key sk_live_ABCDEFGHIJKLMNOPQRSTUVWXyz'
+    description: 'A generic word from the detector name ("key") next to a matching value is not 75 evidence; it reached 75 through the generated name-word tier'
 false_positives:
 - description: Authentication-related terminology in software documentation, security training materials, or system architecture
     descriptions without actual credentials.
@@ -96,7 +98,7 @@ purview:
   - confidence_level: 75
     id_match: Regex_stripe_key
     matches:
-    - ref: Keyword_global_stripe_key_domain_context
+    - ref: Keyword_stripe_service
     - type: any
       min_matches: 0
       max_matches: 0
@@ -114,8 +116,6 @@ purview:
   regexes:
   - id: Regex_stripe_key
     pattern: \b(sk|pk)_(?:live|test)_[0-9a-zA-Z]{24,}\b
-  - id: Pattern_global_stripe_key_label_context
-    pattern: (?i)\b(?:stripe\s+key|stripe|key)\b
   keywords:
   - id: Keyword_stripe
     groups:
@@ -134,14 +134,14 @@ purview:
       - STRIPE_API_KEY
       - checkout
     strength: specific
-  - id: Keyword_global_stripe_key_domain_context
+  - id: Keyword_stripe_service
     groups:
     - match_style: word
       terms:
-      - stripe key
       - stripe
-      - key
-    strength: domain
+      - STRIPE_SECRET_KEY
+      - STRIPE_API_KEY
+    strength: specific
 risk_description: The regex matches Stripe keys across secret or publishable prefixes and live or test modes, so one detector
   spans sensitive server credentials, intentionally exposed client keys, and non-production values. A live secret key can
   authorize payment-platform API operations within its account permissions, while a publishable key is designed for client
@@ -176,8 +176,11 @@ references:
   - title: "Criminal Code Act 1995 (Cth)"
     url: https://www.legislation.gov.au/C2004A04868/latest/text
 created: '2026-02-08'
-updated: '2026-10-19'
+updated: '2026-10-20'
 changelog:
+- version: 1.5.0
+  date: '2026-10-20'
+  description: 'Generated name-word tier replaced: the 75 tier whose only evidence was the detector name split into words (Keyword_global_stripe_key_domain_context). Its only evidence was the domain-context list (the name split into words), so "key" next to a matching key reached 75. The 75 tier now uses Keyword_stripe_service, which keeps the service name ("stripe", "STRIPE_SECRET_KEY", "STRIPE_API_KEY") and drops the generic word, so one key beside the service name stays 75. Keyword_stripe is not reused at 75 because its sk_live / pk_test terms sit inside the key itself. Definitions left unreferenced are removed. Added a should_not_match case with "key" next to a valid value.'
 - version: 1.4.1
   date: '2026-10-19'
   description: 'Added a should_match case with two distinct primary values that reaches the 85 tier.'

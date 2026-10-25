@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Azure Storage Connection String
 slug: global-azure-storage-connection-string
-version: 1.2.2
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -105,8 +105,17 @@ purview:
     - confidence_level: 85
       id_match: Regex_azure_storage
       matches:
-        - ref: Pattern_global_azure_storage_connection_string_label_context
-        - ref: Keyword_global_azure_storage_connection_string_domain_context
+        - ref: Keyword_azure_storage_access_key
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    # Populated label alone is 75 (self-corroboration convention); 85 still needs
+    # independent context. The label evidence inside the IdMatch never matches (dev-tenant word-break probe 2026-10-19, testpatterndev/testpattern.dev#30).
+    - confidence_level: 75
+      id_match: Regex_azure_storage
+      matches:
         - type: any
           min_matches: 0
           max_matches: 0
@@ -124,22 +133,29 @@ purview:
   regexes:
     - id: Regex_azure_storage
       pattern: DefaultEndpointsProtocol=https?;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=\s]{86,92}
-    - id: Pattern_global_azure_storage_connection_string_label_context
-      pattern: (?i)\b(?:azure\s+storage\s+connection\s+string|azure|storage|connection|string)\b
   keywords:
-    - id: Keyword_global_azure_storage_connection_string_domain_context
+    - id: Keyword_azure_storage_access_key
       groups:
         - match_style: word
           terms:
-            - azure storage connection string
-            - azure
-            - storage
-            - connection
-            - string
+            - Azure Storage
+            - storage account
+            - AccountKey
+            - AccountName
+            - DefaultEndpointsProtocol
+            - blob
+            - container
+            - connection string
+            - core.windows.net
+            - primary key
+            - secondary key
       strength: domain
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-20'
 changelog:
+  - version: 1.3.0
+    date: '2026-10-20'
+    description: 'Generated name-word tier removed: the 85 tier whose only evidence was the detector name split into words (Pattern_global_azure_storage_connection_string_label_context + Keyword_global_azure_storage_connection_string_domain_context). It was the only enforcing tier, so the bare connection string sat at 65 and reached 85 only beside a name word (azure, storage, connection, string). A full connection string is itself a credential (#71), so this detector now carries the same tiers as its twin azure-storage-account-access-key (same IdMatch): 85 on Keyword_azure_storage_access_key and 75 on the string alone. Its curated terms inside the string (AccountKey=, DefaultEndpointsProtocol=) are joined by "=", which is not a Purview word break (testpattern.dev#30), so the bare string rises from 65 to 75 and storage context lifts it to 85. Definitions left unreferenced are removed.'
   - version: 1.2.2
     date: '2026-09-25'
     description: >-
