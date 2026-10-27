@@ -131,6 +131,9 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   if (p.purview && p.status !== 'deprecated') {
     const rc = p.purview.recommended_confidence
     if (rc !== undefined && !PURVIEW_LEVELS.includes(rc)) errors.push(`${p.slug ?? f}: purview.recommended_confidence must be 65|75|85 (low|medium|high), got ${rc}`)
+    // DLP-only: unique instances a DLP rule needs before it matches (SIT-Reference "DLP Min Matches").
+    const dm = p.purview.recommended_dlp_min_matches
+    if (dm !== undefined && !(Number.isInteger(dm) && dm >= 1)) errors.push(`${p.slug ?? f}: purview.recommended_dlp_min_matches must be an integer >= 1, got ${dm}`)
     for (const tier of p.purview.pattern_tiers ?? []) if (!PURVIEW_LEVELS.includes(tier.confidence_level)) errors.push(`${p.slug ?? f}: pattern_tiers confidence_level must be 65|75|85 (low|medium|high), got ${tier.confidence_level}`)
   }
   // Purview has no tier-level count and the exporter ignores one, so a count on the tier
