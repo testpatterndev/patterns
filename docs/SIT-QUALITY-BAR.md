@@ -34,6 +34,7 @@ Authoritative expectations for pattern YAML in this repo. CI may enforce a subse
 | `data_categories` | Semantic class (not default `pii` for business/IP; not `credentials` for findings/maps) |
 | `confidence` | Honesty about FP rate (digit shapes without checksum ⇒ not `high`) |
 | `recommended_confidence` | Align with lowest intended **enforce** tier |
+| `recommended_dlp_min_matches` | Optional; unique instances a DLP rule needs (absent = 1). Set when one hit is routine (an email address, a name) and only volume is a risk. Feeds SIT-Reference "DLP Min Matches"; auto-labelling ignores it |
 
 ## Classification cross-walk (minimum)
 
