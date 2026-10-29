@@ -1,21 +1,40 @@
 schema: testpattern/v1
 name: Titled Person Reference
 slug: au-titled-person-reference
-version: 2.7.2
+version: 3.0.0
 type: keyword_proximity
 pattern_class: concept
 engine: boost_regex
 description: >-
-  Identifies personal names preceded by salutations (Mr, Mrs, Ms, Dr, Prof, etc.) in Australian
-  documents. Uses structural regex for honorific + capitalised name components with corroborative
-  evidence from the consolidated Australian forename and surname dictionaries.
+  Identifies personal names preceded by a title (Mr, Mrs, Ms, Dr, Prof, Cr, Hon and similar) in Australian
+  documents. The name after the title is checked against the consolidated Australian forename and surname
+  dictionaries.
 operation: >-
-  Primary: honorific (Mr, Mrs, Miss, Ms, Dr, Prof, Rev, Hon, Sir, Dame, Lord, Lady) followed by two or three capitalised name tokens (case-sensitive). 65 (discovery only): titled name alone. 75: titled name plus at least one Australian forename or surname registry hit plus a populated contact/identity field (phone, mobile, email, address, DOB, customer/client/member/employee/patient/account/reference number). 85: titled name plus both forename and surname registry hits plus two distinct populated contact/identity fields. Business-name and street-address collisions and template framing are excluded from 75/85.
-pattern: \b(?:Mr|Mrs|Miss|Ms|Dr|Prof|Rev|Hon|Sir|Dame|Lord|Lady)\.?\s+(?:[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}|[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20})\b
+  The primary match is a title (Mr, Mrs, Miss, Ms, Mx, Dr, Prof, Professor, Rev, Hon, Sir, Dame, Lord, Lady,
+  Cr, Clr, Councillor, Senator), optionally followed by a second title (Hon. Justice, Lord Mayor, Hon Dr,
+  Hon Minister), then a pair of capitalised words (Dr Jane Smith-Jones, MR SEAN O'BRIEN, Mr Ewan McDonald).
+  The titles are consumed before \K, so the reported value is the name pair alone. Purview reads line
+  breaks and tabs as spaces, so a longer run would glue the name to the words around it (Dr Harry Tobin
+  Senior Consultant); the match is therefore exactly two words, with one optional middle particle (Van, Thi,
+  Bin, De, Al and similar: Mr Nguyen Van Minh). A three-part name is reported as its first two words
+  (Dr Mary Jane Watson gives Mary Jane). The title must start with a capital letter and may be in any case
+  after that (Dr, DR); the name words must be capitalised or in capitals, so lowercase prose does not
+  match. A leading (?-i) states the case rule explicitly (Purview's default in a dev-tenant test). Titles
+  and salutations cannot be part of the pair, and a pair followed by a road-type or company word (Road,
+  Street, Pty, Ltd, Holdings, Engineering and similar) is not a name. Two value filters keep only pairs
+  whose first word is in the consolidated Australian forename dictionary and whose second word is in the
+  surname dictionary. Forename and surname evidence must also sit inside the match (proximity 1), which
+  keeps every tier gated on the name lists if a deployer drops the filters. 65 (discovery only): the
+  titled name alone. 75: plus a populated contact or identity field (phone, mobile, email, address, DOB,
+  customer, client, member, employee, patient, account or reference number). 85: plus two distinct
+  populated contact or identity fields. Template framing vetoes every tier.
 case_sensitive: true
 confidence: medium
 confidence_justification: >-
-  Medium: a titled name alone is common in correspondence and public text, so enforce tiers now need an independent populated contact or identity field next to the name; the registry dictionaries confirm the tokens are plausible names but are not counted as independent evidence.
+  Medium: a titled name alone is common in correspondence and public text, so enforce tiers need an
+  independent populated contact or identity field near the name. The title and the forename and surname
+  dictionaries make the matched value a plausible personal name but are not counted as independent
+  evidence.
 jurisdictions:
   - au
 regulations:
@@ -31,39 +50,73 @@ data_categories:
 test_cases:
   should_match:
     - value: "Contact record\nMs Sarah Thompson\nMobile: 0412 345 678\nEmail: s.thompson@harbourclinic.com.au\nCustomer number: C4471820"
-      description: Titled name with both registry hits and two distinct contact/identity fields (85)
+      description: 85 - titled name with two distinct populated contact/identity fields; the reported value is Sarah Thompson
       synthetic: true
-    - value: "Dr Aaliyah Zorvane\nPhone: 07 3000 1234"
-      description: Titled name with one registry hit and one contact field (75)
+    - value: "Dr Aaliyah Abbasi\nPhone: 07 3000 1234"
+      description: 75 - titled name with one populated contact field; the reported value is Aaliyah Abbasi
       synthetic: true
     - value: "Attention: Prof. James Wilson"
-      description: Titled name alone (65 discovery)
+      description: 65 discovery - titled name alone
+      synthetic: true
+    - value: "Kind Regards\nDr Harry Tobin\nSenior Consultant"
+      description: 65 - signature block; the reported value is Harry Tobin, not the sign-off or job title on the next lines
+      synthetic: true
+    - value: "Yours sincerely\nDr Jane Smith\nSt Vincent's Hospital\nPhone: 07 3000 1234"
+      description: 75 - a hospital starting with St on the next line does not veto the name; the reported value is Jane Smith
+      synthetic: true
+    - value: "The Lord Mayor Harry Tobin opened the session."
+      description: 65 - two titles (Lord Mayor) are both consumed before the name
+      synthetic: true
+    - value: "Hon Dr Grace Bennett MP"
+      description: 65 - Hon and Dr together; the reported value is Grace Bennett
+      synthetic: true
+    - value: "DR JANE SMITH-JONES"
+      description: 65 - all capitals with a hyphenated surname
+      synthetic: true
+    - value: "Mr Nguyen Van Minh"
+      description: 65 - one middle particle stays inside the pair
+      synthetic: true
+    - value: "MR SEAN O'BRIEN and Mr Ewan McDonald"
+      description: 65 - O' and Mc surname shapes
       synthetic: true
   should_not_match:
     - value: "The weather forecast predicts rain across the region this weekend."
-      description: Generic non-name text with no salutation present
+      description: Generic non-name text with no title present
     - value: "The mrs clause in the contract"
       description: Lowercase clause wording does not satisfy the case-sensitive titled-name structure
-    - value: "Dr Brown Engineering Pty Ltd lodged the tender."
-      description: Titled business-name collision present in both Australian dictionaries must not reach enforcement
-    - value: "Dr Victoria Road, QLD 4000"
-      description: Titled formatted-address collision present in both Australian dictionaries must not reach enforcement
-    - value: "Sample: Dear Dr Aaliyah Abbasi"
+    - value: "dr harry tobin will see you now. Phone: 07 3000 1234"
+      description: Lowercase prose is not matched even with a populated contact field
+    - value: "Dr Brown Engineering Pty Ltd lodged the tender. Phone: 07 3000 1234"
+      description: Titled business name - Engineering is not a surname and a company word follows the pair
+    - value: "Dr Harry Tobin Pty Ltd. Phone: 07 3000 1234"
+      description: Company named after a person - a pair followed by a company word is not a name
+    - value: "Dr Victoria Road, QLD 4000. Phone: 07 3000 1234"
+      description: Titled formatted address - Road is not a surname
+    - value: "Dear Sir Project Manager, Phone: 07 3000 1234"
+      description: Business phrase after a title - Project is not a forename
+    - value: "Dr Grace Records Management. Email: records@example.com.au"
+      description: Starts with a forename but Records is not a surname
+    - value: "Sample: Dear Dr Aaliyah Abbasi. Phone: 07 3000 1234"
       description: High-like titled-name fixture must be rejected by the shared exclusion dictionary
-    - value: "The Hon. Justice Michael Kirby delivered the lecture on constitutional law at the university."
-      description: Public figure named in prose without contact or identity fields (no enforce tier)
+    - value: "The Hon. Justice Oliver Bennett delivered the lecture on constitutional law at the university."
+      description: Public figure named in prose without contact or identity fields (65 discovery only, no enforce tier)
     - value: "Contact details\nName: ____________________\nPhone: ____________________\nEmail: ____________________\nCustomer number: ____________________\nSignature: ____________  Date: __/__/____"
       description: Blank form with unpopulated labelled fields (placeholder guard keeps it below 75)
 false_positives:
-  - description: Salutations preceding non-name words in informal text or brand references.
-    mitigation: Require capitalised words following the salutation and corroborative family-name dictionary.
+  - description: Titles before capitalised non-name words in headings, brand names or business names.
+    mitigation: >-
+      The pair must start with a dictionary forename and end with a dictionary surname, and a pair followed
+      by a road-type or company word is rejected. Enforce tiers also need a populated contact or identity
+      field.
+  - description: Names that are also ordinary words (Grace, Hill, Rose) after a title.
+    mitigation: Both words of the pair must be capitalised and fit the forename-then-surname order; enforce tiers need record fields.
 exports:
   - purview_xml
   - yaml
 scope: wide
 risk_rating: 5
 risk_description: >-
-  A Titled Person Reference match combines an honorific with two or three capitalised name tokens and, to enforce, name-registry evidence plus a populated contact or identity field (phone, email, address, DOB or customer/member number); a titled name alone stays at 65 discovery. It can expose an identifiable person's name and role cue, which may aid correlation, unwanted contact, or a tailored professional pretext. Names and titles are often public, and the match contains no account, case, contact route, or credential. Risk 5 and OFFICIAL recognise a likely populated identity reference while reserving SENSITIVE for a name linked to substantive private or operational information.
+  A Titled Person Reference match is a title followed by a forename and surname from the Australian name dictionaries; to enforce, it also needs a populated contact or identity field (phone, email, address, DOB or customer/member number) nearby, and a titled name alone stays at 65 discovery. It can expose an identifiable person's name and role cue, which may aid correlation, unwanted contact, or a tailored professional pretext. Names and titles are often public, and the match contains no account, case, contact route, or credential. Risk 5 and OFFICIAL recognise a likely populated identity reference while reserving SENSITIVE for a name linked to substantive private or operational information.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -98,12 +151,25 @@ purview:
     - dict: au-surnames-australian
       as: Evidence_au_surname_registry
       match_style: word
+  filters:
+    - id: Filter_titled_name_starts_with_forename
+      type: TextMatchFilter
+      direction: StartsWith
+      logic: Include
+      text_processor_ref: Evidence_au_forename_registry
+    - id: Filter_titled_name_ends_with_surname
+      type: TextMatchFilter
+      direction: EndsWith
+      logic: Include
+      text_processor_ref: Evidence_au_surname_registry
   pattern_tiers:
     - confidence_level: 85
       id_match: Pattern_titled_person
       matches:
         - ref: Evidence_au_forename_registry
+          proximity: 1
         - ref: Evidence_au_surname_registry
+          proximity: 1
         - ref: Regex_au_titled_person_reference_contact_fields
           min_count: 2
           unique_results: true
@@ -112,26 +178,30 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-            - Pattern_non_person_name_collision
     - confidence_level: 75
       id_match: Pattern_titled_person
       matches:
-        - type: any
-          min_matches: 1
-          refs:
-            - Evidence_au_forename_registry
-            - Evidence_au_surname_registry
+        - ref: Evidence_au_forename_registry
+          proximity: 1
+        - ref: Evidence_au_surname_registry
+          proximity: 1
         - ref: Regex_au_titled_person_reference_contact_fields
         - type: any
           min_matches: 0
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
-            - Pattern_non_person_name_collision
     - confidence_level: 65
       discovery_only: true
       id_match: Pattern_titled_person
       matches:
+        # A forename and a surname inside the match (proximity 1 = overlapping).
+        # Redundant while the value filters apply; keeps the tier gated on the name
+        # lists if a deployer drops the filters.
+        - ref: Evidence_au_forename_registry
+          proximity: 1
+        - ref: Evidence_au_surname_registry
+          proximity: 1
         - type: any
           min_matches: 0
           max_matches: 0
@@ -139,14 +209,31 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Pattern_titled_person
-      pattern: \b(?:Mr|Mrs|Miss|Ms|Dr|Prof|Rev|Hon|Sir|Dame|Lord|Lady)\.?\s+(?:[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20}|[A-Z][a-z]{1,20}\s+[A-Z][a-z]{1,20})\b
+      pattern: '(?-i)\b(?=[A-Z])(?i:Mr|Mrs|Miss|Ms|Mx|Dr|Prof|Professor|Rev|Hon|Sir|Dame|Lord|Lady|Cr|Clr|Councillor|Senator)\.?\s+(?:(?=[A-Z])(?i:Dr|Prof|Professor|Justice|Senator|Councillor|Cr|Mayor|Minister|Sir|Dame)\.?\s+)?\K(?!(?i:Mr|Mrs|Miss|Ms|Mx|Dr|Prof|Professor|Rev|Hon|Sir|Dame|Lord|Lady|Cr|Clr|Councillor|Senator|Justice|Mayor|Minister|Dear|Hi|Hello|Regards|Kind|Thanks)\b)(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\s+(?:(?:Van|Thi|Duc|Bin|Binti|Binte|Ibn|Abu|Al|El|De|Del|Della|Di|Da|Dos|Du|Le|La|Von|Der|Den|Ter|Ten)\s+)?(?!(?i:Mr|Mrs|Miss|Ms|Mx|Dr|Prof|Professor|Rev|Hon|Sir|Dame|Lord|Lady|Cr|Clr|Councillor|Senator|Justice|Mayor|Minister|Dear|Hi|Hello|Regards|Kind|Thanks)\b)(?:O[’''])?[A-Z][A-Za-z]{1,20}(?:-[A-Z][A-Za-z]{1,20})?\b(?!\s+(?i:Street|Road|Rd|Avenue|Ave|Drive|Lane|Court|Place|Parade|Terrace|Crescent|Highway|Boulevard|Close|Circuit|Way|Pty|Ltd|Limited|Holdings|Group|Corporation|Corp|Company|Inc|Engineering|Consulting|Services|Partners|Associates|Council|University)\b)'
     - id: Regex_au_titled_person_reference_contact_fields
       pattern: (?i)\b(?:phone|mobile|tel(?:ephone)?|e-?mail|(?:postal\s+|residential\s+)?address|date\s+of\s+birth|DOB|(?:customer|client|member|employee|patient|account|reference|ref)\s*(?:no\.?|number|ID))(?:[ \t]*\([^)\n]{1,20}\))?[ \t]*[:#][ \t]{0,3}(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]{0,30}(?:[ \t]+[A-Z0-9][A-Za-z0-9'-]{0,30}){0,3}
-    - id: Pattern_non_person_name_collision
-      pattern: (?i)\b(?:(?:engineering|consulting|holdings|services|pty\s+ltd|ltd|limited|company|corporation|council|university)|(?:street|road|avenue|highway|parade|drive|lane|terrace|crescent)\s*,?\s*(?:NSW|QLD|VIC|TAS|SA|WA|NT|ACT|\d{4}))\b
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-29'
 changelog:
+  - version: 3.0.0
+    date: '2026-10-29'
+    description: >-
+      Match the name itself, not the words around it, as au-individual-name-record 3.0.0 does. The match was
+      a title plus two or three capitalised words joined by \s+; Purview reads line breaks and tabs as
+      spaces, so it glued a name to the next line (Dr Harry Tobin Senior), and the forename and surname
+      dictionaries counted as evidence anywhere within 300 characters. The match is now a title (any case
+      after a capital first letter; Mx, Cr, Clr, Councillor and Senator added), an optional second title
+      (Hon. Justice, Lord Mayor), consumed before \K, then a pair of capitalised words with one optional
+      middle particle; the reported value is the pair. Value filters require the first word to be in the
+      forename dictionary and the second in the surname dictionary, and the dictionary evidence must sit
+      inside the match (proximity 1). A pair followed by a road-type or company word is rejected; this
+      replaces the business/address collision veto, which also suppressed real people named next to their
+      employer. The follow-word list is au-individual-name-record's without St, because after a
+      titled name St is usually a hospital or school on the next line (St Vincent's). The ramp keeps its contact evidence: 65 titled name, 75 one populated contact or identity
+      field, 85 two. The old split between one dictionary (75) and both (85) goes, because every match
+      now needs both. A three-part name is reported as its first two words. The top-level pattern field is
+      removed, as in au-individual-name-record. Synthetic names replace a real public figure in the tests.
+      Needs the dictionary-backed TextMatchFilter export (text_processor_ref).
   - version: 2.7.2
     date: '2026-09-25'
     description: >-
