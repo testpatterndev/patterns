@@ -28,7 +28,7 @@ Classifiers that depend on an organisation-specific or unpublished identifier de
 | [Generator outage work order / reference](#generator-outage-work-order) | The generator's maintenance system (e.g. SAP PM, Maximo) | customer-defined | low | 1 |
 | [Queensland housing client / application number](#housing-client-number) | Queensland Government housing services (Housing Service Centres) | unpublished | low | 2 |
 | [Queensland social housing tenancy / property reference](#housing-tenancy-number) | Queensland Government housing services | unpublished | low | 3 |
-| [Infringement notice number](#infringement-notice-number) | Queensland Revenue Office / Department of Transport and Main Roads (camera-detected offences); issuing authorities for other penalty infringement notices | unpublished | medium | 4 |
+| [Infringement notice number](#infringement-notice-number) | Queensland Revenue Office / Department of Transport and Main Roads (camera-detected offences); issuing authorities for other penalty infringement notices | unpublished | medium | 3 |
 | [Law enforcement request / authorisation reference](#lea-request-reference) | The requesting enforcement agency or the carrier | unpublished | low | 1 |
 | [Library card / member number](#library-card-number) | The council library service (library management system) | customer-defined | low | 1 |
 | [My Aged Care ID](#my-aged-care-id) | My Aged Care (Australian Government Department of Health, Disability and Ageing) | unpublished | low | 1 |
@@ -1282,7 +1282,7 @@ samples: ["Infringement notice number: 2026084291", "Notice no. 7004418273", "no
 
 **Sensitivity:** Links a vehicle and its registered operator or driver to an alleged offence, location and time.
 
-**Used by:** `au-qld-council-infringement-sper-record`, `au-qld-non-voter-notice-record`, `council-customer-reference`, `traffic-camera-record`
+**Used by:** `au-qld-council-infringement-sper-record`, `council-customer-reference`, `traffic-camera-record`
 
 ## lea-request-reference
 

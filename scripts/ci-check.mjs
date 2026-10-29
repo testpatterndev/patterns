@@ -34,7 +34,6 @@ const BASE = fileURLToPath(new URL('..', import.meta.url))
 // *is* the confidential address, and BEC/payroll-redirect content names the organisation by design.
 const LOCAL_NOISE_FORBIDDEN = new Set([
   'au-dfv-confidential-address',
-  'au-qld-postal-declaration-vote',
   'global-top500-142-supplier-bank-change-requests',
   'bank-account-with-payment-authorisation-token',
   'global-top500-081-payroll-bank-account-details',

@@ -258,15 +258,10 @@ const cases = [
   },
 
   // ── Literal space in a lookbehind: the exporter turns ' ' into \s+ (variable length) ──
-  // Pinned 2026-10-01 from the Queensland electoral name-field regexes (1.0.3 / 1.0.2).
+  // Pinned 2026-10-01 from the Queensland silent elector name-field regex.
   {
     name: 'au-qld-silent-elector-record name field (exports as (?<![A-Za-z]\\s+))',
     src: "(?i)\\b(?:surname|applicant(?:\\s+name)?|(?<![A-Za-z] )name)\\s*[:#]\\s*[A-Z][A-Za-z'-]{1,30}",
-    expect: [LB_SPACE],
-  },
-  {
-    name: 'au-qld-elector-participation-data name field',
-    src: "(?i)\\b(?:voter(?:\\s+name)?|(?<![A-Za-z] )(?:full\\s+)?name)\\s*[:#]\\s*[A-Z][A-Za-z'-]{1,30}",
     expect: [LB_SPACE],
   },
   {
