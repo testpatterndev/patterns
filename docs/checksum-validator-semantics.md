@@ -122,9 +122,8 @@ for both the 9- and 14-digit forms: the first nine digits of a 14-digit REGON ar
 parent's 9-digit REGON. The 14-digit form's own check digit (different weights) is not
 checked. au-medicare-card-identifier pads its weights with zeros the same way.
 
-Seven other patterns still export `CheckDigit 0` and need the same treatment, one at a time
-because each scheme differs: ar-cuit-cuil, br-cnpj, ch-social-security-ahv, cl-rut,
-ee-personal-id, pl-pesel, pl-tax-id.
+The seven other patterns that exported `CheckDigit 0` are covered in the 2026-10-31 section
+below.
 
 ## Func_* validators are not usable in exported rulepacks
 
@@ -136,3 +135,36 @@ classification identifiers referenced by these resources cannot be found") — s
 and `testpattern/scripts/regression-purview-validators.js`, which asserts `Func_*`
 refs are stripped at export. Inline `type: Checksum` validators are therefore the only
 enforceable encoding in this pipeline.
+
+## Check digit = (M - sum) mod M: negate the weights (2026-10-31)
+
+Many schemes define the check digit as the complement of the remainder: EAN-13, PESEL,
+CUIT, CNPJ. Purview compares the remainder itself with the check digit, so encode such a
+rule with the negated weights `M - w` (and 0 at the check position). Then
+`sum((M - w_i) * d_i) mod M = (-sum(w_i * d_i)) mod M`, which is the complement.
+Written with the scheme's own weights the validator checks a different rule.
+
+| Pattern | Encoding | Covers |
+|---|---|---|
+| ch-social-security-ahv | 9,7,9,7,9,7,9,7,9,7,9,7,0 / Mod 10 / CheckDigit 13 | EAN-13 exactly |
+| pl-pesel | 9,7,3,1,9,7,3,1,9,7,0 / Mod 10 / CheckDigit 11 | exactly |
+| br-cnpj | 6,7,8,9,2,3,4,5,6,7,8,9,0,0 / Mod 11 / CheckDigit 13 | first check digit exactly (results 10 and 11 mean 0, matching Purview's remainder-10-as-0); second check digit unchecked |
+| ar-cuit-cuil | 6,7,8,9,4,5,6,7,8,9,0 / Mod 11 / CheckDigit 11 | exactly, except a never-issued result of 10 ending in 0 is accepted |
+| pl-tax-id | 6,5,7,2,3,4,5,6,7,0 / Mod 11 / CheckDigit 10 | plain remainder rule; an invalid remainder of 10 ending in 0 is accepted |
+
+Validators removed instead, because no single Checksum validator expresses the scheme
+without rejecting genuine values:
+
+- **cl-rut**: weights run from the right over a seven- or eight-digit body, and a result of
+  10 is the letter K, which is not a digit position.
+- **ee-personal-id**: a first-pass result of 10 triggers a second pass with other weights.
+  A first-pass-only validator rejects about 8% of genuine codes.
+
+The rule for a partial encoding: it may accept some invalid values (document them), but it
+must never reject a genuine one.
+
+Measured 2026-10-31: a throwaway pack holding all seven was accepted by the test tenant, and
+`Test-DataClassification` gave the expected result for 26 of 26 values. That covered valid
+values, invalid twins, and three remainder-10 cases (a CNPJ whose first check digit is 0,
+plus a CUIT and a NIP ending in 0, both accepted as described above), so remainder 10 is
+compared as digit 0 in these patterns too.

@@ -1,15 +1,17 @@
 schema: testpattern/v1
 name: RUT
 slug: cl-rut
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
   Detects RUT patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
 operation: >-
-  Validation: Mod 11. Reference: https://www.sii.cl/ Corroborative evidence: 3 keywords within 300 characters. Keyword
-  lists: pii-civic-credentials.
+  Reference: https://www.sii.cl/ Corroborative evidence: 3 keywords within 300 characters. Keyword lists:
+  pii-civic-credentials. No checksum validator: the RUT Mod 11 rule weights the body from the right (2,3,4,5,6,7,2,3)
+  over a seven- or eight-digit body and uses K for a result of 10. Purview weights digits from the left and counts
+  digits only, so one Checksum validator cannot hold both body lengths or the K check character.
 pattern: (\b\d{1,2}\.\d{3}\.\d{3}-[0-9Kk]\b|\b\d{7,8}-?[0-9Kk]\b)
 confidence: medium
 confidence_justification: >-
@@ -36,11 +38,11 @@ corroborative_evidence:
     - pii-civic-credentials
 test_cases:
   should_match:
-    - value: 12345678K
+    - value: 12345670K
       description: Chilean RUT with K check digit
-    - value: 1234567k
+    - value: 1234502k
       description: RUT with lowercase k
-    - value: '12345670'
+    - value: '12345674'
       description: RUT with numeric check digit
   should_not_match:
     - value: 123456L
@@ -99,8 +101,6 @@ purview:
   regexes:
     - id: Regex_cl_rut
       pattern: (\b\d{1,2}\.\d{3}\.\d{3}-[0-9Kk]\b|\b\d{7,8}-?[0-9Kk]\b)
-      validators:
-        - ref: Validator_cl_rut_checksum
   keywords:
     - id: Keyword_cl_rut_specific
       groups:
@@ -133,19 +133,12 @@ purview:
             - text: SII
               case_sensitive: true
       strength: specific
-  validators:
-    - id: Validator_cl_rut_checksum
-      type: Checksum
-      params:
-        weights: "3,2,7,6,5,4,3,2"
-        mod: 11
-        checkDigit: 0
   filters:
     - id: Filter_cl_rut_same_digits
       type: AllDigitsSameFilter
 risk_rating: 5
 risk_description: >-
-  The detector recognises a seven- or eight-digit Chilean RUT with a numeric or K check character and validates it using Mod 11. A RUT may identify either an individual taxpayer or a legal entity and is frequently exchanged in commercial and administrative processes. Fraudulent tax or account activity still requires the holder's identity, financial instructions, or service access, while the number alone mainly supports correlation and impersonation attempts. Risk 5 OFFICIAL captures that bounded dual-use risk; SENSITIVE would require a private taxpayer record, financial account, or authentication context.
+  The detector recognises a seven- or eight-digit Chilean RUT with a numeric or K check character. A RUT may identify either an individual taxpayer or a legal entity and is frequently exchanged in commercial and administrative processes. Fraudulent tax or account activity still requires the holder's identity, financial instructions, or service access, while the number alone mainly supports correlation and impersonation attempts. Risk 5 OFFICIAL captures that bounded dual-use risk; SENSITIVE would require a private taxpayer record, financial account, or authentication context.
 sensitivity_labels:
   pspf: OFFICIAL
   qgiscf: OFFICIAL
@@ -158,7 +151,7 @@ sensitivity_labels:
 classification:
   tier: Low
   rationale: >-
-    Risk 5 maps to PSPF OFFICIAL, QGISCF OFFICIAL, DLM OFFICIAL, and Low because a validated RUT is an administrative
+    Risk 5 maps to PSPF OFFICIAL, QGISCF OFFICIAL, DLM OFFICIAL, and Low because a RUT is an administrative
     identifier used for people and businesses but does not itself reveal protected financial or tax content. SENSITIVE
     is not met without linked personal or transactional data.
   generic:
@@ -172,8 +165,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-chile-identity-card-number
     title: "Chile identity card number entity definition - Microsoft Learn"
 created: '2026-02-08'
-updated: '2026-10-30'
+updated: '2026-10-31'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-31'
+    description: 'Checksum validator fix: the inline Checksum validator exported CheckDigit=0, which Purview rejects ("Param CheckDigit is invalid", 0x8000FFFF), so every rule package containing this pattern failed to upload. Validator removed rather than replaced: the RUT rule weights a seven- or eight-digit body from the right and uses K for 10, which one left-weighted, digits-only Checksum validator cannot hold. The regex is unchanged; test values replaced with checksum-valid RUTs.'
   - version: 1.4.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

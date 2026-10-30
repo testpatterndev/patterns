@@ -1,13 +1,21 @@
 schema: testpattern/v1
 name: CNPJ
 slug: br-cnpj
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
 description: >-
   Detects CNPJ patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
-operation: 'Validation: Mod 11. Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.'
+operation: >-
+  Validation: Mod 11. Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Checksum: inline Checksum validator Validator_br_cnpj_checksum (Weights 6,7,8,9,2,3,4,5,6,7,8,9,0,0 / Mod 11 /
+  CheckDigit 13) checks the first CNPJ check digit only. The CNPJ rule is DV1 = 11 - (sum of digits 1-12 x
+  5,4,3,2,9,8,7,6,5,4,3,2 mod 11), with results 10 and 11 meaning 0. Purview compares the remainder itself with the
+  check digit, so the weights are the negated CNPJ weights (11 - w); a remainder of 10 is compared as 0, which is the
+  CNPJ rule (Purview behaviour measured on a test tenant, see docs/checksum-validator-semantics.md). Do not change
+  the weights back to 5,4,3,2,...: that checks a different rule. The second check digit (weights
+  6,5,4,3,2,9,8,7,6,5,4,3,2 on digits 1-13, digit 14) is not checked: one Checksum validator holds one rule.
 pattern: \b(\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2})\b
 confidence: medium
 confidence_justification: >-
@@ -34,12 +42,12 @@ corroborative_evidence:
     - pii-civic-credentials
 test_cases:
   should_match:
-    - value: 12.345.678/0001-01
-      description: Standard CNPJ format
-    - value: '12345678000101'
-      description: CNPJ without punctuation
-    - value: 00.000.000/0001-00
-      description: Zero-filled CNPJ format
+    - value: 12.345.678/0001-95
+      description: Standard CNPJ format (both check digits valid)
+    - value: '11222333000181'
+      description: CNPJ without punctuation (both check digits valid)
+    - value: 13.535.341/1738-06
+      description: First check digit is 0 because the weighted sum mod 11 is 1 (Purview compares remainder 10 as 0)
   should_not_match:
     - value: '12.345.678/0001-0'
       description: Only 1 check digit instead of 2
@@ -47,6 +55,12 @@ test_cases:
       description: 3 check digits instead of 2
     - value: '12.345.67/0001-01'
       description: Only 2 digits in third group instead of 3
+    - value: 12.345.678/0001-05
+      description: fails mod-11 first check digit (perturbation of valid value 12.345.678/0001-95)
+    - value: '11222333000171'
+      description: fails mod-11 first check digit (perturbation of valid value 11222333000181)
+    - value: 13.535.341/1738-16
+      description: fails mod-11 first check digit (perturbation of valid value 13.535.341/1738-06)
 false_positives:
   - description: >-
       Common words and phrases related to cnpj appearing in policy documents, training materials, HR templates, or
@@ -113,9 +127,9 @@ purview:
     - id: Validator_br_cnpj_checksum
       type: Checksum
       params:
-        weights: "5,4,3,2,9,8,7,6,5,4,3,2"
+        weights: "6,7,8,9,2,3,4,5,6,7,8,9,0,0"
         mod: 11
-        checkDigit: 0
+        checkDigit: 13
   filters:
     - id: Filter_br_cnpj_same_digits
       type: AllDigitsSameFilter
@@ -148,8 +162,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-brazil-legal-entity-number
     title: "Brazil legal entity number (CNPJ) entity definition - Microsoft Learn"
 created: '2026-02-08'
-updated: '2026-10-30'
+updated: '2026-10-31'
 changelog:
+  - version: 1.5.0
+    date: '2026-10-31'
+    description: 'Checksum validator fix: the inline Checksum validator exported CheckDigit=0, which Purview rejects ("Param CheckDigit is invalid", 0x8000FFFF), so every rule package containing this pattern failed to upload. Now Weights 6,7,8,9,2,3,4,5,6,7,8,9,0,0 / Mod 11 / CheckDigit 13 (negated CNPJ weights): the first check digit exactly, including the remainder-10-means-0 case. The second check digit is not checked. The regex is unchanged. Test cases replaced with checksum-valid values plus invalid-twin should_not_match values. Test-tenant upload accepted; Test-DataClassification matched the valid values and rejected the invalid twins.'
   - version: 1.4.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'
