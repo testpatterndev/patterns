@@ -27,6 +27,7 @@ import { validateCustomisations } from './lib/customisation.mjs'
 import { loadIdentifiers, validateIdentifier, renderIdentifierDocs } from './lib/identifiers.mjs'
 import { validateClassification, validateIdcf, validateReferences, validateRegulations } from './lib/classification.mjs'
 import { validateBlocks } from './lib/blocks.mjs'
+import { purviewExportedRegex } from './lib/purview-export-length.mjs'
 
 const BASE = fileURLToPath(new URL('..', import.meta.url))
 
@@ -180,6 +181,13 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
     if (src.length > 1024) {
       const msg = `${p.slug}: ${id} regex is ${src.length} chars — Purview rejects patterns over 1024`
       if (p.purview) errors.push(msg); else warns.push(msg)
+    } else {
+      // The exporter's PDF rewrite (spaces → \s+, . → [\s\S], ...) lengthens it before upload.
+      const exported = purviewExportedRegex(src).length
+      if (exported > 1024) {
+        const msg = `${p.slug}: ${id} regex is ${src.length} chars in source but ${exported} after the exporter's PDF rewrite — Purview rejects patterns over 1024`
+        if (p.purview) errors.push(msg); else warns.push(msg)
+      }
     }
   }
   for (const kl of p.corroborative_evidence?.keyword_lists ?? []) if (!kwSlugs.has(kl)) errors.push(`${p.slug}: missing keyword_list '${kl}'`)
