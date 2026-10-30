@@ -122,9 +122,8 @@ for both the 9- and 14-digit forms: the first nine digits of a 14-digit REGON ar
 parent's 9-digit REGON. The 14-digit form's own check digit (different weights) is not
 checked. au-medicare-card-identifier pads its weights with zeros the same way.
 
-Seven other patterns still export `CheckDigit 0` and need the same treatment, one at a time
-because each scheme differs: ar-cuit-cuil, br-cnpj, ch-social-security-ahv, cl-rut,
-ee-personal-id, pl-pesel, pl-tax-id.
+The seven other patterns that exported `CheckDigit 0` are covered in the 2026-10-31 section
+below.
 
 ## Func_* validators are not usable in exported rulepacks
 
