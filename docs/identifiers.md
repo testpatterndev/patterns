@@ -80,7 +80,7 @@ Unique numbers of access permits and test permits for work on HV electrical plan
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:(?:access|test|access\s*/\s*test)\s+permit\s+(?:no\.?|number|ref(?:erence)?)|permit\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:(?:access|test|access\s*/\s*test)\s+permit\s+(?:no\.?|number|ref(?:erence)?)|permit\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Permit labels also occur for building and parking permits; HV evidence is required alongside.
@@ -110,7 +110,7 @@ Permit labels also occur for building and parking permits; HV evidence is requir
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:access|test)\s+permit\s+(?:no\.?|number)\s*[:#]?\s*AP\d{6}\b
+pattern: (?i)\b((?:access|test)\s+permit\s+(?:no\.?|number)\s*[:#]?\s*AP\d{6})\b
 samples: ["Access permit no: AP204718", "test permit number AP007193", "Access Permit No. AP020471"]
 ```
 
@@ -133,7 +133,7 @@ Client, customer or participant IDs issued by the customer's service system (hum
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:client|customer|participant)\s+(?:no\.?|number|ID)\s*[:#]?\s*[A-Z]{0,3}\d{4,10}\b
+(?i)\b((?:client|customer|participant)\s+(?:no\.?|number|ID)\s*[:#]?\s*[A-Z]{0,3}\d{4,10})\b
 ```
 
 Generic client labels are common; the fallback supports other record evidence and the customer format adds precision.
@@ -163,7 +163,7 @@ Generic client labels are common; the fallback supports other record evidence an
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bclient\s+(?:no\.?|number|ID)\s*[:#]?\s*C\d{7}\b
+pattern: (?i)\b(client\s+(?:no\.?|number|ID)\s*[:#]?\s*C\d{7})\b
 samples: ["Client ID: C4417820", "Client number C0071932", "Client no. C5520117"]
 ```
 
@@ -186,7 +186,7 @@ Dog and cat registration numbers and registration tag numbers issued by Queensla
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:animal\s+)?registration(?:\s+tag)?\s+(?:no\.?|number)|tag\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:(?:animal\s+)?registration(?:\s+tag)?\s+(?:no\.?|number)|tag\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Registration labels are generic; owner and animal fields supply the precision.
@@ -216,7 +216,7 @@ Registration labels are generic; owner and animal fields supply the precision.
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bregistration\s+(?:no\.?|number)\s*[:#]?\s*D\d{6}\b
+pattern: (?i)\b(registration\s+(?:no\.?|number)\s*[:#]?\s*D\d{6})\b
 samples: ["Registration number: D204718", "registration no. D007193", "Registration Number D020471"]
 ```
 
@@ -239,7 +239,7 @@ Class A / Class B asbestos removal licence numbers recorded on removal control p
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:asbestos\s+removal\s+)?licen[cs]e\s+(?:no\.?|number)|class\s+[AB]\s+licen[cs]e(?:\s+(?:no\.?|number))?)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:(?:asbestos\s+removal\s+)?licen[cs]e\s+(?:no\.?|number)|class\s+[AB]\s+licen[cs]e(?:\s+(?:no\.?|number))?)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Licence labels are generic; asbestos record fields and analysis results supply the precision.
@@ -269,7 +269,7 @@ Licence labels are generic; asbestos record fields and analysis results supply t
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\blicen[cs]e\s+(?:no\.?|number)\s*[:#]?\s*AR\d{6}\b
+pattern: (?i)\b(licen[cs]e\s+(?:no\.?|number)\s*[:#]?\s*AR\d{6})\b
 samples: ["Licence number: AR204718", "licence no. AR007193", "Licence Number AR020471"]
 ```
 
@@ -292,7 +292,7 @@ Sample identifiers used on asbestos registers, survey reports and laboratory cer
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:sample\s+(?:no\.?|number|ID|ref(?:erence)?))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:sample\s+(?:no\.?|number|ID|ref(?:erence)?))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Sample labels occur in many laboratory contexts; asbestos terms and results supply the precision.
@@ -322,7 +322,7 @@ Sample labels occur in many laboratory contexts; asbestos terms and results supp
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bsample\s+(?:no\.?|ID)\s*[:#]?\s*AS\d{5}\b
+pattern: (?i)\b(sample\s+(?:no\.?|ID)\s*[:#]?\s*AS\d{5})\b
 samples: ["Sample no: AS04471", "sample ID AS00719", "Sample No. AS20471"]
 ```
 
@@ -345,7 +345,7 @@ The unique number recorded for an Aviation Security Identification Card (ASIC) o
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:ASIC|MSIC|card)\s+(?:unique\s+)?(?:number|no\.?|serial)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9-]{3,19}\b
+(?i)\b((?:ASIC|MSIC|card)\s+(?:unique\s+)?(?:number|no\.?|serial)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9-]{3,19})\b
 ```
 
 The fallback anchors on the card label; the register structure (holder, card colour, dates, AusCheck outcome) supplies the precision.
@@ -375,7 +375,7 @@ The fallback anchors on the card label; the register structure (holder, card col
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:ASIC|MSIC)\s+(?:number|no\.?)\s*[:#]?\s*[A-Z]{2}\d{7}\b
+pattern: (?i)\b((?:ASIC|MSIC)\s+(?:number|no\.?)\s*[:#]?\s*[A-Z]{2}\d{7})\b
 samples: ["ASIC number: RA0448213", "MSIC number BW0071932", "ASIC no. GR0552011"]
 ```
 
@@ -398,7 +398,7 @@ Asset numbers, equipment serials and functional locations from the customer asse
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:asset\s+(?:no\.?|number|ID)|functional\s+location|equipment\s+(?:no\.?|number|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:asset\s+(?:no\.?|number|ID)|functional\s+location|equipment\s+(?:no\.?|number|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Asset labels are common in business records; plant evidence and measurements supply the precision.
@@ -428,7 +428,7 @@ Asset labels are common in business records; plant evidence and measurements sup
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bfunctional\s+location\s*[:#]?\s*[A-Z]{3}-[A-Z0-9]{2,6}-[A-Z0-9]{1,6}\b
+pattern: (?i)\b(functional\s+location\s*[:#]?\s*[A-Z]{3}-[A-Z0-9]{2,6}-[A-Z0-9]{1,6})\b
 samples: ["Functional location: PWR-SUB1-T2", "functional location GEN-U3-BFP1", "Functional Location WTP-F2-PMP4"]
 ```
 
@@ -451,7 +451,7 @@ Numbers assigned to Cabinet and Cabinet Budget Review Committee submissions and 
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:CBRC|Cabinet)\s+)?(?:submission|decision)\s+(?:no\.?|number)\s*[:#]?\s*\d[\d/-]{1,12}\b
+(?i)\b((?:(?:CBRC|Cabinet)\s+)?(?:submission|decision)\s+(?:no\.?|number)\s*[:#]?\s*\d[\d/-]{1,12})\b
 ```
 
 Parliamentary committees and public consultations also number submissions, so the fallback only corroborates a CBRC heading plus a Cabinet marking; it never enforces on its own.
@@ -481,7 +481,7 @@ Parliamentary committees and public consultations also number submissions, so th
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:CBRC\s+)?submission\s+no\.?\s*[:#]?\s*\d{4}\b
+pattern: (?i)\b((?:CBRC\s+)?submission\s+no\.?\s*[:#]?\s*\d{4})\b
 samples: ["CBRC Submission No. 0047", "Submission No: 0089", "submission no. 1180"]
 ```
 
@@ -504,7 +504,7 @@ Internal case, file or matter numbers from the customer's case management system
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:case|file|matter|reference)\s+(?:no\.?|number|ID|#)\s*[:#]?\s*(?:[A-Z]{1,4}[/-]?)?\d[A-Z0-9/-]{3,20}\b
+(?i)\b((?:case|file|matter|reference)\s+(?:no\.?|number|ID|#)\s*[:#]?\s*(?:[A-Z]{1,4}[/-]?)?\d[A-Z0-9/-]{3,20})\b
 ```
 
 Generic case labels are common, so the fallback only supports other evidence; the value must start with an optional short prefix followed by a digit, so label-only prose ("case number must be recorded") and blank forms do not match. The customer format raises precision substantially.
@@ -534,7 +534,7 @@ Generic case labels are common, so the fallback only supports other evidence; th
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:case|file)\s+(?:no\.?|number)\s*[:#]?\s*[A-Z]{2}\d{8}\b
+pattern: (?i)\b((?:case|file)\s+(?:no\.?|number)\s*[:#]?\s*[A-Z]{2}\d{8})\b
 samples: ["Case number: HC20264471", "File no. PI20251827", "Case number CR20260412"]
 ```
 
@@ -557,7 +557,7 @@ Reference numbers used by the CCC and notifying agencies for corrupt conduct not
 **Public fallback** (precision: medium):
 
 ```
-(?i)\bCCC\s+(?:ref(?:erence)?|file|matter)\s*(?:no\.?|number)?\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20}\b
+(?i)\b(CCC\s+(?:ref(?:erence)?|file|matter)\s*(?:no\.?|number)?\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20})\b
 ```
 
 The CCC prefix on the label is specific to corruption matters.
@@ -587,7 +587,7 @@ The CCC prefix on the label is specific to corruption matters.
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bCCC\s+ref(?:erence)?\s*[:#]?\s*CO-\d{2}-\d{4}\b
+pattern: (?i)\b(CCC\s+ref(?:erence)?\s*[:#]?\s*CO-\d{2}-\d{4})\b
 samples: ["CCC reference: CO-26-1187", "CCC ref CO-25-4471", "CCC reference CO-26-0412"]
 ```
 
@@ -610,7 +610,7 @@ Right of interment (burial right) numbers and plot / niche references held in co
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:right|grant|licen[cs]e)\s+(?:of\s+(?:burial|interment)\s+)?(?:no\.?|number)|(?:plot|niche|grave)\s+(?:ref(?:erence)?|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:(?:right|grant|licen[cs]e)\s+(?:of\s+(?:burial|interment)\s+)?(?:no\.?|number)|(?:plot|niche|grave)\s+(?:ref(?:erence)?|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Plot and right labels are generic; deceased and next-of-kin fields supply the precision.
@@ -640,7 +640,7 @@ Plot and right labels are generic; deceased and next-of-kin fields supply the pr
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bplot\s+reference\s*[:#]?\s*[A-Z]{2,6}-[A-Z]-\d{1,4}\b
+pattern: (?i)\b(plot\s+reference\s*[:#]?\s*[A-Z]{2,6}-[A-Z]-\d{1,4})\b
 samples: ["Plot reference: LAWN-B-112", "plot reference MON-C-7", "Plot Reference GDN-A-2044"]
 ```
 
@@ -663,7 +663,7 @@ Application and approval numbers for development applications, building approval
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:development|building|planning|plumbing)\s+application|DA|BA|application|approval|permit|decision\s+notice)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*(?:[A-Z]{1,5}[/-]?)?\d[A-Z0-9/-]{3,20}\b
+(?i)\b((?:(?:development|building|planning|plumbing)\s+application|DA|BA|application|approval|permit|decision\s+notice)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*(?:[A-Z]{1,5}[/-]?)?\d[A-Z0-9/-]{3,20})\b
 ```
 
 Application and approval labels are generic, so the fallback only supports approval-record structure; a digit-bearing value is required so that guidance and blank forms do not match.
@@ -693,7 +693,7 @@ Application and approval labels are generic, so the fallback only supports appro
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:application|DA)\s+(?:no\.?|number)\s*[:#]?\s*A00\d{7}\b
+pattern: (?i)\b((?:application|DA)\s+(?:no\.?|number)\s*[:#]?\s*A00\d{7})\b
 samples: ["Application number: A006123456", "DA number A005998812", "application no. A006000417"]
 ```
 
@@ -716,7 +716,7 @@ Property numbers, rate assessment numbers and similar references used by council
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:property|assessment|rate\s+assessment|rates\s+account)\s+(?:no\.?|number|ID)\s*[:#]?\s*\d{4,12}\b
+(?i)\b((?:property|assessment|rate\s+assessment|rates\s+account)\s+(?:no\.?|number|ID)\s*[:#]?\s*\d{4,12})\b
 ```
 
 Rating labels are council-specific in wording but not in format; the council supplies the real format.
@@ -746,7 +746,7 @@ Rating labels are council-specific in wording but not in format; the council sup
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:property|assessment)\s+(?:no\.?|number)\s*[:#]?\s*\d{8}\b
+pattern: (?i)\b((?:property|assessment)\s+(?:no\.?|number)\s*[:#]?\s*\d{8})\b
 samples: ["Property number: 20441882", "Assessment no. 00719321", "Property number 55201174"]
 ```
 
@@ -769,7 +769,7 @@ Record, document and file numbers assigned by the customer's electronic records 
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:our\s+ref|your\s+ref|record\s+(?:no\.?|number)|file\s+ref|doc(?:ument)?\s+(?:no\.?|number|ID))\s*[:#]?\s*[A-Z]{0,4}\d{2,4}[/-]\d{2,8}\b
+(?i)\b((?:our\s+ref|your\s+ref|record\s+(?:no\.?|number)|file\s+ref|doc(?:ument)?\s+(?:no\.?|number|ID))\s*[:#]?\s*[A-Z]{0,4}\d{2,4}[/-]\d{2,8})\b
 ```
 
 Reference labels plus a year/sequence shape match how most eDRMS numbers are printed without assuming a specific product.
@@ -799,7 +799,7 @@ Reference labels plus a year/sequence shape match how most eDRMS numbers are pri
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:our\s+ref|record\s+(?:no\.?|number))\s*[:#]?\s*D\d{2}/\d{6}\b
+pattern: (?i)\b((?:our\s+ref|record\s+(?:no\.?|number))\s*[:#]?\s*D\d{2}/\d{6})\b
 samples: ["Our ref: D26/123456", "Record number D25/004471", "Our ref D26/000412"]
 ```
 
@@ -822,7 +822,7 @@ The identifying number held for each elector on the Queensland electoral roll (E
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:elector\s+(?:ID|no\.?|number|identifying\s+number)|roll\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9]*\d[A-Z0-9/.-]{1,24}\b
+(?i)\b((?:elector\s+(?:ID|no\.?|number|identifying\s+number)|roll\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9]*\d[A-Z0-9/.-]{1,24})\b
 ```
 
 Elector ID labels are specific to electoral records but the value format is unverified; name, address and restricted roll fields supply the precision.
@@ -852,7 +852,7 @@ Elector ID labels are specific to electoral records but the value format is unve
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\belector\s+ID\s*[:#]?\s*E\d{8}\b
+pattern: (?i)\b(elector\s+ID\s*[:#]?\s*E\d{8})\b
 samples: ["Elector ID: E20471820", "Elector ID E00719320", "elector id E44718201"]
 ```
 
@@ -875,7 +875,7 @@ Staff numbers issued by the customer's payroll or HR system, used on HR, integri
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:employee|staff|payroll)\s+(?:no\.?|number|ID)\s*[:#]?\s*[A-Z]{0,3}\d{4,10}\b
+(?i)\b((?:employee|staff|payroll)\s+(?:no\.?|number|ID)\s*[:#]?\s*[A-Z]{0,3}\d{4,10})\b
 ```
 
 Employee labels are common in HR documents; the fallback supports other evidence.
@@ -905,7 +905,7 @@ Employee labels are common in HR documents; the fallback supports other evidence
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:employee|staff)\s+(?:no\.?|number|ID)\s*[:#]?\s*\d{8}\b
+pattern: (?i)\b((?:employee|staff)\s+(?:no\.?|number|ID)\s*[:#]?\s*\d{8})\b
 samples: ["Employee ID: 00447182", "Staff number 00552011", "Employee no. 00071932"]
 ```
 
@@ -928,7 +928,7 @@ Internal incident numbers and regulator notification references for environmenta
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:incident|notification)\s+(?:no\.?|number|ref(?:erence)?))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:(?:incident|notification)\s+(?:no\.?|number|ref(?:erence)?))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Incident labels are generic; release measurements and incident fields supply the precision.
@@ -958,7 +958,7 @@ Incident labels are generic; release measurements and incident fields supply the
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bincident\s+(?:no\.?|number)\s*[:#]?\s*ENV\d{6}\b
+pattern: (?i)\b(incident\s+(?:no\.?|number)\s*[:#]?\s*ENV\d{6})\b
 samples: ["Incident number: ENV204718", "incident no. ENV007193", "Incident Number ENV020471"]
 ```
 
@@ -981,7 +981,7 @@ Reference numbers issued when a serious electrical incident or dangerous electri
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:ESO|WHSQ|notification|incident)\s+(?:ref(?:erence)?|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:(?:ESO|WHSQ|notification|incident)\s+(?:ref(?:erence)?|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Incident reference labels are generic; the classifier also needs incident fields and a notification record.
@@ -1011,7 +1011,7 @@ Incident reference labels are generic; the classifier also needs incident fields
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:ESO|notification)\s+(?:reference|number)\s*[:#]?\s*E\d{7}\b
+pattern: (?i)\b((?:ESO|notification)\s+(?:reference|number)\s*[:#]?\s*E\d{7})\b
 samples: ["ESO reference: E4471820", "notification number E0071932", "ESO Reference E2047181"]
 ```
 
@@ -1034,7 +1034,7 @@ Codes that ART clinics assign to sperm, egg and embryo donors so that treatment 
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:(?:sperm|egg|embryo|gamete)\s+)?donor\s+(?:code|ID|no\.?|number|ref(?:erence)?)\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{1,20}\b
+(?i)\b((?:(?:sperm|egg|embryo|gamete)\s+)?donor\s+(?:code|ID|no\.?|number|ref(?:erence)?)\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{1,20})\b
 ```
 
 A donor-code label next to a digit-bearing value is rare outside donor conception records; the clinic's real code format removes the remaining ambiguity.
@@ -1064,7 +1064,7 @@ A donor-code label next to a digit-bearing value is rare outside donor conceptio
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bdonor\s+code\s*[:#]?\s*[SE]D\d{4}\b
+pattern: (?i)\b(donor\s+code\s*[:#]?\s*[SE]D\d{4})\b
 samples: ["Donor code: SD4782", "Donor code ED2917", "donor code: ED5104"]
 ```
 
@@ -1087,7 +1087,7 @@ Work order and outage reference numbers raised in the generator maintenance syst
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:work\s+order(?:\s+(?:no\.?|number))?|outage\s+(?:ref(?:erence)?|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:work\s+order(?:\s+(?:no\.?|number))?|outage\s+(?:ref(?:erence)?|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Work order labels are common; the outage plan classifier also needs unit, date and MW structure.
@@ -1117,7 +1117,7 @@ Work order labels are common; the outage plan classifier also needs unit, date a
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bwork\s+order\s*[:#]?\s*4\d{7}\b
+pattern: (?i)\b(work\s+order\s*[:#]?\s*4\d{7})\b
 samples: ["Work order: 40044718", "work order 40007193", "Work Order 40020471"]
 ```
 
@@ -1140,7 +1140,7 @@ Client and application numbers used for social housing applications, housing reg
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:application|client|customer)\s+(?:no\.?|number|ID)\s*[:#]?\s*[A-Z]{0,3}\d{5,10}\b
+(?i)\b((?:application|client|customer)\s+(?:no\.?|number|ID)\s*[:#]?\s*[A-Z]{0,3}\d{5,10})\b
 ```
 
 Anchored on the labels printed on housing forms; generic enough that it relies on the housing primary for context.
@@ -1170,7 +1170,7 @@ Anchored on the labels printed on housing forms; generic enough that it relies o
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:application|client)\s+(?:no\.?|number)\s*[:#]?\s*\d{7}\b
+pattern: (?i)\b((?:application|client)\s+(?:no\.?|number)\s*[:#]?\s*\d{7})\b
 samples: ["Application number: 4471820", "Client no. 0071932", "Application No. 5520117"]
 ```
 
@@ -1193,7 +1193,7 @@ Tenancy and property references for social housing tenancies and rental properti
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:tenancy|tenant|lease|property)\s+(?:no\.?|number|ID)\s*[:#]?\s*[A-Z]{0,3}\d{5,10}\b
+(?i)\b((?:tenancy|tenant|lease|property)\s+(?:no\.?|number|ID)\s*[:#]?\s*[A-Z]{0,3}\d{5,10})\b
 ```
 
 Tenancy labels are fairly specific to housing records; the value shape stays loose.
@@ -1223,7 +1223,7 @@ Tenancy labels are fairly specific to housing records; the value shape stays loo
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\btenancy\s+(?:no\.?|number|ID)\s*[:#]?\s*T\d{8}\b
+pattern: (?i)\b(tenancy\s+(?:no\.?|number|ID)\s*[:#]?\s*T\d{8})\b
 samples: ["Tenancy number: T20417733", "Tenancy ID T00719321", "Tenancy no. T55201174"]
 ```
 
@@ -1246,7 +1246,7 @@ The number printed on a penalty infringement notice or camera-detected offence n
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:(?:penalty\s+)?infringement\s+notice|camera[\s-]+detected\s+offence\s+notice|offence\s+notice|notice)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*(?:[A-Z]{1,4}[/-]?)?\d[A-Z0-9/-]{5,20}\b
+(?i)\b((?:(?:penalty\s+)?infringement\s+notice|camera[\s-]+detected\s+offence\s+notice|offence\s+notice|notice)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*(?:[A-Z]{1,4}[/-]?)?\d[A-Z0-9/-]{5,20})\b
 ```
 
 The notice-number label next to a value of at least seven characters containing a digit is a reasonable signal inside a traffic-camera record; the real format supplied by the issuing agency raises precision further.
@@ -1276,7 +1276,7 @@ The notice-number label next to a value of at least seven characters containing 
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:infringement\s+)?notice\s+(?:no\.?|number)\s*[:#]?\s*\d{10}\b
+pattern: (?i)\b((?:infringement\s+)?notice\s+(?:no\.?|number)\s*[:#]?\s*\d{10})\b
 samples: ["Infringement notice number: 2026084291", "Notice no. 7004418273", "notice number 1200004471"]
 ```
 
@@ -1299,7 +1299,7 @@ Reference numbers of enforcement agency requests and TIA Act authorisations reco
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:agency|request|authoris(?:ation)?|authoriz(?:ation)?|warrant)\s+(?:ref(?:erence)?|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:(?:agency|request|authoris(?:ation)?|authoriz(?:ation)?|warrant)\s+(?:ref(?:erence)?|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Reference labels are generic; disclosure fields and TIA Act anchors supply the precision.
@@ -1329,7 +1329,7 @@ Reference labels are generic; disclosure fields and TIA Act anchors supply the p
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:request|authorisation)\s+(?:reference|number)\s*[:#]?\s*L\d{7}\b
+pattern: (?i)\b((?:request|authorisation)\s+(?:reference|number)\s*[:#]?\s*L\d{7})\b
 samples: ["Request reference: L2047181", "authorisation number L0071932", "Request Reference L4471820"]
 ```
 
@@ -1352,7 +1352,7 @@ Library card, borrower and member numbers issued by council library services, pr
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:library\s+)?(?:card|member(?:ship)?|borrower|patron)\s+(?:no\.?|number|ID|barcode))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:(?:library\s+)?(?:card|member(?:ship)?|borrower|patron)\s+(?:no\.?|number|ID|barcode))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Card and member labels are generic; library loan structure supplies the precision.
@@ -1382,7 +1382,7 @@ Card and member labels are generic; library loan structure supplies the precisio
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\blibrary\s+card\s+(?:no\.?|number)\s*[:#]?\s*2\d{13}\b
+pattern: (?i)\b(library\s+card\s+(?:no\.?|number)\s*[:#]?\s*2\d{13})\b
 samples: ["Library card number: 23058004471820", "library card no. 23058000719320", "Library Card Number 23058002047181"]
 ```
 
@@ -1405,7 +1405,7 @@ My Aged Care client identifiers recorded on aged care assessments, care plans an
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:my\s+aged\s+care\s+(?:ID|no\.?|number)|MAC\s+ID|client\s+(?:ID|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:my\s+aged\s+care\s+(?:ID|no\.?|number)|MAC\s+ID|client\s+(?:ID|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Client labels are generic; aged care program terms and care-need fields supply the precision.
@@ -1435,7 +1435,7 @@ Client labels are generic; aged care program terms and care-need fields supply t
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bmy\s+aged\s+care\s+ID\s*[:#]?\s*AC\d{8}\b
+pattern: (?i)\b(my\s+aged\s+care\s+ID\s*[:#]?\s*AC\d{8})\b
 samples: ["My Aged Care ID: AC20471820", "my aged care ID AC00719320", "My Aged Care ID AC44718201"]
 ```
 
@@ -1458,7 +1458,7 @@ Reference numbers for generator and large-load connection agreements between a n
 **Public fallback** (precision: medium):
 
 ```
-(?i)\bconnection\s+agreement\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{3,24}\b
+(?i)\b(connection\s+agreement\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{3,24})\b
 ```
 
 The label is specific to NEM connections; plant fields and model parameters supply further precision.
@@ -1488,7 +1488,7 @@ The label is specific to NEM connections; plant fields and model parameters supp
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bconnection\s+agreement\s+(?:no\.?|number)\s*[:#]?\s*PL-GEN-\d{4}\b
+pattern: (?i)\b(connection\s+agreement\s+(?:no\.?|number)\s*[:#]?\s*PL-GEN-\d{4})\b
 samples: ["Connection agreement number: PL-GEN-0448", "connection agreement no. PL-GEN-2047", "Connection Agreement Number PL-GEN-0071"]
 ```
 
@@ -1511,7 +1511,7 @@ Facility identification numbers used in NGER reports and Safeguard Mechanism rec
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:facility\s+(?:ID|identification\s+number|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:facility\s+(?:ID|identification\s+number|no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Facility labels are generic; NGER quantities and fields supply the precision.
@@ -1541,7 +1541,7 @@ Facility labels are generic; NGER quantities and fields supply the precision.
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bfacility\s+(?:ID|identification\s+number)\s*[:#]?\s*F\d{5}\b
+pattern: (?i)\b(facility\s+(?:ID|identification\s+number)\s*[:#]?\s*F\d{5})\b
 samples: ["Facility ID: F20471", "facility identification number F00719", "Facility ID F44718"]
 ```
 
@@ -1564,7 +1564,7 @@ Reference numbers for councillor conduct complaints assessed or investigated by 
 **Public fallback** (precision: medium):
 
 ```
-(?i)\bOIA\s+(?:ref(?:erence)?|file|case)\s*(?:no\.?|number)?\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20}\b
+(?i)\b(OIA\s+(?:ref(?:erence)?|file|case)\s*(?:no\.?|number)?\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20})\b
 ```
 
 The OIA prefix is specific to councillor conduct matters in Queensland.
@@ -1594,7 +1594,7 @@ The OIA prefix is specific to councillor conduct matters in Queensland.
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bOIA\s+ref(?:erence)?\s*[:#]?\s*OIA-\d{2}-\d{5}\b
+pattern: (?i)\b(OIA\s+ref(?:erence)?\s*[:#]?\s*OIA-\d{2}-\d{5})\b
 samples: ["OIA reference: OIA-26-00412", "OIA ref OIA-25-11827", "OIA reference OIA-26-04471"]
 ```
 
@@ -1617,7 +1617,7 @@ Tokens, codes and reference numbers that record the authorisation or release of 
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:payment\s+(?:token|authori[sz]ation\s+(?:code|no\.?|number|ref(?:erence)?))|(?:authori[sz]ation|approval|release)\s+(?:token|code|no\.?|number|ref(?:erence)?|ID))\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{3,20}\b
+(?i)\b((?:payment\s+(?:token|authori[sz]ation\s+(?:code|no\.?|number|ref(?:erence)?))|(?:authori[sz]ation|approval|release)\s+(?:token|code|no\.?|number|ref(?:erence)?|ID))\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{3,20})\b
 ```
 
 Authorisation labels also appear on unrelated approvals, so the fallback only counts next to bank account structure; the value must contain a digit.
@@ -1647,7 +1647,7 @@ Authorisation labels also appear on unrelated approvals, so the fallback only co
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:payment\s+token|release\s+code)\s*[:#]?\s*[A-Z]{2}\d{8}\b
+pattern: (?i)\b((?:payment\s+token|release\s+code)\s*[:#]?\s*[A-Z]{2}\d{8})\b
 samples: ["Payment token: PT88205531", "Release code RC20260451", "payment token: PT00417712"]
 ```
 
@@ -1670,7 +1670,7 @@ Position (establishment) numbers used in the customer's HR system on vacancies, 
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:position\s+(?:no\.?|number|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+(?i)\b((?:position\s+(?:no\.?|number|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24})\b
 ```
 
 The label is HR-specific; other record fields supply the precision.
@@ -1700,7 +1700,7 @@ The label is HR-specific; other record fields supply the precision.
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bposition\s+(?:no\.?|number|ID)\s*[:#]?\s*\d{8}\b
+pattern: (?i)\b(position\s+(?:no\.?|number|ID)\s*[:#]?\s*\d{8})\b
 samples: ["Position number: 30047182", "position no. 30007193", "Position ID 30020471"]
 ```
 
@@ -1723,7 +1723,7 @@ File number assigned by QCAT to applications, including guardianship and adminis
 **Public fallback** (precision: medium):
 
 ```
-(?i)\bQCAT\s+(?:file\s+)?(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20}\b
+(?i)\b(QCAT\s+(?:file\s+)?(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20})\b
 ```
 
 The QCAT prefix on the label is specific; the value format is left loose because it is unpublished.
@@ -1753,7 +1753,7 @@ The QCAT prefix on the label is specific; the value format is left loose because
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bQCAT\s+(?:file\s+)?(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*[A-Z]{3}\d{4,6}-\d{2}\b
+pattern: (?i)\b(QCAT\s+(?:file\s+)?(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*[A-Z]{3}\d{4,6}-\d{2})\b
 samples: ["QCAT file number: GAA4471-26", "QCAT ref OCR11827-25", "QCAT number GAA0412-26"]
 ```
 
@@ -1776,7 +1776,7 @@ Identifier for a prisoner or offender in QCS's Integrated Offender Management Sy
 **Public fallback** (precision: medium):
 
 ```
-(?i)\bIOMS\s*(?:no\.?|number|#)?\s*[:#]?\s*[A-Z0-9][A-Z0-9-]{3,15}\b
+(?i)\b(IOMS\s*(?:no\.?|number|#)?\s*[:#]?\s*[A-Z0-9][A-Z0-9-]{3,15})\b
 ```
 
 The "IOMS" label is specific to Queensland corrections, so a labelled value is a strong record signal even without the value format; unlabelled IOMS numbers are not detected until the customer format is supplied.
@@ -1806,7 +1806,7 @@ The "IOMS" label is specific to Queensland corrections, so a labelled value is a
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bIOMS\s*(?:no\.?|number)?\s*[:#]?\s*\d{7}\b
+pattern: (?i)\b(IOMS\s*(?:no\.?|number)?\s*[:#]?\s*\d{7})\b
 samples: ["IOMS number: 4471820", "IOMS 5520117", "IOMS No. 0071932"]
 ```
 
@@ -1829,7 +1829,7 @@ Reference numbers on community corrections orders, parole orders and Parole Boar
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:parole\s+order|community\s+(?:corrections|service)\s+order|PBQ|order)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20}\b
+(?i)\b((?:parole\s+order|community\s+(?:corrections|service)\s+order|PBQ|order)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20})\b
 ```
 
 Anchored on the order-number labels used on corrections documents; the value shape is kept loose because no format is published.
@@ -1859,7 +1859,7 @@ Anchored on the order-number labels used on corrections documents; the value sha
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:PBQ|parole\s+order)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*\d{4}-\d{6}\b
+pattern: (?i)\b((?:PBQ|parole\s+order)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*\d{4}-\d{6})\b
 samples: ["PBQ reference: 2026-004471", "Parole order number 2025-118273", "PBQ ref 2026-000412"]
 ```
 
@@ -1882,7 +1882,7 @@ Working with children (blue card) and exemption card numbers recorded on child-s
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:blue\s+card\s+(?:no\.?|number)|exemption\s+(?:notice|card)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:blue\s+card\s+(?:no\.?|number)|exemption\s+(?:notice|card)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 The label is specific to Qld working with children checks; the classifier also needs conduct and party fields.
@@ -1912,7 +1912,7 @@ The label is specific to Qld working with children checks; the classifier also n
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bblue\s+card\s+(?:no\.?|number)\s*[:#]?\s*\d{7}/\d\b
+pattern: (?i)\b(blue\s+card\s+(?:no\.?|number)\s*[:#]?\s*\d{7}/\d)\b
 samples: ["Blue card number: 1204471/1", "blue card no. 1007193/2", "Blue Card Number 1020471/1"]
 ```
 
@@ -1930,12 +1930,12 @@ The coronial file number assigned to a reported death, cited on findings, inques
 
 **Labels:** `File No(s)`, `File number`, `Coronial file number`
 
-**Public format:** partial — `\b(?:19|20)\d{2}/\d{1,5}\b` ([source](https://www.courts.qld.gov.au/__data/assets/pdf_file/0006/616758/cif-brown-hw-20190612.pdf)). Published findings print the file number as year/sequence under the heading 'FILE NO(s):' (for example 2015/2427). Internal prefixes and suffixes used in the court's case management system are not published. The earlier catalogue used an invented COR-YYYY-NNN format.
+**Public format:** partial — `\b((?:19|20)\d{2}/\d{1,5})\b` ([source](https://www.courts.qld.gov.au/__data/assets/pdf_file/0006/616758/cif-brown-hw-20190612.pdf)). Published findings print the file number as year/sequence under the heading 'FILE NO(s):' (for example 2015/2427). Internal prefixes and suffixes used in the court's case management system are not published. The earlier catalogue used an invented COR-YYYY-NNN format.
 
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:file\s+no\.?(?:\(s\))?|file\s+number|coronial\s+(?:file|reference|case)\s+(?:no\.?|number))\s*[:#]?\s*(?:19|20)\d{2}/\d{1,5}\b
+(?i)\b((?:file\s+no\.?(?:\(s\))?|file\s+number|coronial\s+(?:file|reference|case)\s+(?:no\.?|number))\s*[:#]?\s*(?:19|20)\d{2}/\d{1,5})\b
 ```
 
 The published year/sequence shape next to a file-number label is specific enough to corroborate coronial content; bare year/sequence values are too common (dates, other registries) to use unlabelled.
@@ -1965,7 +1965,7 @@ The published year/sequence shape next to a file-number label is specific enough
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bfile\s+no\.?(?:\(s\))?\s*[:#]?\s*20\d{2}/\d{4}\b
+pattern: (?i)\b(file\s+no\.?(?:\(s\))?\s*[:#]?\s*20\d{2}/\d{4})\b
 samples: ["FILE NO(s): 2015/2427", "File no. 2026/0187", "file no: 2025/3310"]
 ```
 
@@ -1988,7 +1988,7 @@ File or proceeding numbers assigned by Queensland court registries to civil and 
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:court\s+file|proceeding|cause|registry)\s+(?:no\.?|number)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20}\b
+(?i)\b((?:court\s+file|proceeding|cause|registry)\s+(?:no\.?|number)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20})\b
 ```
 
 Court-specific labels make a labelled value a reasonable record signal without guessing the registry format.
@@ -2018,7 +2018,7 @@ Court-specific labels make a labelled value a reasonable record signal without g
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:court\s+file|proceeding)\s+(?:no\.?|number)\s*[:#]?\s*[A-Z]{2,3}\s?\d{3,5}/\d{2}\b
+pattern: (?i)\b((?:court\s+file|proceeding)\s+(?:no\.?|number)\s*[:#]?\s*[A-Z]{2,3}\s?\d{3,5}/\d{2})\b
 samples: ["Court file number: BS 4471/26", "Proceeding number MAG 11827/25", "Court file no. DC 412/26"]
 ```
 
@@ -2036,12 +2036,12 @@ State school student identifier shown on report cards, invoices, student ID card
 
 **Labels:** `EQ ID`, `EQID`, `Student ID`
 
-**Public format:** partial — `\d{10}[A-Z]` ([source](https://tewantinss.eq.edu.au/support-and-resources/qparents)). A school QParents page describes the EQ ID as "10 numbers and one letter" but does not say where the letter sits; no Department of Education specification was found.
+**Public format:** partial — `(\d{10}[A-Z])` ([source](https://tewantinss.eq.edu.au/support-and-resources/qparents)). A school QParents page describes the EQ ID as "10 numbers and one letter" but does not say where the letter sits; no Department of Education specification was found.
 
 **Public fallback** (precision: medium):
 
 ```
-(?i)\bEQ\s*ID\s*[:#]?\s*[A-Z0-9]{10,12}\b
+(?i)\b(EQ\s*ID\s*[:#]?\s*[A-Z0-9]{10,12})\b
 ```
 
 The EQ ID label is specific to Queensland state schools; the value allows 10-12 alphanumerics until the letter position is confirmed from a real sample.
@@ -2071,7 +2071,7 @@ The EQ ID label is specific to Queensland state schools; the value allows 10-12 
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bEQ\s*ID\s*[:#]?\s*\d{10}[A-Z]\b
+pattern: (?i)\b(EQ\s*ID\s*[:#]?\s*\d{10}[A-Z])\b
 samples: ["EQ ID: 0048213772K", "EQID 0071932845L", "EQ ID 1122334455M"]
 ```
 
@@ -2094,7 +2094,7 @@ Licence numbers for explosives authorities in Queensland, including licences to 
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:explosives\s+)?licen[cs]e\s+(?:no\.?|number)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{3,19}\b
+(?i)\b((?:explosives\s+)?licen[cs]e\s+(?:no\.?|number)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{3,19})\b
 ```
 
 Licence labels are generic; the SSAN security-plan structure and UN numbers supply the precision.
@@ -2124,7 +2124,7 @@ Licence labels are generic; the SSAN security-plan structure and UN numbers supp
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\blicen[cs]e\s+(?:no\.?|number)\s*[:#]?\s*EX\d{7}\b
+pattern: (?i)\b(licen[cs]e\s+(?:no\.?|number)\s*[:#]?\s*EX\d{7})\b
 samples: ["Licence number: EX0448213", "licence no. EX2047181", "Licence Number EX0071932"]
 ```
 
@@ -2147,7 +2147,7 @@ Security clearance numbers held by people with unsupervised access to security s
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:security\s+)?clearance\s+(?:no\.?|number|holder)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{3,19}\b
+(?i)\b((?:security\s+)?clearance\s+(?:no\.?|number|holder)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{3,19})\b
 ```
 
 Clearance labels also appear in government security vetting; the SSAN plan structure supplies the precision.
@@ -2177,7 +2177,7 @@ Clearance labels also appear in government security vetting; the SSAN plan struc
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bclearance\s+(?:no\.?|number)\s*[:#]?\s*SC\d{7}\b
+pattern: (?i)\b(clearance\s+(?:no\.?|number)\s*[:#]?\s*SC\d{7})\b
 samples: ["Clearance number: SC0448213", "clearance no. SC2047181", "Security clearance number SC0071932"]
 ```
 
@@ -2200,7 +2200,7 @@ Lot on plan and real property descriptions identifying a parcel of land, used on
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:lot\s+on\s+plan|real\s+property\s+description|title\s+reference)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:lot\s+on\s+plan|real\s+property\s+description|title\s+reference)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 The labels are property-specific; contamination fields supply the precision.
@@ -2230,7 +2230,7 @@ The labels are property-specific; contamination fields supply the precision.
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\blot\s+on\s+plan\s*[:#]?\s*\d{1,4}(?:RP|SP|CP)\d{5,6}\b
+pattern: (?i)\b(lot\s+on\s+plan\s*[:#]?\s*\d{1,4}(?:RP|SP|CP)\d{5,6})\b
 samples: ["Lot on plan: 12RP804471", "lot on plan 3SP204718", "Lot on plan 44CP807193"]
 ```
 
@@ -2253,7 +2253,7 @@ Reference numbers assigned by a Queensland agency to Right to Information and In
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:RTI\s+(?:ref(?:erence)?|no\.?|number)|application\s+(?:no\.?|number|ref(?:erence)?)|our\s+ref(?:erence)?)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:RTI\s+(?:ref(?:erence)?|no\.?|number)|application\s+(?:no\.?|number|ref(?:erence)?)|our\s+ref(?:erence)?)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Reference labels are generic; RTI anchors and decision fields supply the precision.
@@ -2283,7 +2283,7 @@ Reference labels are generic; RTI anchors and decision fields supply the precisi
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bRTI\s+reference\s*[:#]?\s*RTI\d{6}\b
+pattern: (?i)\b(RTI\s+reference\s*[:#]?\s*RTI\d{6})\b
 samples: ["RTI reference: RTI204718", "RTI reference RTI007193", "RTI Reference RTI020471"]
 ```
 
@@ -2306,7 +2306,7 @@ Number assigned to an exhibit or seized property item, used on chain-of-custody 
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:exhibit|property\s+tag|property|evidence\s+bag|seal)\s+(?:no\.?|number|ID|#)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20}\b
+(?i)\b((?:exhibit|property\s+tag|property|evidence\s+bag|seal)\s+(?:no\.?|number|ID|#)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20})\b
 ```
 
 Exhibit and property-tag labels are specific to evidence handling; together with the chain-of-custody primary they indicate a genuine record.
@@ -2336,7 +2336,7 @@ Exhibit and property-tag labels are specific to evidence handling; together with
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:exhibit|property\s+tag)\s+(?:no\.?|number|#)?\s*[:#]?\s*\d{2}[A-Z]{2}\d{6}\b
+pattern: (?i)\b((?:exhibit|property\s+tag)\s+(?:no\.?|number|#)?\s*[:#]?\s*\d{2}[A-Z]{2}\d{6})\b
 samples: ["Exhibit number: 26EX004471", "Property tag 26PT118273", "Exhibit # 25EX000412"]
 ```
 
@@ -2359,7 +2359,7 @@ Police occurrence, event and job reference numbers quoted on council CCTV footag
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:QPS|police|QPRIME)\s+(?:ref(?:erence)?|no\.?|number)|occurrence\s+(?:no\.?|number)|(?:event|job)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:(?:QPS|police|QPRIME)\s+(?:ref(?:erence)?|no\.?|number)|occurrence\s+(?:no\.?|number)|(?:event|job)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 Reference labels are generic; footage and requester fields supply the precision.
@@ -2389,7 +2389,7 @@ Reference labels are generic; footage and requester fields supply the precision.
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bQPS\s+reference\s*[:#]?\s*QP\d{10}\b
+pattern: (?i)\b(QPS\s+reference\s*[:#]?\s*QP\d{10})\b
 samples: ["QPS reference: QP2600447182", "QPS reference QP2600071932", "QPS Reference QP2602047181"]
 ```
 
@@ -2412,7 +2412,7 @@ Application number issued by QTAC to tertiary applicants, printed on EAS forms, 
 **Public fallback** (precision: medium):
 
 ```
-(?i)\bQTAC\s+application\s+(?:no\.?|number)\s*[:#]?\s*\d{5,10}\b
+(?i)\b(QTAC\s+application\s+(?:no\.?|number)\s*[:#]?\s*\d{5,10})\b
 ```
 
 The QTAC prefix on the label is specific; the numeric length range is kept wide because the format is unpublished.
@@ -2442,7 +2442,7 @@ The QTAC prefix on the label is specific; the numeric length range is kept wide 
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bQTAC\s+application\s+(?:no\.?|number)\s*[:#]?\s*\d{7}\b
+pattern: (?i)\b(QTAC\s+application\s+(?:no\.?|number)\s*[:#]?\s*\d{7})\b
 samples: ["QTAC application number: 2641187", "QTAC application no. 2649921", "QTAC application number 2600412"]
 ```
 
@@ -2465,7 +2465,7 @@ File or reference numbers used by a regulator for prosecution briefs, enforcemen
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:prosecution|enforcement|investigation|compliance)\s+(?:ref(?:erence)?|no\.?|number|file)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20}\b
+(?i)\b((?:prosecution|enforcement|investigation|compliance)\s+(?:ref(?:erence)?|no\.?|number|file)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20})\b
 ```
 
 Anchored on the reference labels regulators use; the value shape is loose because formats differ between regulators.
@@ -2495,7 +2495,7 @@ Anchored on the reference labels regulators use; the value shape is loose becaus
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:prosecution|investigation)\s+(?:ref(?:erence)?|no\.?|number)\s*[:#]?\s*[A-Z]{3}\d{6}\b
+pattern: (?i)\b((?:prosecution|investigation)\s+(?:ref(?:erence)?|no\.?|number)\s*[:#]?\s*[A-Z]{3}\d{6})\b
 samples: ["Prosecution reference: WHS004471", "Investigation no. INV118273", "Prosecution number WHS000412"]
 ```
 
@@ -2518,7 +2518,7 @@ Reference numbers for worker screening and background checks (AusCheck critical 
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:application|check|clearance|screening|worker\s+screening)\s+(?:no\.?|number|ref(?:erence)?|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+(?i)\b((?:(?:application|check|clearance|screening|worker\s+screening)\s+(?:no\.?|number|ref(?:erence)?|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24})\b
 ```
 
 Reference labels are generic; the classifier needs a person and a screening outcome.
@@ -2548,7 +2548,7 @@ Reference labels are generic; the classifier needs a person and a screening outc
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:check|clearance)\s+(?:no\.?|number|reference)\s*[:#]?\s*AC\d{7}\b
+pattern: (?i)\b((?:check|clearance)\s+(?:no\.?|number|reference)\s*[:#]?\s*AC\d{7})\b
 samples: ["Check reference: AC4471820", "clearance number AC0071932", "Check number AC2047181"]
 ```
 
@@ -2571,7 +2571,7 @@ Member numbers issued by superannuation funds and written on choice forms, pay s
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:member|membership)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+(?i)\b((?:(?:member|membership)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24})\b
 ```
 
 Member labels occur in many membership contexts; fund fields (USI, fund ABN) supply the precision.
@@ -2601,7 +2601,7 @@ Member labels occur in many membership contexts; fund fields (USI, fund ABN) sup
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bmember(?:ship)?\s+(?:no\.?|number)\s*[:#]?\s*\d{8}\b
+pattern: (?i)\b(member(?:ship)?\s+(?:no\.?|number)\s*[:#]?\s*\d{8})\b
 samples: ["Member number: 40017382", "membership number 40007193", "Member no. 40020471"]
 ```
 
@@ -2624,7 +2624,7 @@ Reference numbers for surveillance device warrants, telecommunications intercept
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:surveillance\s+device\s+warrant|warrant|authorisation)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20}\b
+(?i)\b((?:surveillance\s+device\s+warrant|warrant|authorisation)\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20})\b
 ```
 
 Warrant-number labels inside an operation plan are a strong signal; value formats vary by issuing court and agency.
@@ -2654,7 +2654,7 @@ Warrant-number labels inside an operation plan are a strong signal; value format
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bwarrant\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*SDW\d{7}\b
+pattern: (?i)\b(warrant\s+(?:no\.?|number|ref(?:erence)?)\s*[:#]?\s*SDW\d{7})\b
 samples: ["Warrant number: SDW2604471", "Warrant ref SDW2511827", "Warrant no. SDW2600412"]
 ```
 
@@ -2677,7 +2677,7 @@ Unique numbers of HV switching sheets / switching programs issued under the oper
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:switching\s+(?:sheet|program(?:me)?)\s+(?:no\.?|number|ref(?:erence)?))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:switching\s+(?:sheet|program(?:me)?)\s+(?:no\.?|number|ref(?:erence)?))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 The label is specific to HV switching; step lines supply the precision.
@@ -2707,7 +2707,7 @@ The label is specific to HV switching; step lines supply the precision.
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bswitching\s+sheet\s+(?:no\.?|number)\s*[:#]?\s*SS\d{6}\b
+pattern: (?i)\b(switching\s+sheet\s+(?:no\.?|number)\s*[:#]?\s*SS\d{6})\b
 samples: ["Switching sheet no: SS204718", "switching sheet number SS007193", "Switching Sheet No. SS020471"]
 ```
 
@@ -2730,7 +2730,7 @@ Customer, account and service reference numbers issued by a telecommunications p
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:account|customer|service)\s+(?:no\.?|number|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+(?i)\b((?:(?:account|customer|service)\s+(?:no\.?|number|ID))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24})\b
 ```
 
 Generic account labels; telco evidence and protection actions supply the precision.
@@ -2760,7 +2760,7 @@ Generic account labels; telco evidence and protection actions supply the precisi
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:account|customer)\s+(?:no\.?|number)\s*[:#]?\s*\d{10}\b
+pattern: (?i)\b((?:account|customer)\s+(?:no\.?|number)\s*[:#]?\s*\d{10})\b
 samples: ["Account number: 4001882731", "customer number 4000552011", "Account no. 4007193245"]
 ```
 
@@ -2783,7 +2783,7 @@ Reference numbers that identify a request for tender, quote or offer, and the co
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:tender|contract|offer|invitation|RFx)\s+(?:no\.?|number|ref(?:erence)?|ID)|(?:RFT|RFQ|RFP|RFO|ITO)(?:\s+(?:no\.?|number|ref(?:erence)?))?)\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{2,20}\b
+(?i)\b((?:(?:tender|contract|offer|invitation|RFx)\s+(?:no\.?|number|ref(?:erence)?|ID)|(?:RFT|RFQ|RFP|RFO|ITO)(?:\s+(?:no\.?|number|ref(?:erence)?))?)\s*[:#]?\s*(?:[A-Z]{1,6}[/-]?)?\d[A-Z0-9/-]{2,20})\b
 ```
 
 Tender and contract labels are common in procurement correspondence, so the fallback only corroborates pricing or evaluation structure; the value must contain a digit, which rejects label-only prose and blank forms.
@@ -2813,7 +2813,7 @@ Tender and contract labels are common in procurement correspondence, so the fall
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:RFT|tender)\s*(?:no\.?|number)?\s*[:#]?\s*DOE\d{6}\b
+pattern: (?i)\b((?:RFT|tender)\s*(?:no\.?|number)?\s*[:#]?\s*DOE\d{6})\b
 samples: ["RFT DOE260417", "Tender number: DOE251180", "tender no. DOE260002"]
 ```
 
@@ -2836,7 +2836,7 @@ Student numbers issued by a university or TAFE, printed on access plans, miscond
 **Public fallback** (precision: low):
 
 ```
-(?i)\bstudent\s+(?:no\.?|number|ID)\s*[:#]?\s*[A-Za-z]?\d{6,9}\b
+(?i)\b(student\s+(?:no\.?|number|ID)\s*[:#]?\s*[A-Za-z]?\d{6,9})\b
 ```
 
 Student-number labels are common across education documents; the institution format raises precision.
@@ -2866,7 +2866,7 @@ Student-number labels are common across education documents; the institution for
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bstudent\s+(?:no\.?|number|ID)\s*[:#]?\s*n\d{8}\b
+pattern: (?i)\b(student\s+(?:no\.?|number|ID)\s*[:#]?\s*n\d{8})\b
 samples: ["Student number: n11234567", "Student ID n10071932", "Student no. n09552011"]
 ```
 
@@ -2889,7 +2889,7 @@ Trade waste and seepage water approval numbers issued under the Water Supply (Sa
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:(?:trade\s+waste|seepage\s+water)\s+(?:approval|permit|licen[cs]e|agreement)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}\b
+(?i)\b((?:(?:trade\s+waste|seepage\s+water)\s+(?:approval|permit|licen[cs]e|agreement)\s+(?:no\.?|number))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24})\b
 ```
 
 The label is specific to trade waste; discharge limits and compliance terms supply the precision.
@@ -2919,7 +2919,7 @@ The label is specific to trade waste; discharge limits and compliance terms supp
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\btrade\s+waste\s+approval\s+(?:no\.?|number)\s*[:#]?\s*TW\d{5}\b
+pattern: (?i)\b(trade\s+waste\s+approval\s+(?:no\.?|number)\s*[:#]?\s*TW\d{5})\b
 samples: ["Trade waste approval number: TW20471", "trade waste approval no. TW00719", "Trade Waste Approval Number TW44718"]
 ```
 
@@ -2942,7 +2942,7 @@ Customer and account numbers issued by an energy retailer, water utility or coun
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:customer|account)\s+(?:no\.?|number|ID)\s*[:#]?\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z]{0,3}\d{5,12}\b
+(?i)\b((?:customer|account)\s+(?:no\.?|number|ID)\s*[:#]?\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z]{0,3}\d{5,12})\b
 ```
 
 Account and customer labels are common in business records; the fallback only supports utility-specific evidence (NMI, supply address, life support or family violence terms).
@@ -2972,7 +2972,7 @@ Account and customer labels are common in business records; the fallback only su
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:customer|account)\s+(?:no\.?|number)\s*[:#]?\s*40\d{8}\b
+pattern: (?i)\b((?:customer|account)\s+(?:no\.?|number)\s*[:#]?\s*40\d{8})\b
 samples: ["Account number: 4001882731", "Customer number 4000552011", "account no. 4007193245"]
 ```
 
@@ -2995,7 +2995,7 @@ Application / claim references issued by Victim Assist Queensland for financial 
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:VAQ\s+)?(?:claim|application)\s+(?:no\.?|number|ref(?:erence)?)|VAQ\s+ref(?:erence)?)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+(?i)\b((?:(?:VAQ\s+)?(?:claim|application)\s+(?:no\.?|number|ref(?:erence)?)|VAQ\s+ref(?:erence)?)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24})\b
 ```
 
 Claim labels are generic; Victim Assist anchors and applicant / crime fields supply the precision.
@@ -3025,7 +3025,7 @@ Claim labels are generic; Victim Assist anchors and applicant / crime fields sup
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\b(?:claim|application)\s+(?:no\.?|number)\s*[:#]?\s*VA\d{7}\b
+pattern: (?i)\b((?:claim|application)\s+(?:no\.?|number)\s*[:#]?\s*VA\d{7})\b
 samples: ["Application number: VA2047181", "claim number VA0071932", "Application no. VA4471820"]
 ```
 
@@ -3048,7 +3048,7 @@ Claim numbers issued by the workers' compensation insurer (WorkCover Queensland,
 **Public fallback** (precision: low):
 
 ```
-(?i)\b(?:(?:workcover\s+)?claim\s+(?:no\.?|number|ref(?:erence)?))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24}\b
+(?i)\b((?:(?:workcover\s+)?claim\s+(?:no\.?|number|ref(?:erence)?))\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/-]{2,24})\b
 ```
 
 Claim labels are common in insurance; the classifier also needs worker and injury/medical fields.
@@ -3078,7 +3078,7 @@ Claim labels are common in insurance; the classifier also needs worker and injur
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bclaim\s+(?:no\.?|number)\s*[:#]?\s*C\d{7}\b
+pattern: (?i)\b(claim\s+(?:no\.?|number)\s*[:#]?\s*C\d{7})\b
 samples: ["Claim number: C4471820", "claim no. C0071932", "Claim Number C2047181"]
 ```
 
@@ -3101,7 +3101,7 @@ Client or case reference used by Queensland youth justice services for a young p
 **Public fallback** (precision: medium):
 
 ```
-(?i)\b(?:youth\s+justice|YJ)\s+(?:client\s+)?(?:no\.?|number|ID|ref(?:erence)?)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20}\b
+(?i)\b((?:youth\s+justice|YJ)\s+(?:client\s+)?(?:no\.?|number|ID|ref(?:erence)?)\s*[:#]?\s*[A-Z0-9][A-Z0-9/-]{3,20})\b
 ```
 
 The youth-justice-specific label keeps precision reasonable; generic "client number" labels are left to the record-structure evidence.
@@ -3131,7 +3131,7 @@ The youth-justice-specific label keeps precision reasonable; generic "client num
 **Example overlay (fictional):**
 
 ```yaml
-pattern: (?i)\bYJ\s*(?:ref(?:erence)?|client)?\s*[:#]?\s*\d{8}\b
+pattern: (?i)\b(YJ\s*(?:ref(?:erence)?|client)?\s*[:#]?\s*\d{8})\b
 samples: ["YJ reference: 44718201", "YJ 55201174", "YJ client 00719321"]
 ```
 
