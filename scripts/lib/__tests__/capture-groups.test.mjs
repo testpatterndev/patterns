@@ -32,7 +32,7 @@ const JS_SAME = counts.filter(([s]) => !/^\(\?(?:-i|is|i-s)\)|\(\?i:|\[\^?\]|\[\
 for (const [src, n] of JS_SAME) t(`count ${src} agrees with V8`, () => assert.equal(jsCount(src), n))
 
 // ── Constructs the rewrite refuses ──
-for (const src of [R`(a)\1`, R`(?<n>a)\k<n>`, R`(?|(a)|(b))`, R`(?(1)a|b)`, R`(*SKIP)a`, R`a(?i)b`, R`a|b\Kc`]) {
+for (const src of [R`(a)\1`, R`(?<n>a)\k<n>`, R`(?|(a)|(b))`, R`(?(1)a|b)`, R`(*SKIP)a`, R`a(?i)b`, R`a|b\Kc`, R`(?:foo\Kbar)`]) {
   t(`hand-only: ${src}`, () => assert.throws(() => wrapWholeMatch(src), HandleByHand))
 }
 
@@ -89,7 +89,8 @@ for (const [src] of wraps.filter(([s]) => !/\(\?<n>/.test(s))) {
 
 // ── Gate predicate ──
 for (const src of [R`\b(x)\b`, R`(?i)(a|b)`, R`p\K(x)`, R`(?<=a)(b)(?!c)`]) t(`gate ok: ${src}`, () => assert.ok(checkWholeMatchGroup(src).ok))
-for (const src of [R`x`, R`\bx\b`, R`(a)(b)`, R`((a))`, R`(a)b`, R`(a)|b`, R`(a)+`, R`(?<=(a))b`, R`p(x)\Kq`]) {
+// (foo\Kbar): \K inside the group moves the match start to "bar" while group 1 keeps "foobar".
+for (const src of [R`x`, R`\bx\b`, R`(a)(b)`, R`((a))`, R`(a)b`, R`(a)|b`, R`(a)+`, R`(?<=(a))b`, R`p(x)\Kq`, R`(foo\Kbar)`]) {
   t(`gate rejects: ${src}`, () => assert.equal(checkWholeMatchGroup(src).ok, false))
 }
 
@@ -132,6 +133,11 @@ t('gate RED on an identifier fallback with 0 groups', () => {
   const r = runGate(pat(R`\b(x)\b`, R`\b(\d{9})\b`), `key: i\nfallback:\n  pattern: '\\b\\d{4}\\b'\n`)
   assert.equal(r.status, 1, r.stdout)
   assert.match(r.stdout, /i: fallback\.pattern — 0 capturing groups/)
+})
+t('gate RED on a regional_tuning exclude-regex with 0 groups', () => {
+  const r = runGate(pat(R`\b(x)\b`, R`\b(\d{9})\b`) + `regional_tuning:\n  - action: exclude-regex\n    id: Regex_x\n    pattern: '(?:^|[^0-9])04[0-9]{8}(?:$|[^0-9])'\n`)
+  assert.equal(r.status, 1, r.stdout)
+  assert.match(r.stdout, /regional_tuning\[0\]\.pattern — 0 capturing groups/)
 })
 t('gate GREEN when every regex has one whole-match group', () => {
   const r = runGate(pat(R`(?i)\b(x)\b`, R`(?<!\d)(\d{9})(?!\d)`), `key: i\nfallback:\n  pattern: '\\b(\\d{4})\\b'\n`)

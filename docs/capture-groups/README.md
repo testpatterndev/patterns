@@ -13,10 +13,11 @@ Capturing groups per regex, counted by `scripts/lib/capture-groups.mjs` (agrees 
 | top-level `pattern` | 1,367 | 1,324 | 30 | 13 | 1,367 |
 | `purview.regexes[]` | 3,329 | 3,284 | 30 | 15 | 3,334 |
 | `purview.filters[]` (exclude_pattern, not exported) | 3 | 3 | 0 | 0 | 3 |
+| `regional_tuning[]` (exclude-regex; the exporter adds it as a Purview regex for that jurisdiction) | 10 | 10 | 0 | 0 | 10 |
 | identifier `public_format` / `fallback` / `example_overlay` | 118 | 118 | 0 | 0 | 118 |
-| **All fields** | **4,817** | 4,729 | 60 | 28 | **4,822** |
-| Unique texts | 3,064 | 2,992 | 57 | 15 | 3,069 |
-| Shipped catalogue (`patterns.json`, live patterns, unique `purview.regexes`) | 2,674 | 2,631 | 28 | 15 | 2,679 |
+| **All fields** | **4,827** | 4,739 | 60 | 28 | **4,832** |
+| Unique texts | 3,065 | 2,993 | 57 | 15 | 3,069 |
+| Shipped catalogue (`patterns.json`, live patterns, unique `purview.regexes`) | 2,674 | 2,631 | 28 | 15 | 2,678 |
 
 No regex had 2 or more capturing groups. The seven regexes previously reported as multi-group (for example `Regex_au_qld_mandatory_data_breach_notification_party_field`) have 0: their parentheses are inside character classes such as `[A-Za-z&'.,()-]`. After: +5 fields because one evidence regex became six (below).
 
@@ -25,7 +26,7 @@ No regex had 2 or more capturing groups. The seven regexes previously reported a
 | Rule | Fields | What happened |
 |---|---:|---|
 | promote | 2,118 | Core between the boundaries was one `(?:...)` group; it became the capturing group: `(?i)\b(?:a\|b)\b` → `(?i)\b(a\|b)\b` |
-| wrap | 2,600 | Group added around the core, boundaries and leading flags left outside: `(?<!\d)\d{9}(?!\d)` → `(?<!\d)(\d{9})(?!\d)`; with a top-level `\|` the group takes the whole body |
+| wrap | 2,610 | Group added around the core, boundaries and leading flags left outside: `(?<!\d)\d{9}(?!\d)` → `(?<!\d)(\d{9})(?!\d)`; with a top-level `\|` the group takes the whole body |
 | unchanged | 60 | Already one group spanning the match (`(?i)\b(terms)\b`) |
 | regroup | 25 | A group around part of the match became `(?:...)` and the whole match was wrapped (listed below) |
 | wrap-after-keep | 3 | Group starts after the top-level `\K`, where the reported match starts (listed below) |
@@ -134,14 +135,14 @@ Corpus per regex: all repo test values and identifier samples joined into docume
 
 | | |
 |---|---:|
-| Regex fields compared | 4,816 (3,066 unique pairs, 4,756 changed) |
+| Regex fields compared | 4,826 (3,067 unique pairs, 4,766 changed) |
 | Repo test values / documents | 10,224 / 256 |
-| Strings run | 32,659,731 |
-| Old matches compared | 19,399,092 |
+| Strings run | 32,663,637 |
+| Old matches compared | 19,401,119 |
 | Pairs with any difference | **0** |
 | New matches where group 1 ≠ group 0 | **0** |
 | New regexes without exactly one whole-match group | **0** |
-| Exported text (testpattern `normalizePdfRegex`): pairs compared / with differences / not one whole group or over 1,024 chars | 3,006 / **0** / **0** |
+| Exported text (testpattern `normalizePdfRegex`): pairs compared / with differences / not one whole group or over 1,024 chars | 3,007 / **0** / **0** |
 
 JavaScript is the engine here; Boost has the same rule that capturing groups do not change what a backtracking match consumes (no backreferences or conditionals remain). The test-tenant classification A/B in the PR is the Boost-side check on a sample.
 

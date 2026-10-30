@@ -77,6 +77,9 @@ function toRe(src, ci) {
 }
 const spans = (re, s) => { const out = []; for (const m of s.matchAll(re)) out.push(m) ; return out }
 const key = (ms) => ms.map(m => `${m.index}:${m[0].length}`).join(',')
+// Spans reported by one or more regexes, as one ordered set (start, then length).
+const unionKey = (lists) => [...new Map(lists.flat().map(m => [`${m.index}:${m[0].length}`, [m.index, m[0].length]])).entries()]
+  .sort((x, y) => x[1][0] - y[1][0] || x[1][1] - y[1][1]).map(([k]) => k).join(',')
 
 // ── Generated variants ──
 let seed = 20261030
@@ -113,8 +116,7 @@ function compare(label, oldSrcs, newSrcs, cs, own, transform = (s) => s) {
       const run = (s) => {
         row.strings++
         const a = olds.map(re => spans(re, s)), b = news.map(re => spans(re, s))
-        const ka = olds.length === 1 ? key(a[0]) : [...new Set(a.flatMap(x => key(x).split(',')).filter(Boolean))].sort().join(',')
-        const kb = news.length === 1 ? key(b[0]) : [...new Set(b.flatMap(x => key(x).split(',')).filter(Boolean))].sort().join(',')
+        const ka = unionKey(a), kb = unionKey(b)
         row.matches += a.reduce((n, x) => n + x.length, 0)
         if (ka !== kb) { row.diffs++; if (!row.example) row.example = JSON.stringify(s).slice(0, 160) + ` old=[${ka}] new=[${kb}]` }
         for (const x of b) for (const m of x) if (m[1] !== m[0]) row.group1++
@@ -163,10 +165,11 @@ if (recOld && recNew.length === 6) {
   }
   const olds = [toRe(recOld.src, true)], news = recNew.map(k => toRe(sides.new.get(k).src, true))
   let diffs = 0, hits = 0
-  for (const s of extra) { const a = key(spans(olds[0], s)); if (a) hits++; const b = [...new Set(news.flatMap(re => key(spans(re, s)).split(',')).filter(Boolean))].sort().join(','); if (a !== b) diffs++ }
+  for (const s of extra) { const a = key(spans(olds[0], s)); if (a) hits++; const b = unionKey(news.map(re => spans(re, s))); if (a !== b) diffs++ }
   const edge = '123457-' + Array(7).fill('123456').join('-') + '-123466'
-  const edgeOld = key(spans(olds[0], edge)), edgeNew = [...new Set(news.flatMap(re => key(spans(re, edge)).split(',')).filter(Boolean))].sort().join(',')
-  recovery = { corpus: r, generated: extra.length, generatedHits: hits, generatedDiffs: diffs, edge, edgeOld, edgeNew }
+  const edgeOld = key(spans(olds[0], edge)), edgeNew = unionKey(news.map(re => spans(re, edge)))
+  const recShape = recNew.filter(k => { const src = sides.new.get(k).src; return !checkWholeMatchGroup(src).ok || countCapturingGroups(src) !== 1 }).length
+  recovery = { corpus: r, notExactlyOneWholeGroup: recShape, generated: extra.length, generatedHits: hits, generatedDiffs: diffs, edge, edgeOld, edgeNew }
 }
 // Exporter normalisation: compare the shipped text of each pair too.
 let exported = null
@@ -209,5 +212,5 @@ if (OUT) {
 }
 const bad = summary.pairsWithDiffs || summary.pairsWithErrors || summary.group1NotWholeMatch || summary.notExactlyOneWholeGroup ||
   summary.unpairedNewFields.length || summary.baseOnlyFields.some(k => k !== RECOVERY + 'Evidence_recovery_value') ||
-  (recovery && (recovery.corpus.diffs || recovery.generatedDiffs)) || (exported && (exported.pairsWithDiffs || exported.exportedNotOneWholeGroupOrOver1024))
+  (recovery && (recovery.corpus.diffs || recovery.corpus.error || recovery.corpus.group1 || recovery.notExactlyOneWholeGroup || recovery.generatedDiffs)) || (exported && (exported.pairsWithDiffs || exported.exportedNotOneWholeGroupOrOver1024))
 process.exit(bad ? 1 : 0)

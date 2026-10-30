@@ -103,7 +103,11 @@ export function scanRegex(src) {
         continue
       }
       if (isBackref(src, i)) backrefs.push(i)
-      if (src[i + 1] === 'K' && stack.length === 0) keeps.push(i)
+      if (src[i + 1] === 'K') {
+        // Inside a group \K moves the match start past where that group began.
+        if (stack.length) throw new HandleByHand(`\\K inside a group at ${i}`)
+        keeps.push(i)
+      }
       i += escapeLength(src, i)
       continue
     }
@@ -254,7 +258,8 @@ export function wrapWholeMatch(src) {
 }
 
 // Every regex a pattern or identifier YAML carries, as { where, src, set(newSrc) }.
-// Patterns: top-level pattern, purview.regexes[], purview.filters[] (exclude_pattern).
+// Patterns: top-level pattern, purview.regexes[], purview.filters[] (exclude_pattern) and
+// regional_tuning[] (the exporter adds an exclude-regex as a Purview regex for that jurisdiction).
 // Identifiers: public_format, fallback and the replacement example overlay.
 export function regexFields(doc, kind = 'pattern') {
   const out = []
@@ -270,6 +275,10 @@ export function regexFields(doc, kind = 'pattern') {
   add(doc, 'pattern', 'pattern')
   for (const r of doc?.purview?.regexes ?? []) add(r, 'pattern', `purview.regexes/${r.id}`)
   for (const [i, f] of (doc?.purview?.filters ?? []).entries()) add(f, 'pattern', `purview.filters[${i}]`)
+  for (const [i, t] of (Array.isArray(doc?.regional_tuning) ? doc.regional_tuning : []).entries()) {
+    add(t, 'pattern', `regional_tuning[${i}].pattern`)
+    add(t, 'regex', `regional_tuning[${i}].regex`)
+  }
   return out
 }
 
