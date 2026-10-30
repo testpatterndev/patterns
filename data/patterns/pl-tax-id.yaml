@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Poland Tax Identification Number
 slug: pl-tax-id
-version: 1.3.3
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -12,6 +12,10 @@ description: >-
 operation: >-
   Corroborative evidence: 5 keywords within 300 characters.
   Keyword lists: tax-id, pl-financial.
+  Checksum: inline Checksum validator Validator_pl_nip_checksum (Weights 6,5,7,2,3,4,5,6,7,0 / Mod 11 /
+  CheckDigit 10): the weighted sum of digits 1-9 mod 11 must equal digit 10. Gap: a remainder of 10 means the NIP
+  is invalid, but Purview compares remainder 10 as check digit 0 (measured on a test tenant, see
+  docs/checksum-validator-semantics.md), so such a number ending in 0 is accepted.
 pattern: '\b\d{3}-?\d{3}-?\d{2}-?\d{2}\b'
 confidence: medium
 confidence_justification: >-
@@ -40,10 +44,10 @@ corroborative_evidence:
     - pl-financial
 test_cases:
   should_match:
-    - value: '123-456-78-90'
-      description: Polish NIP with hyphens
-    - value: '1234567890'
-      description: Polish NIP continuous digits
+    - value: '123-456-32-18'
+      description: Polish NIP with hyphens (checksum-valid)
+    - value: '1234563218'
+      description: Polish NIP continuous digits (checksum-valid)
     - value: '987-654-32-10'
       description: Polish tax ID with separators
   should_not_match:
@@ -51,6 +55,10 @@ test_cases:
       description: Only 9 digits, too short for Polish NIP
     - value: '123-456-789-01'
       description: Wrong grouping for Polish NIP format
+    - value: '123-456-32-19'
+      description: fails mod-11 checksum (check-digit perturbation of valid value 123-456-32-18)
+    - value: '987-654-32-11'
+      description: fails mod-11 checksum (check-digit perturbation of valid value 987-654-32-10)
 false_positives:
   - description: Generic numeric sequences in non-tax contexts such as reference numbers or account identifiers
     mitigation: >-
@@ -112,9 +120,9 @@ purview:
     - id: Validator_pl_nip_checksum
       type: Checksum
       params:
-        weights: "6,5,7,2,3,4,5,6,7"
+        weights: "6,5,7,2,3,4,5,6,7,0"
         mod: 11
-        checkDigit: 0
+        checkDigit: 10
   filters:
     - id: Filter_pl_tax_id_same_digits
       type: AllDigitsSameFilter
@@ -149,8 +157,11 @@ frameworks:
   - ISO 27001
   - ISO 27701
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-31'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-31'
+    description: 'Checksum validator fix: the inline Checksum validator exported CheckDigit=0, which Purview rejects ("Param CheckDigit is invalid", 0x8000FFFF), so every rule package containing this pattern failed to upload. Now Weights 6,5,7,2,3,4,5,6,7,0 / Mod 11 / CheckDigit 10. Gap: a remainder of 10 (invalid NIP) with last digit 0 is accepted, because Purview compares remainder 10 as 0. The regex is unchanged. Test cases replaced with checksum-valid values plus invalid-twin should_not_match values.'
   - version: 1.3.3
     date: '2026-09-25'
     description: >-

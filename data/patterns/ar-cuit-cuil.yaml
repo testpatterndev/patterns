@@ -1,13 +1,20 @@
 schema: testpattern/v1
 name: Cuit Cuil
 slug: ar-cuit-cuil
-version: 1.3.3
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
   Detects Cuit Cuil patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
-operation: 'Validation: Mod 11. Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.'
+operation: >-
+  Validation: Mod 11. Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Checksum: inline Checksum validator Validator_ar_cuit_cuil_checksum (Weights 6,7,8,9,4,5,6,7,8,9,0 / Mod 11 /
+  CheckDigit 11). The CUIT rule is check digit = 11 - (sum of digits 1-10 x 5,4,3,2,7,6,5,4,3,2 mod 11), with 11
+  meaning 0. Purview compares the remainder itself with the check digit, so the weights are the negated CUIT weights
+  (11 - w), which makes the remainder equal the CUIT check digit. Do not change them back to 5,4,3,2,...: that
+  checks a different rule. Gap: when the CUIT result would be 10 (a number AFIP never issues) Purview treats the
+  remainder 10 as check digit 0, so such a number ending in 0 is accepted.
 pattern: \b\d{2}-?\d{8}-?\d{1}\b
 confidence: medium
 confidence_justification: >-
@@ -34,12 +41,14 @@ corroborative_evidence:
     - pii-civic-credentials
 test_cases:
   should_match:
-    - value: 20-12345678-9
-      description: Standard CUIT format
-    - value: '20123456789'
-      description: CUIT without separators
-    - value: 27-12345678-4
-      description: CUIL format (27 prefix)
+    - value: 20-12345678-6
+      description: Standard CUIT format (checksum-valid)
+    - value: '20123456786'
+      description: CUIT without separators (checksum-valid)
+    - value: 27-34567890-0
+      description: CUIL format (27 prefix), check digit 0 from a result of 11
+    - value: 30-71234567-1
+      description: Company CUIT (30 prefix, checksum-valid)
   should_not_match:
     - value: '20-1234567-9'
       description: Only 7 digits in middle group instead of 8
@@ -47,6 +56,10 @@ test_cases:
       description: Letters instead of digits in prefix
     - value: '20-12345678-'
       description: Missing check digit at end
+    - value: 20-12345678-9
+      description: fails mod-11 checksum (check-digit perturbation of valid value 20-12345678-6)
+    - value: 27-34567890-4
+      description: fails mod-11 checksum (check-digit perturbation of valid value 27-34567890-0)
 false_positives:
   - description: >-
       Common words and phrases related to cuit cuil appearing in policy documents, training materials, HR templates, or
@@ -113,9 +126,9 @@ purview:
     - id: Validator_ar_cuit_cuil_checksum
       type: Checksum
       params:
-        weights: "5,4,3,2,7,6,5,4,3,2"
+        weights: "6,7,8,9,4,5,6,7,8,9,0"
         mod: 11
-        checkDigit: 0
+        checkDigit: 11
   filters:
     - id: Filter_ar_cuit_cuil_same_digits
       type: AllDigitsSameFilter
@@ -147,8 +160,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-argentina-unique-tax-identification-key
     title: "Argentina Unique Tax Identification Key (CUIT/CUIL) entity definition - Microsoft Learn"
 created: '2026-02-08'
-updated: '2026-09-25'
+updated: '2026-10-31'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-31'
+    description: 'Checksum validator fix: the inline Checksum validator exported CheckDigit=0, which Purview rejects ("Param CheckDigit is invalid", 0x8000FFFF), so every rule package containing this pattern failed to upload. Now Weights 6,7,8,9,4,5,6,7,8,9,0 / Mod 11 / CheckDigit 11 (negated CUIT weights, so the remainder equals the CUIT check digit). Gap: a number whose CUIT result would be 10 (never issued) and that ends in 0 is accepted, because Purview compares remainder 10 as 0. The regex is unchanged. Test cases replaced with checksum-valid values plus invalid-twin should_not_match values.'
   - version: 1.3.3
     date: '2026-09-25'
     description: >-

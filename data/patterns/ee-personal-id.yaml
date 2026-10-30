@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Isikukood
 slug: ee-personal-id
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,6 +9,9 @@ description: >-
   Detects Isikukood patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
 operation: >-
   Reference: https://learn.microsoft.com/en-us/purview/sit-defn-estonia-personal-identification-code Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  No checksum validator: the isikukood check digit uses weights 1,2,3,4,5,6,7,8,9,1 mod 11 and, when that gives
+  10, a second pass with weights 3,4,5,6,7,8,9,1,2,3. One Checksum validator holds only the first pass, which would
+  reject about 8% of genuine codes, so it is left out.
 pattern: \b[1-6]\d{2}[01]\d[0-3]\d\d{4}\b
 confidence: high
 confidence_justification: >-
@@ -37,11 +40,11 @@ corroborative_evidence:
     - pii-civic-credentials
 test_cases:
   should_match:
-    - value: "37501011234"
+    - value: "37501011237"
       description: Estonian ID (male, born 1975-01-01)
-    - value: "48812125678"
+    - value: "48812125673"
       description: Estonian ID (female, born 1988-12-12)
-    - value: "39203034567"
+    - value: "39203034563"
       description: Estonian ID (male, born 1992-03-03)
   should_not_match:
     - value: "77501011234"
@@ -87,8 +90,6 @@ purview:
   regexes:
     - id: Regex_ee_personal_id
       pattern: \b[1-6]\d{2}[01]\d[0-3]\d\d{4}\b
-      validators:
-        - ref: Validator_ee_personal_id_checksum
   keywords:
     - id: Keyword_ee_personal_id
       groups:
@@ -105,13 +106,6 @@ purview:
             - ID-kaart
             - national ID
       strength: specific
-  validators:
-    - id: Validator_ee_personal_id_checksum
-      type: Checksum
-      params:
-        weights: "1,2,3,4,5,6,7,8,9,1"
-        mod: 11
-        checkDigit: 0
   filters:
     - id: Filter_ee_personal_id_same_digits
       type: AllDigitsSameFilter
@@ -144,8 +138,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-estonia-personal-identification-code
     title: "Estonia Personal Identification Code entity definition - Microsoft Learn"
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-31'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-31'
+    description: 'Checksum validator fix: the inline Checksum validator exported CheckDigit=0, which Purview rejects ("Param CheckDigit is invalid", 0x8000FFFF), so every rule package containing this pattern failed to upload. Validator removed rather than replaced: the isikukood check digit needs a second weight pass when the first gives 10, and a first-pass-only validator would reject about 8% of genuine codes. The regex is unchanged; test values replaced with checksum-valid codes.'
   - version: 1.3.2
     date: '2026-09-25'
     description: >-

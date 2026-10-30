@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: AHV-Nummer
 slug: ch-social-security-ahv
-version: 1.3.2
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,6 +9,11 @@ description: >-
   Detects AHV-Nummer patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
 operation: >-
   Reference: https://learn.microsoft.com/en-us/purview/sit-defn-switzerland-ssn-ahv-number Corroborative evidence: 4 keywords within 300 characters. Keyword lists: pii-civic-credentials.
+  Checksum: inline Checksum validator Validator_ch_ahv_checksum (Weights 9,7,9,7,9,7,9,7,9,7,9,7,0 / Mod 10 /
+  CheckDigit 13) is the EAN-13 rule: check digit = (10 - (sum of digits 1-12 x 1,3,1,3,... mod 10)) mod 10. Purview
+  compares the remainder itself with the check digit, so the weights are the negated EAN weights (10 - w), which
+  makes the remainder equal the check digit exactly. Do not change them back to 1,3,1,3,...: that checks a different
+  rule.
 pattern: \b756\.\d{4}\.\d{4}\.\d{2}\b
 confidence: high
 confidence_justification: >-
@@ -35,17 +40,21 @@ corroborative_evidence:
     - pii-civic-credentials
 test_cases:
   should_match:
-    - value: "756.1234.5678.90"
-      description: Swiss AHV number
-    - value: "756.9876.5432.10"
-      description: Another AHV number
-    - value: "756.4567.8901.23"
-      description: Valid AHV format
+    - value: "756.1234.5678.97"
+      description: Swiss AHV number (EAN-13 checksum-valid)
+    - value: "756.9876.5432.17"
+      description: Another checksum-valid AHV number
+    - value: "756.4567.8901.20"
+      description: Checksum-valid AHV number with check digit 0
   should_not_match:
     - value: "757.1234.5678.90"
       description: Wrong country prefix (757)
     - value: "756.1234.5678.9"
       description: Too few digits in last group
+    - value: "756.1234.5678.90"
+      description: fails EAN-13 checksum (check-digit perturbation of valid value 756.1234.5678.97)
+    - value: "756.9876.5432.10"
+      description: fails EAN-13 checksum (check-digit perturbation of valid value 756.9876.5432.17)
 false_positives:
   - description: >-
       The 756 prefix (Switzerland country code) and dot-separated format provide strong structural validation.
@@ -132,9 +141,9 @@ purview:
     - id: Validator_ch_ahv_checksum
       type: Checksum
       params:
-        weights: "1,3,1,3,1,3,1,3,1,3,1,3"
+        weights: "9,7,9,7,9,7,9,7,9,7,9,7,0"
         mod: 10
-        checkDigit: 0
+        checkDigit: 13
 risk_rating: 5
 risk_description: >-
   This detector recognizes the Swiss AHV number's fixed 756 country prefix and dot-separated thirteen-digit presentation with social-security context. A genuine value can support identity correlation across pension, employment, insurance, or government correspondence, and may make targeted impersonation more credible. The ordinary match identifies one person but supplies no benefit entitlement, medical fact, password, or authority to change a record. Risk 5 and OFFICIAL capture the limited standalone privacy impact, while a benefits file or identity package containing the holder's details would warrant SENSITIVE treatment.
@@ -165,8 +174,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-switzerland-ssn-ahv-number
     title: "Swiss Social Security Number AHV entity definition - Microsoft Learn"
 created: '2026-02-09'
-updated: '2026-09-25'
+updated: '2026-10-31'
 changelog:
+  - version: 1.4.0
+    date: '2026-10-31'
+    description: 'Checksum validator fix: the inline Checksum validator exported CheckDigit=0, which Purview rejects ("Param CheckDigit is invalid", 0x8000FFFF), so every rule package containing this pattern failed to upload. Now Weights 9,7,9,7,9,7,9,7,9,7,9,7,0 / Mod 10 / CheckDigit 13 (negated EAN-13 weights): the AHV EAN-13 check digit exactly. The regex is unchanged. Test cases replaced with checksum-valid values plus invalid-twin should_not_match values.'
   - version: 1.3.2
     date: '2026-09-25'
     description: >-
