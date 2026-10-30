@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generated": "2026-10-30T21:07:44.386Z",
+  "generated": "2026-10-30T21:16:36.122Z",
   "patterns": [
     {
       "schema": "testpattern/v1",
@@ -619757,12 +619757,12 @@
       "schema": "testpattern/v1",
       "name": "REGON",
       "slug": "pl-regon",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "type": "regex",
       "pattern_class": "identifier",
       "engine": "universal",
       "description": "Detects REGON patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.",
-      "operation": "Reference: https://learn.microsoft.com/en-us/purview/sit-defn-poland-regon-number Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.",
+      "operation": "Reference: https://learn.microsoft.com/en-us/purview/sit-defn-poland-regon-number Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials. Checksum: inline Checksum validator Validator_pl_regon_checksum (Weights 8,9,2,3,4,5,6,7,0,0,0,0,0,0 / Mod 11 / CheckDigit 9) enforces the nine-digit REGON rule (weighted sum of digits 1-8 mod 11 must equal digit 9) on both forms, because the first nine digits of a fourteen-digit local-unit REGON are the parent's nine-digit REGON. The fourteen-digit form's own check digit (weights 2,4,8,5,0,9,7,3,6,1,2,4,8 on digits 1-13, digit 14) is not checked: one Checksum validator cannot hold both rules. A remainder of 10 means check digit 0; Purview applies that rule (measured on a test tenant 2026-10-30, see docs/checksum-validator-semantics.md).",
       "pattern": "\\b(\\d{9}(?:\\d{5})?)\\b",
       "confidence": "medium",
       "confidence_justification": "Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false positive rates.",
@@ -619804,16 +619804,20 @@
       "test_cases": {
         "should_match": [
           {
-            "value": "123456789",
-            "description": "Nine-digit REGON (small entity)"
+            "value": "612345679",
+            "description": "Nine-digit REGON (checksum-valid)"
           },
           {
-            "value": "12345678901234",
-            "description": "Fourteen-digit REGON (local unit)"
+            "value": "61234567900018",
+            "description": "Fourteen-digit local-unit REGON (valid nine-digit base and valid fourteen-digit check digit)"
           },
           {
-            "value": "987654321",
-            "description": "Another nine-digit REGON"
+            "value": "472158379",
+            "description": "Another checksum-valid nine-digit REGON"
+          },
+          {
+            "value": "301425420",
+            "description": "Weighted sum mod 11 is 10, so the check digit is 0 (Purview accepts this, measured 2026-10-30)"
           }
         ],
         "should_not_match": [
@@ -619824,6 +619828,18 @@
           {
             "value": "1234567890",
             "description": "Invalid length (10 digits)"
+          },
+          {
+            "value": "612345678",
+            "description": "fails mod-11 checksum (single-digit perturbation of valid value 612345679)"
+          },
+          {
+            "value": "472158370",
+            "description": "fails mod-11 checksum (single-digit perturbation of valid value 472158379)"
+          },
+          {
+            "value": "61234567800018",
+            "description": "fourteen-digit value whose nine-digit base fails the mod-11 checksum"
           }
         ]
       },
@@ -619988,9 +620004,9 @@
             "id": "Validator_pl_regon_checksum",
             "type": "Checksum",
             "params": {
-              "weights": "8,9,2,3,4,5,6,7",
+              "weights": "8,9,2,3,4,5,6,7,0,0,0,0,0,0",
               "mod": 11,
-              "checkDigit": 0
+              "checkDigit": 9
             }
           }
         ],
@@ -620029,8 +620045,13 @@
         }
       ],
       "created": "2026-02-09",
-      "updated": "2026-10-30",
+      "updated": "2026-10-31",
       "changelog": [
+        {
+          "version": "1.5.0",
+          "date": "2026-10-31",
+          "description": "Checksum validator fix: Validator_pl_regon_checksum exported CheckDigit=0, which Purview rejects (\"Param CheckDigit is invalid\", 0x8000FFFF), so every rule package containing pl-regon failed to upload. Now Weights 8,9,2,3,4,5,6,7,0,0,0,0,0,0 / Mod 11 / CheckDigit 9: the nine-digit REGON rule, applied to the nine-digit base of both forms. The fourteen-digit form's own check digit is not checked. Test-tenant upload accepted; Test-DataClassification matched valid 9- and 14-digit values and a remainder-10 value ending in 0, and rejected the invalid twins. Added that remainder-10 value as a should_match. The regex is unchanged. Test cases replaced with checksum-valid values (the old ones failed the checksum) plus invalid-twin should_not_match values."
+        },
         {
           "version": "1.4.0",
           "date": "2026-10-30",

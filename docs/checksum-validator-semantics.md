@@ -96,11 +96,35 @@ CheckDigit 9
 ```
 
 which accepts iff `S8 mod 11 == d9` — exactly the reduced TFN rule. (Numbers where
-`S8 mod 11 == 10` are correctly rejected: no digit equals 10.)
+`S8 mod 11 == 10` are correctly rejected: no digit equals 10. Not so: see the 2026-10-30
+measurement below.)
 
 The same encoding style applies to the Medicare card checksum (weights 1,3,7,9,1,3,7,9
 on digits 1-8, mod 10, check digit at position 9; zero weights for the check digit,
 issue number, and IRN positions).
+
+## Remainder 10 compares equal to check digit 0 (measured 2026-10-30)
+
+A throwaway pl-regon pack (`Weights 8,9,2,3,4,5,6,7,0,0,0,0,0,0 / Mod 11 / CheckDigit 9`)
+was uploaded to the test tenant and run through `Test-DataClassification`. For two
+values whose weighted sum is 10 (mod 11), the form ending in 0 matched and the forms
+ending in 1 or 9 did not. So Purview treats a remainder of 10 as check digit 0, which is
+the REGON rule. The docs do not say this.
+
+That contradicts the TFN note above: a TFN whose first eight weighted digits sum to 10
+(mod 11) and whose ninth digit is 0 is not a valid TFN, but the validator should accept it
+(inferred from the REGON measurement, not tested with a TFN). The TFN encoding has not
+been changed.
+
+A variable-length match can share one validator when the shorter form is a prefix of the
+longer one. pl-regon uses `Weights 8,9,2,3,4,5,6,7,0,0,0,0,0,0 / Mod 11 / CheckDigit 9`
+for both the 9- and 14-digit forms: the first nine digits of a 14-digit REGON are the
+parent's 9-digit REGON. The 14-digit form's own check digit (different weights) is not
+checked. au-medicare-card-identifier pads its weights with zeros the same way.
+
+Seven other patterns still export `CheckDigit 0` and need the same treatment, one at a time
+because each scheme differs: ar-cuit-cuil, br-cnpj, ch-social-security-ahv, cl-rut,
+ee-personal-id, pl-pesel, pl-tax-id.
 
 ## Func_* validators are not usable in exported rulepacks
 
