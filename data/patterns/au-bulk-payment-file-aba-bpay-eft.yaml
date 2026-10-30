@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Bulk Payment File (ABA Direct Entry, BPAY Batch or EFT Upload)
 slug: au-bulk-payment-file-aba-bpay-eft
-version: 1.0.0
+version: 1.1.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -10,7 +10,7 @@ description: >-
 operation: >-
   Primary (one regex, any of): an ABA type 1 detail record (1, BSB 999-999, a 9-character account field, indicator blank/N/W/X/Y, transaction code 13 or 50-57, a 10-digit amount and the start of the account title); a delimited row of a hyphenated BSB, a 5-10 digit account number and a decimal amount (up to three other columns between account and amount); or a labelled BPAY line (biller code followed by a CRN or reference value). 65 (discovery only): primary alone. 75: primary plus one of a file control record (ABA type 0 descriptive record, ABA type 7 file total record, a labelled batch / file / control total or a labelled record / payment count), a payment-file column header (BSB ... account ... amount, or biller code ... CRN ... amount) or payment-file context (direct entry, Cemtex, BECS, ABA file, bulk / batch payment, payment file, EFT file, payment run, BPAY batch, lodgement reference, remitter). 85: three distinct primary lines ({ ref: primary, min_count: 3, unique_results: true }) plus a file control record or column header plus payment-file context. Fixed-width blanks are written as [ ] so the exporter's space rewrite cannot change them. Every enforce tier ANDs NOT the shared template-exclusion dictionary and a specification / guidance exclusion, so BECS format guides with worked records stay at 65.
 pattern: >-
-  (?i)(?:\b1\d{3}-\d{3}[ 0-9-]{9}[ NWXY](?:13|5[0-7])\d{10}[A-Z0-9&]|\b\d{3}-\d{3}[ \t]{0,2}[,|\t][ \t]{0,2}"?\d{5,10}"?[ \t]{0,2}[,|\t](?:[^\n,|\t]{1,40}[,|\t]){0,3}[ \t]{0,2}"?\$?\d{1,9}\.\d{2}\b|\bbiller\s+code[ \t]{0,3}[:#]?[ \t]{0,3}\d{3,10}[ \t]{0,3}[,|;\t]?[ \t]{0,3}(?:CRN|customer\s+ref(?:erence)?(?:\s+(?:no\.?|number))?|ref(?:erence)?(?:\s+(?:no\.?|number))?)[ \t]{0,3}[:#]?[ \t]{0,3}\d{2,20}\b)
+  (?i)(\b1\d{3}-\d{3}[ 0-9-]{9}[ NWXY](?:13|5[0-7])\d{10}[A-Z0-9&]|\b\d{3}-\d{3}[ \t]{0,2}[,|\t][ \t]{0,2}"?\d{5,10}"?[ \t]{0,2}[,|\t](?:[^\n,|\t]{1,40}[,|\t]){0,3}[ \t]{0,2}"?\$?\d{1,9}\.\d{2}\b|\bbiller\s+code[ \t]{0,3}[:#]?[ \t]{0,3}\d{3,10}[ \t]{0,3}[,|;\t]?[ \t]{0,3}(?:CRN|customer\s+ref(?:erence)?(?:\s+(?:no\.?|number))?|ref(?:erence)?(?:\s+(?:no\.?|number))?)[ \t]{0,3}[:#]?[ \t]{0,3}\d{2,20}\b)
 confidence: medium
 confidence_justification: >-
   Medium. The ABA type 1 detail record is a rigid 120-character layout (BSB, account field, transaction code, 10-digit amount) that rarely occurs outside payment files, and delimited rows need a hyphenated BSB beside an account number and a decimal amount. Format specifications and bank help pages reproduce worked records, so enforce tiers need a control record, header or payment-file context, and guidance framing is excluded. A delimited row can still occur in a reconciliation or supplier master extract that is not a payment file. 85/75 are heuristic evidence tiers, not measured accuracy. Test values are synthetic.
@@ -149,13 +149,13 @@ purview:
   regexes:
     - id: Regex_au_bulk_payment_file_payment_line
       pattern: >-
-        (?i)(?:\b1\d{3}-\d{3}[ 0-9-]{9}[ NWXY](?:13|5[0-7])\d{10}[A-Z0-9&]|\b\d{3}-\d{3}[ \t]{0,2}[,|\t][ \t]{0,2}"?\d{5,10}"?[ \t]{0,2}[,|\t](?:[^\n,|\t]{1,40}[,|\t]){0,3}[ \t]{0,2}"?\$?\d{1,9}\.\d{2}\b|\bbiller\s+code[ \t]{0,3}[:#]?[ \t]{0,3}\d{3,10}[ \t]{0,3}[,|;\t]?[ \t]{0,3}(?:CRN|customer\s+ref(?:erence)?(?:\s+(?:no\.?|number))?|ref(?:erence)?(?:\s+(?:no\.?|number))?)[ \t]{0,3}[:#]?[ \t]{0,3}\d{2,20}\b)
+        (?i)(\b1\d{3}-\d{3}[ 0-9-]{9}[ NWXY](?:13|5[0-7])\d{10}[A-Z0-9&]|\b\d{3}-\d{3}[ \t]{0,2}[,|\t][ \t]{0,2}"?\d{5,10}"?[ \t]{0,2}[,|\t](?:[^\n,|\t]{1,40}[,|\t]){0,3}[ \t]{0,2}"?\$?\d{1,9}\.\d{2}\b|\bbiller\s+code[ \t]{0,3}[:#]?[ \t]{0,3}\d{3,10}[ \t]{0,3}[,|;\t]?[ \t]{0,3}(?:CRN|customer\s+ref(?:erence)?(?:\s+(?:no\.?|number))?|ref(?:erence)?(?:\s+(?:no\.?|number))?)[ \t]{0,3}[:#]?[ \t]{0,3}\d{2,20}\b)
     - id: Regex_au_bulk_payment_file_control_record
       pattern: >-
-        (?i)(?:\b0[ ]{17}\d{2}[A-Z]{3}[ ]{7}[A-Z0-9]|\b7999-999[ ]{12}\d{30}|\b(?:batch|file|net\s+file|control|payment\s+run)\s+(?:total|control\s+total)[ \t]{0,3}[:#][ \t]{0,3}(?:\$|A\$|AUD)?[ \t]?\d{1,3}(?:,\d{3}){0,4}(?:\.\d{2})?|\b(?:record|item|transaction|payment)\s+count[ \t]{0,3}[:#][ \t]{0,3}\d{1,6}\b)
+        (?i)(\b0[ ]{17}\d{2}[A-Z]{3}[ ]{7}[A-Z0-9]|\b7999-999[ ]{12}\d{30}|\b(?:batch|file|net\s+file|control|payment\s+run)\s+(?:total|control\s+total)[ \t]{0,3}[:#][ \t]{0,3}(?:\$|A\$|AUD)?[ \t]?\d{1,3}(?:,\d{3}){0,4}(?:\.\d{2})?|\b(?:record|item|transaction|payment)\s+count[ \t]{0,3}[:#][ \t]{0,3}\d{1,6}\b)
     - id: Regex_au_bulk_payment_file_column_header
       pattern: >-
-        (?i)(?:\bBSB\b[^\n]{0,40}[,|\t][^\n]{0,60}\b(?:account|acct)\b[^\n]{0,80}\bamount\b|\bbiller[ _]?code\b[^\n]{0,60}\b(?:CRN|customer[ _]?ref(?:erence)?)\b[^\n]{0,60}\bamount\b)
+        (?i)(\bBSB\b[^\n]{0,40}[,|\t][^\n]{0,60}\b(?:account|acct)\b[^\n]{0,80}\bamount\b|\bbiller[ _]?code\b[^\n]{0,60}\b(?:CRN|customer[ _]?ref(?:erence)?)\b[^\n]{0,60}\bamount\b)
   keywords:
     - id: Keyword_au_bulk_payment_file_context
       groups:
@@ -232,8 +232,11 @@ references:
   - title: Financial Accountability Act 2009 (Qld)
     url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2009-009
 created: '2026-10-20'
-updated: '2026-10-20'
+updated: '2026-10-30'
 changelog:
+  - version: 1.1.0
+    date: '2026-10-30'
+    description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'
   - version: 1.0.0
     date: '2026-10-20'
     description: >-
