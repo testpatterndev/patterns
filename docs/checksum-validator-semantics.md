@@ -112,9 +112,9 @@ ending in 1 or 9 did not. So Purview treats a remainder of 10 as check digit 0, 
 the REGON rule. The docs do not say this.
 
 That contradicts the TFN note above: a TFN whose first eight weighted digits sum to 10
-(mod 11) and whose ninth digit is 0 is not a valid TFN, but the validator should accept it
-(inferred from the REGON measurement, not tested with a TFN). The TFN encoding has not
-been changed.
+(mod 11) and whose ninth digit is 0 is not a valid TFN, yet the single TFN validator
+accepted it on the test tenant (2026-10-31). See "Two validators close the remainder-10
+gap" below for the fix.
 
 A variable-length match can share one validator when the shorter form is a prefix of the
 longer one. pl-regon uses `Weights 8,9,2,3,4,5,6,7,0,0,0,0,0,0 / Mod 11 / CheckDigit 9`
@@ -149,8 +149,8 @@ Written with the scheme's own weights the validator checks a different rule.
 | ch-social-security-ahv | 9,7,9,7,9,7,9,7,9,7,9,7,0 / Mod 10 / CheckDigit 13 | EAN-13 exactly |
 | pl-pesel | 9,7,3,1,9,7,3,1,9,7,0 / Mod 10 / CheckDigit 11 | exactly |
 | br-cnpj | 6,7,8,9,2,3,4,5,6,7,8,9,0,0 / Mod 11 / CheckDigit 13 | first check digit exactly (results 10 and 11 mean 0, matching Purview's remainder-10-as-0); second check digit unchecked |
-| ar-cuit-cuil | 6,7,8,9,4,5,6,7,8,9,0 / Mod 11 / CheckDigit 11 | exactly, except a never-issued result of 10 ending in 0 is accepted |
-| pl-tax-id | 6,5,7,2,3,4,5,6,7,0 / Mod 11 / CheckDigit 10 | plain remainder rule; an invalid remainder of 10 ending in 0 is accepted |
+| ar-cuit-cuil | 6,7,8,9,4,5,6,7,8,9,0 / Mod 11 / CheckDigit 11 | exactly, with the second validator below (alone it accepts a never-issued result of 10 ending in 0) |
+| pl-tax-id | 6,5,7,2,3,4,5,6,7,0 / Mod 11 / CheckDigit 10 | plain remainder rule exactly, with the second validator below (alone it accepts an invalid remainder of 10 ending in 0) |
 
 Validators removed instead, because no single Checksum validator expresses the scheme
 without rejecting genuine values:
@@ -168,3 +168,33 @@ Measured 2026-10-31: a throwaway pack holding all seven was accepted by the test
 values, invalid twins, and three remainder-10 cases (a CNPJ whose first check digit is 0,
 plus a CUIT and a NIP ending in 0, both accepted as described above), so remainder 10 is
 compared as digit 0 in these patterns too.
+
+## Two validators close the remainder-10 gap (2026-10-31)
+
+Where a remainder of 10 means "invalid" (TFN, CUIT, NIP), a single validator also accepts
+values whose remainder is 10 and whose check digit is 0. That is about 0.9% of random
+digit strings, or roughly one in ten of everything the validator accepts.
+
+Purview requires every `<Validator>` in a `<Validators>` block to pass (measured: a TFN
+pack with two validators rejected 255 446 010, 255 446 140 and 314 159 040 and still
+matched valid TFNs, including one ending in 0). So add a second validator that has a
+different remainder-10 hole:
+
+- first validator: weights `w_i`, 0 at the check position, accepts iff `S mod 11 == d`
+  (with remainder 10 read as 0)
+- second validator: weights `k * w_i mod 11`, and `(1 - k) mod 11` at the check position,
+  with the same Mod and CheckDigit. It accepts iff `k * S - (k - 1) * d == d (mod 11)`,
+  that is iff `S == d`, but its remainder-10 hole is at `S == 10 / k`, not `S == 10`.
+
+A false accept would need both holes at once, which cannot happen for `k != 1`. With
+`k = 2` the check-position weight is 10. A brute-force comparison over 10^6 random values
+per scheme matched the real algorithm exactly.
+
+| Pattern(s) | Second validator |
+|---|---|
+| au-taxation-identifier, au-tfn-declaration-super-choice-form, payroll-master-file-with-tax-file-numbers, superannuation-fund-member-statement-bulk | Validator_australian_tfn_rem10: 2,8,6,3,10,5,1,7,10 / Mod 11 / CheckDigit 9 |
+| ar-cuit-cuil | Validator_ar_cuit_cuil_checksum_rem10: 1,3,5,7,8,10,1,3,5,7,10 / Mod 11 / CheckDigit 11 |
+| pl-tax-id | Validator_pl_nip_checksum_rem10: 1,10,3,4,6,8,10,1,3,10 / Mod 11 / CheckDigit 10 |
+
+Keep a single validator where remainder 10 really does mean check digit 0: pl-regon, and
+br-cnpj's first check digit.
