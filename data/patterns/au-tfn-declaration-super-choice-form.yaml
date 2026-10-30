@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Completed TFN Declaration or Superannuation Standard Choice Form
 slug: au-tfn-declaration-super-choice-form
-version: 1.1.0
+version: 1.2.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -170,6 +170,7 @@ purview:
       pattern: \b(?!0{3}[ \-]?0{3}[ \-]?0{3}\b)(?!1{3}[ \-]?1{3}[ \-]?1{3}\b)(\d{3}[ \-]?\d{3}[ \-]?\d{3})\b
       validators:
         - ref: Validator_australian_tfn
+        - ref: Validator_australian_tfn_rem10
     - id: Regex_tfn_super_form_person_field
       pattern: >-
         (?i)(\b(?:surname(?:\s+or\s+family\s+name)?|family\s+name|(?:first\s+|other\s+)?given\s+names?|full\s+name|payee(?:'s)?\s+name|employee(?:'s)?\s+(?:name|identification\s+number|number|ID))\s*[:#]\s*(?!(?:n/?a|name|unknown|tbc|tba|withheld|not\s+recorded|the|a|an|any|all|each|see|refer)\b|_{2,}|\[|<)[A-Z0-9][A-Za-z0-9/'.-]+(?:[ \t]+[A-Z][A-Za-z'-]{1,30}){0,3}|\bdate\s+of\s+birth\s*[:\-]?\s*\d{1,2}[/.-]\d{1,2}[/.-]\d{4})
@@ -186,6 +187,15 @@ purview:
       params:
         - name: Weights
           value: 1, 4, 3, 7, 5, 8, 6, 9, 0
+        - name: Modulo
+          value: '11'
+        - name: CheckDigit
+          value: '9'
+    - id: Validator_australian_tfn_rem10
+      type: Checksum
+      params:
+        - name: Weights
+          value: 2, 8, 6, 3, 10, 5, 1, 7, 10
         - name: Modulo
           value: '11'
         - name: CheckDigit
@@ -227,8 +237,11 @@ references:
   - title: ATO - Superannuation standard choice form (NAT 13080)
     url: https://www.ato.gov.au/forms-and-instructions/superannuation-standard-choice-form
 created: '2026-09-24'
-updated: '2026-10-30'
+updated: '2026-10-31'
 changelog:
+  - version: 1.2.0
+    date: '2026-10-31'
+    description: 'Remainder-10 fix: Purview treats a checksum remainder of 10 as check digit 0 (measured on a test tenant 2026-10-31), so Validator_australian_tfn alone accepted invalid TFNs whose first eight weighted digits sum to 10 mod 11 and that end in 0 (about 9% of the numbers it accepted). Added Validator_australian_tfn_rem10 (Weights 2,8,6,3,10,5,1,7,10 / Mod 11 / CheckDigit 9) to the same regex; Purview requires both validators to pass, and together they match the TFN rule exactly. Test tenant: valid TFNs (including one ending in 0) matched; 255 446 010, 255 446 140 and 314 159 040 were rejected. The regex is unchanged; see docs/checksum-validator-semantics.md.'
   - version: 1.1.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'
