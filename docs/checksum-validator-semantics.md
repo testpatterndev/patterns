@@ -139,3 +139,9 @@ without rejecting genuine values:
 
 The rule for a partial encoding: it may accept some invalid values (document them), but it
 must never reject a genuine one.
+
+Measured 2026-10-31: a throwaway pack holding all seven was accepted by the test tenant, and
+`Test-DataClassification` gave the expected result for 26 of 26 values. That covered valid
+values, invalid twins, and three remainder-10 cases (a CNPJ whose first check digit is 0,
+plus a CUIT and a NIP ending in 0, both accepted as described above), so remainder 10 is
+compared as digit 0 in these patterns too.
