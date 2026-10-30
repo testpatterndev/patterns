@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { countCapturingGroups, wrapWholeMatch, checkWholeMatchGroup, nonSpaceAsClass, HandleByHand } from '../capture-groups.mjs'
-import { emulateKeep } from '../boost-to-js.mjs'
+import { emulateKeep, expandScopedI } from '../boost-to-js.mjs'
 
 let passed = 0, failed = 0
 const t = (name, fn) => { try { fn(); passed++ } catch (e) { failed++; console.log(`FAIL ${name}: ${e.message}`) } }
@@ -74,7 +74,7 @@ for (const [src, want, rule] of wraps) {
 // Group 0 unchanged and group 1 == group 0, on strings that exercise each case.
 const SAMPLES = ['foo', 'a foo b', 'pre 123 x', 'pre x12', 'ghp_' + 'a'.repeat(36), 'gho_' + 'Z9'.repeat(18) + ' tail',
   '123456789', '12345678901234', 'x123456789y', '1234567890', 'xa', 'x', 'ab', 'abc', 'terms words', '(x)', 'a(x)b']
-const js = (src) => { const m = src.match(/^\(\?([a-z]+)\)/); const body = emulateKeep(m ? src.slice(m[0].length) : src.replace(/^\(\?-i\)/, '')); return new RegExp(body, 'g' + (m?.[1].includes('i') ? 'i' : '')) }
+const js = (src) => { const m = src.match(/^\(\?([a-z]+)\)/); const body = expandScopedI(emulateKeep(m ? src.slice(m[0].length) : src.replace(/^\(\?-i\)/, ''))); return new RegExp(body, 'g' + (m?.[1].includes('i') ? 'i' : '')) }
 for (const [src] of wraps.filter(([s]) => !/\(\?<n>/.test(s))) {
   t(`group 0 unchanged: ${src}`, () => {
     const out = wrapWholeMatch(src).out
