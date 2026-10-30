@@ -1,18 +1,34 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'fs'
-import { join, relative } from 'path'
+import { join, relative, resolve, isAbsolute, sep } from 'path'
 import { fileURLToPath } from 'url'
+import { parseArgs } from 'util'
 import yaml from 'js-yaml'
 import { resolveCustomisationFallbacks, TOKEN_LITERAL } from './lib/customisation.mjs'
 import { loadIdentifiers } from './lib/identifiers.mjs'
 
-const DATA_DIR = fileURLToPath(new URL('../data', import.meta.url))
-const OUT_FILE = fileURLToPath(new URL('../patterns.json', import.meta.url))
+const REPO_DIR = fileURLToPath(new URL('..', import.meta.url))
+const DATA_DIR = join(REPO_DIR, 'data')
+
+// --overlay <dir> --out <file> compiles a private catalogue. <dir> has the data/ layout
+// (patterns/*.yaml, classifier-ids.json, package-tags.json) and lives outside this repo.
+// The public data is loaded as usual, so overlay patterns can use the public keyword lists
+// and dictionary manifest, but the output carries the overlay's patterns only, and it is
+// never written into this checkout, so private classifiers cannot reach patterns.json.
+const { values: cli } = parseArgs({ options: { overlay: { type: 'string' }, out: { type: 'string' } } })
+const OVERLAY_DIR = cli.overlay ? resolve(cli.overlay) : null
+let OUT_FILE = join(REPO_DIR, 'patterns.json')
+if (OVERLAY_DIR) {
+  if (!cli.out) throw new Error('--overlay needs --out <file> outside this repository')
+  OUT_FILE = resolve(cli.out)
+  const inRepo = relative(REPO_DIR, OUT_FILE)
+  if (inRepo !== '..' && !inRepo.startsWith(`..${sep}`) && !isAbsolute(inRepo)) throw new Error(`--out must be outside this repository: ${OUT_FILE}`)
+} else if (cli.out) {
+  throw new Error('--out is only for --overlay builds')
+}
 
 const REQUIRED_PATTERN_FIELDS = ['schema', 'name', 'slug', 'type', 'confidence', 'jurisdictions', 'regulations', 'data_categories', 'test_cases']
 const REQUIRED_COLLECTION_FIELDS = ['schema', 'name', 'slug', 'description', 'patterns']
 const REQUIRED_KEYWORD_FIELDS = ['schema', 'name', 'slug', 'type', 'keywords']
-const PACKAGE_TAGS_FILE = join(DATA_DIR, 'package-tags.json')
-const CLASSIFIER_IDS_FILE = join(DATA_DIR, 'classifier-ids.json')
 
 function walkDir(dir) {
   const files = []
@@ -37,14 +53,15 @@ function validate(obj, requiredFields, file) {
   return true
 }
 
-function loadPackageTags() {
-  if (!existsSync(PACKAGE_TAGS_FILE)) return null
-  const data = JSON.parse(readFileSync(PACKAGE_TAGS_FILE, 'utf-8'))
+function loadPackageTags(dataDir) {
+  const file = join(dataDir, 'package-tags.json')
+  if (!existsSync(file)) return null
+  const data = JSON.parse(readFileSync(file, 'utf-8'))
   if (data.schema !== 'testpattern.package-tags.v1') {
-    throw new Error(`Unsupported package tags schema '${data.schema}' in ${relative(DATA_DIR, PACKAGE_TAGS_FILE)}`)
+    throw new Error(`Unsupported package tags schema '${data.schema}' in ${relative(DATA_DIR, file)}`)
   }
   if (!data.patterns || typeof data.patterns !== 'object' || Array.isArray(data.patterns)) {
-    throw new Error(`${relative(DATA_DIR, PACKAGE_TAGS_FILE)} must contain a patterns object`)
+    throw new Error(`${relative(DATA_DIR, file)} must contain a patterns object`)
   }
   const { patterns: packagePatterns, ...metadata } = data
   return {
@@ -53,20 +70,21 @@ function loadPackageTags() {
   }
 }
 
-function loadClassifierIds() {
-  if (!existsSync(CLASSIFIER_IDS_FILE)) {
-    throw new Error(`${relative(DATA_DIR, CLASSIFIER_IDS_FILE)} is required; run npm run sync:classifier-ids`)
+function loadClassifierIds(dataDir) {
+  const file = join(dataDir, 'classifier-ids.json')
+  if (!existsSync(file)) {
+    throw new Error(`${relative(DATA_DIR, file)} is required; run npm run sync:classifier-ids`)
   }
-  const data = JSON.parse(readFileSync(CLASSIFIER_IDS_FILE, 'utf-8'))
+  const data = JSON.parse(readFileSync(file, 'utf-8'))
   if (data.schema !== 'testpattern.classifier-ids.v1' || !data.patterns || typeof data.patterns !== 'object') {
-    throw new Error(`Invalid classifier ID registry: ${relative(DATA_DIR, CLASSIFIER_IDS_FILE)}`)
+    throw new Error(`Invalid classifier ID registry: ${relative(DATA_DIR, file)}`)
   }
   return data
 }
 
 console.log('Compiling patterns...')
-const packageTags = loadPackageTags()
-const classifierIds = loadClassifierIds()
+const packageTags = loadPackageTags(DATA_DIR)
+const classifierIds = loadClassifierIds(DATA_DIR)
 
 // ── Load keyword dictionaries first (for reference resolution) ──
 const keywordFiles = walkDir(join(DATA_DIR, 'keywords'))
@@ -83,13 +101,24 @@ for (const file of keywordFiles) {
   }
 }
 
-// ── Load patterns ──
-const patternFiles = walkDir(join(DATA_DIR, 'patterns'))
-const patterns = []
+// ── Load patterns (the public ones, then any overlay's) ──
+const sources = [{ dir: DATA_DIR, ids: classifierIds, tags: packageTags, patterns: [] }]
+if (OVERLAY_DIR) {
+  const overlay = { dir: OVERLAY_DIR, ids: loadClassifierIds(OVERLAY_DIR), tags: loadPackageTags(OVERLAY_DIR), patterns: [] }
+  // An overlay slug or classifier ID that is also public would collide in deployment GUIDs.
+  const publicIds = new Set(Object.values(classifierIds.patterns))
+  for (const [slug, id] of Object.entries(overlay.ids.patterns)) {
+    if (slug in classifierIds.patterns) throw new Error(`Overlay slug is already public: ${slug}`)
+    if (publicIds.has(id)) throw new Error(`Overlay classifier ID is already public: ${id} (${slug})`)
+  }
+  sources.push(overlay)
+}
+const patternFiles = sources.flatMap(source => walkDir(join(source.dir, 'patterns')).map(file => ({ file, source })))
 let resolvedCount = 0
 let unresolvedKeywordRefs = 0
 
-for (const file of patternFiles) {
+for (const { file, source } of patternFiles) {
+  const { ids: classifierIds, tags: packageTags } = source
   const raw = readFileSync(file, 'utf-8')
   let data = yaml.load(raw)
   data = resolveCustomisationFallbacks(data, false)
@@ -189,10 +218,11 @@ for (const file of patternFiles) {
     }
   }
 
-  patterns.push(data)
+  source.patterns.push(data)
 }
 
-if (packageTags) {
+for (const { tags: packageTags, patterns } of sources) {
+  if (!packageTags) continue
   const patternSlugs = new Set(patterns.map(pattern => pattern.slug))
   const missingTags = patterns.filter(pattern => !packageTags.patterns[pattern.slug]).map(pattern => pattern.slug)
   const extraTags = Object.keys(packageTags.patterns).filter(slug => !patternSlugs.has(slug))
@@ -204,6 +234,8 @@ if (packageTags) {
     process.exit(1)
   }
 }
+// An overlay build publishes the overlay's patterns only.
+const patterns = sources.at(-1).patterns
 
 // ── Load collections ──
 const collectionFiles = walkDir(join(DATA_DIR, 'collections'))
@@ -275,7 +307,8 @@ const retired = Object.fromEntries([...deprecatedBySlug.keys()].sort().map(slug 
 
 const output = {
   version: '1.0.0',
-  generated: new Date().toISOString(),
+  // SOURCE_DATE_EPOCH (seconds) pins the timestamp, so the same inputs compile byte-identical.
+  generated: (process.env.SOURCE_DATE_EPOCH ? new Date(Number(process.env.SOURCE_DATE_EPOCH) * 1000) : new Date()).toISOString(),
   patterns: publishedPatterns,
   retired,
   collections,
@@ -297,7 +330,7 @@ if (outString.includes(TOKEN_LITERAL)) {
 }
 writeFileSync(OUT_FILE, outString)
 
-console.log(`Done: ${publishedPatterns.length} patterns (${deprecatedCount} deprecated excluded, ${Object.values(retired).filter(r => r.replaced_by).length} with a replacement), ${collections.length} collections, ${keywordDicts.length} keyword dictionaries → patterns.json`)
+console.log(`Done: ${publishedPatterns.length} patterns (${deprecatedCount} deprecated excluded, ${Object.values(retired).filter(r => r.replaced_by).length} with a replacement), ${collections.length} collections, ${keywordDicts.length} keyword dictionaries → ${OUT_FILE}`)
 if (resolvedCount > 0) {
   console.log(`  (${resolvedCount} patterns had keyword_lists references resolved)`)
 }
