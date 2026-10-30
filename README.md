@@ -27,6 +27,18 @@ npm install
 npm run compile
 ```
 
+To compile private classifiers that must not be published, keep them outside
+this repository in the `data/` layout (`patterns/*.yaml`, `classifier-ids.json`,
+`package-tags.json`) and compile them as an overlay:
+
+```bash
+SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) node scripts/compile.js --overlay <private data dir> --out <file outside this repo>
+```
+
+The output carries only the overlay's patterns. They can use the public keyword
+lists and dictionary manifest. An overlay slug or classifier ID that is already
+public is refused. `SOURCE_DATE_EPOCH` makes the output repeatable.
+
 ## Repository structure
 
 ```
