@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Payroll Master File with Tax File Numbers
 slug: payroll-master-file-with-tax-file-numbers
-version: 1.6.0
+version: 1.7.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -126,6 +126,7 @@ purview:
       pattern: \b(?<!\b\d\d\s)(\d{3}[\s\-]?\d{3}[\s\-]?\d{3})\b
       validators:
         - ref: Validator_australian_tfn
+        - ref: Validator_australian_tfn_rem10
     - id: Pattern_payroll_master_file_with_tax_file_numbers_bsb_format_e_g_064_000_or_064000
       pattern: \b(\d{3}-?\d{3})\b
     - id: Pattern_payroll_master_file_with_tax_file_numbers_dollar_amounts_for_salary_figures
@@ -200,6 +201,15 @@ purview:
           value: '11'
         - name: CheckDigit
           value: '9'
+    - id: Validator_australian_tfn_rem10
+      type: Checksum
+      params:
+        - name: Weights
+          value: 2, 8, 6, 3, 10, 5, 1, 7, 10
+        - name: Modulo
+          value: '11'
+        - name: CheckDigit
+          value: '9'
   filters:
     - id: Guard_payroll_tfn_same_digits
       type: AllDigitsSameFilter
@@ -248,8 +258,11 @@ references:
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: '2026-02-20'
-updated: '2026-10-30'
+updated: '2026-10-31'
 changelog:
+  - version: 1.7.0
+    date: '2026-10-31'
+    description: 'Remainder-10 fix: Purview treats a checksum remainder of 10 as check digit 0 (measured on a test tenant 2026-10-31), so Validator_australian_tfn alone accepted invalid TFNs whose first eight weighted digits sum to 10 mod 11 and that end in 0 (about 9% of the numbers it accepted). Added Validator_australian_tfn_rem10 (Weights 2,8,6,3,10,5,1,7,10 / Mod 11 / CheckDigit 9) to the same regex; Purview requires both validators to pass, and together they match the TFN rule exactly. Test tenant: valid TFNs (including one ending in 0) matched; 255 446 010, 255 446 140 and 314 159 040 were rejected. The regex is unchanged; see docs/checksum-validator-semantics.md.'
   - version: 1.6.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'
