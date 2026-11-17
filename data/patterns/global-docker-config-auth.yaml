@@ -1,0 +1,246 @@
+schema: testpattern/v1
+name: Docker Registry Credentials (config.json auths)
+slug: global-docker-config-auth
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects container-registry credentials stored inline in a Docker client config.json (~/.docker/config.json), or in
+  the same JSON once decoded from a Kubernetes kubernetes.io/dockerconfigjson pull secret. When no credential store is
+  configured, docker login writes each registry's username and password to the auths object as one base64 string
+  (auth), and may store an identitytoken or registrytoken. Base64 is an encoding, not encryption, so anyone holding the
+  file can push and pull images as that account.
+operation: >-
+  The primaries are an "auth" key holding a standard-base64 value of 12 or more characters (short enough for the
+  encoding of user:pass) and an "identitytoken" or
+  "registrytoken" key holding a value of 20 or more characters; alone they are discovery-only at 65. The 75 tier also
+  requires an "auths" object opening within the proximity window. The 85 tier further requires registry or Docker
+  client context (a known registry host, credsStore, credHelpers, the config path, or dockerconfigjson) or a second
+  distinct auth entry. The regexes tolerate pretty-printed and compact JSON. A config that only names a credential
+  store or helper has no inline value and does not match.
+pattern: '("auth"\s*:\s*"[A-Za-z0-9+/]{12,}={0,2}")'
+confidence: medium
+confidence_justification: >-
+  Medium confidence. The auths/auth structure and its base64 encoding come from the Docker CLI source and the
+  Kubernetes documentation, and the nesting is distinctive, but "auth" is a common JSON key and a base64 run has no
+  checksum, so the value cannot be validated and a rotated or sample credential looks the same as a live one. Enforce
+  tiers therefore require the enclosing auths object.
+jurisdictions:
+  - global
+regulations:
+  - Criminal Code Act 1995 (Cth)
+  - Computer Fraud and Abuse Act
+  - Computer Misuse Act 1990
+frameworks:
+  - CIS Controls
+  - ISO 27001
+  - NIST CSF
+  - SOC 2
+data_categories:
+  - credentials
+  - security
+corroborative_evidence:
+  keywords:
+    - auths
+    - docker login
+    - config.json
+    - dockerconfigjson
+    - credsStore
+    - registry
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '"auth": "ZGVwbG95Ym90OkFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaMDEyMzQ1"'
+      description: Exact 65 probe - auth key with a base64 value and no auths object
+    - value: |-
+        {
+          "auths": {
+            "registry.internal.corp:5000": {
+              "auth": "ZGVwbG95Ym90OkFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaMDEyMzQ1"
+            }
+          }
+        }
+      description: Exact 75 probe - pretty-printed config.json for a private registry
+    - value: |-
+        {
+        	"auths": {
+        		"https://index.docker.io/v1/": {
+        			"auth": "Y2ktcnVubmVyOjAxMjM0NTY3ODlBQkNERUZHSElK"
+        		}
+        	}
+        }
+      description: Exact 85 probe - tab-indented config.json with the Docker Hub registry key
+    - value: '{"auths":{"ghcr.io":{"username":"svc-build","password":"abcdefghijklmnopqrstuvwxyz0123456789","auth":"c3ZjLWJ1aWxkOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6MDEyMzQ1Njc4OQ=="}}}'
+      description: Exact 85 probe - compact JSON as decoded from a Kubernetes .dockerconfigjson secret
+    - value: |-
+        {
+          "auths": {
+            "registry.internal.corp": {
+              "auth": "ZGVwbG95Ym90OkFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaMDEyMzQ1"
+            },
+            "mirror.internal.corp": {
+              "auth": "Y2ktcnVubmVyOjAxMjM0NTY3ODlBQkNERUZHSElK"
+            }
+          }
+        }
+      description: Exact 85 probe - two distinct auth entries in one file
+    - value: |-
+        {
+          "auths": {
+            "registry.internal.corp": {
+              "identitytoken": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+            }
+          }
+        }
+      description: Exact 75 probe - identity token stored in place of a username and password
+  should_not_match:
+    - value: '{"auths": {"https://index.docker.io/v1/": {}}, "credsStore": "desktop"}'
+      description: Credential-store configuration - the auths entry is empty and the secret is in the OS keychain
+    - value: '{"credHelpers": {"registry.internal.corp": "secretservice"}}'
+      description: Credential-helper configuration with no inline credential
+    - value: '{"auths": {"https://index.docker.io/v1/": {"auth": "c3R...zE2"}}}'
+      description: Truncated value as printed in the Kubernetes documentation
+    - value: '{"auths": {"registry.internal.corp": {"auth": "<base64 of username:password>"}}}'
+      description: Placeholder in place of the encoded credential
+    - value: '{"transport": {"auth": "c2VydmljZTpBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWg=="}}'
+      description: An auth key outside an auths object (discovery only)
+    - value: 'Documentation example: {"auths": {"https://index.docker.io/v1/": {"auth": "ZGVwbG95Ym90OkFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaMDEyMzQ1"}}}'
+      description: Complete config with registry context, vetoed on every tier by the documentation-example framing
+    - value: Run docker login so the auths section of config.json is populated.
+      description: Prose that names the structure without a value
+false_positives:
+  - description: >-
+      Documentation and tutorials that show a config.json with an invented but well-formed base64 value, such as the
+      encoding of user:password.
+    mitigation: >-
+      The shared template exclusion vetoes documentation framing; truncated and angle-bracket placeholders do not match
+      the base64 class. Decode remaining hits to confirm the account.
+  - description: Other JSON documents that use an "auth" key for a base64 value outside a Docker configuration.
+    mitigation: Those reach only the discovery tier. Enforce tiers require an "auths" object opening nearby.
+  - description: Config files whose registry password or token has since been rotated or expired (cloud registry tokens are short-lived).
+    mitigation: The pattern cannot test liveness. Treat a match as a credential to rotate and move to a credential store.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  This medium-confidence detector identifies registry credentials stored inline in a Docker client configuration: a
+  base64 username and password, or an identity or registry token, inside the auths object. A valid entry lets the
+  holder pull private images and, where the account allows, push or overwrite images that other systems deploy, which
+  is a supply-chain route into build and production environments. Harm is serious but bounded by the registry account's
+  rights and by token lifetime; the match does not establish push rights or the criticality of the images. Risk 8 and
+  SENSITIVE InfoTech fit directly usable registry credentials with unknown scope; PROTECTED requires confirmed write
+  access to images used by critical systems.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
+  idcf: DSL-3
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE and SENSITIVE InfoTech because an inline registry
+    credential is directly usable to pull, and possibly push, container images. PROTECTED is not met because the match
+    does not establish write access, the criticality of the images, or that the credential is still valid.
+  generic:
+    classification: Medium
+    dlm: Medium InfoTech
+    rationale: >-
+      Medium InfoTech handling fits registry credentials whose reach is limited to one account's repositories. High
+      handling requires confirmed write access to images that critical systems deploy.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 65
+      discovery_only: true
+      id_match: &docker_primaries
+        type: any
+        ids:
+          - Regex_docker_auth_entry
+          - Regex_docker_registry_token
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: *docker_primaries
+      matches:
+        - ref: Pattern_docker_auths_object
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: *docker_primaries
+      matches:
+        - ref: Pattern_docker_auths_object
+        - type: any
+          min_matches: 1
+          children:
+            - ref: Keyword_docker_registry_context
+            - ref: Regex_docker_auth_entry
+              min_count: 2
+              unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_docker_auth_entry
+      pattern: '("auth"\s*:\s*"[A-Za-z0-9+/]{12,}={0,2}")'
+    - id: Regex_docker_registry_token
+      pattern: '("(?:identitytoken|registrytoken)"\s*:\s*"[^"\s]{20,}")'
+    - id: Pattern_docker_auths_object
+      pattern: '("auths"\s*:\s*\{)'
+  keywords:
+    - id: Keyword_docker_registry_context
+      groups:
+        - match_style: string
+          terms:
+            - index.docker.io
+            - docker.io
+            - ghcr.io
+            - quay.io
+            - gcr.io
+            - azurecr.io
+            - amazonaws.com
+            - credsStore
+            - credHelpers
+            - .docker/config.json
+            - dockerconfigjson
+      strength: specific
+created: '2026-11-16'
+updated: '2026-11-16'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-16'
+    description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+  - url: https://docs.docker.com/reference/cli/docker/login/
+    title: 'Docker docs, docker login (without a credential store, credentials are stored base64-encoded in $HOME/.docker/config.json; credsStore and credHelpers)'
+  - url: https://github.com/docker/cli/blob/master/cli/config/types/authconfig.go
+    title: 'docker/cli source, AuthConfig (JSON keys username, password, auth, serveraddress, identitytoken, registrytoken)'
+  - url: https://github.com/docker/cli/blob/master/cli/config/configfile/file.go
+    title: 'docker/cli source, ConfigFile (the auths key; auth is standard base64 of username:password)'
+  - url: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    title: 'Kubernetes docs, Pull an Image from a Private Registry (config.json auths example; .dockerconfigjson decodes to the same JSON)'
+  - url: https://www.stepsecurity.io/blog/chaindrop-npm-worm
+    title: 'StepSecurity, ChainDrop npm worm, 4 August 2026 (lists ~/.docker/config.json among the credential files harvested)'

@@ -1,0 +1,205 @@
+schema: testpattern/v1
+name: Court Proceedings Transcript
+slug: au-court-proceedings-transcript
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Transcripts of Australian court proceedings produced by a court reporting service or contracted transcript provider: speaker turns in the transcript convention (HIS HONOUR:, HER HONOUR:, MR SURNAME:, MS SURNAME SC:, THE WITNESS:) together with a transcript marker such as the "TRANSCRIPT OF PROCEEDINGS" title, the copyright notice ("Copyright in Transcript is owned by the Commonwealth of Australia", "Copyright in this transcript is vested in the Crown"), a provider marking (VIQ Solutions, Auscript, State Reporting Bureau, "Transcript produced by"), the per-page footer of Federal Court transcripts (".QUD4471/2026 12.8.26 P-2") or the "..DATE dd/mm/yyyy" and "..DAY n" lines of Queensland transcripts. Family law, children's, child protection, protection-order, closed-court and suppression indicators raise the tier. Detection is on the transcript text; audio and video recordings of proceedings have no text and are out of scope. Court filings are covered by court-filing-reference, sealed filings by global-top500-416-sealed-court-filing-records, hearing lists by au-court-hearing-list-record and intercept transcripts by the lawful-intercept classifiers.
+operation: >-
+  All transcript regexes are case-sensitive ((?-i)), because the convention is upper-case speaker labels and prose such as "his Honour said" must not match. Primary: a judicial or witness speaker turn (HIS HONOUR / HER HONOUR / THE WITNESS followed by a colon). 65 (discovery only): the primary alone. 75: within 1000 characters, a counsel speaker turn (MR / MS / MRS / DR, optional initials, an upper-case surname, optional SC / KC / QC, then a colon) AND a transcript marker (title, copyright notice, provider marking, MATTER ADJOURNED line) or a page reference (Federal Court page footer, Queensland ..DATE / ..DAY line). 85: the same plus a restricted-proceeding term (Family Law Act, Part XIVB, family law, Federal Circuit and Family Court, Children's Court / Childrens Court, child protection order, child protection proceedings, protection order, intervention order, domestic or family violence, closed court, in camera, suppression order, non-publication order, not for publication, pseudonym). The bare terms "child protection" and "Child Protection Act" are deliberately not in that list: the identification WARNING printed on every Queensland transcript names the Child Protection Act 1999, and would lift every Queensland transcript to 85. All enforce tiers AND NOT the shared template-exclusion dictionary. Proximity is 1000 rather than 300 because the cover-page title and copyright notice sit 500 to 700 characters before the first speaker turn, and page footers recur about once per page.
+pattern: >-
+  (?-i)\b((?:HIS|HER)\s+HONOUR|THE\s+WITNESS)(?=\s?:)
+confidence: medium
+confidence_justification: >-
+  Medium: upper-case speaker turns plus a transcript title, copyright notice, provider marking or page footer are a document convention, not a topic phrase, and the header and footer strings were taken from transcripts as issued (a Federal Court transcript produced by VIQ Solutions in 2023 and a Supreme Court of Queensland transcript produced by the State Reporting Bureau in 2009). Not high because only those two layouts and a Queensland commission of inquiry transcript produced by Epiq were read; other courts' and newer providers' layouts are not verified (the HER HONOUR label is assumed as the counterpart of HIS HONOUR, and the Auscript provider name rests on secondary descriptions of older Federal Court transcripts), published open-court transcripts match as readily as restricted ones, and the tiers are heuristic evidence gates rather than measured accuracy. Test values are synthetic.
+jurisdictions:
+  - au
+regulations:
+  - Federal Court Rules 2011 (Cth)
+  - Family Law Act 1975 (Cth)
+  - Child Protection Act 1999 (Qld)
+frameworks:
+  - QGISCF
+data_categories:
+  - legal
+  - court
+  - pii
+corroborative_evidence:
+  keywords:
+    - TRANSCRIPT OF PROCEEDINGS
+    - Copyright in Transcript
+    - HIS HONOUR
+    - HER HONOUR
+    - THE WITNESS
+    - MATTER ADJOURNED
+    - State Reporting Bureau
+    - VIQ Solutions
+  proximity: 1000
+test_cases:
+  should_match:
+    - value: ".QUD4471/2026 12.8.26 P-14\nHIS HONOUR: Yes, Ms Rourke.\nMS ROURKE: If your Honour pleases, I appear for the respondent. We rely on the affidavit filed last week.\nHIS HONOUR: Thank you. I will adjourn until 10 o'clock.\nMATTER ADJOURNED at 3.45 pm UNTIL THURSDAY, 13 AUGUST 2026"
+      description: Body page of a Federal Court style transcript with page footer, speaker turns and adjournment line (75)
+      synthetic: true
+    - value: "TRANSCRIPT OF PROCEEDINGS\nFEDERAL CIRCUIT AND FAMILY COURT OF AUSTRALIA\nJUDGE ELLISDALE\nNo. BRC 4471 of 2026\nTESTON and MARLOW\nBRISBANE\n10.02 AM, WEDNESDAY, 12 AUGUST 2026\nCopyright in Transcript is owned by the Commonwealth of Australia.\nHER HONOUR: This is a parenting matter under the Family Law Act. Ms Okafor?\nMS OKAFOR: Yes, your Honour. I appear as the Independent Children's Lawyer.\nTHE WITNESS: I collected the children from school on the Friday."
+      description: Cover page and first turns of a family law transcript (85)
+      synthetic: true
+    - value: "Transcript of Proceedings\nCopyright in this transcript is vested in the Crown.\nCHILDRENS COURT OF QUEENSLAND\n..DATE 05/08/2026\n..DAY 1\nHIS HONOUR: Yes, Mr Marlow.\nMR MARLOW: Your Honour, I appear for the child.\nHIS HONOUR: This is a closed court for the purposes of this application."
+      description: Queensland reporting-bureau style transcript of a Childrens Court matter in closed court (85)
+      synthetic: true
+    - value: "HIS HONOUR: Yes, Mr Marlow."
+      description: Judicial speaker turn alone (65 discovery)
+      synthetic: true
+  should_not_match:
+    - value: "The primary judge set out the following exchange from the hearing:\nHIS HONOUR: Do you press the application?\nMR MARLOW: I do, your Honour.\nThe appellant submits that the exchange shows the matter had been prejudged. We do not accept that submission: Teston v Marlow [2026] QCA 118 at [42]."
+      description: Published judgment quoting an exchange - speaker turns but no transcript marker (65 only)
+    - value: "His Honour said the transcript of proceedings would be available to the parties next week, and Mr Marlow SC told reporters outside court that his client would appeal."
+      description: News report - lower-case prose, no speaker turns
+    - value: "How to order a transcript of proceedings: complete the request form with the matter title, matter number, court location and event dates. Copyright in the transcript remains with the State."
+      description: Transcript ordering guidance, no speaker turns
+    - value: "Mock trial script for Year 11 legal studies\nHIS HONOUR: Please be seated.\nMR SMITH: May it please the court, I appear for the prosecution.\nTHE WITNESS: I saw the car leave at about nine."
+      description: Mock trial script - speaker turns but no transcript marker, and "mock" is in the template exclusion (no match)
+false_positives:
+  - description: Transcripts that are already public - High Court transcripts, public-hearing transcripts of royal commissions and commissions of inquiry, and Federal Court online-file transcripts - saved inside the organisation.
+    mitigation: They carry the same title, copyright and provider markings and reach 75 when they use the HIS HONOUR / HER HONOUR / THE WITNESS convention. The detector cannot tell a published transcript from a restricted one; treat 75 as "a transcript is present" and use the 85 tier, or a separate allow-list of public sources, where only restricted transcripts should be blocked.
+  - description: Judgments, submissions and appeal books that quote a passage of transcript.
+    mitigation: A quoted exchange has speaker turns but normally no transcript title, copyright notice or page footer within 1000 characters, so it stays at 65. An appeal book that reproduces whole transcript pages does match, and is transcript content.
+  - description: Mock trial, moot court and legal-studies scripts written in the transcript convention.
+    mitigation: No transcript marker or page reference, so 65 only; scripts labelled "mock" are also removed by the template exclusion.
+  - description: Transcripts in layouts not read for this pattern (other states' reporting services, tribunal transcripts using MEMBER or DEPUTY PRESIDENT labels, magistrates court transcripts that label the bench differently).
+    mitigation: Not detected, or detected only through THE WITNESS turns (false negative). Add the organisation's own provider header and speaker labels at deployment.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 1000
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_court_transcript_judicial_turn
+      matches:
+        - ref: Regex_au_court_transcript_counsel_turn
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_court_transcript_marker
+            - Regex_au_court_transcript_page_ref
+        - ref: Keyword_au_court_transcript_restricted
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_court_transcript_judicial_turn
+      matches:
+        - ref: Regex_au_court_transcript_counsel_turn
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_court_transcript_marker
+            - Regex_au_court_transcript_page_ref
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_court_transcript_judicial_turn
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_court_transcript_judicial_turn
+      pattern: >-
+        (?-i)\b((?:HIS|HER)\s+HONOUR|THE\s+WITNESS)(?=\s?:)
+    - id: Regex_au_court_transcript_counsel_turn
+      pattern: >-
+        (?-i)\b((?:MR|MS|MRS|DR)\s+(?:[A-Z]\.\s?){0,3}[A-Z][A-Z'-]{1,30}(?:\s+(?:SC|KC|QC))?)(?=\s?:)
+    - id: Regex_au_court_transcript_marker
+      pattern: >-
+        (?-i)\b(TRANSCRIPT\s+OF\s+PROCEEDINGS|Transcript\s+of\s+Proceedings|Copyright\s+in\s+(?:this\s+)?[Tt]ranscript\s+is\s+(?:owned\s+by|vested\s+in)|Transcript\s+produced\s+by|MATTER\s+ADJOURNED|State\s+Reporting\s+Bureau|VIQ\s+SOLUTIONS|Auscript)\b
+    - id: Regex_au_court_transcript_page_ref
+      pattern: >-
+        (?-i)(?<![A-Za-z0-9.])(\.[A-Z]{2,4}\d{1,5}/(?:19|20)\d{2}\s+\d{1,2}\.\d{1,2}\.\d{2,4}\s+P-\d{1,5}|\.\.DATE\s+\d{1,2}/\d{1,2}/(?:19|20)\d{2}|\.\.DAY\s+\d{1,3})\b
+  keywords:
+    - id: Keyword_au_court_transcript_restricted
+      groups:
+        - match_style: word
+          terms:
+            - Family Law Act
+            - Part XIVB
+            - family law
+            - Federal Circuit and Family Court
+            - Children's Court
+            - Childrens Court
+            - child protection order
+            - child protection proceedings
+            - protection order
+            - intervention order
+            - domestic violence
+            - family violence
+            - closed court
+            - in camera
+            - suppression order
+            - non-publication order
+            - not for publication
+            - pseudonym
+      strength: specific
+risk_rating: 7
+risk_description: >-
+  The classifier identifies the text of a court transcript by its convention: upper-case speaker turns for the judge, counsel and witness together with a transcript title, copyright notice, provider marking or page footer. A transcript is a verbatim record of evidence and submissions and commonly names parties, witnesses and third parties and records health, financial and family detail given in evidence. Transcripts of open-court hearings can be bought by non-parties and some are published, but copies are released under conditions (the Federal Court states they cannot be shared between parties or distributed to other recipients) and the transcript supplier breach reported in 2026 exposed recordings and transcripts across many matters. Risk 7 supports SENSITIVE Legal for the general case. PROTECTED is not set at pattern level; transcripts of family law, children's, child protection and closed-court proceedings, or those under a suppression order, reach the 85 tier and organisations should consider PROTECTED for that tier, since publishing identities from those proceedings is an offence.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Legal
+  idcf: DSL-3
+  idcf_marker: Legal Privilege
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 7 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Legal and Medium because a transcript is a
+    verbatim record of evidence naming parties and witnesses and is released under conditions on further distribution.
+    PROTECTED is not met at pattern level because open-court transcripts can be purchased and some are published; the
+    85 tier marks family, children's, closed-court and suppressed proceedings where a higher label may be warranted.
+  generic:
+    classification: Medium
+    dlm: Medium Legal
+    rationale: >-
+      Medium with Medium Legal handling fits a court transcript held by a party or agency. High would need a confirmed
+      suppression order, closed court or children's or family law proceeding.
+references:
+  - title: Federal Court of Australia - Access to transcript - copyright in transcripts belongs to the Commonwealth, transcripts cannot be shared between parties or distributed to other recipients, transcripts may be confidential or restricted by order, panel providers, VIQ contract ceased 30 June 2026
+    url: https://www.fedcourt.gov.au/transcript
+  - title: Federal Court transcript of 23 November 2023 produced by VIQ Solutions (copy hosted by a party to the proceeding) - provider block with O/N number, TRANSCRIPT OF PROCEEDINGS title, court, registry, judge and "No. [registry letters] [number] of [year]" lines, copyright notice, page footer of the form ".[letters][number]/[year] [d.m.yy] P-[page]", HIS HONOUR and MR SURNAME SC speaker turns, MATTER ADJOURNED line
+    url: https://schiffradio.com/wp-content/uploads/2023/11/Injunction-part-1.pdf
+  - title: Supreme Court of Queensland transcript of 5 June 2009 produced by the State Reporting Bureau (third-party hosted copy) - "Transcript of Proceedings" title, "Copyright in this transcript is vested in the Crown", ..DATE and ..DAY lines, identification WARNING naming the Child Protection Act 1999, HIS HONOUR and MR SURNAME speaker turns
+    url: https://michaelmcfadyenscuba.info/watson/watson%20queensland%20sentencing.pdf
+  - title: Commission of Inquiry into Forensic DNA Testing in Queensland - hearing transcript 10 October 2022 - "State of Queensland - Transcript produced by Epiq" marking, THE WITNESS and MS SURNAME speaker turns
+    url: https://www.dnainquiry.qld.gov.au/public-hearings/assets/hearing-transcript-10-October-2022.pdf
+  - title: Queensland Courts - Request for transcript or audio of proceeding form - Recording and Transcription Services, release only where there is no restriction, courts covered include Childrens Court and Domestic and Family Violence Court
+    url: https://www.courts.qld.gov.au/__data/assets/pdf_file/0005/864293/rts-request-for-transcript.pdf
+  - title: Federal Circuit and Family Court of Australia - Daily court lists - notice that Part XIVB of the Family Law Act 1975 restricts publishing accounts of family law proceedings that identify parties or witnesses
+    url: https://courtlists.fcfcoa.gov.au/wps/wcm/connect/fcfcoa/court-lists-and-circuits/daily-court-lists
+created: '2026-11-16'
+updated: '2026-11-16'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-16'
+    description: Initial release - court proceedings transcripts. Case-sensitive judicial speaker-turn primary; 75 needs a counsel speaker turn plus a transcript title, copyright notice, provider marking or page reference within 1000 characters; 85 adds a family law, children's, protection-order, closed-court or suppression term. Quoted exchanges in judgments, news prose, ordering guidance and mock-trial scripts stay at 65 or do not match.
+author: testpattern-community
+license: MIT

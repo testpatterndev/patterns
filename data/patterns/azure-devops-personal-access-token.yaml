@@ -1,21 +1,32 @@
 schema: testpattern/v1
 name: Azure DevOps Personal Access Token
 slug: azure-devops-personal-access-token
-version: 1.5.0
+version: 2.0.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Detects Azure DevOps personal access token (PAT) patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the
-  built-in SIT directly, or use this version as a starting point for customisation.
+  Detects Azure DevOps personal access tokens (PATs). The primary detector is the current 84-character format, which
+  carries a fixed AZDO signature at positions 76-80. Tokens in the legacy 52-character Base32 format are detected only
+  when a specific Azure DevOps term is nearby, because that shape has no signature. Microsoft Purview ships a built-in
+  sensitive information type for the same credential, which also validates the token checksum; this version cannot.
 operation: >-
-  Matches Azure DevOps PATs which are 52-character Base64-encoded strings. DevOps PATs provide scoped access to Azure DevOps REST APIs. Corroborative evidence: 8 keywords within 300 characters.
-  Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.
-pattern: \b([a-z2-7\s]{52,56})\b
-confidence: low
+  Two regexes, both case-sensitive. (1) Current format: 76 alphanumeric characters, the literal AZDO, then 4
+  alphanumeric characters (84 in total), bounded so it cannot match inside a longer alphanumeric run. Tiers: 85 with an
+  Azure DevOps or PAT term within 300 characters, 65 discovery-only for the bare token. (2) Legacy format: exactly 52
+  lowercase Base32 characters (a-z, 2-7) with no whitespace allowed, so ordinary prose cannot match. It has one tier
+  only, 75, and that tier requires a specific Azure DevOps term (Azure DevOps, dev.azure.com, visualstudio.com, VSTS,
+  ADO, AZURE_DEVOPS_PAT); it has no discovery tier and never fires on the value alone. Template/sample text is excluded
+  on every tier. The token checksum is not validated. A PAT sent as an HTTP Basic header is Base64-encoded and is not
+  detected.
+pattern: (?-i)(?<![A-Za-z0-9])([A-Za-z0-9]{76}AZDO[A-Za-z0-9]{4})(?![A-Za-z0-9])
+confidence: high
 confidence_justification: >-
-  Low confidence: generic Base32-like pattern that may match unrelated data. Corroborative evidence keywords are essential for reliable detection. Added context gating and exclusion rules improve
-  precision and reduce incidental matches.
+  High for the current format: Microsoft documents a fixed length (84) and a fixed AZDO signature at a fixed offset, so
+  a chance match needs an 84-character alphanumeric run with those four letters in exactly that place. The legacy
+  52-character format is a generic Base32 shape with no signature; it is capped at the 75 tier and needs a specific
+  Azure DevOps term, and the whitespace that let the previous regex match ordinary prose has been removed. Neither
+  branch validates the checksum that Microsoft's built-in detector uses.
 jurisdictions:
   - global
 regulations:
@@ -32,13 +43,13 @@ data_categories:
 corroborative_evidence:
   keywords:
     - Azure DevOps
-    - DevOps
-    - VSTS
-    - personal access token
-    - PAT
+    - azuredevops
     - dev.azure.com
     - visualstudio.com
-    - authorization
+    - VSTS
+    - ADO
+    - personal access token
+    - PAT
   proximity: 300
   keyword_lists:
     - credentials
@@ -46,26 +57,52 @@ corroborative_evidence:
     - generic-data-labels
 test_cases:
   should_match:
-    - value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-      description: DevOps PAT with all lowercase a (52 chars)
-    - value: abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz
-      description: DevOps PAT with sequential lowercase letters
-    - value: '2345672345672345672345672345672345672345672345672345'
-      description: DevOps PAT with digits 2-7 (52 chars)
+    - value: abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnAZDOabcd
+      description: Bare current-format PAT (76 alphanumerics, AZDO, 4 alphanumerics); 65 discovery tier
+    - value: 'URL="org.visualstudio.com/proj"; PAT = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnAZDOabcd"'
+      description: Current-format PAT in the assignment shape Microsoft's own example uses; 85 tier
+    - value: AZURE_DEVOPS_PAT=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNAZDO0123
+      description: Current-format PAT in the environment variable Microsoft's documentation uses; 85 tier
+    - value: 'Azure DevOps PAT (old format): abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrst'
+      description: Legacy 52-character Base32 PAT with a specific Azure DevOps term; 75 tier
+    - value: 'git remote https://dev.azure.com/contoso/_git/app token 234567abcdefghijklmnopqrstuvwxyz234567abcdefghijklmn'
+      description: Legacy 52-character PAT next to a dev.azure.com URL; 75 tier
   should_not_match:
-    - value: aaaaaaaaaaaaa
-      description: Too short to be a DevOps PAT
-    - value: ABCDEFGHIJKLMNOPQRSTUVWXYZ0189ABCDEFGHIJKLMNOPQRSTUV
-      description: 52 chars but contains Base32-invalid digits 0/1/8/9, so not a valid PAT body
+    - value: Azure DevOps pipeline the nightly build agent restarts when the queue is idle
+      description: 55 characters of lowercase prose after "Azure DevOps pipeline"; the previous regex allowed whitespace and matched this
+    - value: abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrst
+      description: Legacy-shaped 52-character value with no Azure DevOps term; the legacy branch never fires alone, not even for discovery
+    - value: azure abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrst
+      description: The generic word "azure" next to a legacy-shaped value is not specific Azure DevOps evidence
+    - value: Azure DevOps PAT ABCDEFGHIJKLMNOPQRSTUVWXYZ0189ABCDEFGHIJKLMNOPQRSTUV
+      description: 52 characters but upper case with digits 0/1/8/9, so not a lowercase Base32 body, even with an Azure DevOps term
+    - value: dev.azure.com PAT abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmAZDOabcde
+      description: 84 alphanumerics with AZDO one position early (75 before it, 5 after), so the signature is not at 76-80
+    - value: dev.azure.com PAT abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnazdoabcd
+      description: Signature in lower case; the format is case-sensitive
+    - value: Azure DevOps aaaaaaaaaaaaa
+      description: Too short to be a PAT in either format
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
-    - value: 'azure aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-      description: 'A generic word from the detector name ("azure") next to a matching value is not 85 evidence; it reached 85 through the generated name-word tier'
 false_positives:
-  - description: Random 52-character lowercase strings in application data.
-    mitigation: Require proximity to Azure DevOps specific keywords to confirm context.
-  - description: Base32-encoded data that coincidentally matches the 52-character length.
-    mitigation: Combine with DevOps URL patterns (dev.azure.com, visualstudio.com) for validation.
+  - description: >-
+      Documentation and tutorials that show a made-up token in the 84-character AZDO shape. Microsoft's own example
+      value has this shape and is described as invalidated; this pattern still matches it because it cannot test the
+      checksum.
+    mitigation: >-
+      The template-exclusion dictionary suppresses values framed as examples or placeholders. For checksum-accurate
+      matching, run Microsoft's built-in Azure DevOps personal access token SIT alongside this one.
+  - description: >-
+      Other 52-character lowercase Base32 values near an Azure DevOps term, such as a Base32-encoded 256-bit hash or
+      key in a pipeline log.
+    mitigation: >-
+      The legacy branch stops at the 75 tier and needs a specific Azure DevOps term within 300 characters. Azure
+      DevOps Services has issued the 84-character format since July 2024 and advises regenerating older tokens, so
+      review legacy matches with that in mind.
+  - description: A current-format PAT that has already expired or been revoked.
+    mitigation: >-
+      The pattern cannot test validity. Treat a match as a credential until the token is confirmed revoked on the
+      user's Personal access tokens page.
 exports:
   - purview_xml
   - yaml
@@ -82,6 +119,15 @@ purview:
     - confidence_level: 85
       id_match: Regex_azure_devops_pat
       matches:
+        - ref: Keyword_azure_devops_pat_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_azure_devops_pat_legacy
+      matches:
         - ref: Keyword_azure_devops_specific
         - type: any
           min_matches: 0
@@ -92,7 +138,6 @@ purview:
       discovery_only: true
       id_match: Regex_azure_devops_pat
       matches:
-        - ref: Keyword_azure_devops_broad
         - type: any
           min_matches: 0
           max_matches: 0
@@ -100,38 +145,44 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_azure_devops_pat
-      pattern: \b([a-z2-7\s]{52,56})\b
+      pattern: (?-i)(?<![A-Za-z0-9])([A-Za-z0-9]{76}AZDO[A-Za-z0-9]{4})(?![A-Za-z0-9])
+    - id: Regex_azure_devops_pat_legacy
+      pattern: (?-i)(?<![A-Za-z0-9])([a-z2-7]{52})(?![A-Za-z0-9])
   keywords:
+    - id: Keyword_azure_devops_pat_context
+      groups:
+        - match_style: word
+          terms:
+            - Azure DevOps
+            - azuredevops
+            - dev.azure.com
+            - visualstudio.com
+            - VSTS
+            - text: ADO
+              case_sensitive: true
+            - AZURE_DEVOPS_PAT
+            - personal access token
+            - text: PAT
+              case_sensitive: true
+            - DevOps PAT
+            - devops token
+      strength: specific
     - id: Keyword_azure_devops_specific
       groups:
         - match_style: word
           terms:
             - Azure DevOps
-            - personal access token
-            - text: PAT
-              case_sensitive: true
+            - azuredevops
             - dev.azure.com
             - visualstudio.com
             - VSTS
-            - DevOps PAT
-            - devops token
+            - text: ADO
+              case_sensitive: true
+            - AZURE_DEVOPS_PAT
       strength: specific
-    - id: Keyword_azure_devops_broad
-      groups:
-        - match_style: word
-          terms:
-            - DevOps
-            - authorization
-            - bearer
-            - token
-            - access token
-            - git credential
-            - pipeline
-            - repository
-      strength: domain
 risk_rating: 8
 risk_description: >-
-  The low-confidence pattern looks for a 52-character Azure DevOps personal access token body with nearby DevOps context. If live, the PAT can act as its issuing user against repositories, pipelines, boards, feeds, or administration APIs according to explicitly selected scopes. The direct scale is one identity and the Azure DevOps resources that identity can reach, while token expiration, scope, and random-string collisions materially affect exploitability. Risk 8 SENSITIVE preserves serious contained code and pipeline risk; PROTECTED would require evidence of broad administrator scope, critical supply-chain reach, or significant irreversible damage.
+  The pattern finds an Azure DevOps personal access token: the current 84-character format by its fixed AZDO signature, or a legacy 52-character Base32 token when a specific Azure DevOps term is nearby. If live, the PAT can act as its issuing user against repositories, pipelines, boards, feeds, or administration APIs according to explicitly selected scopes. The direct scale is one identity and the Azure DevOps resources that identity can reach, while token expiration, scope, and the unvalidated checksum affect exploitability. Risk 8 SENSITIVE preserves serious contained code and pipeline risk; PROTECTED would require evidence of broad administrator scope, critical supply-chain reach, or significant irreversible damage.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -154,11 +205,20 @@ classification:
       Generic Medium and Medium InfoTech is appropriate for a user-scoped development token capable of material
       repository or pipeline misuse without assuming organisation-administrator authority.
 references:
+  - url: https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops#pat-format
+    title: Use personal access tokens, PAT format - Microsoft Learn (PATs are 84 characters with 52 randomized; fixed AZDO signature at positions 76 through 80)
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-devops-personal-access-token
-    title: Azure DevOps personal access token entity definition - Microsoft Learn
+    title: Azure DevOps personal access token entity definition - Microsoft Learn (84 case-sensitive a-z, A-Z, 0-9 with AZDO at 76-80; example value; built-in SIT has a checksum; keyword list)
+  - url: https://learn.microsoft.com/en-us/azure/devops/release-notes/2024/general/sprint-241-update
+    title: Azure DevOps Sprint 241 release notes, July 2024 - Microsoft Learn (token length increased from 52 to 84 characters; integrators should support both lengths)
+  - url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/azuredevopspersonalaccesstoken/azuredevopspersonalaccesstoken.go
+    title: TruffleHog Azure DevOps PAT detector (corroborates the legacy token as 52 lowercase characters, keyword-gated)
 created: '2026-02-09'
-updated: '2026-10-30'
+updated: '2026-11-16'
 changelog:
+  - version: 2.0.0
+    date: '2026-11-16'
+    description: 'Detector rewritten. The old regex \b([a-z2-7\s]{52,56})\b allowed whitespace inside the token, so it matched ordinary lowercase prose, and it covered only the legacy 52-character format. Primary regex is now the current 84-character format with the fixed AZDO signature at positions 76-80 (Microsoft Learn), at 85 with an Azure DevOps or PAT term and 65 discovery-only bare. The legacy format is kept as a second regex of exactly 52 lowercase Base32 characters with no whitespace, reachable only at 75 with a specific Azure DevOps term and with no discovery tier. Both regexes are case-sensitive. The broad keyword group (DevOps, authorization, bearer, token, pipeline, repository) is removed. Confidence low to high; description, operation, tests, false positives, risk description and references rewritten to match.'
   - version: 1.5.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

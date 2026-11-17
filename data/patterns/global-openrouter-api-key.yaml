@@ -1,0 +1,178 @@
+schema: testpattern/v1
+name: OpenRouter API Key
+slug: global-openrouter-api-key
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: Detects OpenRouter API keys, which start with sk-or-v1- followed by 64 lowercase hexadecimal characters. OpenRouter
+  is a gateway to many model providers behind one key, so a leaked key lets someone else run billed inference against every
+  model the account can reach. OpenRouter's management keys use the same format and are matched too.
+operation: 'Fixed format: the literal prefix sk-or-v1- and exactly 64 lowercase hexadecimal characters (73 characters in total),
+  bounded so it cannot match inside a longer token. Tiers: 85 for two distinct keys with an OpenRouter or API-key term within
+  300 characters, 75 for one key with such a term, 65 discovery-only for a bare key. Template/sample text is excluded on every
+  tier.'
+pattern: (?<![A-Za-z0-9_-])(sk-or-v1-[0-9a-f]{64})(?![A-Za-z0-9_-])
+confidence: high
+confidence_justification: 'High confidence: OpenRouter''s authentication documentation states the format exactly (sk-or-v1-
+  plus 64 lowercase hexadecimal characters, 73 in total), and TruffleHog''s production detector pins the same structure independently.
+  The prefix is vendor-specific and the body length is fixed, so a chance match is not realistic. The enforce tiers still ask
+  for a nearby OpenRouter or API-key term, and a single key stops at 75.'
+jurisdictions:
+- global
+regulations:
+- Criminal Code Act 1995 (Cth)
+frameworks:
+- CIS Controls
+- ISO 27001
+- NIST CSF
+- SOC 2
+data_categories:
+- credentials
+- security
+corroborative_evidence:
+  keywords:
+  - openrouter
+  - openrouter.ai
+  - OPENROUTER_API_KEY
+  - api key
+  proximity: 300
+  keyword_lists:
+  - credentials
+  - data-record-context
+  - generic-data-labels
+test_cases:
+  should_match:
+  - value: sk-or-v1-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    description: Bare OpenRouter key (sk-or-v1- plus 64 lowercase hex); 65 discovery tier
+  - value: OPENROUTER_API_KEY=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
+    description: Labelled key in an env assignment; 75 tier
+  - value: 'Authorization: Bearer sk-or-v1-abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 (openrouter.ai)'
+    description: Key in a bearer header next to the OpenRouter host name; 75 tier
+  - value: "OpenRouter API keys:\nsk-or-v1-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n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"
+    description: "Two distinct OpenRouter API Key values in one file with context; the 85 tier needs two distinct tokens (one token, or the same token repeated, stays below 85)"
+  should_not_match:
+  - value: OPENROUTER_API_KEY=sk-or-v1-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde
+    description: Body one character short (63 hex characters) despite the OpenRouter label
+  - value: OPENROUTER_API_KEY=sk-or-v1-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0
+    description: Body one character long (65 hex characters) despite the OpenRouter label
+  - value: OPENROUTER_API_KEY=sk-or-v1-0123456789abcdefghij0123456789abcdefghij0123456789abcdefghij0123
+    description: Body of the right length that is not hexadecimal (contains g-j)
+  - value: openrouter api key sk-or-v2-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    description: Wrong version segment in the prefix (v2); no such format is documented
+  - value: rotate the openrouter api key before deployment
+    description: Prose mention without a key value
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+- description: Keys that have already been deleted. OpenRouter is a GitHub secret-scanning partner and tells the owner when
+    a key is found exposed, so a key copied from a public repository may be dead by the time it is seen.
+  mitigation: The pattern cannot test validity. Treat a match in internal content as live until the key is confirmed deleted
+    in the OpenRouter account.
+- description: Made-up keys in SDK documentation and tests that copy the real prefix and length.
+  mitigation: The template-exclusion dictionary suppresses values framed as examples or placeholders; a single key also
+    needs an OpenRouter or API-key term to reach 75.
+- description: Overlap with detectors for other sk- prefixed provider keys (OpenAI, Anthropic).
+  mitigation: None needed for the catalogue's own patterns. Their regexes require a different segment straight after sk-
+    (48 alphanumerics, proj-, svcacct-, admin- or ant-), which sk-or-v1- does not satisfy, so they do not co-fire.
+exports:
+- purview_xml
+- yaml
+- regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: The high-confidence detector finds an OpenRouter API key through its sk-or-v1- prefix and fixed 64-character
+  hexadecimal body. A live key can run billed inference against any model the account can reach and expose prompts, outputs,
+  or application data sent through it. The affected scale is one OpenRouter account, with credit limits, monitoring, and
+  key deletion limiting damage. Risk 8 and SENSITIVE reflect serious contained
+  financial and service exposure, while a shared production key carrying protected workloads across many systems would raise
+  the impact.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
+  idcf: DSL-3
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 supports QGISCF SENSITIVE, PSPF OFFICIAL: Sensitive, and SENSITIVE InfoTech because a valid OpenRouter key
+    directly enables unauthorized billed use of the account's models and credits. PROTECTED is not met because the
+    detector does not establish broad privileged reach, protected prompt data, or significant compromise of a critical
+    service.
+  generic:
+    classification: Medium
+    dlm: Medium InfoTech
+    rationale: >-
+      Medium generic classification with Medium InfoTech handling suits OpenRouter keys because they grant direct
+      account access while credit limits and key deletion contain the outcome.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+  - dict: template-exclusion
+    as: Keyword_noise_exclusion
+    match_style: word
+  pattern_tiers:
+  - confidence_level: 85
+    id_match: Regex_openrouter_api_key
+    matches:
+    - ref: Regex_openrouter_api_key
+      min_count: 2
+      unique_results: true
+    - ref: Keyword_openrouter_api_key
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_openrouter_api_key
+    matches:
+    - ref: Keyword_openrouter_api_key
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 65
+    discovery_only: true
+    id_match: Regex_openrouter_api_key
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  regexes:
+  - id: Regex_openrouter_api_key
+    pattern: (?<![A-Za-z0-9_-])(sk-or-v1-[0-9a-f]{64})(?![A-Za-z0-9_-])
+  keywords:
+  - id: Keyword_openrouter_api_key
+    groups:
+    - match_style: word
+      terms:
+      - openrouter
+      - openrouter.ai
+      - OPENROUTER_API_KEY
+      - openrouter api
+      - api key
+      - API_KEY
+      - Bearer
+    strength: specific
+created: '2026-11-16'
+updated: '2026-11-16'
+changelog:
+- version: 1.0.0
+  date: '2026-11-16'
+  description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+- url: https://openrouter.ai/docs/api-reference/authentication
+  title: OpenRouter API authentication documentation (key format is sk-or-v1- followed by 64 lowercase hexadecimal characters, 73 in total; management keys use the same format; OPENROUTER_API_KEY variable; OpenRouter is a GitHub secret-scanning partner)
+- url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/openrouter/openrouter.go
+  title: TruffleHog production OpenRouter detector (sk-or-v1-[0-9a-f]{64}, keyword sk-or-v1-)

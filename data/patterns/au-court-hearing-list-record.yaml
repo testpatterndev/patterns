@@ -1,0 +1,235 @@
+schema: testpattern/v1
+name: Court Hearing List with Participant Contact Details
+slug: au-court-hearing-list-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Court and tribunal hearing lists, online-hearing schedules and participant lists that tie named participants and their email addresses to a matter: a case title or number, a courtroom or hearing date, the role each person plays (lawyer, court staff, observer, applicant, respondent, witness, interpreter) and a contact email for each. This is the shape of the online-hearing linking data disclosed by Court Services Victoria on 30 July 2026 (Magistrates' Court and Children's Court of Victoria). Courts publish daily lists that already show party names, courtrooms and times, so a list of that kind is not what this detector enforces on: enforce tiers need at least two participant email addresses next to the matter, courtroom and role details, which a published list does not carry. Lists for children's, family law, child protection and family violence matters raise the tier. Court filings are covered by court-filing-reference and sealed or suppressed filings by global-top500-416-sealed-court-filing-records; transcripts by au-court-proceedings-transcript.
+operation: >-
+  65 (discovery only): a hearing-list phrase (court list, hearing list, law list, online/virtual/remote hearing, hearing schedule/link/date/time/type, courtroom). This tier surfaces published daily lists, registry guidance and news. 75: the primary is a participant email address, and within 300 characters there must be a second distinct email address, a hearing slot (a numbered courtroom such as "Courtroom 3" or "Court 4C", a populated hearing/listing/mention/return date or time field, or "listed for hearing/mention/directions/trial/sentence"), a matter reference (a populated case/file/matter/proceeding number field, a "No. NSD 123 of 2026" style number, or an "A v B" case title) and a participant role term. 85: the same, plus a restricted-jurisdiction term (Children's Court, family law, family violence, intervention order, child protection, protection order, domestic violence, youth justice). Every enforce tier AND NOT the shared template-exclusion dictionary and a guidance exclusion (media release, data security notification, frequently asked questions, fact sheet, this policy, this procedure). The email primary recurs on every line of a tabular export, so rows far from the header still qualify. Case-number formats differ by court and are not modelled: only a labelled value, the "No. X of YYYY" form and the "A v B" title form are matched.
+pattern: >-
+  (?i)\b((?:daily\s+)?(?:court|hearing|law)\s+lists?|list\s+of\s+(?:hearings|matters)|(?:online|virtual|remote)\s+hearings?|hearing\s+(?:schedule|link|date|time|type)|court\s?room)\b
+confidence: medium
+confidence_justification: >-
+  Medium: the enforce tiers need four independent populated elements around a participant email (a second email, a hearing slot, a matter reference and a role term), which published daily lists, hearing notices to one party, registry guidance and news about court data incidents do not carry together. Not high because the role terms and the "A v B" title form are ordinary words, numbered "Court 3" also describes sports courts, and the tiers are heuristic evidence gates rather than measured accuracy. Test values are synthetic.
+jurisdictions:
+  - au
+regulations:
+  - Family Law Act 1975 (Cth)
+  - Child Protection Act 1999 (Qld)
+  - Information Privacy Act 2009 (Qld)
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - QGISCF
+data_categories:
+  - pii
+  - legal
+  - court
+corroborative_evidence:
+  keywords:
+    - hearing list
+    - court list
+    - online hearing
+    - courtroom
+    - case number
+    - hearing date
+    - respondent
+    - observer
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Online hearing participants - Magistrates' Court\nCase Number,Case Title,Hearing Date,Courtroom,Participant,Email,Role\nN12345678,Police v Teston,14/08/2026 10:00,Courtroom 3,Avery Teston,avery.teston@mailbox.example,Defendant\nN12345678,Police v Teston,14/08/2026 10:00,Courtroom 3,Jordan Marlow,j.marlow@harbourlegal.example,Lawyer\nN12345679,Police v Okafor-Lind,14/08/2026 11:30,Courtroom 3,Casey Rourke,casey.rourke@mailbox.example,Observer"
+      description: Tabular online-hearing participant export, one line per participant with case title, courtroom, email and role (75)
+      synthetic: true
+    - value: "Children's Court - online hearing list\nCase number: CC-0412/26\nHearing date: 02/09/2026 9:30 AM\nCourtroom 2\nParticipants:\nApplicant - child protection practitioner: Morgan Ellisdale (morgan.ellisdale@agency.example)\nRespondent (mother): Riley Teston (riley.teston@mailbox.example)\nInterpreter: Sam Okafor (sam.okafor@language.example)"
+      description: Children's Court online hearing list with labelled case number, hearing date and participant emails (85)
+      synthetic: true
+    - value: "Family violence intervention order list - Thursday\nTeston v Marlow, file no: FV26/1182, listed for mention, Court 4\nAffected family member: Riley Teston - riley.t@mailbox.example\nRespondent: Jordan Marlow - jordan.m@mailbox.example\nApplicant lawyer: Casey Rourke - crourke@harbourlegal.example"
+      description: Intervention order list entry naming the affected family member and respondent with emails (85)
+      synthetic: true
+    - value: "Daily court list - Courtroom 12"
+      description: Hearing-list phrase alone (65 discovery)
+      synthetic: true
+  should_not_match:
+    - value: "Daily law list - Magistrates Court, Thursday 20 August 2026\nCourtroom 12 - 9:00 AM\nTESTON, Avery - Police v Teston - mention\nMARLOW, Jordan - Police v Marlow - sentence\nCourtroom 14 - 9:30 AM\nROURKE, Casey - application"
+      description: Published daily list with party names, courtroom and time but no contact details (65 only)
+    - value: "Court Services Victoria said the information used to link participants to online hearings included case titles and numbers, hearing dates and times, courtrooms and participant names, along with email addresses and a description of each person's role such as lawyer, court staff or observer."
+      description: News report about a court data incident, no populated record (65 only)
+    - value: "Notice of hearing. Case number: M4471/26. Hearing date: 14/08/2026 10:00 AM, Courtroom 3. The applicant must attend in person. Questions: registry@courthouse.example"
+      description: Hearing notice to one party with a single registry email - not a participant list (65 only)
+    - value: "How to join an online hearing: find your matter in the daily court list, check the courtroom and hearing time, and email the registry if you need an interpreter."
+      description: Registry guidance (65 only)
+    - value: "Court staff contacts for Courtroom 1 bookings: listings@courthouse.example and registrar@courthouse.example. Lawyers should allow two business days."
+      description: Staff contact notice with two emails, a courtroom and role words but no matter reference (65 only)
+false_positives:
+  - description: Daily court lists that courts publish themselves (Queensland daily law lists, Federal Circuit and Family Court daily court lists, Victorian hearing search results), saved or forwarded inside the organisation.
+    mitigation: They carry party names, courtrooms and times but no participant email addresses, so they stay at the 65 discovery tier. If your organisation treats saved family-law or Children's Court lists as sensitive in their own right, deploy the 65 tier for review rather than enforcement.
+  - description: Emails arranging a hearing between two law firms, or a registry email copied to several parties, that quote the case title, the courtroom and the recipients' addresses.
+    mitigation: These reach 75 when a role term is also present. They do identify the participants and their contact details for a matter, so the match is on-target, but the document is routine correspondence. Tune with recommended_dlp_min_matches or scope the policy to shared storage rather than mailboxes if the volume is high.
+  - description: Sports and venue schedules ("Court 3", "Smith v Jones", "10:30") circulated with player email addresses.
+    mitigation: A role term from the participant-role list is also required. A fixture list that uses "respondent", "observer" or "witness" is unlikely; if a tribunal-style sports judiciary list matches, it is close to the intended content.
+  - description: Hearing lists whose rows carry a bare case number and a date but no numbered courtroom, no "A v B" title and no labelled case-number field.
+    mitigation: Not detected at an enforce tier (false negative). Case-number formats differ by court and are not modelled here; add the organisation's own court file number format to the matter-reference regex at deployment.
+exports:
+  - purview_xml
+  - yaml
+scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_court_hearing_list_email
+      matches:
+        - ref: Regex_au_court_hearing_list_email
+          min_count: 2
+          unique_results: true
+        - ref: Regex_au_court_hearing_list_slot
+        - ref: Regex_au_court_hearing_list_matter_ref
+        - ref: Keyword_au_court_hearing_list_role
+        - ref: Keyword_au_court_hearing_list_restricted
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_court_hearing_list_guidance_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_court_hearing_list_email
+      matches:
+        - ref: Regex_au_court_hearing_list_email
+          min_count: 2
+          unique_results: true
+        - ref: Regex_au_court_hearing_list_slot
+        - ref: Regex_au_court_hearing_list_matter_ref
+        - ref: Keyword_au_court_hearing_list_role
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_court_hearing_list_guidance_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_court_hearing_list_phrase
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_court_hearing_list_phrase
+      pattern: >-
+        (?i)\b((?:daily\s+)?(?:court|hearing|law)\s+lists?|list\s+of\s+(?:hearings|matters)|(?:online|virtual|remote)\s+hearings?|hearing\s+(?:schedule|link|date|time|type)|court\s?room)\b
+    - id: Regex_au_court_hearing_list_email
+      pattern: >-
+        \b([A-Za-z0-9][A-Za-z0-9._%-]{0,63}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?){1,8})\b
+    - id: Regex_au_court_hearing_list_slot
+      pattern: >-
+        (?i)\b(court\s?room\s*(?:no\.?\s*)?\d{1,2}[A-Z]?|court\s+(?:no\.?\s*)?\d{1,2}[A-Z]?|(?:hearing|listing|mention|return)\s+(?:date|time)(?:\s+and\s+time)?\s*[:#-]?\s*\d{1,2}[/.:-]\d{1,2}|listed\s+for\s+(?:hearing|mention|directions|trial|sentence))\b
+    - id: Regex_au_court_hearing_list_matter_ref
+      pattern: >-
+        (?i)\b((?:case|file|matter|proceeding|court\s+file|court\s+reference)\s*(?:number|no\.?|ref(?:erence)?|ID)\s*[:#]\s*(?!(?:n/?a|unknown|tbc|tba|withheld|not\s+recorded)\b|_{2,}|\[|<)[A-Z0-9][A-Z0-9/.-]{2,24}|(?:No\.?|Number)\s+(?:[A-Z]{1,4}\s?)?\d{1,6}\s+of\s+(?:19|20)\d{2}|[A-Z][A-Za-z'-]{1,30}\s+v\.?\s+[A-Z][A-Za-z'-]{1,30})\b
+  keywords:
+    - id: Keyword_au_court_hearing_list_role
+      groups:
+        - match_style: word
+          terms:
+            - lawyer
+            - legal representative
+            - solicitor
+            - barrister
+            - duty lawyer
+            - court staff
+            - observer
+            - applicant
+            - respondent
+            - defendant
+            - accused
+            - informant
+            - prosecutor
+            - complainant
+            - appellant
+            - witness
+            - interpreter
+            - support person
+            - affected family member
+            - protected person
+            - litigation guardian
+      strength: domain
+    - id: Keyword_au_court_hearing_list_restricted
+      groups:
+        - match_style: word
+          terms:
+            - Children's Court
+            - Childrens Court
+            - family law
+            - Family Law Act
+            - family violence
+            - domestic violence
+            - intervention order
+            - protection order
+            - child protection
+            - youth justice
+      strength: specific
+    - id: Keyword_au_court_hearing_list_guidance_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - media release
+            - data security notification
+            - frequently asked questions
+            - fact sheet
+            - this policy
+            - this procedure
+      strength: exclusion
+risk_rating: 8
+risk_description: >-
+  The classifier enforces on a court or tribunal hearing list that ties at least two participants' email addresses to a matter reference, a courtroom or hearing date and each person's role; published-style lists with names, courtrooms and times alone stay at 65 discovery. A genuine match shows who is involved in which proceeding, in what capacity, and how to contact them. For adult criminal and civil matters much of the matter detail is on the public record, but the contact details and non-party roles (observers, support persons, interpreters, witnesses) are not, and they enable targeted phishing, harassment or intimidation of participants. In Children's Court, child protection, family law and family violence matters the identities themselves are restricted from publication, and a list can reveal that a family is before the court. Risk 8 supports SENSITIVE Personal-Privacy. PROTECTED is not set because the detector cannot tell a single adult-jurisdiction list from a bulk export or a list identifying a child or a protected person; organisations holding Children's Court or family violence lists should apply PROTECTED to the 85 tier after their own harm assessment.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy and Medium because an enforced
+    match links several named participants, their roles and their email addresses to an identified court matter.
+    PROTECTED is not met by default: the detector does not establish bulk scale, a suppression order or that a child
+    or protected person is identified, although the 85 tier flags the jurisdictions where that is likely.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium with Medium Personal-Privacy handling fits a participant list with contact details for court matters.
+      High would need bulk records or confirmed children's, family violence or suppressed matters.
+references:
+  - title: Court Services Victoria - Data Security Notification (30 July 2026) - online-hearing linking data held case titles and numbers, hearing dates and times, courtrooms, participant names, email addresses and role descriptions (lawyer, court staff, observer) for the Magistrates' Court and Children's Court
+    url: https://courts.vic.gov.au/node/18238
+  - title: Federal Circuit and Family Court of Australia - Daily court lists - published lists show time, parties, courtroom and judicial officer; notice that Part XIVB of the Family Law Act 1975 restricts publishing the identity of parties and witnesses in family law proceedings
+    url: https://courtlists.fcfcoa.gov.au/wps/wcm/connect/fcfcoa/court-lists-and-circuits/daily-court-lists
+  - title: Queensland Courts - Daily law lists - lists are published daily; notice about non-publication (suppression) orders and statutory prohibitions on publication
+    url: https://www.courts.qld.gov.au/daily-law-lists
+  - title: Queensland Courts - Request for transcript or audio of proceeding form - matter title convention (R v Party 1, Party 1 v Party 2) and matter number field
+    url: https://www.courts.qld.gov.au/__data/assets/pdf_file/0005/864293/rts-request-for-transcript.pdf
+created: '2026-11-16'
+updated: '2026-11-16'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-16'
+    description: Initial release - court hearing lists and online-hearing participant lists. Enforce tiers key on a participant email address and need a second distinct email, a hearing slot, a matter reference and a role term; children's, family law, child protection and family violence terms raise 75 to 85. Published daily lists, single-party hearing notices, registry guidance and incident news stay at 65 discovery.
+author: testpattern-community
+license: MIT
