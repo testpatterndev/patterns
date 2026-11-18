@@ -1,0 +1,217 @@
+schema: testpattern/v1
+name: Salesforce OAuth Token
+slug: global-salesforce-oauth-token
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: 'Detects Salesforce OAuth tokens in the two shapes Salesforce''s own documentation shows: the opaque access token,
+  which doubles as a session ID and begins with the 15-character org ID (00D...) and an exclamation mark, and the refresh
+  token beginning 5Aep861. An access token gives API access to the org''s data as the user who authorised it; a refresh token
+  can be exchanged for new access tokens, so a stolen one gives continuing access to that data over the REST API. JWT-based
+  access tokens, which an app must opt in to, are not covered.'
+operation: 'Two regexes share the same tiers. (1) Access token / session ID: 00D plus 12 alphanumerics (the org ID), then !
+  or its URL-encoded form %21, then 90-130 characters of letters, digits, underscore and dot. Every Salesforce example and
+  TruffleHog''s detector show a 96-character body; the range allows for the token being documented as opaque. (2) Refresh
+  token: the literal 5Aep861, 60-300 characters of letters, digits, underscore and dot, and up to two = padding characters.
+  Tiers: 85 for two distinct tokens of the same kind with a Salesforce or OAuth term within 300 characters, 75 for one token
+  with such a term, 65 discovery-only for a bare token. Template/sample text is excluded on every tier.'
+pattern: (?<![A-Za-z0-9])(00D[A-Za-z0-9]{12}(?:!|%21)[A-Za-z0-9_.]{90,130})(?![A-Za-z0-9_.])
+confidence: medium
+confidence_justification: 'Medium confidence. The access-token shape is well attested: three examples in Salesforce Help
+  share it exactly (org ID, !, 96-character body) and TruffleHog''s production detector pins the same structure, so the org-ID
+  prefix and separator make a chance match unlikely. The refresh-token shape is less certain: one Salesforce example and TruffleHog
+  agree on the 5Aep861 prefix but not on length, and Salesforce''s rotation example shows a refresh token with a different
+  beginning. Salesforce publishes examples, not a format specification, and describes its tokens as opaque, so both regexes
+  can go stale without notice; a single token therefore stops at 75 and needs a Salesforce or OAuth term.'
+jurisdictions:
+- global
+regulations:
+- Criminal Code Act 1995 (Cth)
+frameworks:
+- CIS Controls
+- ISO 27001
+- NIST CSF
+- SOC 2
+data_categories:
+- credentials
+- security
+corroborative_evidence:
+  keywords:
+  - salesforce
+  - force.com
+  - sfdc
+  - access_token
+  - refresh_token
+  - instance_url
+  - session id
+  proximity: 300
+  keyword_lists:
+  - credentials
+  - data-record-context
+  - generic-data-labels
+test_cases:
+  should_match:
+  - value: 00D000000000ABC!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef
+    description: Bare access token / session ID (15-character org ID, !, 96-character body); 65 discovery tier
+  - value: '{"access_token": "00D000000000ABC!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef", "instance_url": "https://yourInstance.salesforce.com", "token_type": "Bearer"}'
+    description: Access token in a token-endpoint JSON response; 75 tier
+  - value: https://localhost:8443/callback#access_token=00Dxx0000000XYZ%21abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_.abcdefghijklmnopqrstuvwxyz012345&instance_url=https://yourInstance.salesforce.com
+    description: Access token in a user-agent flow redirect URL, where the ! is URL-encoded as %21; 75 tier
+  - value: 'Salesforce connected app refresh_token: 5Aep861ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL_'
+    description: Refresh token with a Salesforce label; 75 tier
+  - value: "sfdc refresh tokens\n5Aep861ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL_\n5Aep8610123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN_ABCDEFGHIJKLMNOPQRSTUVWXYZ=="
+    description: "Two distinct Salesforce refresh tokens in one file with context; the 85 tier needs two distinct tokens of the same kind (one token, or the same token repeated, stays below 85)"
+  should_not_match:
+  - value: Salesforce org ID 00D000000000ABC
+    description: An org ID on its own is an identifier, not a token
+  - value: Salesforce access_token 00D000000000ABC!ABCDEFGHIJKLMNOPQRSTUVWXYZ
+    description: Org ID and ! followed by a body far too short to be a session ID
+  - value: Salesforce access_token 005000000000ABC!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef
+    description: Same shape but beginning 005 (a user ID prefix), not the 00D org ID prefix
+  - value: Salesforce refresh_token 5Aep861ABCDEFGHIJKLMNOPQRSTUVWXYZ
+    description: 5Aep861 prefix followed by a body far too short to be a refresh token
+  - value: rotate the Salesforce refresh_token for the integration user
+    description: Prose mention without a token value
+  - value: template example placeholder record identifier
+    description: Template/sample context should be excluded even when anchor words are present
+false_positives:
+- description: Expired access tokens. A session ID stops working at the org's session timeout, so one found in an old debug
+    log or support ticket is usually dead; a refresh token is longer-lived.
+  mitigation: The pattern cannot test validity. Treat a refresh token as live until it is confirmed revoked, and check the
+    age of the content before escalating an access token.
+- description: The sample tokens from Salesforce's own documentation (for example 00Dx0000000BV7z!AR8AQ...) copied into internal
+    wikis and integration guides.
+  mitigation: The template-exclusion dictionary suppresses content framed as an example or placeholder; an unframed copy
+    of a documentation sample still matches.
+- description: Tokens this pattern does not match. JWT-based access tokens (opt-in per connected app) are ordinary three-part
+    JWTs with no Salesforce-specific prefix, and Salesforce's refresh-token-rotation example shows a refresh token that does
+    not begin 5Aep861.
+  mitigation: Documented as a known scope limitation. Pair with a generic JWT detector where JWT-based access tokens are
+    enabled; the pattern needs a version bump if Salesforce's token shapes change.
+exports:
+- purview_xml
+- yaml
+- regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: The detector finds a Salesforce OAuth access token (session ID) by its org-ID prefix, or a refresh token
+  by its 5Aep861 prefix. A live access token can read or change whatever the authorising user can reach through the Salesforce
+  APIs, typically customer and sales records; a refresh token can be exchanged for new access tokens for as long as it stays valid. The
+  affected scale is one user's access to one org, with the connected app's scopes, the user's permissions, session timeout,
+  and revocation limiting harm. Risk 8 and SENSITIVE reflect serious contained compromise of CRM data, while a refresh token
+  for an integration user with org-wide access to protected records would raise the impact.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
+  idcf: DSL-3
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to QGISCF SENSITIVE, PSPF OFFICIAL: Sensitive, and SENSITIVE InfoTech because a valid Salesforce token
+    directly exposes the records the authorising user can reach in one org. PROTECTED is not met because access is
+    bounded by that user's permissions and the app's scopes, and the detector does not establish org-wide or
+    protected-record reach.
+  generic:
+    classification: Medium
+    dlm: Medium InfoTech
+    rationale: >-
+      Medium generic classification with Medium InfoTech handling suits Salesforce OAuth tokens because CRM data can be
+      seriously compromised while user permissions, app scopes and revocation contain the scope.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+  - dict: template-exclusion
+    as: Keyword_noise_exclusion
+    match_style: word
+  pattern_tiers:
+  - confidence_level: 85
+    id_match: &id001
+      type: any
+      ids:
+      - Regex_salesforce_access_token
+      - Regex_salesforce_refresh_token
+    matches:
+    - type: any
+      min_matches: 1
+      children:
+      - ref: Regex_salesforce_access_token
+        min_count: 2
+        unique_results: true
+      - ref: Regex_salesforce_refresh_token
+        min_count: 2
+        unique_results: true
+    - ref: Keyword_salesforce_oauth_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 75
+    id_match: *id001
+    matches:
+    - ref: Keyword_salesforce_oauth_context
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 65
+    discovery_only: true
+    id_match: *id001
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  regexes:
+  - id: Regex_salesforce_access_token
+    pattern: (?<![A-Za-z0-9])(00D[A-Za-z0-9]{12}(?:!|%21)[A-Za-z0-9_.]{90,130})(?![A-Za-z0-9_.])
+  - id: Regex_salesforce_refresh_token
+    pattern: (?<![A-Za-z0-9_.])(5Aep861[A-Za-z0-9_.]{60,300}={0,2})(?![A-Za-z0-9_.=])
+  keywords:
+  - id: Keyword_salesforce_oauth_context
+    groups:
+    - match_style: word
+      terms:
+      - salesforce
+      - salesforce.com
+      - force.com
+      - sfdc
+      - access_token
+      - refresh_token
+      - instance_url
+      - session id
+      - sessionId
+      - connected app
+    strength: specific
+created: '2026-11-16'
+updated: '2026-11-16'
+changelog:
+- version: 1.0.0
+  date: '2026-11-16'
+  description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+- url: https://help.salesforce.com/s/articleView?id=xcloud.remoteaccess_oauth_web_server_flow.htm&type=5
+  title: OAuth 2.0 Web Server Flow - Salesforce Help (example token response; access_token is a 15-character 00D org ID, !, then a 96-character body)
+- url: https://help.salesforce.com/s/articleView?id=xcloud.remoteaccess_oauth_refresh_token_flow.htm&type=5
+  title: OAuth 2.0 Refresh Token Flow - Salesforce Help (example access_token whose prefix equals the org ID in the identity URL; the rotation example shows a refresh token that does not begin 5Aep861)
+- url: https://help.salesforce.com/s/articleView?id=xcloud.remoteaccess_oauth_user_agent_flow.htm&type=5
+  title: OAuth 2.0 User-Agent Flow - Salesforce Help (redirect URL example with the ! URL-encoded as %21 and a refresh_token beginning 5Aep861)
+- url: https://help.salesforce.com/s/articleView?id=xcloud.remoteaccess_access_tokens.htm&type=5
+  title: Access Tokens - Salesforce Help (opaque tokens are the default; JWT-based access tokens must be enabled per app)
+- url: https://developer.salesforce.com/docs/atlas.en-us.222.0.api_rest.meta/api/intro_understanding_refresh_token_oauth.htm
+  title: REST API Developer Guide, OAuth refresh token - Salesforce Developers (the access token acts as a session ID)
+- url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/salesforce/salesforce.go
+  title: TruffleHog production Salesforce access-token detector (00 + 13 alphanumerics, !, 96 characters of letters, digits, underscore and dot)
+- url: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/salesforcerefreshtoken/salesforcerefreshtoken.go
+  title: TruffleHog production Salesforce refresh-token detector (5AEP861 followed by 80 or more characters of letters, digits, dot, underscore and =)

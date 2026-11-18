@@ -1,15 +1,15 @@
 schema: testpattern/v1
 name: Azure Storage Key
 slug: global-azure-storage-key
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Detects Azure Storage Key patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or
+  Detects Azure Storage account keys: 86 Base64 characters followed by ==, on their own or as the value of an assignment such as AccountKey=. Replaces the deprecated azure-storage-account-key. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or
   use this version as a starting point for customisation.
-operation: 'Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials. Uses additional domain-context evidence and explicit exclusion logic for template/sample/test text.'
-pattern: (?<![A-Za-z0-9/+=])([A-Za-z0-9/+=]{86}==)(?![A-Za-z0-9/+=])
+operation: 'Matches exactly 86 Base64 characters plus == (88 in total), not preceded or followed by another Base64 character; an equals sign may come directly before the key. One tier, 85, which requires an Azure Storage keyword within 300 characters. Keyword lists: credentials. Uses explicit exclusion logic for template/sample/test text.'
+pattern: (?<![A-Za-z0-9/+])([A-Za-z0-9/+]{86}==)(?![A-Za-z0-9/+=])
 confidence: low
 confidence_justification: >-
   Low confidence: generic pattern format that may match unrelated data. Corroborative evidence keywords are essential for reliable detection. Added context gating and exclusion rules improve precision
@@ -50,6 +50,8 @@ test_cases:
       description: Azure storage account key, alternate
     - value: nu18DKRYfmt07CJQXelsz6BIPWdkry5AHOVcjqx4/GNUbipw3+FMTahov29ELSZgnu18DKRYfmt07CJQXelsz6==
       description: Azure storage account key, mixed-case
+    - value: AccountKey=NUbipw3+FMTahov29ELSZgnu18DKRYfmt07CJQXelsz6BIPWdkry5AHOVcjqx4/GNUbipw3+FMTahov29ELSZg==;EndpointSuffix=core.windows.net
+      description: Key written straight after an equals sign, as in a connection-string fragment or an environment file
   should_not_match:
     - value: ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNPQ
       description: 88 base64 chars but not ending in == (not a storage key)
@@ -90,7 +92,7 @@ purview:
             - Keyword_noise_exclusion
   regexes:
     - id: Regex_azure_storage_key
-      pattern: (?<![A-Za-z0-9/+=])([A-Za-z0-9/+=]{86}==)(?![A-Za-z0-9/+=])
+      pattern: (?<![A-Za-z0-9/+])([A-Za-z0-9/+]{86}==)(?![A-Za-z0-9/+=])
   keywords:
     - id: Keyword_azure_storage_key
       groups:
@@ -138,8 +140,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-azure-storage-account-key
     title: Azure storage account key entity definition - Microsoft Learn
 created: '2026-02-08'
-updated: '2026-10-30'
+updated: '2026-11-16'
 changelog:
+  - version: 1.6.0
+    date: '2026-11-16'
+    description: 'Regex no longer treats = as a key character: the lookbehind rejected any key that came straight after an equals sign, so AccountKey=<key> and NAME=<key> assignments were missed, and = was allowed in the middle of the 86-character body where Base64 never has it. Found while merging azure-storage-account-key into this pattern (that one matched the assignment form, this one did not). Added a should_match case for the assignment form; description and operation now say what the detector matches. Tiers and keywords unchanged.'
   - version: 1.5.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

@@ -1,19 +1,25 @@
 schema: testpattern/v1
 name: AWS Access Key
 slug: global-aws-access-key
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
-description: Detects AWS Access Key patterns.
+description: >-
+  Detects AWS access key IDs and other IAM unique identifiers by prefix, including long-term keys (AKIA) and the temporary keys AWS STS issues (ASIA). Confidence rises when the identifier sits next to
+  a labelled secret access key or, for temporary credentials, a labelled session token.
 operation: >-
-  Reference: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials. Uses additional
-  domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Reference: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html The primary regex is a known IAM prefix followed by 16 upper-case alphanumeric characters. Tiers: 65
+  discovery-only for the bare identifier; 75 when an AWS identity phrase or a labelled session token is within 300 characters; 85 when, in addition, a labelled secret access key is present. The session
+  token counts only with its label (aws_session_token, AWS_SESSION_TOKEN or SessionToken, then a separator and the first 40 Base64 characters of the token, so a token wrapped across lines still counts): a
+  long Base64 string without the label is not evidence, and a session token never fires a tier without an access key ID. The secret-key label accepts AWS_SECRET_ACCESS_KEY and SecretAccessKey, with or without quotes. Uses explicit exclusion logic for
+  template/sample/test text.
 pattern: \b((?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16})\b
 confidence: high
 confidence_justification: >-
-  High confidence: structurally constrained pattern with corroborative keyword support reduces false positive rates significantly. Added context gating and exclusion rules improve precision and reduce
-  incidental matches.
+  High confidence: the identifier has a documented prefix and a fixed length, and the enforce tiers need independent AWS evidence beside it. The session-token and secret-key evidence is label-anchored
+  on the names AWS documents for its credentials file, environment variables and STS responses, so unlabelled Base64 near an identifier stays at discovery. AWS does not fix the session token's length,
+  so the evidence regex asks only for its first 40 characters.
 jurisdictions:
   - global
 regulations:
@@ -50,7 +56,19 @@ test_cases:
       description: Exact 75 probe - access key identifier with an AWS-specific field label
     - value: "AWS IAM credential\nAWS_ACCESS_KEY_ID=ASIA6R5T4Y3U2I1O9P8L\nAWS_SECRET_ACCESS_KEY=Z9pL2mN7qR4sT8vW1xY5aB3cD6eF0gH2iJ4kL7mN"
       description: Exact 85 probe - access key ID independently paired with a populated secret key
+    - value: "export AWS_ACCESS_KEY_ID=ASIA6R5T4Y3U2I1O9P8L\nexport AWS_SESSION_TOKEN=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+      description: Exact 75 probe - temporary (ASIA) access key ID with a labelled session token in environment-variable form, no secret key
+    - value: "[default]\naws_access_key_id = ASIA6R5T4Y3U2I1O9P8L\naws_secret_access_key = Z9pL2mN7qR4sT8vW1xY5aB3cD6eF0gH2iJ4kL7mN\naws_session_token = ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+      description: Exact 85 probe - temporary credential set in credentials-file form (key ID, secret key and labelled session token)
+    - value: '{"Credentials": {"AccessKeyId": "ASIA6R5T4Y3U2I1O9P8L", "SecretAccessKey": "Z9pL2mN7qR4sT8vW1xY5aB3cD6eF0gH2iJ4kL7mN", "SessionToken": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"}}'
+      description: Exact 85 probe - temporary credential set as returned in an STS JSON response
   should_not_match:
+    - value: ASIA6R5T4Y3U2I1O9P8L ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
+      description: Temporary access key ID next to a long Base64 string with no session-token label stays at discovery
+    - value: ASIA6R5T4Y3U2I1O9P8L session_token=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
+      description: A generic session_token label is not the AWS label (aws_session_token / SessionToken)
+    - value: 'ASIA6R5T4Y3U2I1O9P8L aws_session_token = to-be-filled-in'
+      description: Session-token label with no token value after it is not evidence
     - value: XKIAIOSFODNN7EXAMPLE
       description: Invalid prefix (XKIA instead of AKIA/ASIA/etc.)
     - value: AKIA123456789012345
@@ -64,10 +82,14 @@ test_cases:
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
-  - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
-    mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
-  - description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer documentation.
-    mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce false positives from technical writing.
+  - description: >-
+      IAM unique IDs that are not credentials. AROA (role), AIDA (user), AGPA (group) and similar prefixes share the shape and appear in policies, CloudTrail logs and STS responses.
+    mitigation: >-
+      On their own they stay at the 65 discovery tier. The 85 tier needs a labelled secret access key as well, which an identifier in a policy or log does not have.
+  - description: Expired temporary credentials. An ASIA key with its session token in an old log or ticket is usually dead, since STS credentials last from minutes to hours.
+    mitigation: The pattern cannot test validity. Treat a recent match as live; for older content, check the timestamp against the session duration before escalating.
+  - description: AWS documentation values such as AKIAIOSFODNN7EXAMPLE and ASIAIOSFODNN7EXAMPLE copied into runbooks and tutorials.
+    mitigation: The template-exclusion dictionary suppresses content framed as an example, but a bare copy of the documentation values with no such framing still matches.
 exports:
   - purview_xml
   - yaml
@@ -93,7 +115,11 @@ purview:
     - confidence_level: 75
       id_match: Regex_aws_access_key
       matches:
-        - ref: Keyword_aws_identity_context
+        - type: any
+          min_matches: 1
+          refs:
+            - Keyword_aws_identity_context
+            - Pattern_aws_session_token_label
         - type: any
           min_matches: 0
           max_matches: 0
@@ -102,7 +128,11 @@ purview:
     - confidence_level: 85
       id_match: Regex_aws_access_key
       matches:
-        - ref: Keyword_aws_identity_context
+        - type: any
+          min_matches: 1
+          refs:
+            - Keyword_aws_identity_context
+            - Pattern_aws_session_token_label
         - ref: Pattern_aws_secret_key_pair
         - type: any
           min_matches: 0
@@ -113,7 +143,9 @@ purview:
     - id: Regex_aws_access_key
       pattern: \b((?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16})\b
     - id: Pattern_aws_secret_key_pair
-      pattern: (?i)\b(AWS_SECRET_ACCESS_KEY\s*[=:]\s*[A-Za-z0-9/+=]{32,64})
+      pattern: (?i)\b((?:AWS_SECRET_ACCESS_KEY|SecretAccessKey)["']?\s*[=:]\s*["']?[A-Za-z0-9/+=]{32,64})
+    - id: Pattern_aws_session_token_label
+      pattern: (?i)\b((?:aws_session_token|SessionToken)["']?\s*[=:>]\s*["']?[A-Za-z0-9/+]{40})
   keywords:
     - id: Keyword_aws_identity_context
       groups:
@@ -151,9 +183,22 @@ classification:
 references:
   - title: "Criminal Code Act 1995 (Cth)"
     url: https://www.legislation.gov.au/C2004A04868/latest/text
+  - title: "IAM identifiers, unique ID prefixes - AWS IAM User Guide (AKIA is an access key; ASIA is a temporary AWS STS access key ID, unique only together with the secret access key and session token)"
+    url: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html
+  - title: "Configuration and credential file settings - AWS CLI User Guide (aws_session_token setting; credentials-file examples pairing an ASIA key ID with aws_session_token)"
+    url: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+  - title: "Environment variables - AWS CLI User Guide (AWS_SESSION_TOKEN is required with temporary credentials from AWS STS and overrides aws_session_token)"
+    url: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html
+  - title: "Credentials data type - AWS STS API Reference (response fields AccessKeyId, SecretAccessKey and SessionToken)"
+    url: https://docs.aws.amazon.com/STS/latest/APIReference/API_Credentials.html
+  - title: "GetSessionToken - AWS STS API Reference (session token size is not fixed and no maximum should be assumed; sample response with a Base64 token)"
+    url: https://docs.aws.amazon.com/STS/latest/APIReference/API_GetSessionToken.html
 created: '2026-02-08'
-updated: '2026-10-30'
+updated: '2026-11-16'
 changelog:
+  - version: 1.5.0
+    date: '2026-11-16'
+    description: 'Temporary credentials: added Pattern_aws_session_token_label (aws_session_token / AWS_SESSION_TOKEN / SessionToken, a separator, then at least 40 Base64 characters) as an alternative to the AWS identity phrase on the 75 and 85 tiers. An access key ID with a labelled session token now reaches 75, and with a labelled secret key as well reaches 85; before, a real temporary credential set stayed at 65 unless a phrase such as "AWS IAM credential" was also present. The session token is evidence only, never a primary match, and only with its label. Pattern_aws_secret_key_pair now also accepts the STS response label SecretAccessKey and quoted values. Added test cases, pattern-specific false positives and the AWS documentation references; description, operation and confidence justification rewritten.'
   - version: 1.4.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking. An existing group around part of the match became (?:...).'

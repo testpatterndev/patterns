@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Mobile Advertising ID (IDFA / GAID / AAID)
 slug: global-advertising-id
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -15,7 +15,7 @@ operation: >-
   Explicit iOS, Android, Apple-IDFA, Google-Advertising-ID, or mobile-ad-SDK context raises it to 75.
   The 85 tier additionally requires an attribution, consent, campaign-event, device-profile, install,
   or audience-segment record. Enforcing tiers reject public documentation, templates, and examples.
-pattern: ((?:idfa|gaid|aaid|advertising[\s_-]*id|ad[\s_-]*id)[\s:#=_-]{0,8}[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-f-])
+pattern: (?i)(?<![A-Za-z])((?:idfa|gaid|aaid|advertising[\s_-]*id|ad[\s_-]*id)[\s:#=_-]{0,8}[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-f-])
 confidence: medium
 confidence_justification: >-
   Medium confidence: the UUID body is generic (any v4 UUID matches the hex layout), so detection relies on an explicit
@@ -77,7 +77,7 @@ purview:
       id_match: Regex_advertising_id
   regexes:
     - id: Regex_advertising_id
-      pattern: ((?:idfa|gaid|aaid|advertising[\s_-]*id|ad[\s_-]*id)[\s:#=_-]{0,8}[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-f-])
+      pattern: (?i)(?<![A-Za-z])((?:idfa|gaid|aaid|advertising[\s_-]*id|ad[\s_-]*id)[\s:#=_-]{0,8}[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-f-])
   keywords:
     - id: Keyword_mobile_ad_platform
       groups:
@@ -120,9 +120,13 @@ test_cases:
       description: Low-tier probe - labelled candidate without platform context
     - value: 'iOS device IDFA: 97987bca-ae59-4c7d-94ba-ee4f19ab8c21'
       description: Medium-tier probe - labelled identifier plus mobile-platform context
+    - value: 'iOS device IDFA: 97987BCA-AE59-4C7D-94BA-EE4F19AB8C21'
+      description: Medium-tier probe - upper-case UUID, the form iOS emits
     - value: 'Mobile attribution record for iOS device - IDFA: 12345678-90ab-cdef-1234-567890abcdef; install attribution captured.'
       description: High-tier probe - platform context plus attribution record
   should_not_match:
+    - value: 'Android device crash report - Upload ID: 6d92078a-8246-4ba4-ae5b-76104861e7dc'
+      description: Upload ID ends in "ad id" but is not an advertising identifier
     - value: 6d92078a-8246-4ba4-ae5b-76104861e7dc
       description: Bare UUID with no advertising-ID label
     - value: 'session id: 6d92078a-8246-4ba4-ae5b'
@@ -165,8 +169,11 @@ classification:
       Generic Low and Low handling fit a resettable advertising identifier whose privacy impact becomes material only
       after linkage to identity or behavioural datasets.
 created: '2026-06-13'
-updated: '2026-10-30'
+updated: '2026-11-17'
 changelog:
+  - version: 1.4.0
+    date: '2026-11-17'
+    description: 'Matching widened: the regex now carries a leading (?i), so both the label and the UUID hex match in any case. Purview regex is case-sensitive by default (dev-tenant test recorded in commit bc6255bc9e), so the lower-case label missed "IDFA: ..." and the lower-case hex class missed upper-case UUIDs, the form iOS emits for an IDFA. UUID hex is case-insensitive on input (RFC 4122). A letter may no longer sit directly before the label: "Upload ID", "Lead ID" and "Thread ID" end in "ad id" and reached 75 beside a device term. Added an upper-case UUID test case and an Upload ID decoy.'
   - version: 1.3.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

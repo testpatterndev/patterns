@@ -1,21 +1,27 @@
 schema: testpattern/v1
 name: Github Pat
 slug: global-github-pat
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
-  Detects Github Pat patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use
-  this version as a starting point for customisation.
+  Detects GitHub access tokens by prefix: classic personal access tokens (ghp_), OAuth tokens (gho_), GitHub App user tokens (ghu_), refresh tokens (ghr_) and GitHub App installation tokens (ghs_).
+  Installation tokens are matched in both formats: the legacy 40-character form and the stateless form GitHub made the default in October 2026 (still ghs_, about 520 characters, a JWT with two dots).
+  Fine-grained personal access tokens (github_pat_) are covered by global-github-pat-fine-grained. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already
+  running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
 operation: >-
-  Reference: https://github.blog/changelog/2021-03-31-authentication-token-format-updates/ Corroborative evidence: 8 keywords within 300 characters. Keyword lists: credentials, credentials. Uses
-  additional domain-context evidence and explicit exclusion logic for template/sample/test text.
+  Two regexes share the same tiers. (1) Opaque tokens: one of the prefixes ghp_, gho_, ghu_, ghs_, ghr_ followed by exactly 36 alphanumeric characters (reference:
+  https://github.blog/changelog/2021-03-31-authentication-token-format-updates/). (2) Stateless installation tokens: ghs_ followed by three runs of letters, digits, hyphens and underscores joined by
+  exactly two dots, i.e. the ghs_APPID_JWT layout. GitHub publishes the prefix, the two dots, the character set and an approximate length of 520 that varies with the token's contents; it publishes no
+  segment lengths, so the bounds are deliberately loose (first run 20-300, second 20-1000, third 20-700) and the regex does not assume a numeric app ID or an eyJ header. Tiers: 85 with a GitHub keyword
+  within 300 characters, 65 discovery-only for a bare token. Template/sample text is excluded on both.
 pattern: \b((?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36})\b
 confidence: high
 confidence_justification: >-
-  High confidence: structurally constrained pattern with corroborative keyword support reduces false positive rates significantly. Added context gating and exclusion rules improve precision and reduce
-  incidental matches.
+  High confidence: every branch starts with a GitHub-specific prefix that GitHub introduced so that scanners can identify its tokens. The opaque branch is a fixed 40 characters. The stateless
+  installation-token branch needs ghs_ plus three long URL-safe runs joined by exactly two dots, which file names and identifiers that merely begin with ghs_ do not satisfy. GitHub advises treating
+  tokens as opaque and may change the stateless layout again; the bounds leave room above the published length of about 520 for that reason. The checksum in the opaque format is not validated.
 jurisdictions:
   - global
 regulations:
@@ -52,7 +58,17 @@ test_cases:
       description: GitHub OAuth token
     - value: ghs_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef0123
       description: GitHub server-to-server token
+    - value: ghs_1234567_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123_-.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefgh
+      description: Bare stateless installation token (ghs_, app ID, underscore, then a three-part JWT; 488 characters); 65 discovery tier
+    - value: 'GitHub App installation token: ghs_1234567_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123_-.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefgh'
+      description: Labelled stateless installation token; 85 tier
+    - value: 'https://x-access-token:ghs_7654321_KLMNOPQRSTUVWXYZabcdefghijklmnopqrst.0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRST.ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGH@github.com/octo-org/octo-repo.git'
+      description: Stateless installation token embedded in a git remote URL (github.com supplies the keyword); 85 tier
   should_not_match:
+    - value: GitHub Actions reads ghs_config.production.yaml before each deploy
+      description: A file name that begins with ghs_ and has two dots; the runs are far shorter than a token's
+    - value: 'GitHub App installation token: ghs_1234567_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+      description: ghs_ value with only one dot (a truncated stateless token) is neither format
     - value: ghx_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef01
       description: Invalid prefix (ghx instead of ghp/gho/ghu/ghs/ghr)
     - value: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef0
@@ -62,10 +78,12 @@ test_cases:
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
-  - description: Authentication-related terminology in software documentation, security training materials, or system architecture descriptions without actual credentials.
-    mitigation: Require proximity to credential-specific patterns (API keys, connection strings, tokens) rather than general security terminology.
-  - description: Code snippets and configuration examples containing credential-related keywords or placeholder values in developer documentation.
-    mitigation: Check for common placeholder patterns (example.com, localhost, 0000) and documentation file types to reduce false positives from technical writing.
+  - description: Expired tokens. Installation tokens (ghs_) expire after one hour, so one found in an old CI log or chat export is usually dead.
+    mitigation: The pattern cannot test validity. Treat a recent match as live; for older content, confirm the timestamp before escalating.
+  - description: Made-up tokens in documentation, tests and tutorials that copy the real prefix and length.
+    mitigation: The template-exclusion dictionary suppresses values framed as examples or placeholders. The opaque format's checksum is not validated, so structurally valid fakes still match.
+  - description: Source files, variables or keys whose names begin with ghs_ and contain dots.
+    mitigation: The stateless branch needs three runs of at least 20 characters with no other punctuation, joined by exactly two dots, which names of this kind do not reach.
 exports:
   - purview_xml
   - yaml
@@ -80,7 +98,11 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_github_pat
+      id_match: &id001
+        type: any
+        ids:
+          - Regex_github_pat
+          - Regex_github_stateless_installation_token
       matches:
         - ref: Keyword_github_pat
         - type: any
@@ -90,7 +112,7 @@ purview:
             - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_github_pat
+      id_match: *id001
       matches:
         - type: any
           min_matches: 0
@@ -100,6 +122,8 @@ purview:
   regexes:
     - id: Regex_github_pat
       pattern: \b((?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36})\b
+    - id: Regex_github_stateless_installation_token
+      pattern: (?<![A-Za-z0-9_.-])(ghs_[A-Za-z0-9_-]{20,300}\.[A-Za-z0-9_-]{20,1000}\.[A-Za-z0-9_-]{20,700})(?![A-Za-z0-9_-])
   keywords:
     - id: Keyword_github_pat
       groups:
@@ -116,10 +140,13 @@ purview:
             - git credential
             - GITHUB_TOKEN
             - github api
+            - GitHub App
+            - installation token
+            - installation access token
       strength: specific
 risk_rating: 8
 risk_description: >-
-  The pattern identifies GitHub token prefixes for personal, OAuth, user-to-server, server-to-server, and refresh credentials followed by the expected 36-character body. A valid token can authenticate to GitHub and expose or modify repositories, issues, packages, workflows, or account data within that token's grants. The normal affected scale is one token owner, application installation, or server relationship, while token type, expiry, revocation, and permissions determine actual reach. Risk 8 SENSITIVE is retained for serious bounded account or repository compromise; PROTECTED needs demonstrated organisation-wide administration or critical software-supply-chain control.
+  The pattern identifies GitHub token prefixes for personal, OAuth, user-to-server, server-to-server, and refresh credentials followed by the expected 36-character body, and GitHub App installation tokens in the longer stateless ghs_ format. A valid token can authenticate to GitHub and expose or modify repositories, issues, packages, workflows, or account data within that token's grants. The normal affected scale is one token owner, application installation, or server relationship, while token type, expiry, revocation, and permissions determine actual reach. Risk 8 SENSITIVE is retained for serious bounded account or repository compromise; PROTECTED needs demonstrated organisation-wide administration or critical software-supply-chain control.
 sensitivity_labels:
   pspf: "OFFICIAL: Sensitive"
   qgiscf: SENSITIVE
@@ -145,9 +172,20 @@ classification:
 references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-github-personal-access-token
     title: GitHub personal access token entity definition - Microsoft Learn
+  - url: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github
+    title: About authentication to GitHub, GitHub's token formats - GitHub Docs (prefix per token type; stateless ghs_APPID_JWT rollout from 27 April 2026; installation tokens may not be 40 characters)
+  - url: https://github.blog/changelog/2026-04-24-notice-about-upcoming-new-format-for-github-app-installation-tokens/
+    title: GitHub changelog, 24 April 2026 (installation tokens change to ghs_APPID_JWT, about 520 characters and varying; ghs_[A-Za-z0-9]{36} may not match; GitHub Enterprise Server not affected)
+  - url: https://github.blog/changelog/2026-05-15-github-app-installation-tokens-per-request-override-header
+    title: GitHub changelog, 15 May 2026 (a stateless token has two dots, a stateful one none; GitHub's recommended regex for both is ghs_[A-Za-z0-9\.\-_]{36,})
+  - url: https://github.blog/changelog/2026-10-02-stateless-github-app-installation-tokens-rolled-out/
+    title: GitHub changelog, 2 October 2026 (stateless format is now the default for newly minted installation tokens; still ghs_, about 520 characters instead of 40)
 created: '2026-02-08'
-updated: '2026-10-30'
+updated: '2026-11-16'
 changelog:
+  - version: 1.6.0
+    date: '2026-11-16'
+    description: 'Added the stateless GitHub App installation token format as a second regex (Regex_github_stateless_installation_token): ghs_ followed by three URL-safe runs joined by exactly two dots. GitHub made this format the default on 2 October 2026; at about 520 characters it never matched the 36-character branch, so new installation tokens went undetected. The existing branch for ghp_/gho_/ghu_/ghr_ and legacy ghs_ is unchanged, and both regexes share the 85 and 65 tiers. Added GitHub App and installation-token keywords, test cases for the new format, pattern-specific false positives and the GitHub sources; description, operation and confidence justification rewritten to say what is matched.'
   - version: 1.5.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking. An existing group around part of the match became (?:...).'

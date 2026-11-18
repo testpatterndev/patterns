@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Health Insurance Member / Subscriber ID (Labelled)
 slug: global-insurance-member-id
-version: 1.2.0
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,14 +9,25 @@ description: >-
   Detects a labelled health-insurance member, subscriber, policy or group identifier:
   a member/subscriber/policy/group ID label followed by a 6-15 character alphanumeric
   value that contains at least one digit. Insurance identifiers are protected health
-  information under HIPAA and are frequently exposed in breach disclosures.
+  information under HIPAA and are frequently exposed in breach disclosures. Australian private
+  health funds call the identifier a "membership number" (Medibank, Bupa, HCF), and it sits in
+  patient and customer records next to the fund name or "private health insurance"; that label
+  is detected by a second regex with its own, health-specific evidence, because motoring clubs,
+  gyms and loyalty programmes also issue membership numbers.
 operation: >-
-  A member / subscriber / policy / group label, an id/number/no qualifier, up to 8
-  separator characters, then a 6-15 character value of letters, digits and hyphens
-  that must include at least one digit (so it does not match an ordinary word).
-  Bounded with non-alphanumeric lookarounds. Corroborative evidence: keywords within
+  Two primaries with the same value shape (up to 8 separator characters, then a 6-15 character
+  value of letters, digits and hyphens that must include at least one digit, bounded with
+  non-alphanumeric lookarounds). Regex_insurance_member_id: a member / subscriber / policy / group /
+  enrollee / insured label with an id/identifier/number/no qualifier; 75 needs the general
+  health-insurance context group and 85 adds person-coverage context. Regex_insurance_membership_number:
+  a "membership number" / "membership no" label; 75 needs health-fund context only (health fund,
+  private health, health cover, hospital cover, extras cover, Medibank, Bupa) and 85 adds
+  person-coverage context. The general terms insurer, coverage, insurance claim, health plan and
+  payer never raise a membership number above 65, so a motoring-club or general-insurer membership
+  record stays discovery-only. Both primaries have a 65 discovery tier and every tier rejects the
+  shared template exclusion. The top-level pattern is the first regex only. Evidence proximity is
   300 characters.
-pattern: '(?<![A-Za-z])((?:member|subscriber|policy|group|enrollee|insured)\s+(?:id|identifier|number|no\.?)[\s:#=-]{0,8}(?=[A-Z0-9-]{6,15}(?![A-Z0-9-]))(?:[A-Z-]*\d[A-Z0-9-]*))(?![A-Z0-9-])'
+pattern: '(?<![A-Za-z])((?i:(?:member|subscriber|policy|group|enrollee|insured)\s+(?:id|identifier|number|no\.?))[\s:#=-]{0,8}(?=[A-Z0-9-]{6,15}(?![A-Z0-9-]))(?:[A-Z-]*\d[A-Z0-9-]*))(?![A-Z0-9-])'
 confidence: medium
 confidence_justification: >-
   Medium confidence: the value charset is generic, but requiring an explicit
@@ -25,8 +36,10 @@ confidence_justification: >-
   label-plus-alphanumeric structure can appear in non-health contexts.
 jurisdictions:
   - global
+  - au
 regulations:
   - HIPAA
+  - Privacy Act 1988 (Cth)
 frameworks:
   - CIS Controls
   - ISO 27001
@@ -58,6 +71,12 @@ test_cases:
       description: Exact 75 probe with health-insurance context
     - value: 'Patient claim for Health plan Member ID: ABC123456789'
       description: Exact 85 probe with health-insurance and person-linked care context
+    - value: "Private health insurance: Medibank Private\nMembership number: 71820394A"
+      description: Australian private health fund membership number in a patient record (75)
+      synthetic: true
+    - value: "Patient: Avery Teston  Date of birth: 04/02/1991\nHealth fund: Bupa  Membership no. 6044718\nHospital cover: yes"
+      description: Australian health fund membership number with patient linkage (85)
+      synthetic: true
   should_not_match:
     - value: 'Member ID: ABCDEFGH'
       description: Value has no digit, likely a word not an identifier
@@ -67,9 +86,21 @@ test_cases:
       description: Value too short (under 6 characters)
     - value: 'Club Member ID: ABC123456789'
       description: Valid non-health membership identifier must remain discovery-only
+    - value: 'Frequent flyer membership number: 7182039A - points balance 48,200, Gold status until 31/12/2026'
+      description: Loyalty programme membership number with no health context must remain discovery-only
+    - value: 'Gym membership number 20481736 - direct debit fortnightly, 12 month term'
+      description: Gym membership number with no health-insurance context must remain discovery-only
+    - value: "Motoring club roadside assistance\nMembership number: 71820394\nYour insurer will contact you about coverage for the insurance claim lodged on 12/08/2026."
+      description: Motoring-club membership number beside general insurance words (insurer, coverage, insurance claim) must remain discovery-only
 false_positives:
   - description: Order numbers, membership IDs for non-health clubs, or group codes that share the member/policy/group labelling.
     mitigation: Require corroborative health-insurance keywords (health plan, EOB, payer) within proximity to confirm a health context.
+  - description: Motoring club, general insurer and mutual memberships (roadside assistance, car or home insurance) where a "membership number" or "policy number" sits near the words insurer, coverage or insurance claim.
+    mitigation: A "membership number" label is a separate primary whose 75 and 85 tiers accept health-fund context only (health fund, private health, health cover, hospital cover, extras cover, Medibank, Bupa), so these membership records stay at the 65 discovery tier. A "policy number" or "member ID" beside insurer, coverage or insurance claim still reaches 75 through the original labels, as it did before 1.3.0; that older behaviour is unchanged.
+  - description: Loyalty, frequent-flyer, gym, union and library "membership number" fields, matched by the membership label.
+    mitigation: They stay at the 65 discovery tier unless health-fund context is within 300 characters. A club page that prints a membership number next to a health-fund offer ("members save on hospital cover with ...") would reach 75.
+  - description: Health fund membership numbers recorded with no fund name and none of the health-fund terms, for example under a bare "Health insurance" or "Insurance" heading, or for funds other than Medibank and Bupa.
+    mitigation: Not detected above 65 (false negative) unless "health fund", "private health", "health cover", "hospital cover" or "extras cover" is within 300 characters. Short or ambiguous fund names (nib, HCF, HBF) are deliberately not keywords; add the funds your records name at deployment.
 exports:
   - purview_xml
   - yaml
@@ -136,9 +167,39 @@ purview:
           max_matches: 0
           refs:
             - Keyword_noise_exclusion
+    - confidence_level: 85
+      id_match: Regex_insurance_membership_number
+      matches:
+        - ref: Keyword_health_fund_context
+        - ref: Keyword_person_coverage_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_insurance_membership_number
+      matches:
+        - ref: Keyword_health_fund_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_insurance_membership_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
   regexes:
     - id: Regex_insurance_member_id
-      pattern: '(?<![A-Za-z])((?:member|subscriber|policy|group|enrollee|insured)\s+(?:id|identifier|number|no\.?)[\s:#=-]{0,8}(?=[A-Z0-9-]{6,15}(?![A-Z0-9-]))(?:[A-Z-]*\d[A-Z0-9-]*))(?![A-Z0-9-])'
+      pattern: '(?<![A-Za-z])((?i:(?:member|subscriber|policy|group|enrollee|insured)\s+(?:id|identifier|number|no\.?))[\s:#=-]{0,8}(?=[A-Z0-9-]{6,15}(?![A-Z0-9-]))(?:[A-Z-]*\d[A-Z0-9-]*))(?![A-Z0-9-])'
+    - id: Regex_insurance_membership_number
+      pattern: '(?<![A-Za-z])((?i:membership\s+(?:number|no\.?))[\s:#=-]{0,8}(?=[A-Z0-9-]{6,15}(?![A-Z0-9-]))(?:[A-Z-]*\d[A-Z0-9-]*))(?![A-Z0-9-])'
   keywords:
     - id: Keyword_health_insurance_context
       groups:
@@ -153,6 +214,18 @@ purview:
             - insurance claim
             - coverage
       strength: domain
+    - id: Keyword_health_fund_context
+      groups:
+        - match_style: word
+          terms:
+            - health fund
+            - private health
+            - health cover
+            - hospital cover
+            - extras cover
+            - Medibank
+            - Bupa
+      strength: specific
     - id: Keyword_person_coverage_context
       groups:
         - match_style: word
@@ -166,8 +239,11 @@ purview:
             - clinic
       strength: specific
 created: '2026-06-13'
-updated: '2026-10-30'
+updated: '2026-11-17'
 changelog:
+  - version: 1.3.0
+    date: '2026-11-17'
+    description: 'Australian private health fund membership numbers: a GP network breach notice in 2026 listed private health insurance numbers, and "Membership number: ..." under "Private health insurance: ..." did not match because the label needed member/subscriber/policy + id/number. "Membership number/no" (the term Medibank, Bupa and HCF use on their own pages) is now a second primary, Regex_insurance_membership_number, with its own 65/75/85 tiers: 75 needs health-fund context only (health fund, private health, health cover, hospital cover, extras cover, Medibank, Bupa) and 85 adds the existing person-coverage context. It is deliberately not gated on the general terms (insurer, coverage, insurance claim, health plan, payer), so motoring-club, loyalty and gym membership numbers stay at 65. The original regex keeps its context groups and three tiers, with one change: its label words (member, subscriber, policy, group, enrollee, insured, then id, identifier, number, no.) now match in any case, through a scoped (?i:...) group. Purview regex is case-sensitive by default (dev-tenant test recorded in commit bc6255bc9e), so the all-lower-case label missed "Member ID: ..." and "Policy No. ...". The value class still needs upper-case letters, digits and hyphens. Added au jurisdiction, Privacy Act 1988 (Cth), fund-page references, Australian positives, and loyalty, gym and motoring-club decoys.'
   - version: 1.2.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'
@@ -192,3 +268,9 @@ references:
     title: HHS - HIPAA Privacy Rule (protected health information)
   - url: https://www.hhs.gov/hipaa/for-professionals/breach-notification/index.html
     title: HHS - HIPAA breach notification rule
+  - url: https://www.bupa.com.au/help/mybupa/having-trouble-logging-in-to-mybupa
+    title: Bupa Australia - Find your membership number - the identifier is called a membership number and is on the card or welcome email
+  - url: https://www.hcf.com.au/health-insurance/faq/your-online-account
+    title: HCF - Your online account - the membership number is on the front of the HCF membership card and on letters and emails
+  - url: https://www.medibank.com.au/help/account-management/
+    title: Medibank - Managing my account, logging in - the membership number includes numbers and letters and is on the digital or physical card
