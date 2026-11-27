@@ -1,0 +1,166 @@
+schema: testpattern/v1
+name: Hong Kong Business Registration Number (BRN)
+slug: hk-business-registration-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Hong Kong Business Registration Numbers (BRN) and full Business Registration Certificate numbers issued by the Inland Revenue Department under the Business Registration Ordinance (Cap. 310). Covers the 8-digit entity identifier (Unique Business Identifier / UBI) and the full hyphenated certificate format (12345678-000-01-23-A).
+operation: >-
+  Uses two regexes: Regex_hk_brn_certificate matches the distinctive hyphenated certificate format (8 digits + 3-digit branch code + optional 2-digit year/status + check character) for 65 discovery, while Regex_hk_brn matches both 8-digit and hyphenated forms at 75/85 when corroborated by Hong Kong Inland Revenue / Business Registration terms in English or Chinese.
+pattern: (?-i)\b(\d{8}(?:-\d{3}(?:-\d{2}-\d{2}-[0-9A-Z]|-\d{2}-[0-9A-Z])?)?)\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: the full hyphenated certificate number (8-3-2-2-1) is structurally distinctive, whereas the 8-digit UBI core overlaps ordinary numbers and is restricted to keyword-corroborated enforcing tiers.
+jurisdictions:
+  - hk
+regulations:
+  - PDPO (Hong Kong)
+frameworks:
+  - ISO 27001
+data_categories:
+  - business
+  - financial
+  - government-id
+corroborative_evidence:
+  keywords:
+    - Business Registration Number
+    - Business Registration Certificate
+    - Inland Revenue Department
+    - Companies Registry
+    - Unique Business Identifier
+    - 商業登記號碼
+  proximity: 300
+test_cases:
+  should_match:
+    - value: 38492017-000-04-26-A
+      description: Full Hong Kong Business Registration Certificate number (head office -000)
+    - value: 61928374-001
+      description: Hong Kong BRN with 3-digit branch suffix
+    - value: 'Business Registration Number: 52819374'
+      description: Labelled 8-digit Hong Kong Unique Business Identifier / BRN
+  should_not_match:
+    - value: '5281937'
+      description: Seven digits (too short for an 8-digit Hong Kong BRN)
+    - value: '528193749'
+      description: Nine continuous digits (too long for an 8-digit Hong Kong BRN)
+    - value: Provide a copy of your Hong Kong Business Registration Certificate
+      description: Prose mention without a BRN value
+false_positives:
+  - description: Eight-digit Hong Kong telephone numbers or invoice numbers near general business wording.
+    mitigation: Discovery tier requires at least the -NNN branch suffix, and 8-digit matches require explicit Business Registration / Inland Revenue / UBI keywords.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 4
+risk_description: >-
+  The detector identifies a Hong Kong Business Registration Number or Certificate number under Cap. 310. Since December 2023 the 8-digit BRN serves as Hong Kong's Unique Business Identifier across the Companies Registry and Inland Revenue Department. Standalone exposure identifies a registered business rather than granting portal access; risk 4 and OFFICIAL fit public business-registry metadata.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+classification:
+  tier: Low
+  rationale: >-
+    Risk 4 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because a Hong Kong Business Registration Number is public corporate-registry metadata displayed at places of business under Cap. 310.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling suits a public Hong Kong entity registration identifier without confidential tax or banking records.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_hk_brn
+      matches:
+        - ref: Keyword_hk_brn_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_hk_brn
+      matches:
+        - ref: Keyword_hk_brn_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_hk_brn_certificate
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_hk_brn
+      pattern: (?-i)\b(\d{8}(?:-\d{3}(?:-\d{2}-\d{2}-[0-9A-Z]|-\d{2}-[0-9A-Z])?)?)\b
+    - id: Regex_hk_brn_certificate
+      pattern: (?-i)\b(\d{8}-\d{3}(?:-\d{2}-\d{2}-[0-9A-Z]|-\d{2}-[0-9A-Z])?)\b
+  keywords:
+    - id: Keyword_hk_brn_specific
+      groups:
+        - match_style: word
+          terms:
+            - Business Registration Number
+            - Business Registration Certificate
+            - Unique Business Identifier
+            - Inland Revenue Department
+            - 商業登記號碼
+            - 商業登記證號碼
+            - 商业登记号码
+      strength: specific
+    - id: Keyword_hk_brn_broad
+      groups:
+        - match_style: word
+          terms:
+            - text: BRN
+              case_sensitive: true
+            - business registration
+            - Companies Registry
+            - Cap. 310
+      strength: domain
+  filters:
+    - id: Filter_hk_brn_same_digits
+      type: AllDigitsSameFilter
+    - id: Filter_hk_brn_test_values
+      type: TextMatchFilter
+      direction: Full
+      logic: Exclude
+      terms:
+        - '12345678'
+        - '87654321'
+references:
+  - url: https://www.ird.gov.hk/eng/tax/bre.htm
+    title: Hong Kong Inland Revenue Department - Business Registration
+  - url: https://www.cr.gov.hk/en/legislation/ubi/overview.htm
+    title: Hong Kong Companies Registry - Unique Business Identifier (UBI / 8-digit BRN)
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

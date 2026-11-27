@@ -1,0 +1,161 @@
+schema: testpattern/v1
+name: "U.S. IRS Preparer Tax Identification Number (PTIN)"
+slug: us-irs-ptin
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects 9-character U.S. Internal Revenue Service Preparer Tax Identification Numbers (uppercase P followed by 8 digits, e.g. P01234567) issued under 26 U.S.C. 6109 to paid federal tax-return preparers (CPAs, Enrolled Agents, and tax attorneys).
+operation: >-
+  Matches uppercase P followed by 8 digits on word boundaries. Because P + 8 digits overlaps passport and part numbers, every tier requires PTIN, Paid Preparer, Form 1040/1120, or IRS tax-return preparation corroboration within 300 characters.
+pattern: '(?-i)\b(P\d{8})\b'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: P\d{8} is shared with older passport/serial formats, so gating every tier on PTIN / Paid Preparer / IRS return-signature terms ensures high domain precision.
+jurisdictions:
+  - us
+regulations:
+  - "Internal Revenue Code 26 U.S.C. 6109"
+  - "Internal Revenue Code 26 U.S.C. 7216"
+  - "GLBA"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - financial
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "PTIN"
+    - "Preparer Tax Identification Number"
+    - "Paid Preparer Use Only"
+    - "preparer signature"
+    - "Form 1040"
+    - "IRS"
+    - "Enrolled Agent"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "PTIN: P01482937"
+      description: "Labelled 9-character IRS Preparer Tax Identification Number"
+    - value: "Paid Preparer Use Only — Preparer PTIN P02938471, Firm EIN 12-3456789"
+      description: "Form 1040 Paid Preparer signature block with PTIN (85 tier)"
+    - value: "P00918273"
+      description: "9-character IRS PTIN format"
+  should_not_match:
+    - value: "p01482937"
+      description: "Lowercase p rejected by case-sensitive PTIN rule"
+    - value: "P0148293"
+      description: "Seven digits after P (one short of 8-digit PTIN body)"
+    - value: "Renew your IRS PTIN before preparing federal tax returns"
+      description: "Prose reminder without a PTIN value"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Passport numbers or purchase-order numbers starting with P + 8 digits."
+    mitigation: "Every tier requires IRS, PTIN, or Paid Preparer tax-return context within 300 characters; local_noise_filter lets accounting firms exclude their own preparers' PTINs."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 5
+risk_description: >-
+  The detector matches an IRS Preparer Tax Identification Number (P + 8 digits) in tax-return preparation context. Paid preparers use PTINs specifically so they do not place their personal SSN on client tax returns, yet stolen PTINs are actively abused by "ghost preparers" to file fraudulent tax refunds in a CPA's or Enrolled Agent's name, and PTINs reliably mark completed IRS tax returns (IRC s 7216 protected tax-return information). Risk 5 and OFFICIAL fit a standalone PTIN.
+sensitivity_labels:
+  pspf: "OFFICIAL"
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+classification:
+  tier: Low
+  rationale: >-
+    Risk 5 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because an isolated IRS PTIN is a professional tax-preparer identifier (FOIA-accessible in IRS public directories), while completed client tax returns co-fire SSN/ITIN/EIN detectors at higher sensitivity.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling reflects a standalone professional tax-preparer registration number.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_us_irs_ptin
+      matches:
+        - ref: Keyword_us_ptin_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_us_irs_ptin
+      matches:
+        - ref: Keyword_us_ptin_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_us_irs_ptin
+      matches:
+        - ref: Keyword_us_ptin_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_us_irs_ptin
+      pattern: '(?-i)\b(P\d{8})\b'
+  keywords:
+    - id: Keyword_us_ptin_specific
+      groups:
+        - match_style: word
+          terms:
+            - text: "PTIN"
+              case_sensitive: true
+            - "Preparer Tax Identification Number"
+            - "Paid Preparer Use Only"
+            - "Paid Preparer"
+            - "Firm's EIN"
+            - "Enrolled Agent"
+      strength: specific
+    - id: Keyword_us_ptin_broad
+      groups:
+        - match_style: word
+          terms:
+            - "Form 1040"
+            - "Form 1120"
+            - "Form 1065"
+            - "tax return"
+            - "tax preparer"
+            - text: "IRS"
+              case_sensitive: true
+      strength: domain
+references:
+  - url: https://www.irs.gov/tax-professionals/ptin-requirements-for-tax-return-preparers
+    title: "IRS - PTIN Requirements for Tax Return Preparers (26 U.S.C. 6109)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

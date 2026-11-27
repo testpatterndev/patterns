@@ -1,16 +1,16 @@
 schema: testpattern/v1
 name: DEA
 slug: us-dea-number
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
 description: >-
   Detects DEA patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
 operation: >-
-  Validation: Checksum: (d1+d3+d5) + 2*(d2+d4+d6). Reference: https://en.wikipedia.org/wiki/DEA_number Corroborative
+  Checksum enforced in Purview via split inline Checksum validators: Validator_us_dea_alpha (Weights 1,2,1,2,1,2,0 / Mod 10 / CheckDigit 7 on [ABFGMPRX][A-Z]\d{7}) and Validator_us_dea_nine (Weights 0,1,2,1,2,1,2,0 / Mod 10 / CheckDigit 8 on [ABFGMPRX]9\d{7}, zero-weighting the leading 9 registrant marker), computing ((d1+d3+d5) + 2*(d2+d4+d6)) mod 10 == d7 exactly. Reference: https://en.wikipedia.org/wiki/DEA_number Corroborative
   evidence: 19 keywords within 300 characters. Keyword lists: healthcare-identifiers, au-healthcare-medications.
-pattern: \b([ABFGMPRX][A-Z9]\d{7})\b
+pattern: (?-i)\b([ABFGMPRX][A-Z9]\d{7})\b
 confidence: high
 confidence_justification: 'High confidence: validated with Checksum: (d1+d3+d5) + 2*(d2+d4+d6) and supported by corroborative keyword evidence.'
 jurisdictions:
@@ -56,19 +56,25 @@ corroborative_evidence:
     - au-healthcare-medications
 test_cases:
   should_match:
-    - value: AB1234567
-      description: Standard DEA number
-    - value: FA9876543
-      description: DEA with F prefix
-    - value: MR1234567
-      description: Mid-level practitioner DEA
+    - value: AB1234563
+      description: Standard DEA number (Mod-10 checksum valid)
+    - value: FA9876547
+      description: DEA with F prefix (Mod-10 checksum valid)
+    - value: MR1234563
+      description: Mid-level practitioner DEA (Mod-10 checksum valid)
+    - value: A91234563
+      description: DEA number with 9 in second character position (Mod-10 checksum valid)
   should_not_match:
-    - value: CB1234567
+    - value: CB1234563
       description: Invalid first character (C not in valid set A/B/F/G/M/P/R/X)
     - value: AB123456
       description: Only 6 digits instead of 7
     - value: AB12345678
       description: 8 digits instead of 7
+    - value: AB1234567
+      description: Fails DEA Mod-10 checksum (perturbation of AB1234563)
+    - value: A91234567
+      description: Fails DEA Mod-10 checksum on 9-second-character form
 false_positives:
   - description: >-
       Medical terminology in health education materials, research publications, clinical guidelines, or public health
@@ -94,7 +100,11 @@ purview:
       match_style: word
   pattern_tiers:
     - confidence_level: 85
-      id_match: Regex_us_dea
+      id_match:
+        type: any
+        ids:
+          - Regex_us_dea_alpha
+          - Regex_us_dea_nine
       matches:
         - ref: Keyword_us_dea_specific
         - type: any
@@ -103,7 +113,11 @@ purview:
           refs:
             - Keyword_noise_exclusion
     - confidence_level: 75
-      id_match: Regex_us_dea
+      id_match:
+        type: any
+        ids:
+          - Regex_us_dea_alpha
+          - Regex_us_dea_nine
       matches:
         - ref: Keyword_us_dea_broad
         - type: any
@@ -113,12 +127,33 @@ purview:
             - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
-      id_match: Regex_us_dea
+      id_match:
+        type: any
+        ids:
+          - Regex_us_dea_alpha
+          - Regex_us_dea_nine
   regexes:
-    - id: Regex_us_dea
-      pattern: \b([ABFGMPRX][A-Z9]\d{7})\b
+    - id: Regex_us_dea_alpha
+      pattern: (?-i)\b([ABFGMPRX][A-Z]\d{7})\b
       validators:
-        - ref: Func_dea_number
+        - ref: Validator_us_dea_alpha
+    - id: Regex_us_dea_nine
+      pattern: (?-i)\b([ABFGMPRX]9\d{7})\b
+      validators:
+        - ref: Validator_us_dea_nine
+  validators:
+    - id: Validator_us_dea_alpha
+      type: Checksum
+      params:
+        weights: "1,2,1,2,1,2,0"
+        mod: 10
+        checkDigit: 7
+    - id: Validator_us_dea_nine
+      type: Checksum
+      params:
+        weights: "0,1,2,1,2,1,2,0"
+        mod: 10
+        checkDigit: 8
   keywords:
     - id: Keyword_us_dea_specific
       groups:
@@ -175,8 +210,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-drug-enforcement-agency-number
     title: "Drug Enforcement Agency (DEA) number entity definition - Microsoft Learn"
 created: '2026-02-08'
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.5.0
+    date: '2026-11-25'
+    description: Replace stripped Func_dea_number with split alpha/9-registrant exact Mod-10 inline Checksum validators, and fix test values to pass the DEA checksum.
   - version: 1.4.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

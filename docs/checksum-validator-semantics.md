@@ -195,6 +195,22 @@ per scheme matched the real algorithm exactly.
 | au-taxation-identifier, au-tfn-declaration-super-choice-form, payroll-master-file-with-tax-file-numbers, superannuation-fund-member-statement-bulk | Validator_australian_tfn_rem10: 2,8,6,3,10,5,1,7,10 / Mod 11 / CheckDigit 9 |
 | ar-cuit-cuil | Validator_ar_cuit_cuil_checksum_rem10: 1,3,5,7,8,10,1,3,5,7,10 / Mod 11 / CheckDigit 11 |
 | pl-tax-id | Validator_pl_nip_checksum_rem10: 1,10,3,4,6,8,10,1,3,10 / Mod 11 / CheckDigit 10 |
+| uk-nhs-number | Validator_uk_nhs_checksum_rem10: 2,4,6,8,10,1,3,5,7,10 / Mod 11 / CheckDigit 10 (paired with 1,2,3,4,5,6,7,8,9,0 / Mod 11 / CheckDigit 10) |
+| ch-uid | Validator_ch_uid_checksum_rem10: 1,3,5,7,8,10,1,3,10 / Mod 11 / CheckDigit 9 (paired with 6,7,8,9,4,5,6,7,0 / Mod 11 / CheckDigit 9) |
 
-Keep a single validator where remainder 10 really does mean check digit 0: pl-regon, and
-br-cnpj's first check digit.
+Keep a single validator where remainder 10 really does mean check digit 0: `pl-regon`, and `jp-my-number` (`Weights 5,6,7,8,9,4,5,6,7,8,9,0 / Mod 11 / CheckDigit 12` — negated official weights `6,5,4,3,2,7,6,5,4,3,2`; official remainder `<= 1` yields check digit `0`, which matches negated remainders `0` and `10` both comparing equal to `0`!).
+
+## Additional exact inline encodings replacing stripped `Func_*` refs (2026-11-25)
+
+| Pattern | Validators | Notes |
+|---|---|---|
+| `us-aba-routing-number` | `7,3,9,7,3,9,7,3,0 / Mod 10 / CheckDigit 9` | Negated Mod-10 weights for `3(d1+d4+d7)+7(d2+d5+d8)+(d3+d6+d9) ≡ 0 (mod 10)` |
+| `jp-my-number` | `5,6,7,8,9,4,5,6,7,8,9,0 / Mod 11 / CheckDigit 12` | Exact single validator via Purview's remainder-10-as-0 rule |
+| `uk-nhs-number` | `1,2,3,4,5,6,7,8,9,0` + `2,4,6,8,10,1,3,5,7,10` (`Mod 11 / CheckDigit 10`) | Dual validator closes the invalid remainder-10 case |
+| `br-cpf` | `1,2,3,4,5,6,7,8,9,0,0` (`CheckDigit 10`) + `0,1,2,3,4,5,6,7,8,9,0` (`CheckDigit 11`), `Mod 11` | Enforces BOTH CPF check digits identically |
+| `br-cnpj` | `6,7,8,9,2,3,4,5,6,7,8,9,0,0` (`CheckDigit 13`) + `5,6,7,8,9,2,3,4,5,6,7,8,9,0` (`CheckDigit 14`), `Mod 11` | Enforces BOTH CNPJ check digits identically |
+| `tr-national-id` | `7,9,7,9,7,9,7,9,7,0,0` (`CheckDigit 10`) + `1,1,1,1,1,1,1,1,1,1,0` (`CheckDigit 11`), `Mod 10` | Enforces BOTH T.C. Kimlik check digits identically |
+| `us-dea-number` | Split regex: `[A-Z]` 2nd char uses `1,2,1,2,1,2,0 / Mod 10 / CheckDigit 7`; `9` 2nd char uses `0,1,2,1,2,1,2,0 / Mod 10 / CheckDigit 8` | Zero-weights the leading `9` registrant digit so digit positions stay exact |
+| `au-arbn-arsn` | `2,3,4,5,6,7,8,9,0 / Mod 10 / CheckDigit 9` | Negated ASIC Mod-10 complement weights (`10 - w_i` for official weights `8,7,6,5,4,3,2,1`); exact over 9-digit ARBN/ARSN |
+| `uk-ni-health-care-number` | `1,2,3,4,5,6,7,8,9,0` + `2,4,6,8,10,1,3,5,7,10` (`Mod 11 / CheckDigit 10`) | Dual Mod-11 validator identical to NHS number over the `3200000010–3999999999` HSCN range; closes invalid remainder-10 |
+| `ca-bc-phn` | `0,9,7,3,6,1,2,4,8,0` + `0,7,3,6,1,2,4,8,5,10` (`Mod 11 / CheckDigit 10`) | Zero-weights leading `9` digit; negated BC MoH Mod-11 weights (`11 - w_i` for `[2,4,8,5,10,9,7,3]`) plus `k=2` second validator to reject invalid remainder-10 |

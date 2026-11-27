@@ -1,0 +1,157 @@
+schema: testpattern/v1
+name: "Australian ImmiAccount Transaction Reference Number (TRN)"
+slug: au-immiaccount-trn
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects 10-character Australian Department of Home Affairs ImmiAccount Transaction Reference Numbers (EG followed by 8 uppercase alphanumeric characters) used to track online visa/citizenship lodgements and conduct VEVO work-rights checks. Complements global-top500-032-visa-grant-number, which covers 13-digit Visa Grant Numbers.
+operation: >-
+  Primary matches an explicit Transaction Reference Number / ImmiAccount TRN / VEVO TRN label followed by EG[A-Z0-9]{8} at enforcing tiers (75 standalone labelled, 85 with Home Affairs / VEVO / visa subclass corroboration); bare EG[A-Z0-9]{8} with immigration context is discovery-only at 65.
+pattern: '(?-i)\b((?i:transaction\s+reference\s+(?:number|no\.?)|ImmiAccount\s+TRN|VEVO\s+TRN|TRN)[\s:#-]{1,6}EG[A-Z0-9]{8})\b'
+confidence: high
+confidence_justification: >-
+  High confidence: requiring both an explicit TRN / Transaction Reference Number label and the Department of Home Affairs 10-character EG[A-Z0-9]{8} lodgement prefix eliminates collisions with 13-digit Visa Grant Numbers (covered by global-top500-032-visa-grant-number) and generic reference IDs.
+jurisdictions:
+  - au
+regulations:
+  - "Migration Act 1958 (Cth)"
+  - "Privacy Act 1988 (Cth)"
+  - "NDB Scheme (Cth)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "ImmiAccount"
+    - "Transaction Reference Number"
+    - "VEVO"
+    - "Department of Home Affairs"
+    - "visa subclass"
+    - "Visa Entitlement Verification Online"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "ImmiAccount TRN: EGO8K29M4Q — Department of Home Affairs VEVO check"
+      description: "10-character Home Affairs ImmiAccount TRN with VEVO / Home Affairs context (85 tier)"
+    - value: "Transaction Reference Number EG7P39L2X1 — Visa Subclass 482"
+      description: "Spelled-out Transaction Reference Number with visa subclass context (85 tier)"
+    - value: "TRN: EGP4920X7M"
+      description: "Labelled Home Affairs TRN (75 tier)"
+  should_not_match:
+    - value: "Visa Grant Number: 1094827361920"
+      description: "13-digit Visa Grant Number (covered separately by global-top500-032-visa-grant-number)"
+    - value: "TRN: AB7P39L2X1"
+      description: "Does not start with Home Affairs EG prefix"
+    - value: "Log into ImmiAccount and enter your Transaction Reference Number"
+      description: "Prose instruction without an EGxxxxxxxx TRN"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Sample VEVO or ImmiAccount screenshots in HR onboarding manuals."
+    mitigation: "Suppressed on every tier by template-exclusion."
+  - description: "13-digit Australian Visa Grant Numbers on grant notices."
+    mitigation: "Handled separately by global-top500-032-visa-grant-number; this detector matches only EG[A-Z0-9]{8} ImmiAccount TRNs."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 6
+risk_description: >-
+  The detector matches a labelled 10-character Department of Home Affairs ImmiAccount Transaction Reference Number (EGxxxxxxxx). Together with passport details and date of birth, an ImmiAccount TRN is an active lookup key in VEVO and ImmiAccount for pending and granted visa applications, bridging visas, and work-entitlement checks. Risk 6 and SENSITIVE Personal-Privacy reflect a live immigration application/VEVO reference; 13-digit Visa Grant Numbers are covered separately by global-top500-032-visa-grant-number.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 6 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy, and Medium because an ImmiAccount TRN links a non-citizen to an active visa or citizenship application and serves as a VEVO verification key when combined with biographical fields.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling protects a live immigration application and VEVO lookup identifier.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_immi_trn_labeled
+      matches:
+        - ref: Keyword_au_immi_trn_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_immi_trn_labeled
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_au_immi_trn_labeled
+          - Regex_au_immi_trn_bare
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_immi_trn_labeled
+      pattern: '(?-i)\b((?i:transaction\s+reference\s+(?:number|no\.?)|ImmiAccount\s+TRN|VEVO\s+TRN|TRN)[\s:#-]{1,6}EG[A-Z0-9]{8})\b'
+    - id: Regex_au_immi_trn_bare
+      pattern: '(?-i)\b(EG[A-Z0-9]{8})\b'
+  keywords:
+    - id: Keyword_au_immi_trn_context
+      groups:
+        - match_style: word
+          terms:
+            - "Department of Home Affairs"
+            - text: "VEVO"
+              case_sensitive: true
+            - "Visa Entitlement Verification Online"
+            - "ImmiAccount"
+            - "visa subclass"
+            - "visa application"
+            - "bridging visa"
+            - "visa conditions"
+            - "visa holder"
+      strength: specific
+references:
+  - url: https://immi.homeaffairs.gov.au/visas/already-have-a-visa/check-visa-details-and-conditions/check-conditions-online
+    title: "Department of Home Affairs - Check visa details and conditions (VEVO / ImmiAccount TRN)"
+  - url: https://www.legislation.gov.au/C2004A07381/latest/text
+    title: "Migration Act 1958 (Cth)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release (focused on Home Affairs EGxxxxxxxx ImmiAccount TRNs without duplicating 13-digit Visa Grant Numbers).
+author: testpattern-community
+license: MIT

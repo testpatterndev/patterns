@@ -25,7 +25,7 @@ import { purviewBanned } from './lib/purview-banned.mjs'
 import { emulateKeep, expandScopedI } from './lib/boost-to-js.mjs'
 import { validateCustomisations } from './lib/customisation.mjs'
 import { loadIdentifiers, validateIdentifier, renderIdentifierDocs } from './lib/identifiers.mjs'
-import { validateClassification, validateIdcf, validateReferences, validateRegulations } from './lib/classification.mjs'
+import { validateClassification, validateFiveEyes, validateIdcf, validateReferences, validateRegulations } from './lib/classification.mjs'
 import { validateBlocks } from './lib/blocks.mjs'
 import { purviewExportedRegex } from './lib/purview-export-length.mjs'
 
@@ -55,8 +55,9 @@ const PACKAGE_ADDONS = new Set(['ai-readiness', 'payment-card-pci', 'credentials
 const PACKAGE_LABEL_DOMAINS = new Set(['privacy', 'financial', 'health', 'legal', 'security', 'government', 'education', 'children', 'infrastructure', 'ai', 'business', 'investigations', 'privilege', 'payment', 'fraud', 'credentials', 'clinical', 'operational-technology', 'environment'])
 const PACKAGE_DEPLOYMENT_PRIORITIES = new Set(['starter', 'standard', 'expanded', 'discovery'])
 
-// MS functions documented as "Is a validator: yes" (sit-functions, 2025-11-18)
-const MS_VALIDATORS = new Set(['Func_aba_routing','Func_australian_tax_file_number','Func_brazil_cnpj','Func_brazil_cpf','Func_canadian_sin','Func_credit_card','Func_dea_number','Func_formatted_itin','Func_iban','Func_india_aadhaar','Func_japanese_my_number_corporate','Func_japanese_my_number_personal','Func_randomized_formatted_ssn','Func_randomized_unformatted_ssn','Func_south_africa_identification_number','Func_ssn','Func_swedish_national_identifier','Func_Turkish_National_Id','Func_uk_nhs_number','Func_unformatted_itin','Func_unformatted_ssn','Func_usa_uk_passport'])
+// Built-in Func_* validators are rejected by Purview when referenced in custom RulePack XML
+// (<Regex validators="...">) and are stripped by the exporter — see docs/checksum-validator-semantics.md.
+// Only inline local validators (purview.validators[]) may be referenced.
 
 const kwSlugs = new Set()
 const patternSlugs = new Set()
@@ -65,9 +66,22 @@ const deprecatedSlugs = new Set()
 const replacedBy = []
 const errors = [], warns = []
 
-// A leading (?-i) is Boost's case-sensitive switch; JS has no bare (?-i), so strip it and drop the i flag.
+// Purview (Boost.RegEx) is case-sensitive by default (measured on dev-tenant, bc6255bc9e / f0c61ecf51).
+// Match case-sensitively unless (?i) / (?is) / (?im) is explicitly authored on the regex (or case_sensitive: false).
 // \K and scoped (?i:...) are translated by lib/boost-to-js.mjs (shared with verify-pattern-testcases).
-const toRe = (src, caseSensitive = false) => { let b = String(src), fl = caseSensitive ? '' : 'i'; if (b.startsWith('(?-i)')) { b = b.slice(5); fl = '' } const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } return new RegExp(expandScopedI(emulateKeep(b)), fl) }
+const toRe = (src, caseSensitive = true) => { let b = String(src), cs = caseSensitive !== false; if (b.startsWith('(?-i)')) { b = b.slice(5); cs = true } let fl = ''; const m = b.match(/^\(\?([ims]+)\)/); if (m) { b = b.slice(m[0].length); if (m[1].includes('i')) cs = false; if (m[1].includes('s')) fl += 's'; if (m[1].includes('m')) fl += 'm' } if (!cs) fl = 'i' + fl; return new RegExp(expandScopedI(emulateKeep(b)), fl) }
+
+function hasUnflaggedCaseSpecificLetters(src) {
+  if (/^\(\?[ims]*i/.test(src) || /^\(\?-i\)/.test(src)) return false
+  const noScoped = String(src).replace(/\\[bdswBDSWnrtxu0-9]/g, '').replace(/\(\?i:[^)]*\)/g, '')
+  const outside = noScoped.replace(/\[(?:[^\]\\]|\\.)*\]/g, '[]')
+  if (/[A-Za-z]/.test(outside)) return true
+  const classes = [...noScoped.matchAll(/\[(?:[^\]\\]|\\.)*\]/g)].map(m => m[0])
+  return classes.some(c => {
+    const clean = c.replace(/\\[bdswBDSWnrtxu]/g, '')
+    return (/[A-Z]/.test(clean) !== /[a-z]/.test(clean))
+  })
+}
 
 // Build kwSlugs (used by the pattern loop below for keyword_list/shared-dict reference
 // checks) and validate each dictionary's own {{CUSTOMISE:*}} declarations. This must run
@@ -80,6 +94,10 @@ for (const kf of readdirSync(kwDir).filter(f => f.endsWith('.yaml'))) {
   catch (e) { errors.push(`${kf}: YAML parse — ${e.message.split('\n')[0]}`); continue }
   if (!d || typeof d !== 'object' || Array.isArray(d)) { errors.push(`${kf}: dictionary must be a YAML mapping`); continue }
   for (const msg of validateCustomisations(d, { isDictionary: true })) errors.push(`${d.slug ?? kf}: ${msg}`)
+  for (const t of d.keywords ?? []) {
+    const txt = typeof t === 'string' ? t : String(t?.text ?? '')
+    if (txt.length > 50) errors.push(`${d.slug ?? kf}: keyword term '${txt.slice(0, 30)}...' is ${txt.length} chars — Purview XML <Term> max is 50`)
+  }
 }
 
 // Identifier type registry (data/identifiers/*.yaml). Every definition must be fully
@@ -116,8 +134,14 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   }
   if ('identifier_dependencies' in p) errors.push(`${p.slug ?? f}: identifier_dependencies is superseded — declare customisation entries of kind identifier-format referencing data/identifiers/`)
   if (p.status !== 'deprecated') {
+    if (p.license !== 'MIT') errors.push(`${p.slug ?? f}: active pattern license must be 'MIT', got '${p.license}'`)
+    if (!p.purview) errors.push(`${p.slug ?? f}: active pattern is missing 'purview' block`)
+    const VALID_EXPORTS = new Set(['purview_xml', 'yaml', 'regex_copy'])
+    if (!Array.isArray(p.exports) || !p.exports.length) errors.push(`${p.slug ?? f}: active pattern must declare non-empty 'exports'`)
+    else for (const ex of p.exports) if (!VALID_EXPORTS.has(ex)) errors.push(`${p.slug ?? f}: invalid export target '${ex}' (must be purview_xml|yaml|regex_copy)`)
     for (const msg of validateClassification(p)) errors.push(`${p.slug ?? f}: ${msg}`)
     for (const msg of validateIdcf(p)) errors.push(`${p.slug ?? f}: ${msg}`)
+    for (const msg of validateFiveEyes(p)) errors.push(`${p.slug ?? f}: ${msg}`)
     for (const msg of validateReferences(p)) errors.push(`${p.slug ?? f}: ${msg}`)
     for (const msg of validateRegulations(p)) errors.push(`${p.slug ?? f}: ${msg}`)
   }
@@ -135,6 +159,26 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
     const dm = p.purview.recommended_dlp_min_matches
     if (dm !== undefined && !(Number.isInteger(dm) && dm >= 1)) errors.push(`${p.slug ?? f}: purview.recommended_dlp_min_matches must be an integer >= 1, got ${dm}`)
     for (const tier of p.purview.pattern_tiers ?? []) if (!PURVIEW_LEVELS.includes(tier.confidence_level)) errors.push(`${p.slug ?? f}: pattern_tiers confidence_level must be 65|75|85 (low|medium|high), got ${tier.confidence_level}`)
+    if (rc !== undefined && (p.purview.pattern_tiers ?? []).length > 0) {
+      const tiers = p.purview.pattern_tiers
+      const hasEnforce = tiers.some(t => t.discovery_only !== true)
+      const tiersAtRc = tiers.filter(t => t.confidence_level === rc)
+      if (!tiersAtRc.length) errors.push(`${p.slug ?? f}: purview.recommended_confidence ${rc} is not an exported tier`)
+      else if (hasEnforce && tiersAtRc.every(t => t.discovery_only === true)) errors.push(`${p.slug ?? f}: purview.recommended_confidence ${rc} points only to discovery_only tier(s) while enforce tiers exist`)
+    }
+    for (const kw of p.purview.keywords ?? []) {
+      for (const g of kw.groups ?? []) {
+        for (const t of g.terms ?? []) {
+          const txt = typeof t === 'string' ? t : String(t?.text ?? '')
+          if (txt.length > 50) errors.push(`${p.slug ?? f}: ${kw.id} term '${txt.slice(0, 30)}...' is ${txt.length} chars — Purview XML <Term> max is 50`)
+        }
+      }
+    }
+    for (const flt of p.purview.filters ?? []) {
+      if (flt.type !== 'AllDigitsSameFilter' && flt.type !== 'TextMatchFilter') {
+        errors.push(`${p.slug ?? f}: purview.filters type '${flt.type}' is not exported to Purview XML — wire a purview.regexes / purview.keywords NOT-group instead`)
+      }
+    }
   }
   // Purview has no tier-level count and the exporter ignores one, so a count on the tier
   // would silently ship looser than written. Counts belong on a match node: to require N
@@ -171,6 +215,9 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
     catch (e) { errors.push(`${p.slug}: ${id} regex does not compile — ${e.message.split('\n')[0]}`) }
     if (/\\\\[bdswWDSnrt]/.test(src)) errors.push(`${p.slug}: ${id} double-escaped regex`)
     if (/\|top500\)/.test(src)) errors.push(`${p.slug}: ${id} contains |top500 generator token`)
+    if (p.status !== 'deprecated' && p.case_sensitive !== true && hasUnflaggedCaseSpecificLetters(src)) {
+      errors.push(`${p.slug}: ${id} contains case-specific letters without explicit (?i) or (?-i) — Purview is case-sensitive by default; state the case rule explicitly`)
+    }
     for (const bad of purviewBanned(src)) {
       const msg = `${p.slug}: ${id} Purview-banned construct — ${bad}`
       if (p.purview) errors.push(msg); else warns.push(msg)
@@ -194,7 +241,7 @@ for (const f of readdirSync(patDir).filter(f => f.endsWith('.yaml'))) {
   for (const sk of p.purview?.shared_keywords ?? []) if (sk.dict && !kwSlugs.has(sk.dict)) errors.push(`${p.slug}: missing shared dict '${sk.dict}'`)
   const localVal = new Set((p.purview?.validators ?? []).map(v => v.id))
   for (const r of p.purview?.regexes ?? []) for (const v of r.validators ?? [])
-    if (v.ref && !MS_VALIDATORS.has(v.ref) && !localVal.has(v.ref)) errors.push(`${p.slug}: validator ref '${v.ref}' is not a real MS validator nor local`)
+    if (v.ref && !localVal.has(v.ref)) errors.push(`${p.slug}: validator ref '${v.ref}' is not a local purview.validators[] definition (Purview rejects Func_* in custom rulepacks — see docs/checksum-validator-semantics.md)`)
 
   // test-case execution (uses the `compiled` array built during per-regex validation above)
   const top = (typeof p.pattern === 'string') ? (() => { try { return toRe(p.pattern, p.case_sensitive) } catch { return null } })() : null

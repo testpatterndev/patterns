@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: International Bank Account Number (IBAN)
 slug: eu-iban
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -10,14 +10,12 @@ description: >-
   two-letter country code, two check digits, and up to 30 alphanumeric characters representing the domestic bank account
   number. This pattern matches IBANs with or without space or hyphen delimiters between digit groups.
 operation: >-
-  Validation: Mod 97 (ISO 7064). Reference: https://en.wikipedia.org/wiki/International_Bank_Account_Number
-  Corroborative evidence: 10 keywords within 300 characters. Keyword lists: financial-deposit-terms.
-pattern: '\b([A-Z]{2}\d{2}[A-Z0-9 -]{11,40})\b'
-confidence: high
+  Structural IBAN match (2-letter country prefix + 2 check digits + BBAN) with corroborative banking keywords within 300 characters and template-exclusion gating. Note: ISO 7064 Mod-97 (Func_iban) is rejected by Purview in custom RulePack XML; enable the built-in IBAN SIT when Mod-97 validation is required. Reference: https://en.wikipedia.org/wiki/International_Bank_Account_Number
+  Keyword lists: financial-deposit-terms.
+pattern: (?-i)\b([A-Z]{2}\d{2}[A-Z0-9 -]{11,40})\b
+confidence: medium
 confidence_justification: >-
-  The two-letter country code prefix followed by exactly two check digits provides a strong structural anchor. Combined
-  with corroborative evidence keywords and the fixed digit-group format, false positive rates are low in most document
-  contexts.
+  Medium confidence: the uppercase two-letter country prefix followed by two digits and banking corroboration provide solid precision, though custom Purview XML cannot run ISO 7064 Mod-97 checksum validation.
 jurisdictions:
   - eu
 regulations:
@@ -77,20 +75,27 @@ scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
       local_noise_filter: true
       id_match: Regex_eu_iban
       matches:
         - ref: Keyword_eu_iban
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_eu_iban
   regexes:
     - id: Regex_eu_iban
-      pattern: '\b([A-Z]{2}\d{2}[A-Z0-9 -]{11,40})\b'
-      validators:
-        - ref: Func_iban
+      pattern: (?-i)\b([A-Z]{2}\d{2}[A-Z0-9 -]{11,40})\b
   keywords:
     - id: Keyword_eu_iban
       groups:
@@ -143,8 +148,11 @@ references:
   - title: "Regulation (EU) 2016/679 (General Data Protection Regulation)"
     url: https://eur-lex.europa.eu/eli/reg/2016/679/oj
 created: '2026-02-08'
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.5.0
+    date: '2026-11-25'
+    description: Remove unsupported Func_iban custom-XML validator ref, wire template-exclusion, add explicit (?-i), and align confidence to medium.
   - version: 1.4.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

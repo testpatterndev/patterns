@@ -1,0 +1,148 @@
+schema: testpattern/v1
+name: Figma Personal Access Token
+slug: global-figma-pat
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects Figma personal access tokens (figd_ prefix) and OAuth user tokens (figu_ prefix) followed by 40 to 48 URL-safe characters. A leaked token grants REST API access to unreleased product designs, FigJam architecture boards, design tokens, and organization member metadata.
+operation: >-
+  Matches figd_ or figu_ followed by 40-48 [A-Za-z0-9_-] characters, bounded on identifier characters. Tiers: 85 for two distinct tokens with Figma context, 75 for one token with context, 65 discovery-only for a bare token, with template-exclusion gating.
+pattern: '(?-i)(?<![A-Za-z0-9_-])(fig[du]_[A-Za-z0-9_-]{40,48})(?![A-Za-z0-9_-])'
+confidence: high
+confidence_justification: >-
+  High confidence: Figma personal access tokens use the vendor-specific figd_ prefix (and figu_ for OAuth tokens) with high-entropy 40-48 character bodies, attested by Figma developer docs, GitHub secret scanning, and gitleaks.
+jurisdictions:
+- global
+regulations:
+- Criminal Code Act 1995 (Cth)
+frameworks:
+- CIS Controls
+- ISO 27001
+- NIST CSF
+- SOC 2
+data_categories:
+- credentials
+- security
+corroborative_evidence:
+  keywords:
+  - figma
+  - FIGMA_TOKEN
+  - X-Figma-Token
+  - api.figma.com
+  proximity: 300
+  keyword_lists:
+  - credentials
+  - data-record-context
+  - generic-data-labels
+test_cases:
+  # Positive literals omitted: GitHub Push Protection blocks all syntactically valid figd_/figu_ strings on public repos.
+  should_match: []
+  should_not_match:
+  - value: "FIGMA_TOKEN=figd_shorttoken12345"
+    description: "Token body shorter than 40 characters"
+  - value: "FIGMA_TOKEN=FIGD_shorttoken12345"
+    description: "Uppercase FIGD_ prefix and short body rejected"
+  - value: "Pass your personal access token in the X-Figma-Token header."
+    description: "Documentation prose without a token value"
+  - value: "template example placeholder record identifier"
+    description: "Template/sample context should be excluded even when anchor words are present"
+false_positives:
+- description: "Expired Figma personal access tokens in design-system CI workflows."
+  mitigation: "Check token expiration and scopes in Figma Account Settings."
+- description: "Placeholder figd_ strings in plugin SDK examples."
+  mitigation: "Excluded on every tier by template-exclusion."
+exports:
+- purview_xml
+- yaml
+- regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The high-confidence detector finds a Figma personal access token or OAuth token. Compromised tokens expose confidential UI mockups, unreleased product designs, internal architecture diagrams in FigJam, comments, and webhook configurations scoped to the user. Risk 8 and SENSITIVE InfoTech fit bounded SaaS design-repository access.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
+  idcf: DSL-3
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE InfoTech, and Medium because a valid Figma token grants direct API access to private design files and organizational assets. PROTECTED is not met without broader identity or infrastructure compromise.
+  generic:
+    classification: Medium
+    dlm: Medium InfoTech
+    rationale: >-
+      Medium and Medium InfoTech handling suit Figma access tokens because they grant direct API access to private design repositories within user scope.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+  - dict: template-exclusion
+    as: Keyword_noise_exclusion
+    match_style: word
+  pattern_tiers:
+  - confidence_level: 85
+    id_match: Regex_figma_pat
+    matches:
+    - ref: Regex_figma_pat
+      min_count: 2
+      unique_results: true
+    - ref: Keyword_figma_pat
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_figma_pat
+    matches:
+    - ref: Keyword_figma_pat
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 65
+    discovery_only: true
+    id_match: Regex_figma_pat
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  regexes:
+  - id: Regex_figma_pat
+    pattern: '(?-i)(?<![A-Za-z0-9_-])(fig[du]_[A-Za-z0-9_-]{40,48})(?![A-Za-z0-9_-])'
+  keywords:
+  - id: Keyword_figma_pat
+    groups:
+    - match_style: word
+      terms:
+      - figma
+      - FIGMA_TOKEN
+      - FIGMA_ACCESS_TOKEN
+      - X-Figma-Token
+      - api.figma.com
+      - figma.com
+      - personal access token
+    strength: specific
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+- version: 1.0.0
+  date: '2026-11-25'
+  description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+- url: https://www.figma.com/developers/api#access-tokens
+  title: "Figma REST API Access Tokens documentation (figd_ personal access tokens and X-Figma-Token)"
+- url: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+  title: "Supported secret scanning patterns - GitHub Docs (Figma Personal Access Token)"

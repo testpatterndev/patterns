@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: NEM Energy/FCAS Bid Submission
 slug: au-nem-bid-file
-version: 1.1.0
+version: 1.2.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -19,7 +19,7 @@ operation: >-
   or Data Interchange loader content. Corroborative keywords tighten to trading
   context.
 pattern: >-
-  (\b(?:BIDDAYOFFER|BIDOFFERPERIOD|BIDPEROFFER|BIDOFFERFILETRK|MNSP_DAYOFFER|MNSP_BIDOFFERPERIOD|DISPATCHOFFERTRK|PREDISPATCHOFFERTRK)\b|\b(?:energyBids|fcasBids|mnspBids|rebidExplanation)\b|(?<![A-Za-z0-9])[A-Z0-9]{3,15}_[A-Za-z0-9]*BID[A-Za-z0-9]*_[0-9]{8,14}\.(?:zip|json|tmp)(?![A-Za-z0-9]))
+  (?-i)(\b(?:BIDDAYOFFER|BIDOFFERPERIOD|BIDPEROFFER|BIDOFFERFILETRK|MNSP_DAYOFFER|MNSP_BIDOFFERPERIOD|DISPATCHOFFERTRK|PREDISPATCHOFFERTRK)\b|\b(?:energyBids|fcasBids|mnspBids|rebidExplanation)\b|(?<![A-Za-z0-9])[A-Z0-9]{3,15}_[A-Za-z0-9]*BID[A-Za-z0-9]*_[0-9]{8,14}\.(?:zip|json|tmp)(?![A-Za-z0-9]))
 confidence: medium
 confidence_justification: >-
   Medium confidence: the table and JSON member names are highly distinctive, but the
@@ -90,8 +90,66 @@ false_positives:
     mitigation: Keep confidence at medium; combine with volume/count thresholds in
       DLP rules so schema-only mentions do not enforce.
 exports:
+  - purview_xml
   - yaml
+  - regex_copy
 scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_nem_bid_primary
+      matches:
+        - ref: Keyword_au_nem_bid_trading
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_nem_bid_primary
+      matches:
+        - ref: Keyword_au_nem_bid_trading
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_nem_bid_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_nem_bid_primary
+      pattern: >-
+        (?-i)(\b(?:BIDDAYOFFER|BIDOFFERPERIOD|BIDPEROFFER|BIDOFFERFILETRK|MNSP_DAYOFFER|MNSP_BIDOFFERPERIOD|DISPATCHOFFERTRK|PREDISPATCHOFFERTRK)\b|\b(?:energyBids|fcasBids|mnspBids|rebidExplanation)\b|(?<![A-Za-z0-9])[A-Z0-9]{3,15}_[A-Za-z0-9]*BID[A-Za-z0-9]*_[0-9]{8,14}\.(?:zip|json|tmp)(?![A-Za-z0-9]))
+  keywords:
+    - id: Keyword_au_nem_bid_trading
+      groups:
+        - match_style: word
+          terms:
+            - rebid
+            - trading day
+            - price band
+            - dispatch interval
+            - participant file server
+            - self-forecast
+            - bandavail
+            - maxavail
+            - dailyEnergyConstraint
+      strength: specific
 risk_rating: 8
 risk_description: >-
   Pre-dispatch energy and FCAS bids, price bands, and rebid reasoning reveal a
@@ -123,8 +181,11 @@ references:
   - title: "Competition and Consumer Act 2010 (Cth)"
     url: https://www.legislation.gov.au/C2004A00109/latest/text
 created: 2026-07-24
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.2.0
+    date: '2026-11-25'
+    description: State explicit regex case rule ((?i) or (?-i)) and align tier/keyword semantics with Microsoft Purview evaluation.
   - version: 1.1.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'
@@ -147,4 +208,4 @@ changelog:
     note: Initial draft from public AEMO FTP bidding guide and MMS data-model research.
 author: PVX
 source: compl8-energy-pack
-license: CC-BY-4.0
+license: MIT

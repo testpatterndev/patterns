@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: U.S. Alien Registration Number (A-Number)
 slug: us-alien-registration-number
-version: 1.2.0
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -14,7 +14,7 @@ operation: >-
   Two regexes. The first matches a grouped A-Number with optional separators (A-123-456-789, A 12 345 678). The second
   matches a compact "A" + 8-9 digit body. Corroborative immigration keywords within 300 characters reduce false
   positives from the broad numeric body.
-pattern: \b(A[-#\s]?\d{3}[-\s]?\d{3}[-\s]?\d{2,3})\b
+pattern: (?-i)\b(A[-#\s]?(?:\d{3}[-\s]?\d{3}[-\s]?\d{2,3}|\d{2}[-\s]\d{3}[-\s]\d{3}))\b
 confidence: high
 confidence_justification: >-
   High confidence: the mandatory "A" prefix plus a fixed 8-9 digit body and the optional grouping structure make this
@@ -78,6 +78,73 @@ exports:
   - yaml
   - regex_copy
 scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_us_anumber
+      matches:
+        - ref: Keyword_us_anumber_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_us_anumber
+      matches:
+        - ref: Keyword_us_anumber_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_us_anumber
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_us_anumber
+      pattern: (?-i)\b(A[-#\s]?(?:\d{3}[-\s]?\d{3}[-\s]?\d{2,3}|\d{2}[-\s]\d{3}[-\s]\d{3}))\b
+  keywords:
+    - id: Keyword_us_anumber_specific
+      groups:
+        - match_style: word
+          terms:
+            - alien registration number
+            - alien number
+            - A-Number
+            - USCIS number
+            - Form I-9
+            - I-551
+            - employment authorization
+      strength: specific
+    - id: Keyword_us_anumber_broad
+      groups:
+        - match_style: word
+          terms:
+            - text: USCIS
+              case_sensitive: true
+            - green card
+            - permanent resident
+            - lawful permanent resident
+            - immigration
+            - E-Verify
+            - Department of Homeland Security
+      strength: specific
+  filters:
+    - id: Filter_us_anumber_same_digits
+      type: AllDigitsSameFilter
 risk_rating: 7
 risk_description: >-
   The high-confidence regex finds a USCIS A-Number as the letter A followed by an eight- or nine-digit body, with optional grouping and immigration context. A genuine A-Number persistently links a noncitizen across Green Cards, employment authorisation, immigration court, Form I-9, and E-Verify records, enabling identity fraud or targeted exploitation of immigration status. The normal unit concerns one person and creates credible moderate privacy and legal harm, although it does not authenticate access to DHS systems. Risk 7 and SENSITIVE are justified, while PROTECTED is not met without a complete immigration file, authentication factors, protected-person status, or broad government compromise.
@@ -107,8 +174,11 @@ references:
   - url: https://www.uscis.gov/glossary-term/50684
     title: "A-Number / Alien Registration Number (A-Number or A#) - USCIS"
 created: '2026-06-13'
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.3.0
+    date: '2026-11-25'
+    description: State explicit regex case rule ((?i) or (?-i)) and align tier/keyword semantics with Microsoft Purview evaluation.
   - version: 1.2.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

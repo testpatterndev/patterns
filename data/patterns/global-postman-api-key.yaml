@@ -1,0 +1,148 @@
+schema: testpattern/v1
+name: Postman API Key
+slug: global-postman-api-key
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects Postman API keys (PMAK- followed by 24 and 34 lowercase hexadecimal characters) and Postman collection access keys (PMAT- followed by 26 alphanumeric characters). Postman workspaces frequently store internal API endpoints, environment variables, and production bearer secrets.
+operation: >-
+  Matches PMAK-<24 hex>-<34 hex> (64 characters total) or PMAT-<26 alphanumerics>, bounded on identifier characters. Tiers: 85 for two distinct keys with Postman context, 75 for one key with context, 65 discovery-only for a bare key, with template-exclusion gating.
+pattern: '(?-i)(?<![A-Za-z0-9_-])(PMAK-[0-9a-f]{24}-[0-9a-f]{34}|PMAT-[0-9a-zA-Z]{26})(?![A-Za-z0-9_-])'
+confidence: high
+confidence_justification: >-
+  High confidence: PMAK- with hyphen-split 24/34 lowercase hexadecimal segments and PMAT- with 26 alphanumerics are vendor-specific formats attested by Postman documentation, GitHub secret scanning, gitleaks, and TruffleHog.
+jurisdictions:
+- global
+regulations:
+- Criminal Code Act 1995 (Cth)
+frameworks:
+- CIS Controls
+- ISO 27001
+- NIST CSF
+- SOC 2
+data_categories:
+- credentials
+- security
+corroborative_evidence:
+  keywords:
+  - postman
+  - POSTMAN_API_KEY
+  - X-Api-Key
+  - getpostman.com
+  proximity: 300
+  keyword_lists:
+  - credentials
+  - data-record-context
+  - generic-data-labels
+test_cases:
+  # PMAK- literals omitted: GitHub Push Protection blocks all syntactically valid PMAK-<24 hex>-<34 hex> strings on public repos.
+  should_match: []
+  should_not_match:
+  - value: "POSTMAN_API_KEY=PMAK-short-segment"
+    description: "Hex segments shorter than 24 and 34 characters"
+  - value: "POSTMAN_API_KEY=PMAT-short12345"
+    description: "Collection access key shorter than 26 characters"
+  - value: "Pass your Postman API key in the X-Api-Key request header."
+    description: "Documentation prose without a key value"
+  - value: "template example placeholder record identifier"
+    description: "Template/sample context should be excluded even when anchor words are present"
+false_positives:
+- description: "Revoked Postman keys in archived CI pipelines."
+  mitigation: "Confirm active status in Postman Team Settings -> API Keys."
+- description: "Redacted or example PMAK keys in Postman tutorials."
+  mitigation: "Filtered on every tier by template-exclusion."
+exports:
+- purview_xml
+- yaml
+- regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The high-confidence detector finds a Postman user API key or collection access key. Because Postman workspaces and environments routinely hold internal service URLs, OAuth client secrets, and bearer tokens, a compromised key often exposes downstream credentials across an engineering team. Risk 8 and SENSITIVE InfoTech fit contained workspace and environment secret exposure.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
+  idcf: DSL-3
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE InfoTech, and Medium because a valid Postman key exposes workspace collections, environment variables, and stored API credentials for that account. PROTECTED is not met without confirmed compromise of critical production infrastructure.
+  generic:
+    classification: Medium
+    dlm: Medium InfoTech
+    rationale: >-
+      Medium and Medium InfoTech handling fit Postman API keys because they grant direct programmatic access to collections and environment variables until revoked.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+  - dict: template-exclusion
+    as: Keyword_noise_exclusion
+    match_style: word
+  pattern_tiers:
+  - confidence_level: 85
+    id_match: Regex_postman_api_key
+    matches:
+    - ref: Regex_postman_api_key
+      min_count: 2
+      unique_results: true
+    - ref: Keyword_postman_api_key
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_postman_api_key
+    matches:
+    - ref: Keyword_postman_api_key
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 65
+    discovery_only: true
+    id_match: Regex_postman_api_key
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  regexes:
+  - id: Regex_postman_api_key
+    pattern: '(?-i)(?<![A-Za-z0-9_-])(PMAK-[0-9a-f]{24}-[0-9a-f]{34}|PMAT-[0-9a-zA-Z]{26})(?![A-Za-z0-9_-])'
+  keywords:
+  - id: Keyword_postman_api_key
+    groups:
+    - match_style: word
+      terms:
+      - postman
+      - POSTMAN_API_KEY
+      - X-Api-Key
+      - getpostman.com
+      - api.getpostman.com
+      - postman collection
+      - api key
+    strength: specific
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+- version: 1.0.0
+  date: '2026-11-25'
+  description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+- url: https://learning.postman.com/docs/developer/postman-api/authentication/
+  title: "Postman API authentication documentation (PMAK- key and X-Api-Key header)"
+- url: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+  title: "gitleaks postman-api-token rule (PMAK-[a-f0-9]{24}-[a-f0-9]{34})"

@@ -1,0 +1,158 @@
+schema: testpattern/v1
+name: "Australian APIR Managed Investment Product Code"
+slug: au-apir-code
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects 9-character Australian APIR codes (3 uppercase letters + 4 digits + AU) allocated by APIR Systems Limited to unlisted managed investment products and wholesale trusts (distinct from superannuation SPINs in au-superannuation-usi-spin via managed-investment corroboration).
+operation: >-
+  Matches 3 uppercase letters + 4 digits + AU on word boundaries, corroborated by APIR, managed fund, PDS, unit price, custodian, or platform investment vocabulary, with local_noise_filter enabled at enforcing tiers.
+pattern: '(?-i)\b([A-Z]{3}\d{4}AU)\b'
+confidence: high
+confidence_justification: >-
+  High confidence: the 9-character [A-Z]{3}\d{4}AU coding standard administered by APIR Systems is structurally specific to Australian financial products; wealth/managed-fund corroboration separates investment schedules from SuperStream SPINs.
+jurisdictions:
+  - au
+regulations:
+  - "Corporations Act 2001 (Cth)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - financial
+  - business
+corroborative_evidence:
+  keywords:
+    - "APIR"
+    - "APIR code"
+    - "Product Disclosure Statement"
+    - "managed fund"
+    - "unit price"
+    - "Target Market Determination"
+    - "custodian"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "APIR Code: VAN0003AU"
+      description: "Labelled Vanguard managed fund APIR code"
+    - value: "HOW0098AU — wholesale unit trust redemption"
+      description: "APIR code in unit-trust transaction context"
+    - value: "MAQ0482AU"
+      description: "Bare 9-character APIR product code (65 discovery)"
+  should_not_match:
+    - value: "VAN0003US"
+      description: "Ends in US rather than AU"
+    - value: "van0003au"
+      description: "Lowercase rejected by case-sensitive APIR specification"
+    - value: "Check the APIR code in the Product Disclosure Statement before placing the order"
+      description: "Prose instruction without an APIR code"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Published Product Disclosure Statements and Target Market Determinations carry the fund's APIR code."
+    mitigation: "Risk 3 OFFICIAL reflects public product-identifier status, and local_noise_filter lets fund managers exclude their own published codes."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 3
+risk_description: >-
+  The detector matches a 9-character Australian APIR managed-investment product code. Like an ISIN or ticker symbol, an APIR code is public financial-product reference metadata rather than an investor account number, though it serves as a high-precision anchor inside investor portfolio statements, custody reconciliations, and wholesale application forms. Risk 3 and OFFICIAL fit a public financial-instrument code.
+sensitivity_labels:
+  pspf: "OFFICIAL"
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+classification:
+  tier: Low
+  rationale: >-
+    Risk 3 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because an APIR code identifies a financial product rather than a client holding or account credential.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling reflects a public managed-fund product identifier.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_au_apir_code
+      matches:
+        - ref: Keyword_au_apir_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_au_apir_code
+      matches:
+        - ref: Keyword_au_apir_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_apir_code
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_apir_code
+      pattern: '(?-i)\b([A-Z]{3}\d{4}AU)\b'
+  keywords:
+    - id: Keyword_au_apir_specific
+      groups:
+        - match_style: word
+          terms:
+            - text: "APIR"
+              case_sensitive: true
+            - "APIR code"
+            - "Target Market Determination"
+            - "Product Disclosure Statement"
+            - "mFund"
+            - "unit registry"
+      strength: specific
+    - id: Keyword_au_apir_broad
+      groups:
+        - match_style: word
+          terms:
+            - "managed fund"
+            - "unit trust"
+            - "wholesale fund"
+            - "custodian"
+            - "net asset value"
+            - "redemption"
+      strength: domain
+references:
+  - url: https://www.apir.com.au/
+    title: "APIR Systems Limited - Australian Financial Services Coding Standard"
+  - url: https://www.legislation.gov.au/C2004A00818/latest/text
+    title: "Corporations Act 2001 (Cth)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

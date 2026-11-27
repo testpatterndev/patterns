@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: T.C. Kimlik Numarası
 slug: tr-national-id
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -9,7 +9,7 @@ description: >-
   Detects T.C. Kimlik Numarası patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
 operation: >-
   Reference: https://learn.microsoft.com/en-us/purview/sit-defn-turkey-national-identification-number Corroborative evidence: 3 keywords within 300 characters. Keyword lists: pii-civic-credentials.
-pattern: \b(\d{11})\b
+pattern: \b([1-9]\d{10})\b
 confidence: medium
 confidence_justification: >-
   Medium confidence: pattern has structural constraints but corroborative keywords are recommended to reduce false positive rates.
@@ -45,6 +45,12 @@ test_cases:
       description: Too few digits (10)
     - value: "123456789012"
       description: Too many digits (12)
+    - value: "01234567890"
+      description: Leading zero is invalid for T.C. Kimlik Numarası
+    - value: "10000000088"
+      description: Fails 10th-digit Mod-10 check (perturbation of 10000000078)
+    - value: "10000000079"
+      description: Fails 11th-digit Mod-10 check (perturbation of 10000000078)
 false_positives:
   - description: >-
       Eleven-digit numeric sequences may match phone numbers or other administrative identifiers.
@@ -83,9 +89,23 @@ purview:
       id_match: Regex_tr_national_id
   regexes:
     - id: Regex_tr_national_id
-      pattern: \b(\d{11})\b
+      pattern: \b([1-9]\d{10})\b
       validators:
-        - ref: Func_Turkish_National_Id
+        - ref: Validator_tr_kimlik_d10
+        - ref: Validator_tr_kimlik_d11
+  validators:
+    - id: Validator_tr_kimlik_d10
+      type: Checksum
+      params:
+        weights: "7,9,7,9,7,9,7,9,7,0,0"
+        mod: 10
+        checkDigit: 10
+    - id: Validator_tr_kimlik_d11
+      type: Checksum
+      params:
+        weights: "1,1,1,1,1,1,1,1,1,1,0"
+        mod: 10
+        checkDigit: 11
   keywords:
     - id: Keyword_tr_national_id
       groups:
@@ -134,8 +154,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-turkey-national-identification-number
     title: "Turkish National Identification number entity definition - Microsoft Learn"
 created: '2026-02-09'
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.5.0
+    date: '2026-11-25'
+    description: Replace stripped Func_Turkish_National_Id with exact dual Mod-10 inline Checksum validators checking both check digits, and disallow leading zero.
   - version: 1.4.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

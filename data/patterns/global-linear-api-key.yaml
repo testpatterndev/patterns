@@ -1,0 +1,148 @@
+schema: testpattern/v1
+name: Linear API Key
+slug: global-linear-api-key
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects Linear personal API keys (lin_api_ followed by 40 alphanumeric characters) and Linear OAuth access tokens (lin_oauth_ followed by 40-64 alphanumeric characters). A leaked key grants GraphQL API access to issues, roadmaps, security bug reports, and customer attachments in the Linear workspace.
+operation: >-
+  Matches lin_api_<40 alphanumerics> or lin_oauth_<40-64 alphanumerics>, bounded on identifier characters. Tiers: 85 for two distinct tokens with Linear context, 75 for one token with context, 65 discovery-only for a bare token, with template-exclusion gating.
+pattern: '(?-i)(?<![A-Za-z0-9_-])(lin_api_[A-Za-z0-9]{40}|lin_oauth_[A-Za-z0-9]{40,64})(?![A-Za-z0-9_-])'
+confidence: high
+confidence_justification: >-
+  High confidence: Linear prefixes all personal keys with lin_api_ and fixed 40-character alphanumeric entropy, pinned identically by Linear docs, GitHub secret scanning, gitleaks, and TruffleHog.
+jurisdictions:
+- global
+regulations:
+- Criminal Code Act 1995 (Cth)
+frameworks:
+- CIS Controls
+- ISO 27001
+- NIST CSF
+- SOC 2
+data_categories:
+- credentials
+- security
+corroborative_evidence:
+  keywords:
+  - linear
+  - LINEAR_API_KEY
+  - api.linear.app
+  - linear.app
+  proximity: 300
+  keyword_lists:
+  - credentials
+  - data-record-context
+  - generic-data-labels
+test_cases:
+  # Positive literals omitted: GitHub Push Protection blocks all syntactically valid lin_api_/lin_oauth_ strings on public repos.
+  should_match: []
+  should_not_match:
+  - value: "LINEAR_API_KEY=lin_api_short12345"
+    description: "Body shorter than 40 characters"
+  - value: "LINEAR_API_KEY=LIN_API_short12345"
+    description: "Uppercase LIN_API_ prefix and short body rejected"
+  - value: "Generate a Linear API key in Workspace Settings -> Security & Access."
+    description: "Documentation prose without a key value"
+  - value: "template example placeholder record identifier"
+    description: "Template/sample context should be excluded even when anchor words are present"
+false_positives:
+- description: "Revoked Linear developer keys in historic scripts."
+  mitigation: "Verify active keys under Linear Settings -> API."
+- description: "Synthetic lin_api_ fixtures in GraphQL client tests."
+  mitigation: "Excluded on every tier by template-exclusion."
+exports:
+- purview_xml
+- yaml
+- regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The high-confidence detector finds a Linear personal API key or OAuth token. A valid token grants read/write GraphQL access to engineering issues, unreleased product roadmaps, incident tickets, and private security vulnerability reports within the user scope. Risk 8 and SENSITIVE InfoTech fit contained workspace credential compromise.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
+  idcf: DSL-3
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE InfoTech, and Medium because a valid Linear token exposes private engineering tickets, security issues, and write actions across one workspace identity. PROTECTED is not met without broader infrastructure control.
+  generic:
+    classification: Medium
+    dlm: Medium InfoTech
+    rationale: >-
+      Medium and Medium InfoTech handling suit Linear API keys because they grant direct workspace GraphQL access bounded by user permissions and key revocation.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+  - dict: template-exclusion
+    as: Keyword_noise_exclusion
+    match_style: word
+  pattern_tiers:
+  - confidence_level: 85
+    id_match: Regex_linear_api_key
+    matches:
+    - ref: Regex_linear_api_key
+      min_count: 2
+      unique_results: true
+    - ref: Keyword_linear_api_key
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_linear_api_key
+    matches:
+    - ref: Keyword_linear_api_key
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 65
+    discovery_only: true
+    id_match: Regex_linear_api_key
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  regexes:
+  - id: Regex_linear_api_key
+    pattern: '(?-i)(?<![A-Za-z0-9_-])(lin_api_[A-Za-z0-9]{40}|lin_oauth_[A-Za-z0-9]{40,64})(?![A-Za-z0-9_-])'
+  keywords:
+  - id: Keyword_linear_api_key
+    groups:
+    - match_style: word
+      terms:
+      - linear
+      - LINEAR_API_KEY
+      - api.linear.app
+      - linear.app
+      - linear graphql
+      - api key
+      - Bearer
+    strength: specific
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+- version: 1.0.0
+  date: '2026-11-25'
+  description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+- url: https://linear.app/developers/graphql
+  title: "Linear Developers GraphQL API authentication (lin_api_ personal API keys and OAuth2)"
+- url: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+  title: "gitleaks linear-api-key rule (lin_api_[0-9a-zA-Z]{40})"

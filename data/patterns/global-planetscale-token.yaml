@@ -1,0 +1,148 @@
+schema: testpattern/v1
+name: PlanetScale Database Password and Service Token
+slug: global-planetscale-token
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects PlanetScale database branch passwords (pscale_pw_), organization service tokens (pscale_tkn_), and OAuth tokens (pscale_oauth_) followed by 32 to 64 token characters. Leaked credentials grant direct MySQL/Vitess database access or PlanetScale branch and schema management.
+operation: >-
+  Matches pscale_pw_, pscale_tkn_, or pscale_oauth_ followed by 32-64 [A-Za-z0-9_.-] characters, bounded outside identifier characters. Tiers: 85 for two distinct tokens with PlanetScale context, 75 for one token with context, 65 discovery-only for a bare token, with template-exclusion gating.
+pattern: '(?-i)(?<![A-Za-z0-9_.-])(pscale_(?:pw|tkn|oauth)_[A-Za-z0-9_.-]{32,64})(?![A-Za-z0-9_.-])'
+confidence: high
+confidence_justification: >-
+  High confidence: PlanetScale prefixes every generated database password and API token with pscale_pw_, pscale_tkn_, or pscale_oauth_ and >=32 characters of entropy, pinned by PlanetScale docs, GitHub secret scanning, gitleaks, and TruffleHog.
+jurisdictions:
+- global
+regulations:
+- Criminal Code Act 1995 (Cth)
+frameworks:
+- CIS Controls
+- ISO 27001
+- NIST CSF
+- SOC 2
+data_categories:
+- credentials
+- security
+corroborative_evidence:
+  keywords:
+  - planetscale
+  - pscale
+  - aws.connect.psdb.cloud
+  - DATABASE_URL
+  proximity: 300
+  keyword_lists:
+  - credentials
+  - data-record-context
+  - generic-data-labels
+test_cases:
+  # Positive literals omitted: GitHub Push Protection blocks all syntactically valid pscale_pw_/pscale_tkn_ strings on public repos.
+  should_match: []
+  should_not_match:
+  - value: "PLANETSCALE_SERVICE_TOKEN=pscale_pw_short12345"
+    description: "Secret body shorter than 32 characters"
+  - value: "PLANETSCALE_SERVICE_TOKEN=pscale_key_short12345"
+    description: "Invalid segment pscale_key_ (not pw, tkn, or oauth)"
+  - value: "Create a PlanetScale password in the branch connect dialog."
+    description: "Documentation prose without a token value"
+  - value: "template example placeholder record identifier"
+    description: "Template/sample context should be excluded even when anchor words are present"
+false_positives:
+- description: "Deleted development-branch passwords from temporary schema previews."
+  mitigation: "Check active branch passwords and service tokens in the PlanetScale console."
+- description: "Example pscale_pw_ strings in ORM quickstart tutorials."
+  mitigation: "Excluded on every tier by template-exclusion."
+exports:
+- purview_xml
+- yaml
+- regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The high-confidence detector finds a PlanetScale database password, service token, or OAuth token. A valid pscale_pw_ credential grants direct SQL read/write access to the associated Vitess/MySQL branch over TLS, while pscale_tkn_ permits control-plane operations within granted scopes. Risk 8 and SENSITIVE InfoTech fit direct cloud datastore credential exposure.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
+  idcf: DSL-3
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE InfoTech, and Medium because a live PlanetScale credential directly authenticates to a managed database branch or control-plane API. PROTECTED is not met without proof that the branch holds protected or critical whole-of-enterprise holdings.
+  generic:
+    classification: Medium
+    dlm: Medium InfoTech
+    rationale: >-
+      Medium and Medium InfoTech handling suit PlanetScale database passwords and tokens because they provide direct database or branch API access until rotated.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+  - dict: template-exclusion
+    as: Keyword_noise_exclusion
+    match_style: word
+  pattern_tiers:
+  - confidence_level: 85
+    id_match: Regex_planetscale_token
+    matches:
+    - ref: Regex_planetscale_token
+      min_count: 2
+      unique_results: true
+    - ref: Keyword_planetscale_token
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_planetscale_token
+    matches:
+    - ref: Keyword_planetscale_token
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 65
+    discovery_only: true
+    id_match: Regex_planetscale_token
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  regexes:
+  - id: Regex_planetscale_token
+    pattern: '(?-i)(?<![A-Za-z0-9_.-])(pscale_(?:pw|tkn|oauth)_[A-Za-z0-9_.-]{32,64})(?![A-Za-z0-9_.-])'
+  keywords:
+  - id: Keyword_planetscale_token
+    groups:
+    - match_style: word
+      terms:
+      - planetscale
+      - pscale
+      - psdb.cloud
+      - PLANETSCALE_SERVICE_TOKEN
+      - DATABASE_URL
+      - database password
+      - service token
+    strength: specific
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+- version: 1.0.0
+  date: '2026-11-25'
+  description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+- url: https://planetscale.com/docs/concepts/service-tokens
+  title: "PlanetScale Service Tokens and connection strings documentation (pscale_tkn_ and pscale_pw_)"
+- url: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+  title: "gitleaks planetscale-password / planetscale-api-token rules"

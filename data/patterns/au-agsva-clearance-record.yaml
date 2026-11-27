@@ -1,0 +1,159 @@
+schema: testpattern/v1
+name: "Australian AGSVA Security Clearance Record and CSID"
+slug: au-agsva-clearance-record
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Detects populated Australian Government Security Vetting Agency (AGSVA) clearance records and Clearance Subject Identifiers (CSID) with holder/sponsor/revalidation fields (complementing phrase-level global-security-clearance-reference).
+operation: >-
+  Primary matches AGSVA/myClearance anchored to PSPF clearance levels or an explicit CSID number. 65 is discovery-only; 75 requires a populated holder/sponsor/revalidation field; 85 requires CSID or clearance level plus two vetting fields (holder, sponsoring agency, DISP membership, or revalidation/grant date).
+pattern: '(?i)\b((?:AGSVA|Australian\s+Government\s+Security\s+Vetting\s+Agency|myClearance)\b[\s\S]{0,160}\b(?:CSID|clearance\s+subject\s+ID|Baseline\s+Vetting|Negative\s+Vetting\s+(?:Level\s+)?[12]|Positive\s+Vetting)\b|\bCSID[\s:#-]{1,6}\d{6,10}\b)'
+confidence: high
+confidence_justification: >-
+  High precision on enforce tiers: requiring AGSVA/CSID terminology plus populated subject, sponsor, or revalidation fields prevents PSPF policy documents and job advertisements ("must hold NV1") from enforcing.
+jurisdictions:
+  - au
+regulations:
+  - "Privacy Act 1988 (Cth)"
+  - "Defence Act 1903 (Cth)"
+  - "Crimes Act 1914 (Cth)"
+frameworks:
+  - DISP
+  - ISO 27001
+  - NIST CSF
+data_categories:
+  - government-id
+  - pii
+  - security
+corroborative_evidence:
+  keywords:
+    - "AGSVA"
+    - "myClearance"
+    - "CSID"
+    - "Negative Vetting"
+    - "Positive Vetting"
+    - "Baseline Vetting"
+    - "DISP"
+    - "revalidation date"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "AGSVA Security Clearance Record\nClearance Subject: Taylor Teston\nCSID: 48291736\nClearance Level: Negative Vetting Level 2\nSponsoring Agency: Department of Defence\nRevalidation Date: 14/09/2031"
+      description: "Populated AGSVA NV2 clearance record with CSID, holder, sponsor, and revalidation date (85 tier)"
+      synthetic: true
+    - value: "myClearance status update — CSID: 73918204\nHolder: Jordan Staffson"
+      description: "CSID with populated holder field (75 tier)"
+      synthetic: true
+    - value: "AGSVA clearance pack for Positive Vetting revalidation"
+      description: "AGSVA + clearance level topic match (65 discovery)"
+  should_not_match:
+    - value: "Applicants for this role must hold or be able to obtain an AGSVA Negative Vetting 1 clearance."
+      description: "Job advertisement mentioning AGSVA NV1 without any CSID or populated holder/vetting fields (65 at most, excluded from enforce)"
+    - value: "PSPF policy states AGSVA conducts Baseline Vetting, Negative Vetting 1, Negative Vetting 2, and Positive Vetting."
+      description: "Policy explainer with no subject record"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Defence recruitment advertisements and tender capability statements stating clearance requirements."
+    mitigation: "Job-ad and tender recruitment phrasing is excluded from enforcing tiers, which also require populated CSID, holder, or revalidation fields."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The detector identifies populated Australian Government Security Vetting Agency (AGSVA) clearance records and Clearance Subject IDs (CSID). Lists or records of cleared personnel (especially NV1, NV2, and PV holders in Defence, intelligence, and DISP industry partners) are prime foreign-intelligence recruitment and spear-phishing targets. Risk 8 and SENSITIVE Government fit an individual cleared-person vetting record; bulk cleared-personnel registers or PV psychological/financial vetting dossiers reach PROTECTED.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Government
+  idcf: DSL-3
+  us_gov: "CUI Specified"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Government, and Medium because a populated AGSVA clearance record identifies a vetted individual, their clearance level, CSID, and sponsoring agency, creating counter-intelligence targeting risk. PROTECTED requires bulk cleared-staff registers or full PV background-investigation files.
+  generic:
+    classification: Medium
+    dlm: Medium Government
+    rationale: >-
+      Medium Government handling protects individual national-security vetting status and AGSVA CSID records from adversarial profiling.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_agsva_primary
+      matches:
+        - ref: Regex_au_agsva_subject_field
+        - ref: Regex_au_agsva_meta_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_agsva_job_ad_excl
+    - confidence_level: 75
+      id_match: Regex_au_agsva_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_agsva_subject_field
+            - Regex_au_agsva_meta_field
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_agsva_job_ad_excl
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_agsva_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_agsva_primary
+      pattern: '(?i)\b((?:AGSVA|Australian\s+Government\s+Security\s+Vetting\s+Agency|myClearance)\b[\s\S]{0,160}\b(?:CSID|clearance\s+subject\s+ID|Baseline\s+Vetting|Negative\s+Vetting\s+(?:Level\s+)?[12]|Positive\s+Vetting)|CSID[\s:#-]{1,6}\d{6,10})\b'
+    - id: Regex_au_agsva_subject_field
+      pattern: '(?i)\b((?:clearance\s+subject|holder|employee|candidate|officer)\s*(?:name)?\s*[:#]\s*(?!(?:n/?a|tbc|unknown)\b|_{2,})[A-Z][A-Za-z''-]{1,24}[ \t]+[A-Z][A-Za-z''-]{1,24})'
+    - id: Regex_au_agsva_meta_field
+      pattern: '(?i)\b((?:sponsoring\s+(?:agency|entity)|DISP\s+member|(?:grant|revalidation|review)\s+date|CSID)[\s]*[:#][\s]*(?!(?:n/?a|tbc)\b|_{2,})[A-Z0-9][A-Za-z0-9 /.-]{3,50})'
+  keywords:
+    - id: Keyword_au_agsva_job_ad_excl
+      groups:
+        - match_style: word
+          terms:
+            - "applicants for this role"
+            - "must be able to obtain"
+            - "how to apply"
+            - "selection criteria"
+            - "remuneration package"
+      strength: exclusion
+references:
+  - url: https://www.defence.gov.au/security/clearances
+    title: "Department of Defence - Australian Government Security Vetting Agency (AGSVA) Security Clearances"
+  - url: https://www.protectivesecurity.gov.au/personnel-security
+    title: "Protective Security Policy Framework (PSPF) - Personnel Security and Vetting"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: U.S. FERPA Student Education Record ID
 slug: us-ferpa-student-record
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -17,7 +17,7 @@ operation: >-
   context; 75 requires education-record keywords (transcript/GPA/registrar/…); 85 requires two unique
   education-record hits. Bare labelled IDs without academic context no longer enforce. Template/training markers and conflicting employee/customer/
   member ID labels are modelled as keyword NOT evidence on both tiers.
-pattern: \b((?i:student\s+(?:id|number)|SIS\s+id|enrollment\s+id)[\s:#]{0,8}(?=[A-Z0-9]{6,12}\b)[A-Z]*\d[A-Z0-9]*)\b
+pattern: (?-i)\b((?i:student\s+(?:id|number)|SIS\s+id|enrollment\s+id)[\s:#]{0,8}(?=[A-Z0-9]{6,12}\b)[A-Z]*\d[A-Z0-9]*)\b
 confidence: medium
 confidence_justification: >-
   Medium confidence: the ID must be immediately preceded by an explicit student/enrolment label, so generic alphanumeric
@@ -89,6 +89,10 @@ scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
       id_match: Regex_us_ferpa_student_id
@@ -100,6 +104,7 @@ purview:
           min_matches: 0
           max_matches: 0
           refs:
+            - Keyword_noise_exclusion
             - Keyword_us_ferpa_noise
     - confidence_level: 75
       id_match: Regex_us_ferpa_student_id
@@ -109,6 +114,7 @@ purview:
           min_matches: 0
           max_matches: 0
           refs:
+            - Keyword_noise_exclusion
             - Keyword_us_ferpa_noise
     - confidence_level: 65
       discovery_only: true
@@ -118,10 +124,11 @@ purview:
           min_matches: 0
           max_matches: 0
           refs:
+            - Keyword_noise_exclusion
             - Keyword_us_ferpa_noise
   regexes:
     - id: Regex_us_ferpa_student_id
-      pattern: \b((?i:student\s+(?:id|number)|SIS\s+id|enrollment\s+id)[\s:#]{0,8}(?=[A-Z0-9]{6,12}\b)[A-Z]*\d[A-Z0-9]*)\b
+      pattern: (?-i)\b((?i:student\s+(?:id|number)|SIS\s+id|enrollment\s+id)[\s:#]{0,8}(?=[A-Z0-9]{6,12}\b)[A-Z]*\d[A-Z0-9]*)\b
   keywords:
     - id: Keyword_us_ferpa_record
       groups:
@@ -143,15 +150,10 @@ purview:
       groups:
         - match_style: word
           terms:
-            - template
-            - sample
-            - training
-            - placeholder
-            - fictional
             - employee ID
             - customer ID
             - member ID
-      strength: noise
+      strength: exclusion
 risk_rating: 7
 risk_description: >-
   This identifier detector requires a student ID, student number, SIS ID, or enrollment ID label followed by a six-to-twelve-character value; enforce tiers also require nearby FERPA education-record context. A genuine match persistently links a learner to institutional records and can support impersonation, record lookup, or correlation across disclosed education material. The identifier is not itself an authentication secret, and course templates or non-academic student discount numbers remain documented false positives. Risk 7 SENSITIVE fits a contextualised student-record identifier, while PROTECTED requires linked high-impact records, access credentials, bulk identifiers, or significant damage.
@@ -183,8 +185,11 @@ references:
   - url: https://studentprivacy.ed.gov/ferpa
     title: "FERPA - U.S. Department of Education Student Privacy Policy Office"
 created: '2026-06-13'
-updated: '2026-11-17'
+updated: '2026-11-25'
 changelog:
+  - version: 1.5.0
+    date: '2026-11-25'
+    description: State explicit regex case rule ((?i) or (?-i)) and align tier/keyword semantics with Microsoft Purview evaluation.
   - version: 1.4.0
     date: '2026-11-17'
     description: 'Matching widened: the label words in Regex_us_ferpa_student_id (student id, student number, SIS id, enrollment id) now match in any case, through a scoped (?i:...) group. Purview regex is case-sensitive by default (dev-tenant test recorded in commit bc6255bc9e), so "Student ID: A1234567" and "Enrollment ID: ..." were missed. The value must now contain a digit: with the label matching in any case, the form heading "STUDENT ID NUMBER" beside transcript words reached 85 with NUMBER read as the value. The value is otherwise unchanged (6 to 12 upper-case letters and digits). Added that decoy.'

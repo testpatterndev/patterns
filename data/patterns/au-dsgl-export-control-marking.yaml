@@ -1,0 +1,158 @@
+schema: testpattern/v1
+name: "Australian Defence and Strategic Goods List (DSGL) Export-Control Marking"
+slug: au-dsgl-export-control-marking
+version: 1.0.0
+type: regex
+pattern_class: marking
+engine: boost_regex
+description: >-
+  Detects Australian export-controlled technical data markings and classification notices under the Defence Trade Controls Act 2012 (Cth) (including the 2024 AUKUS s 10A/10B/10C domestic/deemed-supply offences) and the Defence and Strategic Goods List (DSGL Part 1 Munitions and Part 2 Dual-Use).
+operation: >-
+  Matches explicit DSGL distribution warnings, DSGL Category control codes (e.g. ML1..ML22, DSGL Category 3A001), or AUKUS Authorized User export-control notices. Tier 85 requires export-control restriction or permit language; Tier 75 matches DSGL + statutory/category markers; Tier 65 provides discovery.
+pattern: '(?i)\b((?:Defence\s+and\s+Strategic\s+Goods\s+List|DSGL\s+(?:Part\s+[12]|controlled|technology|software|munitions|dual-use))\b[\s\S]{0,160}\b(?:Defence\s+Trade\s+Controls\s+Act|DEC\s+permit|export\s+control|unauthorised\s+(?:supply|transfer|publication)|AUKUS\s+authorised\s+user)|\bDSGL\s+Category\s+[0-9ML][A-Z0-9.]{1,8}\b)'
+confidence: high
+confidence_justification: >-
+  High confidence: DSGL Part 1/2, Defence Trade Controls Act, Defence Export Controls (DEC) permit references, and DSGL Munitions/Dual-Use category codes are exclusive to regulated defence and dual-use technical data.
+jurisdictions:
+  - au
+regulations:
+  - "Defence Trade Controls Act 2012 (Cth)"
+  - "Customs Act 1901 (Cth)"
+frameworks:
+  - DISP
+  - ISO 27001
+data_categories:
+  - defense
+  - intellectual-property
+  - government
+corroborative_evidence:
+  keywords:
+    - "Defence and Strategic Goods List"
+    - "DSGL"
+    - "Defence Trade Controls Act"
+    - "Defence Export Controls"
+    - "AUKUS Authorised User"
+    - "Munitions List"
+    - "Dual-Use"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "EXPORT CONTROL WARNING: This drawing contains DSGL Part 1 controlled technology subject to the Defence Trade Controls Act 2012 (Cth). Supply to foreign persons without a DEC permit is prohibited."
+      description: "Full Australian DSGL technical-data distribution control statement (85 tier)"
+    - value: "Technical specification classified under DSGL Category 5A002 — Dual-Use cryptography export control applies."
+      description: "DSGL Dual-Use category code with export-control context (75/85 tier)"
+    - value: "Defence and Strategic Goods List compliance notice: AUKUS authorised user community transfer only."
+      description: "AUKUS Authorised User DSGL notice"
+  should_not_match:
+    - value: "The export team shipped agricultural goods from Brisbane Port."
+      description: "Ordinary commercial export prose with no DSGL or Defence Trade Controls reference"
+    - value: "Read about Parliament amending the Defence Trade Controls Act in the newspaper."
+      description: "General news mention without DSGL technical-data or category control phrasing"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "University and DISP research-compliance web pages explaining DSGL obligations."
+    mitigation: "Policy/guidance framing without control warnings or engineering artefacts is suppressed by template/policy exclusions."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The detector identifies technical data marked as controlled under Australia's Defence and Strategic Goods List (DSGL) and Defence Trade Controls Act 2012 (Cth). Following the 2024 DTCA amendments supporting AUKUS, unauthorized supply of DSGL technology to foreign nationals even within Australia (or via cloud/AI tools hosted offshore or accessed by non-authorized staff) carries severe criminal penalties. Risk 8 and SENSITIVE Government protect controlled unclassified DSGL engineering and research data; classified DSGL designs carry PROTECTED or higher banners.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Government
+  idcf: DSL-3
+  us_gov: "CUI Specified"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Government, and Medium because unclassified DSGL-controlled technical data is subject to criminal export and deemed-supply offences under the Defence Trade Controls Act 2012 (Cth). PROTECTED applies when the technology itself is security-classified.
+  generic:
+    classification: Medium
+    dlm: Medium Government
+    rationale: >-
+      Medium Government handling enforces strict residency and foreign-national access controls on DSGL export-controlled technical data.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_dsgl_marking
+      matches:
+        - ref: Keyword_au_dsgl_restriction
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_dsgl_marking
+      matches:
+        - ref: Keyword_au_dsgl_domain
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_dsgl_marking
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_dsgl_marking
+      pattern: '(?i)\b((?:Defence\s+and\s+Strategic\s+Goods\s+List|DSGL\s+(?:Part\s+[12]|controlled|technology|software|munitions|dual-use))[\s\S]{0,160}\b(?:Defence\s+Trade\s+Controls\s+Act|DEC\s+permit|export\s+control|unauthorised\s+(?:supply|transfer|publication)|AUKUS\s+authorised\s+user)|DSGL\s+Category\s+[0-9ML][A-Z0-9.]{1,8})\b'
+  keywords:
+    - id: Keyword_au_dsgl_restriction
+      groups:
+        - match_style: word
+          terms:
+            - "export control warning"
+            - "foreign persons"
+            - "DEC permit"
+            - "Defence Export Controls"
+            - "Part 1 Munitions"
+            - "Part 2 Dual-Use"
+            - "AUKUS"
+            - "deemed supply"
+            - "technical data"
+      strength: specific
+    - id: Keyword_au_dsgl_domain
+      groups:
+        - match_style: word
+          terms:
+            - text: "DSGL"
+              case_sensitive: true
+            - "Defence Trade Controls"
+            - "DISP"
+            - "export permit"
+            - "controlled technology"
+      strength: domain
+references:
+  - url: https://www.legislation.gov.au/C2012A00153/latest/text
+    title: "Defence Trade Controls Act 2012 (Cth)"
+  - url: https://www.defence.gov.au/business-industry/exporting/defence-and-strategic-goods-list
+    title: "Department of Defence - Defence and Strategic Goods List (DSGL)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

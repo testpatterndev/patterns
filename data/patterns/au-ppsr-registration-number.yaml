@@ -1,0 +1,161 @@
+schema: testpattern/v1
+name: "Australian PPSR Registration Number"
+slug: au-ppsr-registration-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects standalone 15-digit Australian Personal Property Securities Register (PPSR) registration numbers (YYYYMMDD + 7 digits) issued by AFSA; complements global-ppsr-security-agreement, which targets full General Security Agreement contracts.
+operation: >-
+  Matches a 15-digit date-prefixed PPSR registration number (2012-2049 YYYYMMDD + 7 digits) on word boundaries. Enforcing tiers require PPSR, Security Interest, Verification Statement, Collateral, or Grantor/Secured Party terms within 300 characters.
+pattern: '\b(20[1-4]\d(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{7})\b'
+confidence: medium
+confidence_justification: >-
+  Medium-high confidence: the valid calendar YYYYMMDD prefix (201x-204x) plus 7-digit serial eliminates most 15-digit numbers, and PPSR security-interest vocabulary isolates genuine PPSA financing and verification statements.
+jurisdictions:
+  - au
+regulations:
+  - "Personal Property Securities Act 2009 (Cth)"
+  - "Privacy Act 1988 (Cth)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - financial
+  - legal
+  - business
+corroborative_evidence:
+  keywords:
+    - "PPSR"
+    - "Personal Property Securities Register"
+    - "registration number"
+    - "verification statement"
+    - "secured party"
+    - "grantor"
+    - "security interest"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "PPSR Verification Statement — Registration Number: 202408150048291 (Secured Party security interest)"
+      description: "15-digit PPSR registration number dated 2024-08-15 with Verification Statement and secured party context (85 tier)"
+    - value: "201911040192837"
+      description: "Bare 15-digit PPSR registration number (YYYYMMDD + 7 digits)"
+    - value: "Financing Statement registration 202603220009184 for grantor collateral class"
+      description: "PPSR Financing Statement reference with grantor/collateral context (85 tier)"
+  should_not_match:
+    - value: "202413150048291"
+      description: "Invalid month 13 in YYYYMMDD prefix"
+    - value: "20240815004829"
+      description: "Fourteen digits (one short of 15-digit PPSR registration number)"
+    - value: "Lodge a financing change statement on the PPSR within five business days"
+      description: "Prose instruction without a registration number"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Timestamped 15-digit transaction or document archive IDs starting with YYYYMMDD."
+    mitigation: "Every tier requires PPSR, financing statement, grantor, or collateral corroboration within 300 characters."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 5
+risk_description: >-
+  The detector matches a 15-digit Australian PPSR registration number in security-interest or financing-statement context. While the PPSR is searchable for a fee, internal financing statements, verification statements, and PPSR Giving of Notice Identifiers frequently contain unpublished PPSR tokens (which allow unauthorized discharge or amendment of a security interest) and individual grantor DOB/driver-licence details. Risk 5 and OFFICIAL fit the registration number itself; accompanying grantor PII or discharge tokens elevate the record.
+sensitivity_labels:
+  pspf: "OFFICIAL"
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+classification:
+  tier: Low
+  rationale: >-
+    Risk 5 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because a PPSR registration number is a statutory register locator; SENSITIVE is reserved for documents also holding unredacted individual grantor PII or confidential lending facilities.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling reflects a statutory security-interest registration number.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_ppsr_reg
+      matches:
+        - ref: Keyword_au_ppsr_specific
+        - ref: Keyword_au_ppsr_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_ppsr_reg
+      matches:
+        - ref: Keyword_au_ppsr_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_ppsr_reg
+      matches:
+        - ref: Keyword_au_ppsr_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_ppsr_reg
+      pattern: '\b(20[1-4]\d(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{7})\b'
+  keywords:
+    - id: Keyword_au_ppsr_specific
+      groups:
+        - match_style: word
+          terms:
+            - text: "PPSR"
+              case_sensitive: true
+            - "Personal Property Securities Register"
+            - "Verification Statement"
+            - "Financing Statement"
+            - "Financing Change Statement"
+            - "Giving of Notice Identifier"
+            - "Secured Party Group"
+      strength: specific
+    - id: Keyword_au_ppsr_broad
+      groups:
+        - match_style: word
+          terms:
+            - "security interest"
+            - "secured party"
+            - "grantor"
+            - "collateral class"
+            - "PMSI"
+            - "AFSA"
+      strength: domain
+references:
+  - url: https://www.ppsr.gov.au/
+    title: "Australian Financial Security Authority (AFSA) - Personal Property Securities Register (PPSR)"
+  - url: https://www.legislation.gov.au/C2009A00130/latest/text
+    title: "Personal Property Securities Act 2009 (Cth)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

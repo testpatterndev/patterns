@@ -1,0 +1,148 @@
+schema: testpattern/v1
+name: Resend API Key
+slug: global-resend-api-key
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects Resend transactional email API keys, formatted as re_ followed by 8 alphanumeric characters, an underscore, and 24 alphanumeric characters (36 characters total). A compromised key allows an attacker to send spoofed emails from verified organizational domains and manage audiences or webhooks.
+operation: >-
+  Matches re_<8 alphanumerics>_<24 alphanumerics>, bounded on identifier characters so snake_case identifiers cannot false-match. Tiers: 85 for two distinct keys with Resend context, 75 for one key with context, 65 discovery-only for a bare key, with template-exclusion gating.
+pattern: '(?-i)(?<![A-Za-z0-9_-])(re_[A-Za-z0-9]{8}_[A-Za-z0-9]{24})(?![A-Za-z0-9_-])'
+confidence: high
+confidence_justification: >-
+  High confidence: while re_ alone is short, the exact two-segment structure re_[A-Za-z0-9]{8}_[A-Za-z0-9]{24} with mixed-case high-entropy alphanumeric segments is specific to Resend and pinned by TruffleHog and GitHub secret scanning.
+jurisdictions:
+- global
+regulations:
+- Criminal Code Act 1995 (Cth)
+frameworks:
+- CIS Controls
+- ISO 27001
+- NIST CSF
+- SOC 2
+data_categories:
+- credentials
+- security
+corroborative_evidence:
+  keywords:
+  - resend
+  - RESEND_API_KEY
+  - api.resend.com
+  - resend.com
+  proximity: 300
+  keyword_lists:
+  - credentials
+  - data-record-context
+  - generic-data-labels
+test_cases:
+  # Positive literals omitted: GitHub Push Protection blocks syntactically valid re_<8>_<24> Resend keys on public repos.
+  should_match: []
+  should_not_match:
+  - value: "RESEND_API_KEY=re_12345_short"
+    description: "Segments shorter than required 8+24 characters"
+  - value: "re_try_count_exceeded_maximum_threshold_val"
+    description: "Snake_case identifier with extra underscores does not match fixed 8+24 alphanumeric structure"
+  - value: "Configure RESEND_API_KEY to send transactional emails via api.resend.com."
+    description: "Documentation prose without a key value"
+  - value: "template example placeholder record identifier"
+    description: "Template/sample context should be excluded even when anchor words are present"
+false_positives:
+- description: "Sending-restricted keys scoped to a staging subdomain."
+  mitigation: "Inspect key permission (Full access vs Sending access) and domain scope in Resend dashboard."
+- description: "Example re_12345678_... keys in SDK documentation."
+  mitigation: "Excluded on every tier by template-exclusion."
+exports:
+- purview_xml
+- yaml
+- regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The high-confidence detector finds a Resend API key. Full-access or sending keys allow an attacker to send authenticated SPF/DKIM-aligned phishing emails from verified organizational domains, damaging domain reputation and enabling targeted social engineering. Risk 8 and SENSITIVE InfoTech fit transactional email credential compromise.
+sensitivity_labels:
+  pspf: 'OFFICIAL: Sensitive'
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE InfoTech
+  idcf: DSL-3
+  us_gov: CUI Specified
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE InfoTech, and Medium because a live Resend key enables authenticated email spoofing from verified domains and API access within key permissions. PROTECTED is not met without broader mail-tenant or identity takeover.
+  generic:
+    classification: Medium
+    dlm: Medium InfoTech
+    rationale: >-
+      Medium and Medium InfoTech handling suit Resend API keys because they authorize outbound domain-authenticated email and API operations until revoked.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 85
+  shared_keywords:
+  - dict: template-exclusion
+    as: Keyword_noise_exclusion
+    match_style: word
+  pattern_tiers:
+  - confidence_level: 85
+    id_match: Regex_resend_api_key
+    matches:
+    - ref: Regex_resend_api_key
+      min_count: 2
+      unique_results: true
+    - ref: Keyword_resend_api_key
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 75
+    id_match: Regex_resend_api_key
+    matches:
+    - ref: Keyword_resend_api_key
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  - confidence_level: 65
+    discovery_only: true
+    id_match: Regex_resend_api_key
+    matches:
+    - type: any
+      min_matches: 0
+      max_matches: 0
+      refs:
+      - Keyword_noise_exclusion
+  regexes:
+  - id: Regex_resend_api_key
+    pattern: '(?-i)(?<![A-Za-z0-9_-])(re_[A-Za-z0-9]{8}_[A-Za-z0-9]{24})(?![A-Za-z0-9_-])'
+  keywords:
+  - id: Keyword_resend_api_key
+    groups:
+    - match_style: word
+      terms:
+      - resend
+      - RESEND_API_KEY
+      - api.resend.com
+      - resend.com
+      - resend.emails
+      - transactional email
+      - Bearer
+    strength: specific
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+- version: 1.0.0
+  date: '2026-11-25'
+  description: Initial release.
+author: testpattern-community
+license: MIT
+references:
+- url: https://resend.com/docs/api-reference/introduction
+  title: "Resend API Reference authentication documentation (re_ Bearer API keys)"
+- url: https://github.com/trufflesecurity/trufflehog/tree/main/pkg/detectors/resend
+  title: "TruffleHog production Resend detector"

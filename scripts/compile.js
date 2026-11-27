@@ -269,6 +269,15 @@ if (!Array.isArray(dictionaryManifest?.dictionaries) || dictionaryManifest.dicti
   throw new Error(`${relative(DATA_DIR, manifestPath)} must contain a non-empty dictionaries array; run npm run build-manifest`)
 }
 
+// ── Load package blocks (if present; public builds carry block metadata for SIT-Reference) ──
+const blocksDir = join(DATA_DIR, 'blocks')
+const blocks = (!OVERLAY_DIR && existsSync(blocksDir))
+  ? Object.fromEntries(readdirSync(blocksDir).filter(f => f.endsWith('.json')).sort().map(f => {
+      const b = JSON.parse(readFileSync(join(blocksDir, f), 'utf-8'))
+      return [b.id, { id: b.id, name: b.name, domain: b.domain, layer: b.layer, patterns: b.patterns }]
+    }))
+  : null
+
 // ── Load classification results (if present) ──
 let classificationResults = null
 const classResultsPath = join(DATA_DIR, 'classification-results.json')
@@ -314,6 +323,7 @@ const output = {
   collections,
   keywords: keywordDicts,
   packageTags: packageTags?.metadata ?? null,
+  blocks,
   dictionaryManifest,
   // Documented identifier types referenced by identifier-format customisation entries
   // (definition, public-format evidence, fallback and replacement steps) for deploy tooling.

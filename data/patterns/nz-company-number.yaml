@@ -1,0 +1,147 @@
+schema: testpattern/v1
+name: "New Zealand Companies Office Registration Number"
+slug: nz-company-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects 6- to 7-digit New Zealand Companies Office registration numbers issued by MBIE under the Companies Act 1993 (NZ), distinct from the 13-digit New Zealand Business Number (nz-nzbn).
+operation: >-
+  Matches an explicit NZ company / Companies Office registration label followed by a 6-7 digit company number (100000-9999999). Enables local_noise_filter on enforcing tiers; Tier 85 requires Companies Office / MBIE / constitution / shareholding context.
+pattern: '(?-i)\b((?i:NZ\s+company\s+(?:number|no\.?)|New\s+Zealand\s+company\s+(?:number|no\.?)|Companies\s+Office\s+(?:number|no\.?)|company\s+registration\s+(?:number|no\.?))[\s:#-]{1,6}[1-9]\d{5,6})\b'
+confidence: medium
+confidence_justification: >-
+  Medium confidence: bare 6-7 digit numbers are ubiquitous, so requiring the explicit company-number label prevents false positives while capturing corporate filings and contracts.
+jurisdictions:
+  - nz
+regulations:
+  - "Companies Act 1993 (NZ)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - business
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "Companies Office"
+    - "NZ company number"
+    - "MBIE"
+    - "Companies Act 1993"
+    - "certificate of incorporation"
+    - "NZBN"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "NZ Company Number: 1849203"
+      description: "Labelled 7-digit New Zealand Companies Office number"
+    - value: "Companies Office no. 849201 — incorporated under the Companies Act 1993"
+      description: "6-digit NZ company number with statutory context (85 tier)"
+    - value: "Company registration number: 3291847"
+      description: "Labelled 7-digit company registration number"
+  should_not_match:
+    - value: "1849203"
+      description: "Bare 7-digit number without company registration label"
+    - value: "NZ Company Number: 12345"
+      description: "Five digits (shorter than 6-7 digit NZ company number range)"
+    - value: "Search the New Zealand Companies Office register by director name"
+      description: "Prose mention without a company number"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Foreign company numbers (such as 8-digit UK Companies House numbers) using generic \"Company registration number\" labels."
+    mitigation: "8-digit UK numbers are excluded by the 6-7 digit upper bound, and Tier 85 requires NZ/MBIE/Companies Act 1993 context."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 3
+risk_description: >-
+  The detector matches a labelled 6- or 7-digit New Zealand Companies Office registration number. Like an Australian ACN or New Zealand NZBN, it is public corporate-registry metadata rather than a confidential secret, anchoring legal contracts, M&A schedules, and vendor onboarding records. Risk 3 and OFFICIAL fit a public company registration number.
+sensitivity_labels:
+  pspf: "OFFICIAL"
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+classification:
+  tier: Low
+  rationale: >-
+    Risk 3 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because a New Zealand Companies Office number is publicly searchable on companiesoffice.govt.nz.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling suits a public corporate registration identifier.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_nz_company_number
+      matches:
+        - ref: Keyword_nz_company_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_nz_company_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_nz_company_number
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_nz_company_number
+      pattern: '(?-i)\b((?i:NZ\s+company\s+(?:number|no\.?)|New\s+Zealand\s+company\s+(?:number|no\.?)|Companies\s+Office\s+(?:number|no\.?)|company\s+registration\s+(?:number|no\.?))[\s:#-]{1,6}[1-9]\d{5,6})\b'
+  keywords:
+    - id: Keyword_nz_company_context
+      groups:
+        - match_style: word
+          terms:
+            - "Companies Office"
+            - "Companies Act 1993"
+            - "MBIE"
+            - "New Zealand"
+            - "Auckland"
+            - "Wellington"
+            - "Christchurch"
+            - "Certificate of Incorporation"
+            - "NZBN"
+      strength: specific
+references:
+  - url: https://companies-register.companiesoffice.govt.nz/
+    title: "New Zealand Companies Office Register (MBIE)"
+  - url: https://www.legislation.govt.nz/act/public/1993/0105/latest/DLM319570.html
+    title: "Companies Act 1993 (New Zealand)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

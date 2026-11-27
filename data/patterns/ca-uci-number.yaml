@@ -1,0 +1,166 @@
+schema: testpattern/v1
+name: "Canada IRCC Unique Client Identifier (UCI)"
+slug: ca-uci-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects 8- or 10-digit Canadian Immigration, Refugees and Citizenship Canada (IRCC) Unique Client Identifiers (UCIs, formatted 0000-0000 or 00-0000-0000) assigned to study/work permit holders, permanent residents, and visa applicants under the Immigration and Refugee Protection Act.
+operation: >-
+  Matches an explicitly labelled 8- or 10-digit UCI or the hyphenated 10-digit 00-0000-0000 IRCC format. Enforcing tiers require IRCC, work/study permit, PR card, or immigration corroboration.
+pattern: '(?-i)\b((?:UCI|(?i:Unique\s+Client\s+Identifier|Client\s+ID))[\s:#-]{1,6}(?:\d{4}[-\s]?\d{4}|\d{2}[-\s]?\d{4}[-\s]?\d{4})|\d{2}-\d{4}-\d{4})\b'
+confidence: medium
+confidence_justification: >-
+  Medium-high confidence: requiring either the UCI label or the 2-4-4 hyphenated structure plus IRCC immigration vocabulary avoids 8/10-digit phone and account collisions.
+jurisdictions:
+  - ca
+regulations:
+  - "Privacy Act (Canada)"
+  - "PIPEDA"
+  - "Immigration and Refugee Protection Act (Canada)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "Unique Client Identifier"
+    - "UCI"
+    - "IRCC"
+    - "Immigration, Refugees and Citizenship Canada"
+    - "Permanent Resident Card"
+    - "work permit"
+    - "study permit"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "UCI: 11-4829-3716"
+      description: "Labelled 10-digit hyphenated IRCC Unique Client Identifier"
+    - value: "Unique Client Identifier 4829-1736 — IRCC Work Permit"
+      description: "8-digit UCI with IRCC Work Permit context (85 tier)"
+    - value: "12-9038-4715"
+      description: "10-digit 2-4-4 hyphenated UCI format"
+  should_not_match:
+    - value: "48291736"
+      description: "Bare 8-digit number without UCI label"
+    - value: "UCI: 123456"
+      description: "Six digits (neither 8-digit nor 10-digit IRCC UCI)"
+    - value: "Find your UCI on your IRCC study permit or PR card"
+      description: "Prose instruction without a UCI value"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Internal CRM \"Client ID\" fields holding 8-digit customer numbers."
+    mitigation: "Generic \"Client ID\" requires IRCC / immigration / permit / PR-card corroboration to reach 85."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 7
+risk_description: >-
+  The detector matches a Canadian IRCC Unique Client Identifier (UCI) in immigration or employer right-to-work context. Like the U.S. USCIS A-Number, an IRCC UCI is a lifelong non-citizen/permanent-resident file identifier linking visa applications, work/study permits, PR cards, and citizenship files. Risk 7 and SENSITIVE Personal-Privacy match us-alien-registration-number.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 7 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy, and Medium because an IRCC UCI persistently links an individual across Canadian immigration, permit, and permanent-residency records (Protected B in Canada).
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling reflects a persistent national immigration identifier.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match:
+        type: any
+        ids:
+          - Regex_ca_uci_labeled
+          - Regex_ca_uci_hyphen10
+      matches:
+        - ref: Keyword_ca_uci_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_ca_uci_labeled
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_ca_uci_hyphen10
+      matches:
+        - ref: Keyword_ca_uci_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_ca_uci_labeled
+          - Regex_ca_uci_hyphen10
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_ca_uci_labeled
+      pattern: '(?-i)\b((?:UCI|(?i:Unique\s+Client\s+Identifier))[\s:#-]{1,6}(?:\d{4}[-\s]?\d{4}|\d{2}[-\s]?\d{4}[-\s]?\d{4}))\b'
+    - id: Regex_ca_uci_hyphen10
+      pattern: '\b(\d{2}-\d{4}-\d{4})\b'
+  keywords:
+    - id: Keyword_ca_uci_specific
+      groups:
+        - match_style: word
+          terms:
+            - text: "IRCC"
+              case_sensitive: true
+            - "Immigration, Refugees and Citizenship Canada"
+            - "Permanent Resident Card"
+            - "PR card"
+            - "study permit"
+            - "work permit"
+            - "Express Entry"
+            - "eTA"
+      strength: specific
+references:
+  - url: https://ircc.canada.ca/english/helpcentre/answer.asp?qnum=013&top=4
+    title: "Government of Canada (IRCC) - What is a Unique Client Identifier (UCI)?"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

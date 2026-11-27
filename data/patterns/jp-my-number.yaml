@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: My Number
 slug: jp-my-number
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -44,6 +44,8 @@ test_cases:
       description: Continuous My Number (Mod-11 checksum-valid)
     - value: 2837-4650-1929
       description: Hyphenated My Number (Mod-11 checksum-valid)
+    - value: '123456789310'
+      description: Check digit 0 where official Mod-11 remainder is 1 (Purview negated-weights remainder 10 compares equal to 0)
   should_not_match:
     - value: 1234 5678 901
       description: Only 11 digits instead of 12
@@ -51,6 +53,8 @@ test_cases:
       description: 13 digits instead of 12
     - value: 1234-5678
       description: Only 8 digits (two groups instead of three)
+    - value: '123456789019'
+      description: Fails Mod-11 My Number checksum (single-digit perturbation of 123456789018)
     - value: template example placeholder record identifier
       description: Template/sample context should be excluded even when anchor words are present
 false_positives:
@@ -93,7 +97,14 @@ purview:
     - id: Regex_jp_my_number
       pattern: \b(\d{4}[\s.-]?\d{4}[\s.-]?\d{4})\b
       validators:
-        - ref: Func_japanese_my_number_personal
+        - ref: Validator_jp_my_number_checksum
+  validators:
+    - id: Validator_jp_my_number_checksum
+      type: Checksum
+      params:
+        weights: "5,6,7,8,9,4,5,6,7,8,9,0"
+        mod: 11
+        checkDigit: 12
   keywords:
     - id: Keyword_jp_my_number
       groups:
@@ -143,8 +154,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-japan-my-number-personal
     title: Japan My Number - Personal entity definition - Microsoft Learn
 created: '2026-02-08'
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.6.0
+    date: '2026-11-25'
+    description: Replace stripped Func_japanese_my_number_personal with exact inline Mod-11 Checksum validator (Weights 5,6,7,8,9,4,5,6,7,8,9,0 / CheckDigit 12).
   - version: 1.5.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

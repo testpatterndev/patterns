@@ -62,6 +62,58 @@ export function validateIdcf(p) {
   return out
 }
 
+// Five Eyes classification parity (US CUI, UK GSCP, NZ PSR, Canada TBS): every active pattern
+// carries all four keys so SIT-Reference can frame under any Five Eyes jurisdiction. Existing
+// curated values are preserved; fiveEyesForLabels derives defaults only for missing keys.
+export const FIVE_EYES_KEYS = ['us_gov', 'uk_gov', 'nz_gov', 'ca_gov']
+const CAVEATED_SENSITIVE_DLMS = new Set([
+  'SENSITIVE Personal-Privacy', 'SENSITIVE Legal', 'SENSITIVE Law-Enforcement',
+  'SENSITIVE Financial', 'SENSITIVE Electoral Roll', 'SENSITIVE Cabinet-in-Confidence',
+])
+const NATIONAL_SECURITY_PROT_DLMS = new Set([
+  'PROTECTED Law-Enforcement', 'PROTECTED Cabinet-in-Confidence', 'PROTECTED Government', 'Marking Protected',
+])
+
+export function fiveEyesForLabels(labels) {
+  const l = labels && typeof labels === 'object' ? labels : {}
+  const dlm = text(l.qgiscf_dlm)
+  const basis = dlm || text(l.qgiscf) || text(l.pspf)
+  if (!basis) return null
+  let base
+  if (basis === 'PUBLIC') {
+    base = { us_gov: 'Public', uk_gov: 'OFFICIAL', nz_gov: 'UNCLASSIFIED', ca_gov: 'Unclassified' }
+  } else if (basis === 'N/A' || basis === 'Marking PSPF') {
+    base = { us_gov: 'CUI Basic', uk_gov: 'OFFICIAL-SENSITIVE', nz_gov: 'IN-CONFIDENCE', ca_gov: 'Protected A' }
+  } else if (/^(PROTECTED|Marking Protected)\b/.test(basis)) {
+    base = NATIONAL_SECURITY_PROT_DLMS.has(dlm)
+      ? { us_gov: 'CUI Specified', uk_gov: 'SECRET', nz_gov: 'SECRET', ca_gov: 'Confidential' }
+      : { us_gov: 'CUI Specified', uk_gov: 'OFFICIAL-SENSITIVE', nz_gov: 'CONFIDENTIAL', ca_gov: 'Protected B' }
+  } else if (/^(SENSITIVE|Marking Sensitive|OFFICIAL: Sensitive)\b/.test(basis)) {
+    base = CAVEATED_SENSITIVE_DLMS.has(dlm)
+      ? { us_gov: 'CUI Specified', uk_gov: 'OFFICIAL-SENSITIVE', nz_gov: 'RESTRICTED', ca_gov: 'Protected B' }
+      : { us_gov: 'CUI', uk_gov: 'OFFICIAL-SENSITIVE', nz_gov: 'IN-CONFIDENCE', ca_gov: 'Protected B' }
+  } else if (/^(OFFICIAL|Marking Official)\b/.test(basis)) {
+    base = { us_gov: 'CUI', uk_gov: 'OFFICIAL', nz_gov: 'IN-CONFIDENCE', ca_gov: 'Protected A' }
+  } else {
+    return null
+  }
+  // UK / NZ marking patterns that authored legacy gscp / psr keys carry those into uk_gov / nz_gov.
+  const gscp = text(l.gscp)
+  if (gscp) base.uk_gov = /SECRET/i.test(gscp) && !/OFFICIAL/i.test(gscp) ? gscp : /OFFICIAL-SENSITIVE/i.test(gscp) ? 'OFFICIAL-SENSITIVE' : gscp
+  const psr = text(l.psr)
+  if (psr) base.nz_gov = /SECRET/i.test(psr) ? 'SECRET' : /RESTRICTED/i.test(psr) ? 'RESTRICTED' : /IN[- ]CONFIDENCE/i.test(psr) ? 'IN-CONFIDENCE' : psr
+  return base
+}
+
+export function validateFiveEyes(p) {
+  const l = p.sensitivity_labels
+  if (!l || typeof l !== 'object' || Array.isArray(l)) return []
+  if (!fiveEyesForLabels(l)) return []
+  const missing = FIVE_EYES_KEYS.filter(k => !text(l[k]))
+  if (!missing.length) return []
+  return [`sensitivity_labels missing Five Eyes key(s) ${missing.join(', ')} — rerun node scripts/backfill-five-eyes-labels.mjs`]
+}
+
 export function validateClassification(p) {
   const out = []
   const c = p.classification

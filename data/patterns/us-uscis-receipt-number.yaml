@@ -1,0 +1,163 @@
+schema: testpattern/v1
+name: "U.S. USCIS Case Receipt Number"
+slug: us-uscis-receipt-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects 13-character U.S. Citizenship and Immigration Services (USCIS) Form I-797 Case Receipt Numbers consisting of a 3-letter service-center/electronic-filing prefix (EAC, WAC, LIN, SRC, NBC, MSC, IOE) followed by 10 digits.
+operation: >-
+  Matches uppercase USCIS service-center prefixes (EAC, WAC, LIN, SRC, NBC, MSC, IOE) followed by optional hyphen/space and 10 digits. Tier 65 discovers bare tokens; Tiers 75/85 require USCIS, I-797, H-1B, I-140, I-485, or immigration case corroboration.
+pattern: '(?-i)\b((?:EAC|WAC|LIN|SRC|NBC|MSC|IOE)[-\s]?\d{10})\b'
+confidence: high
+confidence_justification: >-
+  High confidence: the 7 official 3-letter USCIS service-center codes + 10 digits (13 characters) is the exact Form I-797 Notice of Action identifier structure across U.S. corporate immigration files.
+jurisdictions:
+  - us
+regulations:
+  - "State Breach Laws (US)"
+  - "CCPA/CPRA"
+  - "Privacy Act of 1974 (5 U.S.C. 552a)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "USCIS"
+    - "Receipt Number"
+    - "Form I-797"
+    - "Notice of Action"
+    - "I-129"
+    - "I-140"
+    - "I-485"
+    - "H-1B"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "IOE0924817362"
+      description: "USCIS online-filing IOE 13-character receipt number"
+    - value: "Receipt Number: WAC-24-192-50817"
+      description: "California Service Center Form I-797 receipt number"
+    - value: "EAC2590048291 — Form I-129 H-1B petition approved"
+      description: "Vermont Service Center receipt number with H-1B context (85 tier)"
+  should_not_match:
+    - value: "XYZ0924817362"
+      description: "XYZ is not a valid USCIS service-center prefix"
+    - value: "IOE092481736"
+      description: "Nine digits after IOE (one short of required 10 digits)"
+    - value: "Check your case status online using your 13-character USCIS receipt number"
+      description: "Prose instruction without a receipt number"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Hardware MAC/OUI or shipping codes starting with WAC/MSC/LIN + 10 digits."
+    mitigation: "Enforcing tiers require USCIS, I-797, petition, or visa-filing keywords within 300 characters."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 6
+risk_description: >-
+  The detector matches a 13-character USCIS Form I-797 Case Receipt Number. Anyone possessing a receipt number can query live case history on the public USCIS Case Status Online portal, and inside HR/legal folders it marks H-1B, L-1, O-1, I-140, and I-485 adjustment-of-status dossiers. Risk 6 and SENSITIVE Personal-Privacy complement us-alien-registration-number.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 6 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy, and Medium because a USCIS Receipt Number enables live immigration case-status tracking and identifies employee/applicant visa petitions.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling reflects live USCIS immigration petition tracking sensitivity.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_us_uscis_receipt
+      matches:
+        - ref: Keyword_us_uscis_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_us_uscis_receipt
+      matches:
+        - ref: Keyword_us_uscis_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_us_uscis_receipt
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_us_uscis_receipt
+      pattern: '(?-i)\b((?:EAC|WAC|LIN|SRC|NBC|MSC|IOE)(?:\d{10}|-\d{2}-\d{3}-\d{5}))\b'
+  keywords:
+    - id: Keyword_us_uscis_specific
+      groups:
+        - match_style: word
+          terms:
+            - text: "USCIS"
+              case_sensitive: true
+            - "Form I-797"
+            - "I-797C"
+            - "Notice of Action"
+            - "Receipt Number"
+            - "I-129"
+            - "I-140"
+            - "I-485"
+            - "I-765"
+      strength: specific
+    - id: Keyword_us_uscis_broad
+      groups:
+        - match_style: word
+          terms:
+            - "H-1B"
+            - text: "L-1"
+              case_sensitive: true
+            - "green card"
+            - "petitioner"
+            - "beneficiary"
+            - "immigration"
+            - "adjustment of status"
+      strength: domain
+references:
+  - url: https://egov.uscis.gov/
+    title: "U.S. Citizenship and Immigration Services - Case Status Online and 13-Character Receipt Numbers"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

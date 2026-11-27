@@ -1,0 +1,164 @@
+schema: testpattern/v1
+name: Israel Passport Number
+slug: il-passport-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Israeli passport (Darkon) and travel-document numbers issued by the Population and Immigration Authority. Israeli passport numbers consist of 7 or 8 digits without check letters, requiring passport-context corroboration to separate them from ordinary numeric references.
+operation: >-
+  Matches 7- or 8-digit Israeli passport numbers on word boundaries, guarded by AllDigitsSameFilter and common sequential-sentinel exclusions. Tiers: 85 with Israel-specific passport/Hebrew terms, 75 with general passport terms, 65 discovery-only with broad travel-document context, plus template-exclusion gating on every tier.
+pattern: \b(\d{7,8})\b
+confidence: low
+confidence_justification: >-
+  Low standalone confidence: bare 7-8 digit numbers occur across invoices, phone numbers, and account IDs, so passport keywords (English or Hebrew דרכון) within 300 characters are required on every tier including discovery.
+jurisdictions:
+  - il
+regulations:
+  - Protection of Privacy Law (Israel)
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - Israeli passport
+    - Israel passport
+    - passport number
+    - darkon
+    - דרכון
+    - מספר דרכון
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '28471936'
+      description: Eight-digit Israeli biometric passport number
+    - value: 'Israeli Passport Number: 7391824'
+      description: Labelled seven-digit Israeli passport number
+    - value: 'מספר דרכון: 31948275'
+      description: Hebrew-labelled eight-digit Israeli passport number
+  should_not_match:
+    - value: '123456'
+      description: Six digits (too short for Israeli passport number)
+    - value: '123456789'
+      description: Nine digits (matches Mispar Zehut length, not 7-8 digit passport number)
+    - value: Please renew your Israeli passport before booking international travel
+      description: Prose mention without a passport number
+false_positives:
+  - description: Generic 7-8 digit invoice, customer, or domestic telephone numbers.
+    mitigation: Every tier requires passport/travel-document keywords within 300 characters alongside AllDigitsSameFilter and sequential test-sentinel exclusions.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 5
+risk_description: >-
+  The detector matches a 7- or 8-digit Israeli passport number when corroborated by English or Hebrew passport vocabulary. A standalone travel-document number enables record correlation when holder identity details are also present, but supplies neither authentication nor biometric travel credentials. Risk 5 and OFFICIAL fit an isolated passport number; SENSITIVE requires linked identity dossiers or document scans.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: CUI
+  uk_gov: OFFICIAL-SENSITIVE
+  nz_gov: RESTRICTED
+  ca_gov: Protected B
+classification:
+  tier: Low
+  rationale: >-
+    Risk 5 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because a bare 7-8 digit passport number without biographical dossier context provides bounded correlation utility only.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling reflects a numeric travel-document reference whose consequential misuse requires holder identity and document data.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_il_passport
+      matches:
+        - ref: Keyword_il_passport_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_il_passport
+      matches:
+        - ref: Keyword_il_passport_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_il_passport
+      matches:
+        - ref: Keyword_il_passport_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_il_passport
+      pattern: \b(\d{7,8})\b
+  keywords:
+    - id: Keyword_il_passport_specific
+      groups:
+        - match_style: word
+          terms:
+            - Israeli passport
+            - Israel passport
+            - State of Israel passport
+            - darkon
+            - דרכון ישראלי
+            - מספר דרכון
+      strength: specific
+    - id: Keyword_il_passport_broad
+      groups:
+        - match_style: word
+          terms:
+            - passport
+            - passport number
+            - passport no
+            - travel document
+            - דרכון
+      strength: specific
+  filters:
+    - id: Filter_il_passport_same_digits
+      type: AllDigitsSameFilter
+    - id: Filter_il_passport_test_values
+      type: TextMatchFilter
+      direction: Full
+      logic: Exclude
+      terms:
+        - '1234567'
+        - '12345678'
+        - '7654321'
+        - '87654321'
+references:
+  - url: https://www.gov.il/en/departments/population_and_immigration_authority
+    title: Israel Population and Immigration Authority - Passports and Travel Documents
+  - url: https://learn.microsoft.com/en-us/purview/sit-defn-israel-passport-number
+    title: Israel Passport Number entity definition - Microsoft Learn
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

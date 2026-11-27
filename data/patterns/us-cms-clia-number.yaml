@@ -1,0 +1,160 @@
+schema: testpattern/v1
+name: "U.S. CMS CLIA Laboratory Identification Number"
+slug: us-cms-clia-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects 10-character U.S. Clinical Laboratory Improvement Amendments (CLIA) identification numbers issued by CMS (2-digit SSA state code 01-55 + uppercase letter D + 7 digits, e.g. 05D0987654) appearing on diagnostic pathology reports, HL7/FHIR lab payloads, and Medicare claims.
+operation: >-
+  Matches a valid 2-digit CMS state prefix (01-55), literal uppercase D, and 7 digits on word boundaries. Enables local_noise_filter on enforcing tiers; Tiers 75/85 require CLIA, CMS, pathology, or clinical laboratory corroboration.
+pattern: '(?-i)\b((?:0[1-9]|[1-4]\d|5[0-5])D\d{7})\b'
+confidence: high
+confidence_justification: >-
+  High confidence: 2-digit state code (01-55) + uppercase D + 7 digits is the canonical CMS CLIA format; laboratory/pathology keywords prevent accidental scientific-notation or part-code matches.
+jurisdictions:
+  - us
+regulations:
+  - "42 CFR Part 493 (CLIA)"
+  - "HIPAA"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - health
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "CLIA"
+    - "CLIA number"
+    - "CLIA ID"
+    - "Clinical Laboratory Improvement Amendments"
+    - "laboratory director"
+    - "CMS"
+    - "pathology"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "CLIA ID: 05D0987654"
+      description: "California (05) CMS CLIA laboratory identification number"
+    - value: "33D1048293 — Performing Laboratory CLIA Certificate of Accreditation"
+      description: "New York (33) CLIA number on diagnostic lab report"
+    - value: "45D2039184"
+      description: "Texas (45) 10-character CLIA number (65 discovery)"
+  should_not_match:
+    - value: "99D0987654"
+      description: "Invalid state prefix 99 outside CMS 01-55 state range"
+    - value: "05d0987654"
+      description: "Lowercase d rejected by case-sensitive CLIA format"
+    - value: "All performing laboratories must hold an active CMS CLIA certificate"
+      description: "Prose statement without a CLIA number"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Clinical lab reports legitimately carry the performing lab's public CLIA number."
+    mitigation: "Risk 4 OFFICIAL reflects facility-level regulatory metadata (matching us-npi), and local_noise_filter lets laboratories exclude their own CLIA ID."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 4
+risk_description: >-
+  The detector matches a 10-character U.S. CMS CLIA clinical laboratory identifier. Like a U.S. National Provider Identifier (us-npi) or Australian LSPN (au-lspn-diagnostic-number), a CLIA number is publicly searchable facility metadata rather than PHI on its own, while serving as a reliable structural marker on clinical pathology reports and lab billing feeds. Risk 4 and OFFICIAL match us-npi.
+sensitivity_labels:
+  pspf: "OFFICIAL"
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+classification:
+  tier: Low
+  rationale: >-
+    Risk 4 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because a CMS CLIA number is a public clinical-laboratory accreditation identifier searchable in CMS QCOR/S&C registries.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling suits a healthcare facility accreditation identifier.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_us_clia
+      matches:
+        - ref: Keyword_us_clia_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_us_clia
+      matches:
+        - ref: Keyword_us_clia_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_us_clia
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_us_clia
+      pattern: '(?-i)\b((?:0[1-9]|[1-4]\d|5[0-5])D\d{7})\b'
+  keywords:
+    - id: Keyword_us_clia_specific
+      groups:
+        - match_style: word
+          terms:
+            - text: "CLIA"
+              case_sensitive: true
+            - "CLIA number"
+            - "CLIA ID"
+            - "Clinical Laboratory Improvement Amendments"
+            - "Certificate of Waiver"
+            - "performing laboratory"
+            - "laboratory director"
+      strength: specific
+    - id: Keyword_us_clia_broad
+      groups:
+        - match_style: word
+          terms:
+            - "pathology"
+            - "specimen"
+            - "reference range"
+            - "laboratory"
+            - text: "CMS"
+              case_sensitive: true
+            - text: "NPI"
+              case_sensitive: true
+      strength: domain
+references:
+  - url: https://www.cms.gov/medicare/quality/clinical-laboratory-improvement-amendments
+    title: "CMS - Clinical Laboratory Improvement Amendments (CLIA)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

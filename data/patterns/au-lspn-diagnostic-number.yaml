@@ -1,0 +1,150 @@
+schema: testpattern/v1
+name: "Australian Medicare Location Specific Practice Number (LSPN)"
+slug: au-lspn-diagnostic-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects 6-digit Australian Medicare Location Specific Practice Numbers (LSPNs) issued by Services Australia under the Health Insurance Act 1973 (Cth) to accredited diagnostic imaging and radiation oncology practices and equipment sites.
+operation: >-
+  Matches an explicit uppercase LSPN or spelled-out Location Specific Practice Number label followed by 6 digits. Follows the #80 populated-label convention (75 on labelled LSPN with local_noise_filter, 85 with diagnostic imaging / radiation oncology / Services Australia context).
+pattern: '(?-i)\b((?:LSPN|(?i:Location\s+Specific\s+Practice\s+(?:Number|No\.?)))[\s:#-]{1,6}\d{6})\b'
+confidence: medium
+confidence_justification: >-
+  Medium-high confidence: requiring the explicit LSPN / Location Specific Practice Number label eliminates bare 6-digit collisions while accurately identifying Medicare diagnostic-imaging billing and accreditation records.
+jurisdictions:
+  - au
+regulations:
+  - "Health Insurance Act 1973 (Cth)"
+  - "Privacy Act 1988 (Cth)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - health
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "LSPN"
+    - "Location Specific Practice Number"
+    - "diagnostic imaging"
+    - "radiation oncology"
+    - "Services Australia"
+    - "Medicare"
+    - "NATA"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "LSPN: 004829"
+      description: "Labelled 6-digit Medicare Location Specific Practice Number"
+    - value: "Location Specific Practice Number 012948 — Diagnostic Imaging Accreditation Scheme"
+      description: "Spelled-out LSPN with diagnostic imaging accreditation context (85 tier)"
+    - value: "LSPN# 009381"
+      description: "Hash-delimited LSPN on radiology request/billing record"
+  should_not_match:
+    - value: "004829"
+      description: "Bare 6-digit number without LSPN label"
+    - value: "LSPN: 04829"
+      description: "Five digits (one short of 6-digit LSPN format)"
+    - value: "Register diagnostic imaging equipment for an LSPN through HPOS"
+      description: "Prose instruction without a 6-digit LSPN"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Radiology clinics print their own LSPN on imaging request forms and invoices."
+    mitigation: "Risk 4 OFFICIAL reflects practice-level metadata, and local_noise_filter lets clinics suppress their own site LSPNs."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 4
+risk_description: >-
+  The detector matches a labelled 6-digit Medicare Location Specific Practice Number for an Australian diagnostic imaging or radiation oncology site. Like a Medicare Provider Number or HPI-O, an LSPN identifies a healthcare facility/equipment registration rather than a patient, though it frequently sits on radiology reports and Medicare bulk-billing claims. Risk 4 and OFFICIAL match au-hpi-organisation and au-medicare-provider-number.
+sensitivity_labels:
+  pspf: "OFFICIAL"
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+classification:
+  tier: Low
+  rationale: >-
+    Risk 4 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because an LSPN is a practice-site Medicare accreditation identifier rather than personal health information.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling suits a healthcare practice-location registration identifier.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_au_lspn
+      matches:
+        - ref: Keyword_au_lspn_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_au_lspn
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_lspn
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_lspn
+      pattern: '(?-i)\b((?:LSPN|(?i:Location\s+Specific\s+Practice\s+(?:Number|No\.?)))[\s:#-]{1,6}\d{6})\b'
+  keywords:
+    - id: Keyword_au_lspn_context
+      groups:
+        - match_style: word
+          terms:
+            - "diagnostic imaging"
+            - "radiation oncology"
+            - "Services Australia"
+            - "Medicare"
+            - "HPOS"
+            - "Diagnostic Imaging Accreditation"
+            - "radiology"
+            - text: "MRI"
+              case_sensitive: true
+            - "CT scan"
+      strength: specific
+references:
+  - url: https://www.servicesaustralia.gov.au/diagnostic-imaging-and-radiation-oncology-register-location-specific-practice-number
+    title: "Services Australia - Location Specific Practice Number (LSPN) Register"
+  - url: https://www.legislation.gov.au/C2004A00101/latest/text
+    title: "Health Insurance Act 1973 (Cth)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

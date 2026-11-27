@@ -1,0 +1,173 @@
+schema: testpattern/v1
+name: "Australian Registered Body and Registered Scheme Number (ARBN / ARSN)"
+slug: au-arbn-arsn
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects 9-digit Australian Registered Body Numbers (ARBNs, issued to foreign companies and registrable Australian bodies) and Australian Registered Scheme Numbers (ARSNs, issued to managed investment schemes) under the Corporations Act 2001 (Cth). Enforces the exact ASIC Modulo-10 check digit via an inline Purview Checksum validator.
+operation: >-
+  Matches 9 digits (compact or 3-3-3 grouped) validated by Validator_au_arbn_arsn_checksum (Weights 2,3,4,5,6,7,8,9,0 / Modulo 10 / CheckDigit 9, negating ASIC weights 8,7,6,5,4,3,2,1). Requires ARBN/ARSN keywords so ACNs (covered by au-company-number) do not cross-fire.
+pattern: '\b(\d{3}[\s-]?\d{3}[\s-]?\d{3})\b'
+confidence: high
+confidence_justification: >-
+  High confidence: exact ASIC Modulo-10 check-digit enforcement removes 90% of random 9-digit numbers, and mandatory ARBN / ARSN / Registered Scheme corroboration distinguishes these entities from ACNs and TFNs.
+jurisdictions:
+  - au
+regulations:
+  - "Corporations Act 2001 (Cth)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - business
+  - financial
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "ARBN"
+    - "ARSN"
+    - "Australian Registered Body Number"
+    - "Australian Registered Scheme Number"
+    - "managed investment scheme"
+    - "responsible entity"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Product Disclosure Statement — Managed Investment Scheme ARSN 088 947 291"
+      description: "Valid ASIC Mod-10 9-digit ARSN with managed investment scheme / PDS context (85 tier)"
+    - value: "Foreign company registration — ARBN: 004-085-616"
+      description: "Valid ASIC Mod-10 9-digit ARBN in hyphenated format with foreign company context (85 tier)"
+    - value: "004085616"
+      description: "Compact valid 9-digit ASIC Mod-10 number"
+  should_not_match:
+    - value: "088 947 295"
+      description: "Fails ASIC Mod-10 check digit (5 instead of 1)"
+    - value: "004 085 619"
+      description: "Single-digit perturbation failing ASIC Mod-10 check digit"
+    - value: "Quote the fund ARSN on every Product Disclosure Statement"
+      description: "Prose mention without a 9-digit number"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Product Disclosure Statements and fund fact sheets legitimately publish the scheme's ARSN."
+    mitigation: "Enforcing tiers enable local_noise_filter so responsible entities can exclude their own published ARSNs/ARBNs."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 4
+risk_description: >-
+  The detector matches a checksum-valid 9-digit Australian Registered Body Number or Australian Registered Scheme Number in ASIC corporate or managed-investment-scheme context. Like an ACN or ABN, an ARBN/ARSN is public statutory register metadata rather than a confidential credential. Risk 4 and OFFICIAL match au-company-number and au-afsl-number; SENSITIVE requires investor registry holdings, unit-holder PII, or unannounced fund transactions.
+sensitivity_labels:
+  pspf: "OFFICIAL"
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+classification:
+  tier: Low
+  rationale: >-
+    Risk 4 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because ARBN and ARSN identifiers are publicly searchable on ASIC Connect and must be displayed on registered body and scheme documents under the Corporations Act 2001 (Cth).
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling suits a public ASIC corporate/scheme registration identifier.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_au_arbn_arsn
+      matches:
+        - ref: Keyword_au_arbn_arsn_specific
+        - ref: Keyword_au_arbn_arsn_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_au_arbn_arsn
+      matches:
+        - ref: Keyword_au_arbn_arsn_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_arbn_arsn
+      matches:
+        - ref: Keyword_au_arbn_arsn_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_arbn_arsn
+      pattern: '\b(\d{3}[\s-]?\d{3}[\s-]?\d{3})\b'
+      validators:
+        - ref: Validator_au_arbn_arsn_checksum
+  validators:
+    - id: Validator_au_arbn_arsn_checksum
+      type: Checksum
+      params:
+        - name: Weights
+          value: 2, 3, 4, 5, 6, 7, 8, 9, 0
+        - name: Modulo
+          value: '10'
+        - name: CheckDigit
+          value: '9'
+  keywords:
+    - id: Keyword_au_arbn_arsn_specific
+      groups:
+        - match_style: word
+          terms:
+            - text: "ARBN"
+              case_sensitive: true
+            - text: "ARSN"
+              case_sensitive: true
+            - "Australian Registered Body Number"
+            - "Australian Registered Scheme Number"
+      strength: specific
+    - id: Keyword_au_arbn_arsn_broad
+      groups:
+        - match_style: word
+          terms:
+            - "managed investment scheme"
+            - "responsible entity"
+            - "foreign company"
+            - "registrable Australian body"
+            - "Product Disclosure Statement"
+      strength: domain
+  filters:
+    - id: Filter_au_arbn_arsn_same_digits
+      type: AllDigitsSameFilter
+references:
+  - url: https://asic.gov.au/for-business/registering-a-company/steps-to-register-a-company/australian-company-numbers/australian-company-number-digit-check/
+    title: "ASIC - ACN / ARBN / ARSN Modulo-10 Check Digit Calculation"
+  - url: https://www.legislation.gov.au/C2004A00818/latest/text
+    title: "Corporations Act 2001 (Cth)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT
