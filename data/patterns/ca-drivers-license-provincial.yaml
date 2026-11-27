@@ -1,0 +1,170 @@
+schema: testpattern/v1
+name: "Canada Provincial Driver's Licence Number (ON / QC / AB / BC)"
+slug: ca-drivers-license-provincial
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Packable custom multi-province Canadian driver's licence detector (complementing ca-drivers-license, which is a source: microsoft built-in reference stub): covers structured Ontario (15 chars: letter + 4 + 5 + YYMMDD with +50 female month), Québec SAAQ (13 chars: letter + 4 + DDMMYY/YYMMDD + 2), and Alberta hyphenated (6 digits - 3 digits) formats.
+operation: >-
+  Matches structured Ontario 1-4-5-5 (valid DOB tail), Québec 1-4-6-2, and Alberta 6-3 driver's licence formats. Enforcing tiers require driver's licence / MTO / SAAQ / ICBC / provincial licensing corroboration.
+pattern: '(?-i)\b([A-Z]\d{4}[-\s]?\d{5}[-\s]?\d{2}(?:0[1-9]|1[0-2]|5[1-9]|6[0-2])(?:0[1-9]|[12]\d|3[01])|[A-Z]\d{4}[-\s]?\d{2}(?:0[1-9]|1[0-2]|5[1-9]|6[0-2])(?:0[1-9]|[12]\d|3[01])[-\s]?\d{2}|\d{6}-\d{3})\b'
+confidence: high
+confidence_justification: >-
+  High confidence on Ontario and Québec structured formats (15-char and 13-char alpha-hyphenated with date-of-birth constraints); Alberta 6-3 is gated on driver's licence keywords.
+jurisdictions:
+  - ca
+regulations:
+  - "PIPEDA"
+  - "Act respecting the protection of personal information in the private sector (Québec Law 25)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "driver's licence"
+    - "drivers license"
+    - "permis de conduire"
+    - "SAAQ"
+    - "MTO"
+    - "Ministry of Transportation"
+    - "class G"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "S4829-37160-850419"
+      description: "Ontario 15-character driver's licence (letter + 4 + 5 + YYMMDD)"
+    - value: "Permis de conduire SAAQ: T4829-190485-07"
+      description: "Québec SAAQ 13-character driver's licence"
+    - value: "Alberta DL: 148293-715"
+      description: "Alberta 6-3 hyphenated driver's licence format"
+  should_not_match:
+    - value: "S4829-37160-851519"
+      description: "Invalid Ontario DOB month 15 (neither 01-12 nor 51-62)"
+    - value: "s4829-37160-850419"
+      description: "Lowercase leading letter rejected by case-sensitive rule"
+    - value: "Present a valid Ontario or Québec driver's licence as photo ID"
+      description: "Prose mention without a licence number"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Alberta 6-3 hyphenated part numbers."
+    mitigation: "6-3 numeric branch requires explicit driver's licence / Alberta registry corroboration to enforce."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 6
+risk_description: >-
+  The detector matches structured Ontario, Québec, and Alberta driver's licence numbers. Ontario and Québec licence numbers embed the holder's surname initial, exact date of birth, and (in Ontario) sex directly inside the 13/15-character number, elevating identity-theft and synthetic-credit-application risk above an opaque serial number. Risk 6 and SENSITIVE Personal-Privacy reflect Protected B provincial identity credentials.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 6 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy, and Medium because Ontario and Québec driver's licence numbers encode DOB and name data and serve as primary KYC identity verification credentials in Canada.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling reflects provincial KYC driver's licence numbers with embedded biographical attributes.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match:
+        type: any
+        ids:
+          - Regex_ca_dl_on_qc
+          - Regex_ca_dl_ab
+      matches:
+        - ref: Keyword_ca_dl_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_ca_dl_on_qc
+      matches:
+        - ref: Keyword_ca_dl_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_ca_dl_on_qc
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_ca_dl_on_qc
+      pattern: '(?-i)\b([A-Z]\d{4}[-\s]?\d{5}[-\s]?\d{2}(?:0[1-9]|1[0-2]|5[1-9]|6[0-2])(?:0[1-9]|[12]\d|3[01])|[A-Z]\d{4}[-\s]?\d{6}[-\s]?\d{2})\b'
+    - id: Regex_ca_dl_ab
+      pattern: '\b(\d{6}-\d{3})\b'
+  keywords:
+    - id: Keyword_ca_dl_specific
+      groups:
+        - match_style: word
+          terms:
+            - "driver's licence"
+            - "drivers license"
+            - "driver's license"
+            - "permis de conduire"
+            - text: "SAAQ"
+              case_sensitive: true
+            - text: "MTO"
+              case_sensitive: true
+            - "Ministry of Transportation"
+            - "Class G"
+            - "Class 5"
+      strength: specific
+    - id: Keyword_ca_dl_broad
+      groups:
+        - match_style: word
+          terms:
+            - text: "DL"
+              case_sensitive: true
+            - "licence number"
+            - "license number"
+            - "numéro de permis"
+            - "Ontario"
+            - "Québec"
+            - "Alberta"
+      strength: domain
+references:
+  - url: https://www.ontario.ca/page/get-g-drivers-licence-new-drivers
+    title: "Government of Ontario - Ontario Driver's Licence Format"
+  - url: https://saaq.gouv.qc.ca/en/drivers-licences
+    title: "Société de l'assurance automobile du Québec (SAAQ) - Driver's Licence Number"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

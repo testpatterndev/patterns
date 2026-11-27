@@ -1,22 +1,20 @@
 schema: testpattern/v1
 name: Us ABA Routing
 slug: us-aba-routing-number
-version: 1.5.0
+version: 1.6.0
 type: regex
 pattern_class: identifier
 engine: universal
 description: >-
   Detects Us ABA Routing patterns. This pattern is based on a Microsoft Purview built-in sensitive information type. Users already running Purview may prefer to enable the built-in SIT directly, or use this version as a starting point for customisation.
 operation: >-
-  Checksum (NOT enforced in this regex-only pattern): 3*(d1+d4+d7) + 7*(d2+d5+d8) + (d3+d6+d9) mod 10 = 0. Reference:
+  Checksum (enforced via inline Checksum validator Validator_us_aba_routing_checksum: Weights 7,3,9,7,3,9,7,3,0 / Mod 10 / CheckDigit 9, equivalent to 3*(d1+d4+d7) + 7*(d2+d5+d8) + (d3+d6+d9) mod 10 = 0) plus Federal Reserve routing-symbol prefix constraint (01-12, 21-32, 61-72, 80) and AllDigitsSameFilter. Reference:
   https://en.wikipedia.org/wiki/ABA_routing_transit_number Corroborative evidence: 9 keywords within 300 characters.
   Keyword lists: financial-deposit-terms.
-pattern: \b(\d{9})\b
-confidence: low
+pattern: \b((?:0[1-9]|1[0-2]|2[1-9]|3[0-2]|6[1-9]|7[0-2]|80)\d{7})\b
+confidence: high
 confidence_justification: >-
-  Low confidence: a bare nine-digit number matches many non-routing values (including unformatted SSNs and phone-derived
-  numbers). The ABA checksum is NOT enforced by this regex-only pattern, so corroborative routing/banking keywords within
-  the proximity window are essential. Prefer enabling the Microsoft built-in (Func_aba_routing) for checksum validation.
+  High confidence: constrained to valid two-digit Federal Reserve routing prefixes, validated in Purview by an exact Mod-10 inline Checksum validator, and corroborated by routing/banking keywords within 300 characters.
 jurisdictions:
   - us
 regulations:
@@ -63,6 +61,8 @@ test_cases:
       description: 10 digits instead of 9
     - value: 12345678A
       description: Contains a letter instead of all digits
+    - value: '021000022'
+      description: Valid Federal Reserve prefix but fails ABA Mod-10 checksum (perturbation of 021000021)
 false_positives:
   - description: >-
       Financial terminology appearing in published reports, accounting textbooks, regulatory guidance, or template
@@ -114,9 +114,16 @@ purview:
       id_match: Regex_us_aba_routing
   regexes:
     - id: Regex_us_aba_routing
-      pattern: \b(\d{9})\b
+      pattern: \b((?:0[1-9]|1[0-2]|2[1-9]|3[0-2]|6[1-9]|7[0-2]|80)\d{7})\b
       validators:
-        - ref: Func_aba_routing
+        - ref: Validator_us_aba_routing_checksum
+  validators:
+    - id: Validator_us_aba_routing_checksum
+      type: Checksum
+      params:
+        weights: "7,3,9,7,3,9,7,3,0"
+        mod: 10
+        checkDigit: 9
   keywords:
     - id: Keyword_us_aba_specific
       groups:
@@ -177,8 +184,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-aba-routing
     title: "ABA routing number entity definition - Microsoft Learn"
 created: '2026-02-08'
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.6.0
+    date: '2026-11-25'
+    description: Replace stripped Func_aba_routing with exact inline Mod-10 Checksum validator (Weights 7,3,9,7,3,9,7,3,0 / CheckDigit 9) and Federal Reserve prefix constraint.
   - version: 1.5.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

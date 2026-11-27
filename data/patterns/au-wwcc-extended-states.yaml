@@ -1,0 +1,172 @@
+schema: testpattern/v1
+name: "Australian Working with Vulnerable People Check Number (ACT / SA / TAS / NT)"
+slug: au-wwcc-extended-states
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Completes national Working with Children / Vulnerable People identifier coverage alongside au-wwcc-number (NSW/VIC/WA) and au-qld-blue-card-number (QLD): detects SA DHS Screening Reference Numbers (CS / SRN + 7-8 digits), TAS Registration to Work with Vulnerable People (RWVP, 9 digits), ACT WWVP registration numbers, and NT Working with Children Ochre Card numbers.
+operation: >-
+  Matches SA DHS CS/SRN screening prefixes or explicitly labelled RWVP (TAS), WWVP (ACT), and Ochre Card (NT) registration numbers. Enforcing tiers require state screening-unit corroboration or populated-label structure.
+pattern: '(?-i)\b(SRN[-\s]?\d{7,8}|CS\d{7,8}|(?i:(?:RWVP|WWVP|Ochre\s+Card)(?:\s+(?:registration|card))?(?:\s+(?:number|no\.?))?)[\s:#-]{1,6}\d{6,9})\b'
+confidence: medium
+confidence_justification: >-
+  Medium-high confidence: SA CS/SRN prefixes and explicit RWVP/WWVP/Ochre Card labels prevent bare numeric collisions while closing the four remaining Australian jurisdictions.
+jurisdictions:
+  - au
+regulations:
+  - "Registration to Work with Vulnerable People Act 2013 (Tas)"
+  - "Working with Vulnerable People (Background Checking) Act 2011 (ACT)"
+  - "Child Safety (Prohibited Persons) Act 2016 (SA)"
+  - "Privacy Act 1988 (Cth)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "Working with Vulnerable People"
+    - "RWVP"
+    - "WWVP"
+    - "Ochre Card"
+    - "SAFE NT"
+    - "DHS Screening Unit"
+    - "Access Canberra"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "SA WWCC: CS4829173"
+      description: "South Australia DHS Screening Unit CS-prefixed WWCC reference"
+    - value: "RWVP Registration Number: 904827163"
+      description: "Tasmania 9-digit Registration to Work with Vulnerable People number"
+    - value: "Ochre Card no: 3829104"
+      description: "Northern Territory SAFE NT Working with Children Ochre Card number"
+    - value: "WWVP card number: 19283746"
+      description: "ACT Access Canberra Working with Vulnerable People registration number"
+  should_not_match:
+    - value: "CS1234"
+      description: "Only 4 digits after CS (below 7-digit SA DHS screening minimum)"
+    - value: "904827163"
+      description: "Bare 9-digit number without RWVP/WWVP/Ochre Card label"
+    - value: "Applicants must hold current ACT WWVP registration prior to placement"
+      description: "Prose requirement without a registration number"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Customer-service ticket numbers starting with CS + 7-8 digits."
+    mitigation: "Bare CS######## is discovery-only unless corroborated by SA DHS Screening / Working with Children keywords."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 6
+risk_description: >-
+  The detector identifies Working with Vulnerable People and Working with Children screening numbers for South Australia, Tasmania, the ACT, and the Northern Territory. Like NSW/VIC/WA WWCC and QLD Blue Card numbers, these identifiers link named workers and volunteers to statutory child- and vulnerable-person screening registers. Risk 6 and SENSITIVE Personal-Privacy match au-wwcc-number; adverse criminal-history screening outcomes are covered at higher severity by au-worker-screening-background-check-outcome.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 6 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy, and Medium because state and territory vulnerable-people screening numbers are personal compliance identifiers subject to statutory verification.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling suits an individual statutory child/vulnerable-person screening registration number.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match:
+        type: any
+        ids:
+          - Regex_au_wwvp_labeled
+          - Regex_au_sa_wwcc
+      matches:
+        - ref: Keyword_au_wwvp_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_wwvp_labeled
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_sa_wwcc
+      matches:
+        - ref: Keyword_au_wwvp_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match:
+        type: any
+        ids:
+          - Regex_au_wwvp_labeled
+          - Regex_au_sa_wwcc
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_wwvp_labeled
+      pattern: '(?-i)\b((?i:(?:RWVP|WWVP|Ochre\s+Card)(?:\s+(?:registration|card))?(?:\s+(?:number|no\.?))?)[\s:#-]{1,6}\d{6,9})\b'
+    - id: Regex_au_sa_wwcc
+      pattern: '(?-i)\b(SRN[-\s]?\d{7,8}|CS\d{7,8})\b'
+  keywords:
+    - id: Keyword_au_wwvp_context
+      groups:
+        - match_style: word
+          terms:
+            - "Working with Vulnerable People"
+            - "Registration to Work with Vulnerable People"
+            - "Working with Children"
+            - "DHS Screening"
+            - "Access Canberra"
+            - "SAFE NT"
+            - "CBOS"
+            - "Ochre Card"
+      strength: specific
+references:
+  - url: https://www.accesscanberra.act.gov.au/business-and-work/working-with-vulnerable-people
+    title: "Access Canberra - Working with Vulnerable People (WWVP) registration"
+  - url: https://screening.sa.gov.au/types-of-check/working-with-children-check
+    title: "Government of South Australia DHS Screening Unit - Working with Children Check"
+  - url: https://www.cbos.tas.gov.au/topics/licensing-and-registration/registrations/work-with-vulnerable-people
+    title: "Tasmania CBOS - Registration to Work with Vulnerable People (RWVP)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

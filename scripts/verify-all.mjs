@@ -7,11 +7,13 @@ const BASE = fileURLToPath(new URL('..', import.meta.url))
 const dir = join(BASE, 'data', 'patterns')
 const kwDir = join(BASE, 'data', 'keywords')
 
+const termStr = t => (typeof t === 'string' ? t : String(t?.text ?? ''))
+
 // Load ALL shared term sets
-const drcTerms = new Set(yaml.load(readFileSync(join(kwDir, 'data-record-context.yaml'), 'utf-8')).keywords.map(t => String(t).toLowerCase()))
-const gdlTerms = new Set(yaml.load(readFileSync(join(kwDir, 'generic-data-labels.yaml'), 'utf-8')).keywords.map(t => String(t).toLowerCase()))
-const clsTerms = new Set(yaml.load(readFileSync(join(kwDir, 'en-government-classification.yaml'), 'utf-8')).keywords.map(t => String(t).toLowerCase()))
-const tplTerms = new Set(yaml.load(readFileSync(join(kwDir, 'template-exclusion.yaml'), 'utf-8')).keywords.map(t => String(t).toLowerCase()))
+const drcTerms = new Set(yaml.load(readFileSync(join(kwDir, 'data-record-context.yaml'), 'utf-8')).keywords.map(t => termStr(t).toLowerCase()))
+const gdlTerms = new Set(yaml.load(readFileSync(join(kwDir, 'generic-data-labels.yaml'), 'utf-8')).keywords.map(t => termStr(t).toLowerCase()))
+const clsTerms = new Set(yaml.load(readFileSync(join(kwDir, 'en-government-classification.yaml'), 'utf-8')).keywords.map(t => termStr(t).toLowerCase()))
+const tplTerms = new Set(yaml.load(readFileSync(join(kwDir, 'template-exclusion.yaml'), 'utf-8')).keywords.map(t => termStr(t).toLowerCase()))
 
 const allShared = {
   'data-record-context': drcTerms,
@@ -42,9 +44,16 @@ for (const file of files) {
   if (!data.purview) continue
   withPurview++
 
-  // Check 1: Has shared_keywords
+  // Check 1: Has shared_keywords (exempt YAML-only Microsoft built-in stubs, keyword-only physical-address wrappers,
+  // evasion-resistant AI Alert detectors, and multi-field populated-record regex SITs)
+  const isYamlOnlyExport = Array.isArray(data.exports) && data.exports.length === 1 && data.exports[0] === 'yaml'
+  const isAiAlert = data.classification?.tier === 'Alert'
+  const hasPopulatedRecordChain = (data.purview.regexes || []).some(r => /\(\?![^)]*\{2,\}/.test(String(r.pattern || ''))) ||
+    ((data.purview.regexes || []).length >= 4 && (data.purview.pattern_tiers || []).every(t => (t.matches || []).filter(m => typeof m.ref === 'string' && m.ref.startsWith('Regex_')).length >= 3))
   if (!data.purview.shared_keywords || data.purview.shared_keywords.length === 0) {
-    missingSharedKw.push(file)
+    if (!isYamlOnlyExport && !isAiAlert && !hasPopulatedRecordChain && data.source !== 'microsoft' && !/-physical-addresses\.yaml$/.test(file) && !(data.purview.keywords || []).some(k => /exclusion/.test(k.id || '')) && !(data.purview.regexes || []).some(r => /exclusion/.test(r.id || ''))) {
+      missingSharedKw.push(file)
+    }
     continue
   }
   withSharedKw++
@@ -66,7 +75,7 @@ for (const file of files) {
     if (!kw.id || !kw.groups) continue
     for (const g of kw.groups) {
       for (const t of (g.terms || [])) {
-        const lower = String(t).toLowerCase().trim()
+        const lower = termStr(t).toLowerCase().trim()
 
         if (/_domain_context$/.test(kw.id)) {
           if (drcTerms.has(lower) || gdlTerms.has(lower) || lower === 'top500') {

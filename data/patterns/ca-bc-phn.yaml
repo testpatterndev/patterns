@@ -1,0 +1,186 @@
+schema: testpattern/v1
+name: "Canada British Columbia Personal Health Number (BC PHN)"
+slug: ca-bc-phn
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects 10-digit British Columbia Personal Health Numbers (BC PHNs) assigned under the Medicare Protection Act (BC) on BC Services Cards, starting with 9 and validated by the exact BC Ministry of Health Modulo-11 check digit via dual inline Purview Checksum validators.
+operation: >-
+  Matches 10 digits starting with 9 (compact or 9xxx xxx xxx) and enforces the exact BC Ministry of Health Mod-11 check digit (official weights [2,4,8,5,10,9,7,3] on digits 2-9 -> negated Purview weights 0,9,7,3,6,1,2,4,8,0 + rem-10 guard 0,7,3,6,1,2,4,8,5,10 / Mod 11 / CheckDigit 10).
+pattern: '\b(9\d{3}[\s-]?\d{3}[\s-]?\d{3})\b'
+confidence: high
+confidence_justification: >-
+  High confidence: mandatory leading digit 9 plus exact dual Modulo-11 check-digit validation eliminates >98% of random 10-digit numbers; BC health/MSP keywords gate enforcing tiers.
+jurisdictions:
+  - ca
+regulations:
+  - "Freedom of Information and Protection of Privacy Act (BC)"
+  - "Personal Information Protection Act (BC)"
+  - "PIPEDA"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - phi
+  - pii
+  - health
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "Personal Health Number"
+    - "BC PHN"
+    - "BC Services Card"
+    - "Medical Services Plan"
+    - "MSP"
+    - "HealthGateway"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "9879 767 477"
+      description: "Valid BC Personal Health Number in 4-3-3 display format (Mod-11 check digit 7)"
+    - value: "BC PHN: 9123-456-780"
+      description: "Labelled valid BC PHN (Mod-11 check digit 0)"
+    - value: "9048291736"
+      description: "Compact 10-digit valid BC PHN (Mod-11 check digit 6)"
+  should_not_match:
+    - value: "8879 767 477"
+      description: "Starts with 8 rather than mandatory BC PHN prefix 9"
+    - value: "9879 767 473"
+      description: "Fails BC Ministry of Health Mod-11 check digit (3 instead of 7)"
+    - value: "Bring your BC Services Card showing your Personal Health Number"
+      description: "Prose instruction without a PHN value"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Ten-digit customer or telephone numbers starting with 9 that pass Mod-11."
+    mitigation: "Enforcing tiers require Personal Health Number, MSP, BC Services Card, or clinical patient keywords within 300 characters."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 7
+risk_description: >-
+  The detector matches a checksum-valid 10-digit British Columbia Personal Health Number (BC PHN) in healthcare context. A BC PHN is the lifelong identifier on the BC Services Card linking a resident across Medical Services Plan (MSP) billing, PharmaNet prescription history, and hospital records. Risk 7 and SENSITIVE Personal-Privacy match ca-ohip-number and ca-phin.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: "CUI Specified"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "CONFIDENTIAL"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 7 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy, and Medium because a BC Personal Health Number links an identifiable resident across MSP, PharmaNet, and clinical records, matching ca-ohip-number and ca-phin.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling reflects a provincial healthcare identifier linking insured medical and prescription records.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_ca_bc_phn
+      matches:
+        - ref: Keyword_ca_bc_phn_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_ca_bc_phn
+      matches:
+        - ref: Keyword_ca_bc_phn_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_ca_bc_phn
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_ca_bc_phn
+      pattern: '\b(9\d{3}[\s-]?\d{3}[\s-]?\d{3})\b'
+      validators:
+        - ref: Validator_ca_bc_phn_checksum
+        - ref: Validator_ca_bc_phn_rem10
+  validators:
+    - id: Validator_ca_bc_phn_checksum
+      type: Checksum
+      params:
+        - name: Weights
+          value: 0, 9, 7, 3, 6, 1, 2, 4, 8, 0
+        - name: Modulo
+          value: '11'
+        - name: CheckDigit
+          value: '10'
+    - id: Validator_ca_bc_phn_rem10
+      type: Checksum
+      params:
+        - name: Weights
+          value: 0, 7, 3, 6, 1, 2, 4, 8, 5, 10
+        - name: Modulo
+          value: '11'
+        - name: CheckDigit
+          value: '10'
+  keywords:
+    - id: Keyword_ca_bc_phn_specific
+      groups:
+        - match_style: word
+          terms:
+            - "Personal Health Number"
+            - "BC PHN"
+            - "BC Services Card"
+            - "Medical Services Plan"
+            - "PharmaNet"
+            - "HealthGateway"
+            - "Island Health"
+            - "Fraser Health"
+            - "Vancouver Coastal Health"
+      strength: specific
+    - id: Keyword_ca_bc_phn_broad
+      groups:
+        - match_style: word
+          terms:
+            - text: "PHN"
+              case_sensitive: true
+            - text: "MSP"
+              case_sensitive: true
+            - "patient"
+            - "health card"
+            - "British Columbia"
+      strength: domain
+  filters:
+    - id: Filter_ca_bc_phn_same_digits
+      type: AllDigitsSameFilter
+references:
+  - url: https://www2.gov.bc.ca/gov/content/health/health-drug-coverage/msp/bc-residents/personal-health-identification
+    title: "Government of British Columbia - Personal Health Number (PHN) and BC Services Card"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

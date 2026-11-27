@@ -1,0 +1,158 @@
+schema: testpattern/v1
+name: "Canada Québec Health Insurance Number (RAMQ / NAM)"
+slug: ca-ramq-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects 12-character Québec Régie de l'assurance maladie du Québec (RAMQ) Health Insurance Numbers (Numéro d'assurance maladie / NAM): 4 uppercase letters derived from surname and given name, followed by 8 digits encoding YYMMDD birth date (with +50 on month for female holders), sequence, and check digit.
+operation: >-
+  Matches 4 uppercase letters + 8 digits (compact or 4-4-4 grouped) with valid birth-month encoding (01-12 or 51-62, plus 21-32/71-82 provisional) and day (01-31). Enforcing tiers require RAMQ, NAM, assurance maladie, or Québec clinical context.
+pattern: '(?-i)\b([A-Z]{4}[\s-]?\d{4}[\s-]?\d{4})\b'
+confidence: high
+confidence_justification: >-
+  High confidence: 4 uppercase letters + valid RAMQ YY(MM/+50)DD date + 2 digits is structurally rich and inherently encodes biographical PII (name initials, date of birth, and sex).
+jurisdictions:
+  - ca
+regulations:
+  - "Act respecting the protection of personal information in the private sector (Québec Law 25)"
+  - "PIPEDA"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - phi
+  - pii
+  - health
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "RAMQ"
+    - "numéro d'assurance maladie"
+    - "NAM"
+    - "carte soleil"
+    - "Régie de l'assurance maladie du Québec"
+    - "Québec health card"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "TREJ 8504 1912"
+      description: "Spaced Québec RAMQ number (male born 1985-04-19)"
+    - value: "NAM: BELS92582407"
+      description: "Compact Québec RAMQ number with +50 female birth-month encoding (58 -> August)"
+    - value: "GAGP-7811-0534"
+      description: "Hyphenated Québec RAMQ health insurance number"
+  should_not_match:
+    - value: "TREJ 8515 1912"
+      description: "Month 15 is invalid in RAMQ encoding (must be 01-12 or 51-62)"
+    - value: "TREJ 8504 3512"
+      description: "Day 35 is invalid in RAMQ encoding"
+    - value: "trej 8504 1912"
+      description: "Lowercase letters rejected by case-sensitive RAMQ format"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "12-character container/shipping codes with 4 uppercase letters + 8 digits."
+    mitigation: "Shipping container ISO 6346 numbers have 4 letters + 7 digits (11 chars, not 12), and enforcing tiers require RAMQ/NAM/health keywords."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The detector matches a 12-character Québec RAMQ Health Insurance Number (NAM). Unlike opaque health numbers, a RAMQ number directly embeds the holder's surname/forename letters, exact date of birth, and sex alongside linking their provincial medical and prescription history, making it one of the highest-sensitivity PII/PHI identifiers under Québec Law 25. Risk 8 and SENSITIVE Personal-Privacy reflect embedded biographical + health linkage.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: "CUI Specified"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "CONFIDENTIAL"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy, and Medium because a Québec RAMQ number both links provincial health records and directly reveals name initials, birth date, and sex under Québec Law 25.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling reflects combined provincial health-record linkage and embedded DOB/sex disclosure.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_ca_ramq
+      matches:
+        - ref: Keyword_ca_ramq_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_ca_ramq
+      matches:
+        - ref: Keyword_ca_ramq_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_ca_ramq
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_ca_ramq
+      pattern: '(?-i)\b([A-Z]{4}[\s-]?\d{2}(?:0[1-9]|1[0-2]|5[1-9]|6[0-2])[\s-]?(?:0[1-9]|[12]\d|3[01])\d{2})\b'
+  keywords:
+    - id: Keyword_ca_ramq_specific
+      groups:
+        - match_style: word
+          terms:
+            - text: "RAMQ"
+              case_sensitive: true
+            - "assurance maladie"
+            - "numéro d'assurance maladie"
+            - "carte d'assurance maladie"
+            - "carte soleil"
+            - "Québec health"
+      strength: specific
+    - id: Keyword_ca_ramq_broad
+      groups:
+        - match_style: word
+          terms:
+            - text: "NAM"
+              case_sensitive: true
+            - "health insurance number"
+            - "patient"
+            - "dossier médical"
+            - "clinique"
+            - "hôpital"
+      strength: domain
+references:
+  - url: https://www.ramq.gouv.qc.ca/en/citizens/health-insurance/health-insurance-card
+    title: "Régie de l'assurance maladie du Québec (RAMQ) - Health Insurance Card (NAM)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

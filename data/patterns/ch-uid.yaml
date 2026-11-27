@@ -1,0 +1,187 @@
+schema: testpattern/v1
+name: Swiss Enterprise Identification Number (UID)
+slug: ch-uid
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Swiss Enterprise Identification Numbers (Unternehmens-Identifikationsnummer / UID, IDE, IDI) assigned by the Federal Statistical Office (BFS) in the format CHE-123.456.789. Enforces the official Modulo-11 check digit exactly via dual inline Purview Checksum validators, including rejection of invalid remainder-10 values.
+operation: >-
+  Matches uppercase CHE followed by three 3-digit groups (CHE-123.456.789 or CHE 123 456 789) and validates all 9 digits with dual Mod-11 Checksum validators: Validator_ch_uid_checksum (Weights 6,7,8,9,4,5,6,7,0 / Mod 11 / CheckDigit 9, negating official weights 5,4,3,2,7,6,5,4) paired with Validator_ch_uid_checksum_rem10 (Weights 1,3,5,7,8,10,1,3,10 / Mod 11 / CheckDigit 9) so never-issued remainder-10 values ending in 0 are rejected.
+pattern: (?-i)\b(CHE[- ]?\d{3}[. ]?\d{3}[. ]?\d{3})\b
+confidence: high
+confidence_justification: >-
+  High confidence: the mandatory uppercase CHE prefix, 3-3-3 grouping, and exact dual Modulo-11 check-digit enforcement eliminate accidental numeric collisions. Enforcing tiers add Swiss commercial-register / VAT corroboration and local_noise_filter support.
+jurisdictions:
+  - ch
+regulations:
+  - FADP (Switzerland)
+frameworks:
+  - ISO 27001
+data_categories:
+  - business
+  - financial
+  - government-id
+corroborative_evidence:
+  keywords:
+    - UID
+    - Unternehmens-Identifikationsnummer
+    - MWST
+    - TVA
+    - IVA
+    - Handelsregister
+    - Zefix
+  proximity: 300
+test_cases:
+  should_match:
+    - value: CHE-116.281.710
+      description: Valid Swiss UID in canonical hyphen-dot format (Mod-11 check digit 0)
+    - value: 'UID: CHE-105.805.649 MWST'
+      description: Valid Swiss UID with MWST VAT suffix and UID label (check digit 9)
+    - value: CHE 109 322 551
+      description: Space-separated valid Swiss UID (5+0+27+6+14+12+25+20=109, 109 mod 11 = 10 -> 11-10 = 1)
+  should_not_match:
+    - value: CHE-116.281.715
+      description: Invalid Mod-11 check digit (5 instead of 0)
+    - value: CHE-116.281.740
+      description: Never-issued remainder-10 UID ending in 0 — rejected by Validator_ch_uid_checksum_rem10
+    - value: che-116.281.710
+      description: Lowercase che prefix rejected by case-sensitive rule
+    - value: Lookup the company in the Swiss Handelsregister Zefix portal
+      description: Prose mention without a CHE UID value
+false_positives:
+  - description: Published supplier and company letterheads routinely print the entity's own Swiss UID / MWST number.
+    mitigation: Enforcing tiers enable local_noise_filter so organizations can suppress their own published UID while retaining 65 discovery visibility.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 4
+risk_description: >-
+  The detector matches a checksum-valid Swiss Enterprise Identification Number (CHE-xxx.xxx.xxx), which is public legal-entity registry metadata published in the UID-Register and Zefix. While non-secret on its own, it anchors vendor onboarding, invoicing, VAT filings, and corporate due-diligence documents. Risk 4 and OFFICIAL fit a public corporate registry identifier; SENSITIVE requires confidential contract, tax, or banking details alongside the UID.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+classification:
+  tier: Low
+  rationale: >-
+    Risk 4 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because a Swiss UID is public legal-entity register metadata rather than confidential personal or financial access information.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling reflects a publicly verifiable Swiss enterprise registration number whose sensitivity comes only from surrounding commercial or tax records.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_ch_uid
+      matches:
+        - ref: Keyword_ch_uid_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_ch_uid
+      matches:
+        - ref: Keyword_ch_uid_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_ch_uid
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_ch_uid
+      pattern: (?-i)\b(CHE[- ]?\d{3}[. ]?\d{3}[. ]?\d{3})\b
+      validators:
+        - ref: Validator_ch_uid_checksum
+        - ref: Validator_ch_uid_checksum_rem10
+  validators:
+    - id: Validator_ch_uid_checksum
+      type: Checksum
+      params:
+        - name: Weights
+          value: 6, 7, 8, 9, 4, 5, 6, 7, 0
+        - name: Modulo
+          value: '11'
+        - name: CheckDigit
+          value: '9'
+    - id: Validator_ch_uid_checksum_rem10
+      type: Checksum
+      params:
+        - name: Weights
+          value: 1, 3, 5, 7, 8, 10, 1, 3, 10
+        - name: Modulo
+          value: '11'
+        - name: CheckDigit
+          value: '9'
+  keywords:
+    - id: Keyword_ch_uid_specific
+      groups:
+        - match_style: word
+          terms:
+            - Unternehmens-Identifikationsnummer
+            - UID-Register
+            - Zefix
+            - Handelsregister
+            - Registre du commerce
+            - Registro di commercio
+            - numéro IDE
+      strength: specific
+    - id: Keyword_ch_uid_broad
+      groups:
+        - match_style: word
+          terms:
+            - text: UID
+              case_sensitive: true
+            - text: MWST
+              case_sensitive: true
+            - text: TVA
+              case_sensitive: true
+            - text: IVA
+              case_sensitive: true
+            - Mehrwertsteuer
+            - taxe sur la valeur ajoutée
+      strength: domain
+  filters:
+    - id: Filter_ch_uid_same_digits
+      type: AllDigitsSameFilter
+references:
+  - url: https://www.bfs.admin.ch/bfs/en/home/registers/enterprise-register/enterprise-identification-uid.html
+    title: Swiss Federal Statistical Office (BFS) - Enterprise Identification Number (UID)
+  - url: https://www.fedlex.admin.ch/eli/cc/2010/698/en
+    title: Federal Act on the Enterprise Identification Number (UIDG, SR 431.03)
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release with exact dual Modulo-11 Purview Checksum validators.
+author: testpattern-community
+license: MIT

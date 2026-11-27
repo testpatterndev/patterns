@@ -1,0 +1,146 @@
+schema: testpattern/v1
+name: "Australian State Revenue Assessment Notice (NSW / VIC / WA / SA)"
+slug: au-state-revenue-assessment-notice
+version: 1.0.0
+type: regex
+pattern_class: concept
+engine: boost_regex
+description: >-
+  Extends au-qld-revenue-office-notice-of-assessment nationally: detects populated state tax assessment notices issued by Revenue NSW, State Revenue Office Victoria, RevenueWA, and RevenueSA for land tax, transfer/stamp duty, and payroll tax.
+operation: >-
+  Primary anchors a named state revenue authority (Revenue NSW, SRO Victoria, RevenueWA, RevenueSA) to an assessment notice type. 65 is discovery-only; 75 requires a populated client/assessment/correspondence ID or assessed tax dollar amount; 85 requires both.
+pattern: '(?i)\b((?:Revenue\s+NSW|State\s+Revenue\s+Office(?:\s+Victoria)?|RevenueWA|RevenueSA)\b[\s\S]{0,200}\b(?:notice\s+of\s+assessment|land\s+tax\s+assessment|transfer\s+duty|stamp\s+duty|payroll\s+tax\s+assessment)\b)'
+confidence: medium
+confidence_justification: >-
+  Medium-high confidence: anchoring the exact statutory revenue office name to populated taxpayer/assessment IDs and dollar amounts prevents public tax-rate calculators and media articles from enforcing.
+jurisdictions:
+  - au
+regulations:
+  - "Taxation Administration Act 1996 (NSW)"
+  - "Taxation Administration Act 1997 (Vic)"
+  - "Taxation Administration Act 2003 (WA)"
+  - "Privacy Act 1988 (Cth)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - financial
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "Revenue NSW"
+    - "State Revenue Office Victoria"
+    - "RevenueWA"
+    - "RevenueSA"
+    - "Notice of Assessment"
+    - "Land Tax"
+    - "Transfer Duty"
+    - "Correspondence ID"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Revenue NSW — Land Tax Notice of Assessment\nClient ID: 48291736\nAssessment Number: 2026-908172\nTaxpayer: Avery Teston\nTotal Land Tax Payable: $14,820.50"
+      description: "Populated Revenue NSW Land Tax Notice of Assessment with Client ID and payable amount (85 tier)"
+      synthetic: true
+    - value: "State Revenue Office Victoria — Transfer Duty Notice of Assessment\nCustomer Number: 93817264"
+      description: "SRO Victoria assessment notice with populated Customer Number (75 tier)"
+      synthetic: true
+    - value: "RevenueWA payroll tax assessment notice issued for the financial year"
+      description: "Topic match without populated fields (65 discovery)"
+  should_not_match:
+    - value: "Revenue NSW publishes land tax thresholds and transfer duty calculators each year."
+      description: "Public guidance without assessment notice + populated taxpayer values"
+    - value: "Pay your council rates notice by BPAY before the due date."
+      description: "Local council rates notice, not state revenue assessment"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Law-firm and accounting tax updates discussing Revenue NSW or SRO Victoria land-tax assessments."
+    mitigation: "Enforcing tiers require populated Client/Customer/Assessment IDs and/or assessed dollar amounts."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 7
+risk_description: >-
+  The detector matches populated state tax Notices of Assessment from Revenue NSW, SRO Victoria, RevenueWA, and RevenueSA. State revenue assessments contain secret taxpayer administration data under state Taxation Administration Acts, exposing unencumbered land holdings, property purchase values, or employer wage bills alongside taxpayer identifiers. Risk 7 and SENSITIVE Financial match au-qld-revenue-office-notice-of-assessment.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Financial
+  idcf: DSL-3
+  us_gov: "CUI Specified"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 7 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Financial, and Medium because populated state revenue assessments disclose confidential taxpayer liabilities, property valuations, or payroll totals protected by statutory tax-secrecy provisions.
+  generic:
+    classification: Medium
+    dlm: Medium Financial
+    rationale: >-
+      Medium Financial handling protects taxpayer-attributable state land-tax, duty, and payroll-tax assessments.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_state_rev_primary
+      matches:
+        - ref: Regex_au_state_rev_id
+        - ref: Regex_au_state_rev_amount
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_state_rev_primary
+      matches:
+        - type: any
+          min_matches: 1
+          refs:
+            - Regex_au_state_rev_id
+            - Regex_au_state_rev_amount
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_state_rev_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_state_rev_primary
+      pattern: '(?i)\b((?:Revenue\s+NSW|State\s+Revenue\s+Office(?:\s+Victoria)?|RevenueWA|RevenueSA)\b[\s\S]{0,200}\b(?:notice\s+of\s+assessment|land\s+tax\s+assessment|transfer\s+duty|stamp\s+duty|payroll\s+tax\s+assessment))\b'
+    - id: Regex_au_state_rev_id
+      pattern: '(?i)\b((?:client\s+ID|customer\s+(?:number|no\.?)|correspondence\s+ID|assessment\s+(?:number|no\.?)|bundle\s+ID)[\s]*[:#][\s]*[A-Z0-9][A-Z0-9-]{5,18})\b'
+    - id: Regex_au_state_rev_amount
+      pattern: '(?i)\b((?:total\s+(?:land\s+tax|duty|tax|amount)\s+(?:payable|assessed)|assessed\s+(?:duty|tax)|taxable\s+(?:value|wages))[\s]*[:#]?[\s]*\$[1-9][0-9,]*(?:\.\d{2})?)\b'
+references:
+  - url: https://www.revenue.nsw.gov.au/
+    title: "Revenue NSW - Land Tax, Transfer Duty, and Payroll Tax Assessments"
+  - url: https://www.sro.vic.gov.au/
+    title: "State Revenue Office Victoria - Assessments and Taxpayer Confidentiality"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

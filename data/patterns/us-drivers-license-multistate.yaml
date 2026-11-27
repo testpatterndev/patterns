@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: U.S. Driver's License Number (Multi-State)
 slug: us-drivers-license-multistate
-version: 1.2.0
+version: 1.3.0
 type: regex
 pattern_class: identifier
 engine: universal
@@ -14,7 +14,7 @@ operation: >-
   An alternation of state-specific formats: CA (1 letter + 7 digits), NY (1 letter + 18 digits, or 8-9 digits), TX
   (8 digits), FL (1 letter + 12 digits), NJ (1 letter + 14 digits), IL (1 letter + 11-12 digits). Purely numeric
   formats are ambiguous, so corroborative DMV/license keywords within 300 characters are strongly recommended.
-pattern: (\b[A-Z]\d{18}\b|\b[A-Z]\d{14}\b|\b[A-Z]\d{11,12}\b|\b[A-Z]\d{7}\b|\b\d{8,9}\b)
+pattern: (?-i)(\b[A-Z]\d{18}\b|\b[A-Z]\d{14}\b|\b[A-Z]\d{11,12}\b|\b[A-Z]\d{7}\b|\b\d{8,9}\b)
 confidence: medium
 confidence_justification: >-
   Medium confidence: the letter-prefixed state formats are structurally distinctive, but the purely numeric NY/TX
@@ -76,6 +76,84 @@ exports:
   - yaml
   - regex_copy
 scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_us_dl_multistate_alpha
+      matches:
+        - ref: Keyword_us_dl_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_us_dl_multistate_alpha
+      matches:
+        - ref: Keyword_us_dl_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_us_dl_multistate_numeric
+      matches:
+        - ref: Keyword_us_dl_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_us_dl_multistate_alpha
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_us_dl_multistate_alpha
+      pattern: (?-i)\b([A-Z]\d{18}|[A-Z]\d{14}|[A-Z]\d{11,12}|[A-Z]\d{7})\b
+    - id: Regex_us_dl_multistate_numeric
+      pattern: (?-i)\b(\d{8,9})\b
+  keywords:
+    - id: Keyword_us_dl_specific
+      groups:
+        - match_style: word
+          terms:
+            - driver's license
+            - drivers license
+            - driver license
+            - driving licence
+            - license number
+            - DL number
+            - REAL ID
+      strength: specific
+    - id: Keyword_us_dl_broad
+      groups:
+        - match_style: word
+          terms:
+            - text: DMV
+              case_sensitive: true
+            - text: DL
+              case_sensitive: true
+            - motor vehicle
+            - state ID
+            - identification card
+            - class C
+      strength: domain
+  filters:
+    - id: Filter_us_dl_multistate_same_digits
+      type: AllDigitsSameFilter
 risk_rating: 5
 risk_description: >-
   This companion detector applies specific California, New York, Texas, Florida, New Jersey, and Illinois licence formats instead of the generic national catch-all; it still finds only a licence number, not a card or DMV file. A true value can strengthen rental, insurer, or identity-verification impersonation when the driver's name, state, address, and birth date are also known. The state-aware letter forms are relatively distinctive, but the eight- and nine-digit New York and Texas branches overlap account, order, and ZIP-derived numbers. Risk 5 and OFFICIAL fit the isolated identifier; SENSITIVE would require card imagery, credentials, or linked personal and driving records.
@@ -106,8 +184,11 @@ references:
   - url: https://success.skyhighsecurity.com/Skyhigh_Data_Loss_Prevention/Data_Identifiers/U.S._Driver's_License_Numbers
     title: "U.S. Driver's License Numbers (state formats) - Skyhigh Security"
 created: '2026-06-13'
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.3.0
+    date: '2026-11-25'
+    description: State explicit regex case rule ((?i) or (?-i)) and align tier/keyword semantics with Microsoft Purview evaluation.
   - version: 1.2.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

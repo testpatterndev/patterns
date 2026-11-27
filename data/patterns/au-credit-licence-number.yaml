@@ -1,0 +1,165 @@
+schema: testpattern/v1
+name: Australian Credit Licence Number (ACL)
+slug: au-credit-licence-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects Australian Credit Licence (ACL) numbers issued by ASIC under the National Consumer Credit Protection Act 2009 (Cth) to credit providers, mortgage brokers, and credit assistance providers. Companion to au-afsl-number.
+operation: >-
+  Matches an explicit Australian Credit Licence / ACL label followed by a 6-digit ASIC credit licence number. Following the #80 populated-label convention, a labelled ACL alone reaches 75 (with local_noise_filter enabled so licensees can exclude their own published ACL), while 85 requires independent ASIC/NCCP/credit-provider context outside the label span.
+pattern: (?-i)\b((?:(?i:Australian\s+Credit\s+Licen[cs]e)|ACL)\s*(?i:number|no\.?|#)?\s*[:#-]?\s*\d{6})\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: requiring the explicit Australian Credit Licence or ACL label avoids bare 6-digit collisions; the uppercase-sensitive or spelled-out credit-context evidence at 85 separates ASIC credit licences from IT access-control-list numbering.
+jurisdictions:
+  - au
+regulations:
+  - National Consumer Credit Protection Act 2009 (Cth)
+  - Anti-Money Laundering and Counter-Terrorism Financing Act 2006 (Cth)
+  - Privacy Act 1988 (Cth)
+frameworks:
+  - ISO 27001
+data_categories:
+  - government-id
+  - financial
+corroborative_evidence:
+  keywords:
+    - credit provider
+    - credit representative
+    - credit guide
+    - mortgage broker
+    - ASIC
+    - National Credit Code
+    - responsible lending
+  proximity: 300
+test_cases:
+  should_match:
+    - value: Australian Credit Licence 389214
+      description: Spelled-out Australian Credit Licence with 6-digit number
+    - value: 'ACL No: 412895 — Credit Guide issued by ASIC licensed credit provider'
+      description: ACL label with independent ASIC credit-provider context (85 tier)
+    - value: Australian Credit License number 503918
+      description: US spelling variant with 6-digit licence number
+  should_not_match:
+    - value: '389214'
+      description: Bare 6-digit number without Australian Credit Licence or ACL label
+    - value: Australian Credit Licence 38921
+      description: Five digits (too short for 6-digit ASIC ACL)
+    - value: Configure firewall ACL 100 on the router interface
+      description: Three-digit network ACL rule number rejected by 6-digit requirement
+false_positives:
+  - description: Financial institutions and brokers print their own ACL number on public Credit Guides and footers.
+    mitigation: Enforcing tiers enable local_noise_filter so licensees can list their own published ACL in the tenant exclusion dictionary.
+  - description: Six-digit IT access-control-list identifiers written as ACL 123456.
+    mitigation: Tier 85 requires ASIC / National Credit Code / credit-representative vocabulary, and firewall/router terms are excluded via Keyword_acl_it_exclusion.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 4
+risk_description: >-
+  The detector matches a labelled six-digit ASIC Australian Credit Licence number under the National Consumer Credit Protection Act 2009 (Cth). Like an AFSL number, an ACL is public regulatory register metadata identifying a licensed credit provider or broker rather than a consumer's credit account. Risk 4 and OFFICIAL fit public regulatory licensing references; consumer loan applications or credit reports carry separate SENSITIVE ratings.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+classification:
+  tier: Low
+  rationale: >-
+    Risk 4 aligns with PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because an Australian Credit Licence number is publicly listed on ASIC's Professional Registers and confers no account authority.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling fits a public ASIC credit-licensing identifier absent consumer credit or loan records.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_au_acl_labeled
+      matches:
+        - ref: Keyword_au_acl_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_acl_it_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_au_acl_labeled
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_acl_it_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_acl_labeled
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_acl_it_exclusion
+  regexes:
+    - id: Regex_au_acl_labeled
+      pattern: (?-i)\b((?:(?i:Australian\s+Credit\s+Licen[cs]e)|ACL)\s*(?i:number|no\.?|#)?\s*[:#-]?\s*\d{6})\b
+  keywords:
+    - id: Keyword_au_acl_context
+      groups:
+        - match_style: word
+          terms:
+            - text: ASIC
+              case_sensitive: true
+            - credit provider
+            - credit representative
+            - credit assistance
+            - credit guide
+            - mortgage broker
+            - National Credit Code
+            - responsible lending
+            - target market determination
+      strength: specific
+    - id: Keyword_au_acl_it_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - firewall
+            - router
+            - subnet
+            - Cisco
+            - access control list
+            - chmod
+            - setfacl
+      strength: exclusion
+references:
+  - url: https://www.legislation.gov.au/C2009A00134/latest/text
+    title: National Consumer Credit Protection Act 2009 (Cth)
+  - url: https://asic.gov.au/for-finance-professionals/credit-licensees/
+    title: ASIC - Credit licensees (Australian Credit Licence obligations and register)
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

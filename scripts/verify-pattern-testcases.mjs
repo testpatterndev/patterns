@@ -70,23 +70,24 @@ let warnings = 0
 // case_sensitive pattern (the inline flag is authored per-regex and wins).
 // \K and scoped (?i:...) are translated by lib/boost-to-js.mjs (shared with ci-check).
 
-const toRe = (src, caseSensitive, extraFlags = '') => {
+// Purview (Boost.RegEx) is case-sensitive by default (dev-tenant verified in bc6255bc9e / f0c61ecf51).
+// Default caseSensitive to true unless case_sensitive: false or leading (?i) is present.
+const toRe = (src, caseSensitive = true, extraFlags = '') => {
   let body = String(src)
-  // A leading (?-i) is Boost's explicit case-sensitive switch (a dev-tenant test
-  // found Purview case-sensitive by default; (?-i) makes that explicit). JS has
-  // no bare (?-i), so strip it and match case-sensitively.
+  let cs = caseSensitive !== false
   if (body.startsWith('(?-i)')) {
     body = body.slice(5)
-    caseSensitive = true
+    cs = true
   }
-  let flags = (caseSensitive ? '' : 'i') + extraFlags
+  let flags = extraFlags
   const m = body.match(/^\(\?([ims]+)\)/)
   if (m) {
     body = body.slice(m[0].length)
-    if (m[1].includes('i')) flags += 'i'
+    if (m[1].includes('i')) cs = false
     if (m[1].includes('s')) flags += 's'
     if (m[1].includes('m')) flags += 'm'
   }
+  if (!cs) flags = 'i' + flags
   // After the leading flag group is gone, so the flag does not end up inside the lookbehind.
   body = expandScopedI(emulateKeep(body))
   return new RegExp(body, [...new Set(flags)].join(''))
@@ -136,14 +137,53 @@ function loadDict(slug) {
 //   { kind: 'regex', re, reG }         — reG is the same regex with /g for counting
 //   { kind: 'keyword', terms: [...] }  — compiled term matchers
 //   { kind: 'divergent' }              — regex that JS cannot compile
+function compileChecksumValidators(p, slug) {
+  const byId = new Map()
+  for (const v of p.purview?.validators ?? []) {
+    if (!v?.id || v.type !== 'Checksum') continue
+    let weightsRaw = v.weights, modRaw = v.mod, cdRaw = v.check_digit ?? v.checkDigit
+    if (Array.isArray(v.params)) {
+      for (const prm of v.params) {
+        const n = String(prm?.name || '').toLowerCase()
+        if (n === 'weights') weightsRaw = prm.value
+        else if (n === 'mod' || n === 'modulo') modRaw = prm.value
+        else if (n === 'checkdigit' || n === 'check_digit') cdRaw = prm.value
+      }
+    } else if (v.params && typeof v.params === 'object') {
+      weightsRaw = v.params.weights ?? v.params.Weights ?? weightsRaw
+      modRaw = v.params.mod ?? v.params.Mod ?? v.params.Modulo ?? modRaw
+      cdRaw = v.params.checkDigit ?? v.params.CheckDigit ?? v.params.check_digit ?? cdRaw
+    }
+    const weights = String(weightsRaw ?? '').trim().split(/[\s,]+/).filter(Boolean).map(Number)
+    const mod = Number(modRaw ?? 10)
+    const checkPos = String(cdRaw ?? '').toLowerCase() === 'last' ? weights.length : Number(cdRaw)
+    if (!weights.length || !Number.isInteger(mod) || mod < 2 || !Number.isInteger(checkPos) || checkPos < 1) {
+      console.log(`  warn  ${slug}: invalid Checksum validator '${v.id}'`); warnings++
+      continue
+    }
+    byId.set(v.id, (matchedStr) => {
+      const digits = (matchedStr.match(/[0-9]/g) ?? []).map(Number)
+      if (digits.length < checkPos || digits.length > weights.length) return false
+      let sum = 0
+      for (let i = 0; i < digits.length; i++) sum += (weights[i] ?? 0) * digits[i]
+      let rem = sum % mod
+      if (rem === 10) rem = 0 // Measured Purview remainder-10-as-0 semantics (docs/checksum-validator-semantics.md)
+      return rem === digits[checkPos - 1]
+    })
+  }
+  return byId
+}
+
 function buildRegistry(p, slug) {
   const reg = new Map()
+  const valMap = compileChecksumValidators(p, slug)
   let divergent = 0
   for (const r of p.purview?.regexes ?? []) {
     const id = r.id ?? r.name
     if (!id || typeof r.pattern !== 'string') continue
+    const valFns = (r.validators ?? []).map(v => valMap.get(typeof v === 'string' ? v : v?.ref)).filter(Boolean)
     try {
-      reg.set(id, { kind: 'regex', re: toRe(r.pattern, p.case_sensitive), reG: toRe(r.pattern, p.case_sensitive, 'g') })
+      reg.set(id, { kind: 'regex', re: toRe(r.pattern, p.case_sensitive), reG: toRe(r.pattern, p.case_sensitive, 'g'), valFns })
     } catch (e) {
       divergent++
       console.log(`  ENGINE-DIVERGENT ${slug}: ${e.message} :: ${String(r.pattern).slice(0, 60)}`)
@@ -182,7 +222,7 @@ function buildRegistry(p, slug) {
 function matchCount(matcher, text, unique) {
   if (!matcher || matcher.kind === 'divergent') return null
   if (matcher.kind === 'regex') {
-    const hits = [...text.matchAll(matcher.reG)].map((m) => m[0])
+    const hits = [...text.matchAll(matcher.reG)].map((m) => m[0]).filter((h) => (matcher.valFns ?? []).every((fn) => fn(h)))
     return unique ? new Set(hits).size : hits.length
   }
   if (unique) return matcher.terms.filter((t) => t.test(text)).length // distinct terms
@@ -190,7 +230,12 @@ function matchCount(matcher, text, unique) {
 }
 const matches = (matcher, text) => {
   if (!matcher || matcher.kind === 'divergent') return null
-  return matcher.kind === 'regex' ? matcher.re.test(text) : matcher.terms.some((t) => t.test(text))
+  if (matcher.kind === 'regex') {
+    if (!matcher.valFns?.length) return matcher.re.test(text)
+    for (const hit of text.matchAll(matcher.reG)) if (matcher.valFns.every((fn) => fn(hit[0]))) return true
+    return false
+  }
+  return matcher.terms.some((t) => t.test(text))
 }
 
 // ---------- purview.filters ----------
@@ -317,7 +362,7 @@ function idMatchSurvives(tier, text, reg, filters) {
       continue
     }
     for (const hit of text.matchAll(m.reG)) {
-      if (filters.matchLevel.every((ok) => ok(hit[0]))) return true
+      if ((m.valFns ?? []).every((fn) => fn(hit[0])) && filters.matchLevel.every((ok) => ok(hit[0]))) return true
     }
   }
   return false
@@ -434,10 +479,15 @@ function verifyPattern(slug) {
   }
 
   const docFiltered = (v) => filters.docLevel.some((trips) => trips(v))
+  const isYamlOnlyMicrosoftStub = Array.isArray(p.exports) && p.exports.length === 1 && p.exports[0] === 'yaml' && p.source === 'microsoft'
 
   for (const tc of shouldMatch) {
     const v = String(tc.value)
-    const ok = !docFiltered(v) && ((top && top.test(v)) || kwHit(v) || tiers.some((t) => tierCanPass(t, v, reg, filters)))
+    const ok = !docFiltered(v) && (
+      (tiers.length > 0 && !isYamlOnlyMicrosoftStub)
+        ? tiers.some((t) => tierCanPass(t, v, reg, filters))
+        : ((top && top.test(v)) || kwHit(v) || tiers.some((t) => tierCanPass(t, v, reg, filters)))
+    )
     if (!ok) {
       failures++
       console.log(`  FAIL ${slug} should_match: ${JSON.stringify(tc.value).slice(0, 80)} — no tier can pass: ${shouldMatchFailReason(v, tiers, reg, filters)}`)

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: Australian Mining Geotechnical and Reserves Data
 slug: au-mining-geotechnical-data
-version: 1.1.0
+version: 1.2.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -20,7 +20,7 @@ operation: >-
   (ML/EPC/MDL) are deliberately excluded - bare "ML 123" collides with
   millilitre notation.
 pattern: >-
-  (\bJORC\s+(?:Code|Table\s?1|compliant|classification)\b|\bCompetent\s+Person\b[\s\S]{0,160}\b(?:resource|reserve)s?\b|\b(?:measured|indicated|inferred)\s+(?:mineral|coal)\s+resources?\b|\b(?:proved|probable)\s+(?:ore|coal|marketable)\s+reserves?\b|\bblast\s+(?:design|pattern|plan)\b|\bpowder\s+factor\b|\bmaximum\s+instantaneous\s+charge\b|\bstemming\s+(?:length|column|height)\b|\bburden\s+and\s+spacing\b|\bgeotechnical\b[\s\S]{0,80}\b(?:pit\s+wall|highwall|low\s?wall|slope\s+stability|factor\s+of\s+safety|spoil)\b|\b(?:mining\s+lease|exploration\s+permit(?:\s+for\s+coal)?|mineral\s+development\s+licence)\s+(?:no\.?\s?|number\s?)?\d{2,5}\b)
+  (?i)(\bJORC\s+(?:Code|Table\s?1|compliant|classification)\b|\bCompetent\s+Person\b[\s\S]{0,160}\b(?:resource|reserve)s?\b|\b(?:measured|indicated|inferred)\s+(?:mineral|coal)\s+resources?\b|\b(?:proved|probable)\s+(?:ore|coal|marketable)\s+reserves?\b|\bblast\s+(?:design|pattern|plan)\b|\bpowder\s+factor\b|\bmaximum\s+instantaneous\s+charge\b|\bstemming\s+(?:length|column|height)\b|\bburden\s+and\s+spacing\b|\bgeotechnical\b[\s\S]{0,80}\b(?:pit\s+wall|highwall|low\s?wall|slope\s+stability|factor\s+of\s+safety|spoil)\b|\b(?:mining\s+lease|exploration\s+permit(?:\s+for\s+coal)?|mineral\s+development\s+licence)\s+(?:no\.?\s?|number\s?)?\d{2,5}\b)
 confidence: medium
 confidence_justification: >-
   Medium confidence: blast-design parameters and geotechnical stability phrasing
@@ -81,8 +81,79 @@ false_positives:
       resource model) and reject ASX-release framing from enforcing tiers; blast
       and geotechnical arms carry the security weight.
 exports:
+  - purview_xml
   - yaml
+  - regex_copy
 scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_mining_geotech_primary
+      matches:
+        - ref: Keyword_au_mining_operational
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_mining_public_release
+    - confidence_level: 75
+      id_match: Regex_au_mining_geotech_primary
+      matches:
+        - ref: Keyword_au_mining_operational
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_mining_public_release
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_mining_geotech_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_mining_geotech_primary
+      pattern: >-
+        (?i)(\bJORC\s+(?:Code|Table\s?1|compliant|classification)\b|\bCompetent\s+Person\b[\s\S]{0,160}\b(?:resource|reserve)s?\b|\b(?:measured|indicated|inferred)\s+(?:mineral|coal)\s+resources?\b|\b(?:proved|probable)\s+(?:ore|coal|marketable)\s+reserves?\b|\bblast\s+(?:design|pattern|plan)\b|\bpowder\s+factor\b|\bmaximum\s+instantaneous\s+charge\b|\bstemming\s+(?:length|column|height)\b|\bburden\s+and\s+spacing\b|\bgeotechnical\b[\s\S]{0,80}\b(?:pit\s+wall|highwall|low\s?wall|slope\s+stability|factor\s+of\s+safety|spoil)\b|\b(?:mining\s+lease|exploration\s+permit(?:\s+for\s+coal)?|mineral\s+development\s+licence)\s+(?:no\.?\s?|number\s?)?\d{2,5}\b)
+  keywords:
+    - id: Keyword_au_mining_operational
+      groups:
+        - match_style: word
+          terms:
+            - bench
+            - overburden
+            - detonator
+            - initiation sequence
+            - drillhole
+            - drill and blast
+            - tenement
+            - resource model
+            - strip ratio
+            - pit design
+      strength: specific
+    - id: Keyword_au_mining_public_release
+      groups:
+        - match_style: word
+          terms:
+            - ASX announcement
+            - ASX release
+            - market release
+            - annual report
+            - quarterly activities report
+      strength: exclusion
 risk_rating: 8
 risk_description: >-
   Blast designs disclose explosive quantities, timing and placement at critical
@@ -121,8 +192,11 @@ references:
   - title: JORC Code 2012 - Australasian Code for Reporting of Exploration Results, Mineral Resources and Ore Reserves
     url: https://www.jorc.org/docs/JORC_code_2012.pdf
 created: 2026-07-25
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.2.0
+    date: '2026-11-25'
+    description: State explicit regex case rule ((?i) or (?-i)) and align tier/keyword semantics with Microsoft Purview evaluation.
   - version: 1.1.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'
@@ -141,4 +215,4 @@ changelog:
     note: Initial draft - AU mining-sector coverage gap (blast designs, reserves, geotech).
 author: PVX
 source: compl8-energy-pack
-license: CC-BY-4.0
+license: MIT

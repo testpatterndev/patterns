@@ -1,0 +1,166 @@
+schema: testpattern/v1
+name: "Australian State Firearms Licence and Permit to Acquire Number"
+slug: au-firearms-licence-pta
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects populated Australian state and territory Firearms / Weapons Licence numbers and Permit to Acquire (PTA) numbers (replacing phrase-only matching in global-top500-037-firearm-license-number when actual licence/PTA digits are present).
+operation: >-
+  Matches an explicit Firearms/Weapons/Shooters Licence or Permit to Acquire label followed by a 7-11 character alphanumeric licence/permit identifier. Tier 85 requires independent firearm-registry context (Category A/B/C/D/H, serial number, safe storage, Weapons Licensing, Firearms Registry).
+pattern: '(?-i)\b((?i:firearms?\s+licen[cs]e|weapons?\s+licen[cs]e|shooters?\s+licen[cs]e|permit\s+to\s+acquire|PTA)(?:\s+(?i:number|no\.?|#))?[\s:#-]{1,6}[A-Z0-9]{7,11})\b'
+confidence: medium
+confidence_justification: >-
+  Medium-high confidence: populated licence/PTA labels avoid bare-digit collisions, while firearm-category and police-registry corroboration at 85 isolates genuine weapons-licensing records from parent-teacher-association (PTA) acronyms.
+jurisdictions:
+  - au
+regulations:
+  - "Weapons Act 1990 (Qld)"
+  - "Firearms Act 1996 (NSW)"
+  - "Information Privacy Act 2009 (Qld)"
+  - "Privacy Act 1988 (Cth)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "Weapons Licensing"
+    - "Firearms Registry"
+    - "Category A"
+    - "Category B"
+    - "Category H"
+    - "firearm serial number"
+    - "safe storage"
+    - "Permit to Acquire"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Weapons Licence No: 48291736 — Category A/B, Queensland Police Weapons Licensing"
+      description: "Queensland 8-digit Weapons Act licence with category and police registry context (85 tier)"
+    - value: "Firearms Licence Number: 409283715"
+      description: "NSW 9-digit Firearms Licence number (75 tier)"
+    - value: "Permit to Acquire: PTA90381724 for bolt-action rifle"
+      description: "Permit to Acquire reference with firearm description"
+  should_not_match:
+    - value: "48291736"
+      description: "Bare 8-digit number without Firearms/Weapons Licence label"
+    - value: "PTA meeting 20260815 in the school hall"
+      description: "School Parent-Teacher Association context excluded by school/parent exclusion terms"
+    - value: "Apply for a Queensland Weapons Licence online through QPS"
+      description: "Prose instruction without a licence number"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "School Parent-Teacher Association (PTA) or Passenger Transport Authority references."
+    mitigation: "Exclude school/parent/transit vocabulary and require Weapons Licensing / firearm-category context at 85."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 8
+risk_description: >-
+  The detector matches a populated Australian Firearms or Weapons Licence or Permit to Acquire identifier. Public breaches of firearm-holder details create acute physical-safety and burglary/theft targeting risks because linking a firearm licence or PTA to an address reveals where registered firearms are stored. Risk 8 and SENSITIVE Personal-Privacy reflect elevated physical-safety harm for an individual licence holder; bulk state firearm registries or residential-address extracts warrant PROTECTED.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: "CUI Specified"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 8 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy, and Medium because an individual firearms licence or Permit to Acquire number carries direct physical-security and firearm-theft targeting risk if linked to a holder's location. PROTECTED is reserved for bulk registry exports or suppressed address lists.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling reflects elevated personal-safety and criminal-targeting sensitivity for firearm licence identifiers.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_firearms_lic
+      matches:
+        - ref: Keyword_au_firearms_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_pta_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_firearms_lic
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_pta_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_firearms_lic
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_au_pta_exclusion
+  regexes:
+    - id: Regex_au_firearms_lic
+      pattern: '(?-i)\b((?:(?i:firearms?\s+licen[cs]e|weapons?\s+licen[cs]e|shooters?\s+licen[cs]e|permit\s+to\s+acquire)|PTA)(?:\s+(?i:number|no\.?|#))?[\s:#-]{1,6}[A-Z0-9]{7,11})\b'
+  keywords:
+    - id: Keyword_au_firearms_context
+      groups:
+        - match_style: word
+          terms:
+            - "Weapons Licensing"
+            - "Firearms Registry"
+            - "Category A"
+            - "Category B"
+            - "Category C"
+            - "Category D"
+            - "Category H"
+            - "rimfire"
+            - "centrefire"
+            - "firearm serial"
+            - "safe storage"
+            - "licensed dealer"
+      strength: specific
+    - id: Keyword_au_pta_exclusion
+      groups:
+        - match_style: word
+          terms:
+            - "parent teacher"
+            - "school hall"
+            - "Passenger Transport Authority"
+            - "public transport"
+      strength: exclusion
+references:
+  - url: https://www.police.qld.gov.au/weapon-licensing
+    title: "Queensland Police Service - Weapons Licensing"
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-1990-071
+    title: "Weapons Act 1990 (Qld)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

@@ -1,0 +1,163 @@
+schema: testpattern/v1
+name: "Australian Superannuation USI and SPIN"
+slug: au-superannuation-usi-spin
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects structured Australian Unique Superannuation Identifiers (14-digit ABN+3 USIs) and 9-character Superannuation Product Identification Numbers (SPINs, [A-Z]{3}\d{4}AU). Complements au-superannuation-fund-number (APRA R\d{7} RSE numbers), au-apir-code (managed-fund APIR codes sharing the [A-Z]{3}\d{4}AU syntax), and global-top500-096-superannuation-identifiers (person-linked member super records).
+operation: >-
+  Matches a 14-digit numeric USI or 9-character [A-Z]{3}\d{4}AU SPIN on word boundaries. Enforcing tiers require USI, SPIN, SuperStream, APRA, or member-choice superannuation vocabulary within 300 characters.
+pattern: '(?-i)\b(\d{11}\d{3}|[A-Z]{3}\d{4}AU)\b'
+confidence: high
+confidence_justification: >-
+  High confidence when corroborated: [A-Z]{3}\d{4}AU is structurally unique to Australian superannuation/APIR codes, and the 14-digit ABN-derived USI format paired with superannuation keywords cleanly separates fund product IDs from generic numbers.
+jurisdictions:
+  - au
+regulations:
+  - "Superannuation Industry (Supervision) Act 1993 (Cth)"
+  - "Privacy Act 1988 (Cth)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - financial
+  - pii
+corroborative_evidence:
+  keywords:
+    - "Unique Superannuation Identifier"
+    - "USI"
+    - "SPIN"
+    - "SuperStream"
+    - "fund ABN"
+    - "superannuation choice"
+    - "member number"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "USI: 65714394898001"
+      description: "14-digit ABN-derived Unique Superannuation Identifier"
+    - value: "STA0100AU"
+      description: "9-character SPIN / alphanumeric superannuation product identifier ending in AU"
+    - value: "Superannuation Fund USI AUS0100AU"
+      description: "Alphanumeric USI/SPIN format used by major industry super funds"
+  should_not_match:
+    - value: "STA0100NZ"
+      description: "Ends in NZ rather than required AU suffix"
+    - value: "65714394898"
+      description: "11-digit bare ABN without 3-digit USI product suffix"
+    - value: "Enter your fund Unique Superannuation Identifier on the Standard Choice Form"
+      description: "Prose instruction without a USI/SPIN value"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Employer default-fund onboarding guides publish the default fund's USI."
+    mitigation: "Enforcing tiers enable local_noise_filter and require superannuation/member context; Risk 4 OFFICIAL reflects public fund-product metadata unless paired with TFN or member balances."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 4
+risk_description: >-
+  The detector matches an Australian Unique Superannuation Identifier (14-digit ABN+product or [A-Z]{3}\d{4}AU SPIN) in superannuation context. A USI/SPIN identifies the superannuation product rather than an individual's member balance or TFN, and is published in the ATO Fund Validation Service lookup. However, it routinely marks SuperStream contribution files and Standard Choice Forms. Risk 4 and OFFICIAL fit product-level superannuation routing metadata; member statements and TFN declarations are elevated by separate SITs.
+sensitivity_labels:
+  pspf: "OFFICIAL"
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL"
+  nz_gov: "IN-CONFIDENCE"
+  ca_gov: "Protected A"
+classification:
+  tier: Low
+  rationale: >-
+    Risk 4 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because a superannuation USI or SPIN is a public fund-routing identifier listed in the ATO Fund Validation Service, similar to a bank BSB (au-branch-routing-code).
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling suits a public superannuation product routing identifier absent member account balances or TFNs.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_au_super_usi_spin
+      matches:
+        - ref: Keyword_au_super_usi_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_au_super_usi_spin
+      matches:
+        - ref: Keyword_au_super_usi_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_super_usi_spin
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_super_usi_spin
+      pattern: '(?-i)\b(\d{14}|[A-Z]{3}\d{4}AU)\b'
+  keywords:
+    - id: Keyword_au_super_usi_specific
+      groups:
+        - match_style: word
+          terms:
+            - "Unique Superannuation Identifier"
+            - "Superannuation Product Identification Number"
+            - text: "SPIN"
+              case_sensitive: true
+            - "SuperStream"
+            - "Fund Validation Service"
+            - "Standard Choice Form"
+      strength: specific
+    - id: Keyword_au_super_usi_broad
+      groups:
+        - match_style: word
+          terms:
+            - text: "USI"
+              case_sensitive: true
+            - "superannuation"
+            - "super fund"
+            - "fund ABN"
+            - "member number"
+            - "SG contributions"
+      strength: domain
+  filters:
+    - id: Filter_au_super_usi_same_digits
+      type: AllDigitsSameFilter
+references:
+  - url: https://www.ato.gov.au/businesses-and-organisations/super-for-employers/paying-super-contributions/superstream/fund-validation-service
+    title: "Australian Taxation Office - Fund Validation Service (USI and SPIN lookup)"
+  - url: https://www.legislation.gov.au/C2004A04633/latest/text
+    title: "Superannuation Industry (Supervision) Act 1993 (Cth)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

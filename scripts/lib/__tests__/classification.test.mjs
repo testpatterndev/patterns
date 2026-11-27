@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { validateClassification, validateReferences, validateRegulations, tierForLabel, idcfForLabels, validateIdcf, IDCF_LEVELS, IDCF_MARKERS } from '../classification.mjs'
+import { validateClassification, validateReferences, validateRegulations, tierForLabel, idcfForLabels, validateIdcf, IDCF_LEVELS, IDCF_MARKERS, fiveEyesForLabels, validateFiveEyes, FIVE_EYES_KEYS } from '../classification.mjs'
 
 let passed = 0, failed = 0
 function t(name, fn) { try { fn(); passed++ } catch (e) { failed++; console.error(`FAIL ${name}: ${e.message}`) } }
@@ -110,6 +110,28 @@ t('validateIdcf: stored values must equal the derivation', () => {
   p.sensitivity_labels = { qgiscf_dlm: 'SENSITIVE Legal', idcf: 'DSL-3' }
   assert.ok(validateIdcf(p).some(m => m.includes("idcf_marker is missing qgiscf_dlm 'SENSITIVE Legal' (expected 'Legal Privilege')")))
   assert.deepEqual(validateIdcf(good()), [], 'no labels at all: nothing to check')
+})
+
+t('fiveEyesForLabels and validateFiveEyes', () => {
+  assert.deepEqual(FIVE_EYES_KEYS, ['us_gov', 'uk_gov', 'nz_gov', 'ca_gov'])
+  assert.deepEqual(fiveEyesForLabels({ qgiscf_dlm: 'OFFICIAL' }),
+    { us_gov: 'CUI', uk_gov: 'OFFICIAL', nz_gov: 'IN-CONFIDENCE', ca_gov: 'Protected A' })
+  assert.deepEqual(fiveEyesForLabels({ qgiscf_dlm: 'SENSITIVE Personal-Privacy' }),
+    { us_gov: 'CUI Specified', uk_gov: 'OFFICIAL-SENSITIVE', nz_gov: 'RESTRICTED', ca_gov: 'Protected B' })
+  assert.deepEqual(fiveEyesForLabels({ qgiscf_dlm: 'SENSITIVE InfoTech' }),
+    { us_gov: 'CUI', uk_gov: 'OFFICIAL-SENSITIVE', nz_gov: 'IN-CONFIDENCE', ca_gov: 'Protected B' })
+  assert.deepEqual(fiveEyesForLabels({ qgiscf_dlm: 'PROTECTED Law-Enforcement' }),
+    { us_gov: 'CUI Specified', uk_gov: 'SECRET', nz_gov: 'SECRET', ca_gov: 'Confidential' })
+  assert.deepEqual(fiveEyesForLabels({ qgiscf_dlm: 'PROTECTED Financial' }),
+    { us_gov: 'CUI Specified', uk_gov: 'OFFICIAL-SENSITIVE', nz_gov: 'CONFIDENTIAL', ca_gov: 'Protected B' })
+  assert.deepEqual(fiveEyesForLabels({ qgiscf_dlm: 'N/A' }),
+    { us_gov: 'CUI Basic', uk_gov: 'OFFICIAL-SENSITIVE', nz_gov: 'IN-CONFIDENCE', ca_gov: 'Protected A' })
+  const p = good()
+  p.sensitivity_labels = { qgiscf_dlm: 'SENSITIVE Legal', us_gov: 'CUI Specified', uk_gov: 'OFFICIAL-SENSITIVE' }
+  assert.ok(validateFiveEyes(p)[0].includes('nz_gov, ca_gov'))
+  p.sensitivity_labels.nz_gov = 'RESTRICTED'
+  p.sensitivity_labels.ca_gov = 'Protected B'
+  assert.deepEqual(validateFiveEyes(p), [])
 })
 
 console.log(`${passed} passed, ${failed} failed`)

@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: International Bank Account Number (IBAN) - Global
 slug: global-iban
-version: 1.3.0
+version: 1.4.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -15,17 +15,11 @@ description: >-
   minimum and would not match it. This pattern intentionally co-fires with eu-iban for EU country codes,
   since neither pattern restricts the 2-letter prefix to a specific country allow-list — see false_positives.
 operation: >-
-  Validation: Mod 97 (ISO 7064) via Func_iban. Reference: SWIFT IBAN Registry (ISO 13616 Registration
-  Authority, https://www.swift.com/standards/data-standards/iban). Corroborative evidence: keywords within
-  300 characters. Keyword lists: financial-deposit-terms.
-pattern: '\b([A-Z]{2}\d{2}[A-Z0-9 -]{11,40})\b'
-confidence: high
+  Structural IBAN match across the ISO 13616 / SWIFT IBAN Registry length range with corroborative banking keywords within 300 characters and template-exclusion gating. Note: ISO 7064 Mod-97 (Func_iban) cannot be referenced in custom Purview RulePack XML; enable the built-in IBAN SIT when Mod-97 validation is required. Reference: SWIFT IBAN Registry (https://www.swift.com/standards/data-standards/iban). Keyword lists: financial-deposit-terms.
+pattern: (?-i)\b([A-Z]{2}\d{2}[A-Z0-9 -]{11,40})\b
+confidence: medium
 confidence_justification: >-
-  High confidence: the two-letter country code prefix followed by exactly two check digits, combined with
-  the mod-97 checksum validator, produces low false positive rates. The widened length range trades a small
-  amount of extra structural looseness (to reach Norway's shorter format) for broader global coverage; the
-  checksum validator carries the precision that the regex alone cannot express without banned per-country
-  length alternation.
+  Medium confidence: the uppercase two-letter country code prefix followed by two digits and banking/payment-instruction corroboration constrain false positives, though custom Purview XML cannot run Mod-97 checksum validation.
 jurisdictions:
   - global
 regulations:
@@ -103,6 +97,10 @@ scope: narrow
 purview:
   patterns_proximity: 300
   recommended_confidence: 85
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
   pattern_tiers:
     - confidence_level: 85
       local_noise_filter: true
@@ -110,19 +108,27 @@ purview:
       matches:
         - ref: Keyword_global_iban
         - ref: Keyword_payment_instruction_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 75
       local_noise_filter: true
       id_match: Regex_global_iban
       matches:
         - ref: Keyword_global_iban
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
     - confidence_level: 65
       discovery_only: true
       id_match: Regex_global_iban
   regexes:
     - id: Regex_global_iban
-      pattern: '\b([A-Z]{2}\d{2}[A-Z0-9 -]{11,40})\b'
-      validators:
-        - ref: Func_iban
+      pattern: (?-i)\b([A-Z]{2}\d{2}[A-Z0-9 -]{11,40})\b
   keywords:
     - id: Keyword_global_iban
       groups:
@@ -182,8 +188,11 @@ references:
   - url: https://en.wikipedia.org/wiki/International_Bank_Account_Number
     title: "International Bank Account Number - Wikipedia (per-country structure and length table)"
 created: '2026-07-06'
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.4.0
+    date: '2026-11-25'
+    description: Remove unsupported Func_iban custom-XML validator ref, wire template-exclusion, add explicit (?-i), and align confidence to medium.
   - version: 1.3.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

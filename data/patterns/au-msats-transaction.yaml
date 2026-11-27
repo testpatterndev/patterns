@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: MSATS / B2B Retail Market Transaction
 slug: au-msats-transaction
-version: 1.1.0
+version: 1.2.0
 type: regex
 pattern_class: concept
 engine: boost_regex
@@ -18,7 +18,7 @@ operation: >-
   in proximity phrasing with NMI. aseXML element vocabulary is distinctive to
   MSATS/B2B payloads and participant system extracts.
 pattern: >-
-  (\b(?:aseXML|CATSChangeRequest|CATSNotification|NMIDiscoveryRequest|NMIDiscoveryResponse|ServiceOrderRequest|ServiceOrderResponse|MeterDataNotification|MeterDataHistoryRequest)\b|\bCATS\s+(?:CR|change\s+request)\s*#?\s*[0-9]{4}\b|\b(?:FRMP|LNSP|MDP|ENM|RoLR)\b[\s\S]{0,80}\bNMI\b)
+  (?-i)(\b(?:aseXML|CATSChangeRequest|CATSNotification|NMIDiscoveryRequest|NMIDiscoveryResponse|ServiceOrderRequest|ServiceOrderResponse|MeterDataNotification|MeterDataHistoryRequest)\b|\bCATS\s+(?:CR|change\s+request)\s*#?\s*[0-9]{4}\b|\b(?:FRMP|LNSP|MDP|ENM|RoLR)\b[\s\S]{0,80}\bNMI\b)
 confidence: medium
 confidence_justification: >-
   Medium confidence: aseXML transaction names are near-unique to AEMO retail market
@@ -69,8 +69,66 @@ false_positives:
     mitigation: Require corroborative keywords, use count thresholds in DLP rules,
       and exclude published procedure repositories by location scoping.
 exports:
+  - purview_xml
   - yaml
+  - regex_copy
 scope: narrow
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_au_msats_primary
+      matches:
+        - ref: Keyword_au_msats_context
+          min_count: 2
+          unique_results: true
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_au_msats_primary
+      matches:
+        - ref: Keyword_au_msats_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_au_msats_primary
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_au_msats_primary
+      pattern: >-
+        (?-i)(\b(?:aseXML|CATSChangeRequest|CATSNotification|NMIDiscoveryRequest|NMIDiscoveryResponse|ServiceOrderRequest|ServiceOrderResponse|MeterDataNotification|MeterDataHistoryRequest)\b|\bCATS\s+(?:CR|change\s+request)\s*#?\s*[0-9]{4}\b|\b(?:FRMP|LNSP|MDP|ENM|RoLR)\b[\s\S]{0,80}\bNMI\b)
+  keywords:
+    - id: Keyword_au_msats_context
+      groups:
+        - match_style: word
+          terms:
+            - text: MSATS
+              case_sensitive: true
+            - meter data
+            - datastream
+            - retail transfer
+            - standing data
+            - connection point
+            - metering installation
+            - participant ID
+      strength: specific
 risk_rating: 6
 risk_description: >-
   MSATS/B2B payloads link NMIs, customer transfers, metering identifiers and
@@ -103,8 +161,11 @@ references:
   - title: "Privacy Act 1988 (Cth)"
     url: https://www.legislation.gov.au/C2004A03712/latest/text
 created: 2026-07-24
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.2.0
+    date: '2026-11-25'
+    description: State explicit regex case rule ((?i) or (?-i)) and align tier/keyword semantics with Microsoft Purview evaluation.
   - version: 1.1.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'
@@ -124,4 +185,4 @@ changelog:
     note: Initial draft from public MSATS/B2B procedure vocabulary.
 author: PVX
 source: compl8-energy-pack
-license: CC-BY-4.0
+license: MIT

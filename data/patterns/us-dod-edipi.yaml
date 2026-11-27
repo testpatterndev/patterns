@@ -1,0 +1,155 @@
+schema: testpattern/v1
+name: "U.S. DoD ID Number (EDIPI)"
+slug: us-dod-edipi
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects 10-digit U.S. Department of Defense Identification Numbers (DoD ID / Electronic Data Interchange Personal Identifier, EDIPI) printed on Common Access Cards (CACs) and Uniformed Services ID cards to replace SSNs across DoD, Defense Industrial Base (CMMC), and Tricare systems.
+operation: >-
+  Uses Regex_us_edipi_labeled (explicit DoD ID / EDIPI label + 10 digits) at 75 and Regex_us_edipi_bare (10 digits) with strict CAC / DEERS / milConnect / Defense Manpower Data Center corroboration at 85.
+pattern: '(?-i)\b((?:(?i:DoD\s+ID(?:\s+(?:number|no\.?))?|EDIPI|Electronic\s+Data\s+Interchange\s+Personal\s+Identifier))[\s:#-]{1,6}[1-9]\d{9}|[1-9]\d{9})\b'
+confidence: medium
+confidence_justification: >-
+  Medium-high confidence: requiring an explicit DoD ID / EDIPI label at 75 and DEERS/CAC/DMDC military-personnel context at 85 prevents 10-digit U.S. telephone numbers from false-matching.
+jurisdictions:
+  - us
+regulations:
+  - "Privacy Act of 1974 (5 U.S.C. 552a)"
+  - "32 CFR 2002"
+  - "FISMA"
+frameworks:
+  - NIST SP 800-171
+  - NIST CSF
+  - ISO 27001
+data_categories:
+  - pii
+  - government-id
+  - defense
+corroborative_evidence:
+  keywords:
+    - "DoD ID"
+    - "EDIPI"
+    - "Common Access Card"
+    - "CAC"
+    - "DEERS"
+    - "milConnect"
+    - "DMDC"
+    - "TRICARE"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "DoD ID: 1409283716"
+      description: "Labelled 10-digit DoD ID Number (75 tier)"
+    - value: "EDIPI: 1192837465 — verified in DEERS for Common Access Card issuance"
+      description: "EDIPI with DEERS and Common Access Card corroboration (85 tier)"
+    - value: "DoD ID Number 1582930471"
+      description: "Spelled-out DoD ID Number with 10 digits"
+  should_not_match:
+    - value: "2025550149"
+      description: "Bare 10-digit telephone number without DoD ID/EDIPI label"
+    - value: "DoD ID: 140928371"
+      description: "Nine digits (SSN length, not 10-digit DoD EDIPI)"
+    - value: "Locate the 10-digit DoD ID Number on the back of your Common Access Card"
+      description: "Prose instruction without an EDIPI value"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Sample CAC training graphics showing mock 10-digit DoD IDs."
+    mitigation: "Suppressed on every tier by template-exclusion and AllDigitsSameFilter."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 7
+risk_description: >-
+  The detector matches a 10-digit U.S. Department of Defense ID Number (EDIPI) printed on CACs and military ID cards. Under DoD Instruction 1000.30 and NARA CUI PRVCY/MIL-PERS guidance, the DoD ID links service members, DoD civilians, and cleared Defense Industrial Base contractors across DEERS, DISS/NBIS clearance systems, and TRICARE benefits. Risk 7 and SENSITIVE Personal-Privacy reflect CUI military/contractor personnel identifier sensitivity.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 7 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy, and Medium because a DoD EDIPI persistently identifies U.S. military, civilian, and cleared defence-contractor personnel across DEERS and TRICARE.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling protects persistent military and defence-personnel identifiers.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match: Regex_us_edipi_labeled
+      matches:
+        - ref: Keyword_us_edipi_context
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      id_match: Regex_us_edipi_labeled
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_us_edipi_labeled
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_us_edipi_labeled
+      pattern: '(?-i)\b((?:(?i:DoD\s+ID(?:\s+(?:number|no\.?))?|Electronic\s+Data\s+Interchange\s+Personal\s+Identifier)|EDIPI)[\s:#-]{1,6}[1-9]\d{9})\b'
+  keywords:
+    - id: Keyword_us_edipi_context
+      groups:
+        - match_style: word
+          terms:
+            - "Common Access Card"
+            - text: "CAC"
+              case_sensitive: true
+            - text: "DEERS"
+              case_sensitive: true
+            - "milConnect"
+            - text: "DMDC"
+              case_sensitive: true
+            - "TRICARE"
+            - "Uniformed Services"
+            - "DISS"
+      strength: specific
+  filters:
+    - id: Filter_us_edipi_same_digits
+      type: AllDigitsSameFilter
+references:
+  - url: https://www.cac.mil/Common-Access-Card/
+    title: "U.S. Department of Defense - Common Access Card (CAC) and 10-digit DoD ID Number (EDIPI)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

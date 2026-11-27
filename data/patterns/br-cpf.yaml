@@ -1,7 +1,7 @@
 schema: testpattern/v1
 name: CPF
 slug: br-cpf
-version: 1.4.0
+version: 1.5.0
 type: regex
 pattern_class: identifier
 engine: boost_regex
@@ -37,12 +37,12 @@ corroborative_evidence:
     - pii-civic-credentials
 test_cases:
   should_match:
-    - value: 123.456.789-01
-      description: Standard CPF format with dots and dash
-    - value: '12345678901'
-      description: CPF without punctuation
-    - value: 000.000.000-00
-      description: Zero-filled CPF format
+    - value: 123.456.789-09
+      description: Standard CPF format with dots and dash (both Mod-11 check digits valid, including remainder-10 first digit)
+    - value: '52998224725'
+      description: CPF without punctuation (both Mod-11 check digits valid)
+    - value: 111.444.777-35
+      description: Standard dotted/dashed CPF (both Mod-11 check digits valid)
   should_not_match:
     - value: '123.456.789-0'
       description: Only 1 check digit instead of 2
@@ -50,6 +50,10 @@ test_cases:
       description: 3 check digits instead of 2
     - value: '123.456.78-01'
       description: Only 2 digits in third group instead of 3
+    - value: 123.456.789-01
+      description: Fails second CPF Mod-11 check digit (perturbation of 123.456.789-09)
+    - value: 123.456.789-19
+      description: Fails first CPF Mod-11 check digit (perturbation of 123.456.789-09)
 false_positives:
   - description: >-
       Common words and phrases related to cpf appearing in policy documents, training materials, HR templates, or
@@ -92,7 +96,21 @@ purview:
     - id: Regex_br_cpf
       pattern: \b(\d{3}\.?\d{3}\.?\d{3}[-.]?\d{2})\b
       validators:
-        - ref: Func_brazil_cpf
+        - ref: Validator_br_cpf_d10
+        - ref: Validator_br_cpf_d11
+  validators:
+    - id: Validator_br_cpf_d10
+      type: Checksum
+      params:
+        weights: "1,2,3,4,5,6,7,8,9,0,0"
+        mod: 11
+        checkDigit: 10
+    - id: Validator_br_cpf_d11
+      type: Checksum
+      params:
+        weights: "0,1,2,3,4,5,6,7,8,9,0"
+        mod: 11
+        checkDigit: 11
   keywords:
     - id: Keyword_br_cpf
       groups:
@@ -144,8 +162,11 @@ references:
   - url: https://learn.microsoft.com/en-us/purview/sit-defn-brazil-cpf-number
     title: "Brazil CPF number entity definition - Microsoft Learn"
 created: '2026-02-08'
-updated: '2026-10-30'
+updated: '2026-11-25'
 changelog:
+  - version: 1.5.0
+    date: '2026-11-25'
+    description: Replace stripped Func_brazil_cpf with exact dual Mod-11 inline Checksum validators checking both CPF check digits, and replace invalid test values.
   - version: 1.4.0
     date: '2026-10-30'
     description: 'Regex shape only: each regex now has one capturing group around the match it reports (our \b and lookaround boundaries stay outside it). Matching is unchanged; the aim is best-effort Copilot prompt blocking.'

@@ -1,0 +1,155 @@
+schema: testpattern/v1
+name: UAE Tax Registration Number (TRN)
+slug: ae-tax-registration-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: universal
+description: >-
+  Detects United Arab Emirates 15-digit Tax Registration Numbers (TRNs) issued by the Federal Tax Authority (FTA) for Value Added Tax (VAT), Excise Tax, and Corporate Tax registration. UAE VAT TRNs begin with the 3-digit federal prefix 100 followed by 12 digits.
+operation: >-
+  Matches a 15-digit UAE TRN beginning with 100 in compact or 3-digit grouped format (100-xxxx-xxxx-xxxx / 100 xxx xxx xxx xxx) on word boundaries. Tiers: 85 with FTA/UAE VAT specific keywords, 75 with general TRN/tax-invoice keywords, 65 discovery-only for the 15-digit 100-prefixed number, with template-exclusion and AllDigitsSameFilter gating.
+pattern: \b(100(?:[\s-]?\d{3}){4})\b
+confidence: medium
+confidence_justification: >-
+  Medium confidence: 15-digit numbers starting with 100 are structurally uncommon in prose, but can overlap long shipment, card, or ledger identifiers without UAE VAT / TRN corroborative evidence within 300 characters.
+jurisdictions:
+  - ae
+regulations:
+  - UAE PDPL
+frameworks:
+  - ISO 27001
+data_categories:
+  - financial
+  - business
+  - government-id
+corroborative_evidence:
+  keywords:
+    - Tax Registration Number
+    - TRN
+    - Federal Tax Authority
+    - UAE VAT
+    - tax invoice
+    - رقم التسجيل الضريبي
+  proximity: 300
+test_cases:
+  should_match:
+    - value: '100234567890003'
+      description: Compact 15-digit UAE VAT Tax Registration Number ending in 003
+    - value: 'TRN: 100-482-917-365-003'
+      description: Hyphen-grouped 15-digit UAE TRN with TRN label
+    - value: 'Tax Registration Number 100 391 827 465 003'
+      description: Space-grouped 15-digit UAE TRN
+  should_not_match:
+    - value: '200234567890003'
+      description: Does not begin with UAE Federal Tax Authority prefix 100
+    - value: '10023456789000'
+      description: Fourteen digits (one digit short of required 15)
+    - value: All UAE VAT tax invoices must state the supplier Tax Registration Number
+      description: Prose mention without a 15-digit TRN value
+false_positives:
+  - description: Supplier tax invoices legitimately display the issuer's published 15-digit TRN.
+    mitigation: Enforcing tiers enable local_noise_filter so organizations can exclude their own TRN while retaining discovery visibility.
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 4
+risk_description: >-
+  The detector identifies a 15-digit UAE Federal Tax Authority Tax Registration Number beginning with 100. TRNs appear on UAE tax invoices, corporate tax returns, and procurement records; standalone exposure identifies a registered taxpayer entity rather than authorizing FTA portal access. Risk 4 and OFFICIAL fit an entity tax registration number; SENSITIVE requires confidential tax-return calculations, audit correspondence, or banking records.
+sensitivity_labels:
+  pspf: OFFICIAL
+  qgiscf: OFFICIAL
+  qgiscf_dlm: OFFICIAL
+  idcf: DSL-2
+  us_gov: CUI
+  uk_gov: OFFICIAL
+  nz_gov: IN-CONFIDENCE
+  ca_gov: Protected A
+classification:
+  tier: Low
+  rationale: >-
+    Risk 4 maps to PSPF OFFICIAL, QGISCF OFFICIAL, OFFICIAL DLM, and Low because a UAE TRN is an entity tax-registration reference routinely printed on tax invoices and verifiable via the FTA register.
+  generic:
+    classification: Low
+    dlm: Low
+    rationale: >-
+      Generic Low handling suits a business VAT/tax registration number that carries no standalone authentication capability.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      local_noise_filter: true
+      id_match: Regex_ae_trn
+      matches:
+        - ref: Keyword_ae_trn_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 75
+      local_noise_filter: true
+      id_match: Regex_ae_trn
+      matches:
+        - ref: Keyword_ae_trn_broad
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_ae_trn
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+  regexes:
+    - id: Regex_ae_trn
+      pattern: \b(100(?:[\s-]?\d{3}){4})\b
+  keywords:
+    - id: Keyword_ae_trn_specific
+      groups:
+        - match_style: word
+          terms:
+            - Tax Registration Number
+            - Federal Tax Authority
+            - UAE VAT
+            - EmaraTax
+            - رقم التسجيل الضريبي
+            - الهيئة الاتحادية للضرائب
+      strength: specific
+    - id: Keyword_ae_trn_broad
+      groups:
+        - match_style: word
+          terms:
+            - text: TRN
+              case_sensitive: true
+            - tax invoice
+            - VAT registration
+            - corporate tax
+            - excise tax
+      strength: domain
+  filters:
+    - id: Filter_ae_trn_same_digits
+      type: AllDigitsSameFilter
+references:
+  - url: https://tax.gov.ae/en/trn.verification.aspx
+    title: UAE Federal Tax Authority - Tax Registration Number (TRN) Verification
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT

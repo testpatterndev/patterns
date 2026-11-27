@@ -1,0 +1,164 @@
+schema: testpattern/v1
+name: "Queensland Blue Card and Exemption Card Number"
+slug: au-qld-blue-card-number
+version: 1.0.0
+type: regex
+pattern_class: identifier
+engine: boost_regex
+description: >-
+  Detects standalone Queensland Blue Card and Exemption Card registration numbers (6-8 digits / 1-2 issue digits) on HR/volunteer rosters, completing state card-number parity alongside au-wwcc-number (NSW/VIC/WA) and au-qld-blue-card-application (full screening application records).
+operation: >-
+  Uses Regex_qld_blue_card_labeled (explicit Blue Card / Exemption Card / Positive Notice label + NNNNNNN/N) at 75 and Regex_qld_blue_card_number (NNNNNNN/N) with Blue Card Services corroboration at 85 and 65 discovery, complementing the form-level concept pattern au-qld-blue-card-application.
+pattern: '(?-i)\b((?i:blue\s+card|exemption\s+card|positive\s+notice)(?:\s+(?i:number|no\.?|registration|#))?[\s:#-]{1,6}\d{6,8}/\d{1,2}|\d{6,8}/\d{1,2})\b'
+confidence: medium
+confidence_justification: >-
+  Medium-high confidence: the slash-suffixed issue format (6-8 digits / 1-2 digits) combined with Blue Card / Working with Children context distinguishes Blue Card numbers from dates and property lot/plan numbers.
+jurisdictions:
+  - au
+regulations:
+  - "Working with Children (Risk Management and Screening) Act 2000 (Qld)"
+  - "Information Privacy Act 2009 (Qld)"
+  - "Privacy Act 1988 (Cth)"
+frameworks:
+  - ISO 27001
+  - ISO 27701
+data_categories:
+  - pii
+  - government-id
+corroborative_evidence:
+  keywords:
+    - "Blue Card"
+    - "Exemption Card"
+    - "Blue Card Services"
+    - "Working with Children"
+    - "Positive Notice"
+    - "expiry date"
+  proximity: 300
+test_cases:
+  should_match:
+    - value: "Blue Card Number: 1482917/2"
+      description: "Labelled Queensland Blue Card registration and issue number"
+    - value: "Exemption Card no. 892341/1 (Queensland Police / registered teacher)"
+      description: "Labelled Queensland Exemption Card number"
+    - value: "1928374/3"
+      description: "Slash-formatted Blue Card registration/issue number"
+  should_not_match:
+    - value: "14829/2"
+      description: "Five digits before slash (below 6-digit Blue Card minimum)"
+    - value: "1482917/123"
+      description: "Three digits after slash (lot/plan style rather than 1-2 digit card issue sequence)"
+    - value: "All volunteers must hold a current Queensland Blue Card before commencing"
+      description: "Prose policy statement without a card number"
+    - value: "Sample template: placeholder example record for training only"
+      description: "Template/sample fixture suppressed by shared exclusion dictionary"
+false_positives:
+  - description: "Queensland property Lot/RP numbers or file references using a slash separator."
+    mitigation: "Exclude Lot/RP/SP/BUP property-title terms and require Blue Card / Working with Children context."
+exports:
+  - purview_xml
+  - yaml
+  - regex_copy
+scope: narrow
+risk_rating: 6
+risk_description: >-
+  The detector matches a Queensland Working with Children Blue Card or Exemption Card registration/issue number. Blue Card numbers appear in school, childcare, health, sport, and council volunteer compliance registers alongside holder full name and date of birth, which are the exact fields used in the Blue Card Services online validation portal. Risk 6 and SENSITIVE Personal-Privacy match au-wwcc-number; negative-notice or child-safety investigation records carry higher SENSITIVE/PROTECTED ratings.
+sensitivity_labels:
+  pspf: "OFFICIAL: Sensitive"
+  qgiscf: SENSITIVE
+  qgiscf_dlm: SENSITIVE Personal-Privacy
+  idcf: DSL-3
+  idcf_marker: Personal Privacy
+  us_gov: "CUI"
+  uk_gov: "OFFICIAL-SENSITIVE"
+  nz_gov: "RESTRICTED"
+  ca_gov: "Protected B"
+classification:
+  tier: Medium
+  rationale: >-
+    Risk 6 maps to PSPF OFFICIAL: Sensitive, QGISCF SENSITIVE, SENSITIVE Personal-Privacy, and Medium because a Blue Card number is a personal worker-screening identifier regulated under Queensland privacy and child-protection legislation.
+  generic:
+    classification: Medium
+    dlm: Medium Personal-Privacy
+    rationale: >-
+      Medium Personal-Privacy handling suits an individual Working with Children screening card identifier.
+purview:
+  patterns_proximity: 300
+  recommended_confidence: 75
+  shared_keywords:
+    - dict: template-exclusion
+      as: Keyword_noise_exclusion
+      match_style: word
+  pattern_tiers:
+    - confidence_level: 85
+      id_match:
+        type: any
+        ids:
+          - Regex_qld_blue_card_labeled
+          - Regex_qld_blue_card_bare
+      matches:
+        - ref: Keyword_qld_blue_card_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_qld_blue_card_property_excl
+    - confidence_level: 75
+      id_match: Regex_qld_blue_card_labeled
+      matches:
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_qld_blue_card_property_excl
+    - confidence_level: 65
+      discovery_only: true
+      id_match: Regex_qld_blue_card_bare
+      matches:
+        - ref: Keyword_qld_blue_card_specific
+        - type: any
+          min_matches: 0
+          max_matches: 0
+          refs:
+            - Keyword_noise_exclusion
+            - Keyword_qld_blue_card_property_excl
+  regexes:
+    - id: Regex_qld_blue_card_labeled
+      pattern: '(?-i)\b((?i:blue\s+card|exemption\s+card|positive\s+notice)(?:\s+(?i:number|no\.?|registration|#))?[\s:#-]{1,6}\d{6,8}/\d{1,2})\b'
+    - id: Regex_qld_blue_card_bare
+      pattern: '\b(\d{6,8}/\d{1,2})\b'
+  keywords:
+    - id: Keyword_qld_blue_card_specific
+      groups:
+        - match_style: word
+          terms:
+            - "Blue Card Services"
+            - "Working with Children Check"
+            - "Working with Children"
+            - "Positive Notice"
+            - "Blue Card register"
+            - "applicant declaration"
+      strength: specific
+    - id: Keyword_qld_blue_card_property_excl
+      groups:
+        - match_style: word
+          terms:
+            - "Lot on Plan"
+            - "Registered Plan"
+            - "Survey Plan"
+            - "title reference"
+      strength: exclusion
+references:
+  - url: https://www.qld.gov.au/law/laws-regulated-industries-and-accountability/queensland-laws-and-regulations/regulated-industries-and-licensing/blue-card-services
+    title: "Queensland Government - Blue Card Services (Working with Children Check)"
+  - url: https://www.legislation.qld.gov.au/view/html/inforce/current/act-2000-060
+    title: "Working with Children (Risk Management and Screening) Act 2000 (Qld)"
+created: '2026-11-25'
+updated: '2026-11-25'
+changelog:
+  - version: 1.0.0
+    date: '2026-11-25'
+    description: Initial release.
+author: testpattern-community
+license: MIT
